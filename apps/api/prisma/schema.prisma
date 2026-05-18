@@ -46,6 +46,22 @@ enum OrderTimeLogEvent {
   PAUSE
   RESUME
   END
+  PACK_START
+  PACK_END
+}
+
+/// Status da onda de separação
+enum PickWaveStatus {
+  DRAFT
+  RELEASED
+  CLOSED
+}
+
+/// Progresso do packing após pick consolidado
+enum PickWaveLineSortStatus {
+  PENDING
+  PICKED
+  SORTED
 }
 
 /// Tipos de movimentação de estoque (log imutável)
@@ -89,6 +105,10 @@ model User {
 
   notifications Notification[]
   pushDevices   PushDevice[]
+  releasedWaves PickWave[] @relation("WaveReleasedBy")
+  acceptedWaves PickWave[] @relation("WaveAcceptedBy")
+  waveLinesPicked     PickWaveLine[]     @relation("WaveLinePickedBy")
+  waveAllocationsSorted PickWaveAllocation[] @relation("WaveAllocSortedBy")
 
   @@index([role])
   @@map("users")
@@ -161,6 +181,7 @@ model Product {
   locations         Location[]
   orderItems        OrderItem[]
   inventoryMovements InventoryMovement[]
+  pickWaveLines     PickWaveLine[]
 
   @@index([sku])
   @@map("products")
@@ -201,6 +222,8 @@ model Location {
 
   /// Movimentações com esta localização como destino
   movementsTo InventoryMovement[] @relation("MovementToLocation")
+
+  pickWaveLines PickWaveLine[]
 
   @@index([corridor, row])
   @@index([type])
@@ -248,6 +271,12 @@ model Order {
   customerName  String?
   shippingLabel String?
   notes         String?
+  /// Horário limite de coleta (ex.: Mercado Livre)
+  collectionDeadline DateTime?
+  /// Marketplace de origem (ex.: MERCADO_LIVRE)
+  marketplace        String?
+  /// Origem do pedido (TINY, MANUAL, etc.)
+  erpSource          String?  @default("MANUAL")
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -260,8 +289,10 @@ model Order {
   items              OrderItem[]
   timeLogs           OrderTimeLog[]
   inventoryMovements InventoryMovement[]
+  waveOrders         PickWaveOrder[]
 
   @@index([status])
+  @@index([status, collectionDeadline, priority])
   @@index([dispatchedAt])
   @@index([basketId])
   @@index([assignedPickerId])
@@ -287,6 +318,7 @@ model OrderItem {
   order        Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
   product      Product  @relation(fields: [productId], references: [id], onDelete: Restrict)
   pickLocation Location? @relation("OrderItemPickLocation", fields: [pickLocationId], references: [id], onDelete: SetNull)
+  waveAllocations PickWaveAllocation[]
 
   @@unique([orderId, lineNumber])
   @@index([orderId])
@@ -354,4 +386,106 @@ model OrderTimeLog {
   @@index([orderId, createdAt])
   @@index([userId])
   @@map("order_time_logs")
+}
+
+// -----------------------------------------------------------------------------
+// Pick Wave — separação em onda
+// -----------------------------------------------------------------------------
+
+model PickWave {
+  id           String         @id @default(cuid())
+  name         String
+  status       PickWaveStatus @default(DRAFT)
+  releasedAt   DateTime?
+  releasedById String?
+  acceptedById String?
+  acceptedAt   DateTime?
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime       @updatedAt
+
+  releasedBy User? @relation("WaveReleasedBy", fields: [releasedById], references: [id], onDelete: SetNull)
+  acceptedBy User? @relation("WaveAcceptedBy", fields: [acceptedById], references: [id], onDelete: SetNull)
+  orders     PickWaveOrder[]
+  lines      PickWaveLine[]
+
+  @@index([status])
+  @@index([releasedAt])
+  @@index([acceptedById])
+  @@map("pick_waves")
+}
+
+/// Log de eventos de integração (ex.: webhook Tiny)
+model IntegrationEventLog {
+  id         String   @id @default(cuid())
+  source     String
+  eventType  String
+  externalId String?
+  status     String
+  message    String?
+  payload    Json?
+  createdAt  DateTime @default(now())
+
+  @@index([source, createdAt])
+  @@map("integration_event_logs")
+}
+
+model PickWaveOrder {
+  id      String @id @default(cuid())
+  waveId  String
+  orderId String
+
+  wave  PickWave @relation(fields: [waveId], references: [id], onDelete: Cascade)
+  order Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@unique([waveId, orderId])
+  @@unique([orderId])
+  @@index([waveId])
+  @@map("pick_wave_orders")
+}
+
+model PickWaveLine {
+  id              String                 @id @default(cuid())
+  waveId          String
+  productId       String
+  pickLocationId  String
+  quantityTotal   Int
+  quantityPicked  Int                    @default(0)
+  sortStatus      PickWaveLineSortStatus @default(PENDING)
+  pickedById      String?
+  pickStartedAt   DateTime?
+  pickCompletedAt DateTime?
+  createdAt       DateTime               @default(now())
+  updatedAt       DateTime               @updatedAt
+
+  wave         PickWave             @relation(fields: [waveId], references: [id], onDelete: Cascade)
+  product      Product              @relation(fields: [productId], references: [id], onDelete: Restrict)
+  pickLocation Location             @relation(fields: [pickLocationId], references: [id], onDelete: Restrict)
+  pickedBy     User?                @relation("WaveLinePickedBy", fields: [pickedById], references: [id], onDelete: SetNull)
+  allocations  PickWaveAllocation[]
+
+  @@index([pickCompletedAt])
+
+  @@unique([waveId, productId, pickLocationId])
+  @@index([waveId, sortStatus])
+  @@map("pick_wave_lines")
+}
+
+model PickWaveAllocation {
+  id              String    @id @default(cuid())
+  waveLineId      String
+  orderItemId     String
+  quantity        Int
+  quantitySorted  Int       @default(0)
+  sortedById      String?
+  sortStartedAt   DateTime?
+  sortCompletedAt DateTime?
+
+  waveLine  PickWaveLine @relation(fields: [waveLineId], references: [id], onDelete: Cascade)
+  orderItem OrderItem    @relation(fields: [orderItemId], references: [id], onDelete: Cascade)
+  sortedBy  User?        @relation("WaveAllocSortedBy", fields: [sortedById], references: [id], onDelete: SetNull)
+
+  @@unique([waveLineId, orderItemId])
+  @@index([waveLineId])
+  @@index([sortCompletedAt])
+  @@map("pick_wave_allocations")
 }

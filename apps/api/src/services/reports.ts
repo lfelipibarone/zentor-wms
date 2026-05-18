@@ -5,29 +5,31 @@ import {
 } from "@prisma/client";
 import { prisma } from "../lib/prisma.js";
 
+import {
+  buildOperationTimeReport,
+  OPERATION_TIME_REPORT_IDS,
+} from "./operation-time-reports.js";
+import {
+  fmtDateBr,
+  type ReportColumn,
+  type ReportResult as BaseReportResult,
+} from "./report-types.js";
+
+export { fmtDateBr, type ReportColumn } from "./report-types.js";
+
 export const REPORT_IDS = [
   "dispatched",
   "orders",
   "picking",
   "movements",
   "low_stock",
+  ...OPERATION_TIME_REPORT_IDS,
 ] as const;
 
 export type ReportId = (typeof REPORT_IDS)[number];
 
-export interface ReportColumn {
-  key: string;
-  header: string;
-}
-
-export interface ReportResult {
+export interface ReportResult extends Omit<BaseReportResult, "report"> {
   report: ReportId;
-  title: string;
-  from: string | null;
-  to: string | null;
-  columns: ReportColumn[];
-  rows: Record<string, string | number | null>[];
-  totalRows: number;
 }
 
 export function startOfDay(date: Date): Date {
@@ -63,11 +65,6 @@ function fmtDate(d: Date | null | undefined): string | null {
   return d.toISOString();
 }
 
-function fmtDateBr(d: Date | null | undefined): string | null {
-  if (!d) return null;
-  return d.toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo" });
-}
-
 const STATUS_LABEL: Record<OrderStatus, string> = {
   PENDING: "Aguardando separação",
   PICKING: "Em separação",
@@ -90,9 +87,13 @@ export function reportTitle(id: ReportId): string {
   const titles: Record<ReportId, string> = {
     dispatched: "Pedidos expedidos",
     orders: "Pedidos no período",
-    picking: "Produtividade de separação",
+    picking: "Separação (movimentações)",
     movements: "Movimentações de estoque",
     low_stock: "Gôndolas abaixo do mínimo",
+    picking_time_by_order: "Tempo de picking por pedido",
+    picking_time_by_user: "Tempo de picking por operador",
+    packing_time_by_order: "Tempo de packing por pedido",
+    packing_time_by_user: "Tempo de packing por operador",
   };
   return titles[id];
 }
@@ -121,6 +122,11 @@ export async function runReport(params: {
       return buildPickingReport(from, to);
     case "movements":
       return buildMovementsReport(from, to, movementType);
+    case "picking_time_by_order":
+    case "picking_time_by_user":
+    case "packing_time_by_order":
+    case "packing_time_by_user":
+      return (await buildOperationTimeReport(report, from, to)) as ReportResult;
     default:
       throw new Error("Relatório desconhecido");
   }

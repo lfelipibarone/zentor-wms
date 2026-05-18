@@ -5,11 +5,14 @@ import { FactoryButton } from "@/components/FactoryButton";
 import { UserAvatarMenu } from "@/components/UserAvatarMenu";
 import { NotificationBell } from "@/components/NotificationBell";
 import { useAuth } from "@/contexts/AuthContext";
+import { useMobileConfig } from "@/hooks/useMobileConfig";
 import { theme, spacing, typography } from "@/lib/theme";
 import { getApiBaseUrl } from "@/lib/api";
 
 export default function HomeScreen() {
   const { user } = useAuth();
+  const { data: mobileConfig } = useMobileConfig();
+  const waveEnabled = mobileConfig?.waveEnabled !== false;
 
   return (
     <ScreenShell
@@ -25,18 +28,25 @@ export default function HomeScreen() {
         <Text style={styles.heroText}>Selecione o fluxo</Text>
       </View>
 
+      {waveEnabled ? (
+        <FactoryButton
+          label="Separação em onda"
+          onPress={() => router.push("/wave-picking/index")}
+        />
+      ) : null}
       <FactoryButton
-        label="Separação"
+        label="Separação (pedido a pedido)"
+        variant={waveEnabled ? "secondary" : "primary"}
         onPress={() => router.push("/picking")}
       />
       <FactoryButton
-        label="Abastecer gôndola"
+        label="Pulmão → gôndola"
         variant="success"
-        onPress={() => router.push("/stocking/index")}
+        onPress={() => router.push("/replenishment")}
       />
       <FactoryButton
-        label="Reabastecer gôndola"
-        onPress={() => router.push("/replenishment")}
+        label="Abastecer gôndola"
+        onPress={() => router.push("/stocking/index")}
       />
       <FactoryButton
         label="Consulta rápida"

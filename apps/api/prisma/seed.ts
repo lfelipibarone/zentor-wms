@@ -120,6 +120,41 @@ async function main() {
     update: { value: "CD Brasil · São Paulo" },
   });
 
+  for (const row of [
+    { key: "wave.enabled", value: "true", description: "Habilitar onda no mobile" },
+    {
+      key: "wave.autoRelease.enabled",
+      value: "false",
+      description: "Liberação automática diária",
+    },
+    {
+      key: "wave.autoRelease.time",
+      value: "06:30",
+      description: "Horário liberação automática",
+    },
+    {
+      key: "wave.autoRelease.maxOrders",
+      value: "50",
+      description: "Máximo pedidos por onda",
+    },
+    {
+      key: "wave.onlyDeadlineToday",
+      value: "false",
+      description: "Somente pedidos com coleta hoje",
+    },
+    {
+      key: "tiny.webhook.secret",
+      value: "",
+      description: "Token header x-tiny-token",
+    },
+  ]) {
+    await prisma.systemSetting.upsert({
+      where: { key: row.key },
+      create: row,
+      update: { value: row.value, description: row.description },
+    });
+  }
+
   // --- Produtos ---
   const products = await Promise.all([
     prisma.product.upsert({
@@ -266,13 +301,64 @@ async function main() {
 
   const [locA, locB, locC, locD, locE] = locations;
 
+  const pulmaoLocations = await Promise.all([
+    prisma.location.upsert({
+      where: { barcode: "PUL-A01-01" },
+      create: {
+        corridor: "P",
+        row: "01",
+        barcode: "PUL-A01-01",
+        type: "PULMAO",
+        productId: screw.id,
+        currentQuantity: 500,
+        capacity: 2000,
+        minThreshold: 100,
+      },
+      update: { currentQuantity: 500 },
+    }),
+    prisma.location.upsert({
+      where: { barcode: "PUL-B01-01" },
+      create: {
+        corridor: "P",
+        row: "02",
+        barcode: "PUL-B01-01",
+        type: "PULMAO",
+        productId: motor.id,
+        currentQuantity: 80,
+        capacity: 200,
+        minThreshold: 20,
+      },
+      update: { currentQuantity: 80 },
+    }),
+    prisma.location.upsert({
+      where: { barcode: "PUL-C01-01" },
+      create: {
+        corridor: "P",
+        row: "03",
+        barcode: "PUL-C01-01",
+        type: "PULMAO",
+        productId: cable.id,
+        currentQuantity: 300,
+        capacity: 1000,
+        minThreshold: 50,
+      },
+      update: { currentQuantity: 300 },
+    }),
+  ]);
+
+  void pulmaoLocations;
+
   await prisma.basket.upsert({
     where: { code: "CESTA-001" },
     create: { code: "CESTA-001", barcode: "BASKET001" },
     update: {},
   });
 
-  // Limpa pedidos demo anteriores para re-seed idempotente
+  // Limpa ondas e pedidos demo para re-seed idempotente
+  await prisma.pickWaveAllocation.deleteMany({});
+  await prisma.pickWaveLine.deleteMany({});
+  await prisma.pickWaveOrder.deleteMany({});
+  await prisma.pickWave.deleteMany({});
   await prisma.order.deleteMany({
     where: { erpOrderId: { startsWith: "ERP-DEMO-" } },
   });
@@ -289,6 +375,9 @@ async function main() {
       dispatchedAt?: Date;
       quantityPicked?: number;
       assignedPickerId?: string;
+      collectionDeadline?: Date;
+      marketplace?: string;
+      priority?: number;
     },
   ) {
     const loc = locCycle[index % locCycle.length]!;
@@ -301,7 +390,9 @@ async function main() {
         erpOrderId: `ERP-DEMO-${String(index).padStart(4, "0")}`,
         customerName: `Cliente Demo ${index + 1}`,
         status,
-        priority: index % 3,
+        priority: opts?.priority ?? index % 3,
+        marketplace: opts?.marketplace ?? "MERCADO_LIVRE",
+        collectionDeadline: opts?.collectionDeadline,
         assignedPickerId: opts?.assignedPickerId,
         createdAt: opts?.createdAt ?? new Date(),
         updatedAt: opts?.updatedAt ?? new Date(),
@@ -331,10 +422,14 @@ async function main() {
     });
   }
 
-  // KPI: aguardando separação (~24)
+  // KPI: aguardando separação (~24) — deadlines escalonados para onda
   for (let i = 0; i < 24; i++) {
+    const deadline = atToday(10 + Math.floor(i / 6), (i % 6) * 10);
     await createDemoOrder(i, OrderStatus.PENDING, {
       createdAt: atToday(7 + (i % 4)),
+      collectionDeadline: deadline,
+      marketplace: "MERCADO_LIVRE",
+      priority: i < 6 ? 3 : i < 12 ? 2 : 1,
     });
   }
 
@@ -457,12 +552,23 @@ async function main() {
 
   for (let i = 0; i < dispatchingOrders.length; i++) {
     const order = dispatchingOrders[i]!;
+    const picker = pickers[i % pickers.length]!;
+    const startAt = atToday(9 + (i % 4), 10);
+    const endAt = atToday(9 + (i % 4), 10 + 8 + (i % 5));
     await prisma.orderTimeLog.create({
       data: {
         orderId: order.id,
-        userId: pickers[i % pickers.length]!.id,
+        userId: picker.id,
+        event: OrderTimeLogEvent.START,
+        createdAt: startAt,
+      },
+    });
+    await prisma.orderTimeLog.create({
+      data: {
+        orderId: order.id,
+        userId: picker.id,
         event: OrderTimeLogEvent.END,
-        createdAt: atToday(10 + (i % 6)),
+        createdAt: endAt,
       },
     });
   }
@@ -476,6 +582,63 @@ async function main() {
         createdAt: yesterdayAt(15 + i),
       },
     });
+  }
+
+  const { releasePickWave } = await import("../src/services/pick-wave.js");
+  const { confirmConsolidatedPick } = await import(
+    "../src/services/pick-wave-pick.js"
+  );
+  const { confirmSortAllocation } = await import(
+    "../src/services/pick-wave-sort.js"
+  );
+  try {
+    const wave = await releasePickWave(admin.id, { auto: true });
+    console.log(
+      `Onda demo liberada: ${wave.orderCount} pedidos, ${wave.lineCount} linhas consolidadas`,
+    );
+
+    const demoLine = await prisma.pickWaveLine.findFirst({
+      where: { waveId: wave.waveId },
+      include: {
+        pickLocation: true,
+        allocations: {
+          include: { orderItem: { include: { order: true } } },
+        },
+      },
+      orderBy: { createdAt: "asc" },
+    });
+
+    if (demoLine && demoLine.quantityTotal > 0) {
+      const remaining = demoLine.quantityTotal - demoLine.quantityPicked;
+      if (remaining > 0) {
+        if (demoLine.pickLocation.currentQuantity < remaining) {
+          await prisma.location.update({
+            where: { id: demoLine.pickLocationId },
+            data: { currentQuantity: remaining + 10 },
+          });
+        }
+        await confirmConsolidatedPick({
+          lineId: demoLine.id,
+          locationBarcode: demoLine.pickLocation.barcode,
+          quantity: remaining,
+          userId: pickers[0]!.id,
+        });
+      }
+
+      for (const alloc of demoLine.allocations.slice(0, 2)) {
+        const qtyLeft = alloc.quantity - alloc.quantitySorted;
+        if (qtyLeft <= 0) continue;
+        await confirmSortAllocation({
+          lineId: demoLine.id,
+          allocationId: alloc.id,
+          quantity: qtyLeft,
+          basketBarcode: "BASKET001",
+          userId: pickers[1]!.id,
+        });
+      }
+    }
+  } catch (e) {
+    console.warn("Onda demo:", e);
   }
 
   const notifyUsers = [admin, operador, ...pickers];

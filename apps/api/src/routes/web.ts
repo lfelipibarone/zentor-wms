@@ -23,6 +23,15 @@ import {
   type LocationImportInput,
   type LocationImportMode,
 } from "../services/location-import.js";
+import {
+  PickWaveError,
+  listPickWaves,
+  previewWaveRelease,
+  releasePickWave,
+  closePickWave,
+} from "../services/pick-wave.js";
+import { getWaveSettings, WAVE_SETTING_META } from "../services/wave-settings.js";
+import { enrichOrderPriority } from "../services/marketplace-priority.js";
 
 const guard = (p: string) => createPermissionGuard(p);
 
@@ -224,6 +233,8 @@ export async function webRoutes(app: FastifyInstance) {
           customerName: o.customerName,
           status: o.status,
           priority: o.priority,
+          collectionDeadline: o.collectionDeadline,
+          marketplace: o.marketplace,
           pickerName: o.assignedPicker?.name ?? null,
           basketCode: o.basket?.code ?? null,
           itemCount: o._count.items,
@@ -234,6 +245,147 @@ export async function webRoutes(app: FastifyInstance) {
         })),
         pagination: buildPaginationMeta(total, page, pageSize),
       };
+    },
+  );
+
+  app.patch<{
+    Params: { id: string };
+    Body: {
+      priority?: number;
+      collectionDeadline?: string | null;
+      marketplace?: string | null;
+    };
+  }>(
+    "/api/orders/:id",
+    { preHandler: guard(Permission.SALES_VIEW) },
+    async (request, reply) => {
+      const { priority, collectionDeadline, marketplace } = request.body ?? {};
+      try {
+        const order = await prisma.order.update({
+          where: { id: request.params.id },
+          data: {
+            ...(priority !== undefined ? { priority } : {}),
+            ...(collectionDeadline !== undefined
+              ? {
+                  collectionDeadline:
+                    collectionDeadline === null
+                      ? null
+                      : new Date(collectionDeadline),
+                }
+              : {}),
+            ...(marketplace !== undefined ? { marketplace } : {}),
+          },
+        });
+        if (
+          priority === undefined &&
+          (collectionDeadline !== undefined || marketplace !== undefined)
+        ) {
+          await enrichOrderPriority(order.id);
+        }
+        const refreshed = await prisma.order.findUnique({
+          where: { id: order.id },
+        });
+        return { order: refreshed ?? order };
+      } catch {
+        return reply.status(404).send({ error: "Pedido não encontrado" });
+      }
+    },
+  );
+
+  app.get(
+    "/api/waves",
+    { preHandler: guard(Permission.SALES_VIEW) },
+    async () => {
+      const waves = await listPickWaves();
+      return {
+        waves: waves.map((w) => ({
+          id: w.id,
+          name: w.name,
+          status: w.status,
+          releasedAt: w.releasedAt,
+          releasedBy: w.releasedBy?.name ?? null,
+          acceptedBy: w.acceptedBy?.name ?? null,
+          acceptedAt: w.acceptedAt,
+          orderCount: w._count.orders,
+          lineCount: w._count.lines,
+          createdAt: w.createdAt,
+        })),
+      };
+    },
+  );
+
+  app.get(
+    "/api/waves/preview",
+    { preHandler: guard(Permission.SALES_VIEW) },
+    async () => {
+      try {
+        return await previewWaveRelease();
+      } catch (e) {
+        if (e instanceof PickWaveError) {
+          return { orderCount: 0, lineCount: 0, gondolaPasses: 0, orders: [], lines: [], error: e.message };
+        }
+        throw e;
+      }
+    },
+  );
+
+  app.get(
+    "/api/waves/settings",
+    { preHandler: guard(Permission.SETTINGS_MANAGE) },
+    async () => {
+      const settings = await getWaveSettings();
+      return { settings, meta: WAVE_SETTING_META };
+    },
+  );
+
+  app.get(
+    "/api/integrations/tiny/events",
+    { preHandler: guard(Permission.SALES_VIEW) },
+    async () => {
+      const events = await prisma.integrationEventLog.findMany({
+        where: { source: "TINY" },
+        orderBy: { createdAt: "desc" },
+        take: 50,
+      });
+      return { events };
+    },
+  );
+
+  app.post<{
+    Body: { orderIds?: string[]; auto?: boolean };
+  }>(
+    "/api/waves/release",
+    { preHandler: guard(Permission.SALES_VIEW) },
+    async (request, reply) => {
+      const userId = request.authUser!.id;
+      try {
+        const result = await releasePickWave(userId, {
+          orderIds: request.body?.orderIds,
+          auto: request.body?.auto ?? true,
+        });
+        return result;
+      } catch (e) {
+        if (e instanceof PickWaveError) {
+          return reply.status(e.statusCode).send({ error: e.message });
+        }
+        throw e;
+      }
+    },
+  );
+
+  app.post<{ Params: { id: string } }>(
+    "/api/waves/:id/close",
+    { preHandler: guard(Permission.SALES_VIEW) },
+    async (request, reply) => {
+      try {
+        await closePickWave(request.params.id);
+        return { ok: true };
+      } catch (e) {
+        if (e instanceof PickWaveError) {
+          return reply.status(e.statusCode).send({ error: e.message });
+        }
+        throw e;
+      }
     },
   );
 
@@ -679,13 +831,13 @@ export async function webRoutes(app: FastifyInstance) {
     Querystring: { from?: string; to?: string };
   }>(
     "/api/reports/summary",
-    { preHandler: guard(Permission.REPORTS_VIEW) },
+    { preHandler: guard(Permission.USERS_MANAGE) },
     async (request) => {
       return getReportsSummary(request.query.from, request.query.to);
     },
   );
 
-  app.get("/api/reports/types", { preHandler: guard(Permission.REPORTS_VIEW) }, async () => ({
+  app.get("/api/reports/types", { preHandler: guard(Permission.USERS_MANAGE) }, async () => ({
     types: [
       {
         id: "dispatched",
@@ -701,9 +853,37 @@ export async function webRoutes(app: FastifyInstance) {
       },
       {
         id: "picking",
-        label: "Separação",
+        label: "Separação (movimentações)",
         description: "Itens separados (movimentações de pick) por operador",
         requiresPeriod: true,
+      },
+      {
+        id: "picking_time_by_order",
+        label: "Tempo de picking por pedido",
+        description: "Duração de separação por pedido (onda e individual)",
+        requiresPeriod: true,
+        group: "operation_times",
+      },
+      {
+        id: "picking_time_by_user",
+        label: "Tempo de picking por operador",
+        description: "Totais e médias de tempo de separação por operador",
+        requiresPeriod: true,
+        group: "operation_times",
+      },
+      {
+        id: "packing_time_by_order",
+        label: "Tempo de packing por pedido",
+        description: "Duração de packing/sort por pedido (onda e individual)",
+        requiresPeriod: true,
+        group: "operation_times",
+      },
+      {
+        id: "packing_time_by_user",
+        label: "Tempo de packing por operador",
+        description: "Totais e médias de tempo de packing por operador",
+        requiresPeriod: true,
+        group: "operation_times",
       },
       {
         id: "movements",
@@ -731,7 +911,7 @@ export async function webRoutes(app: FastifyInstance) {
     };
   }>(
     "/api/reports/data",
-    { preHandler: guard(Permission.REPORTS_VIEW) },
+    { preHandler: guard(Permission.USERS_MANAGE) },
     async (request, reply) => {
       const report = request.query.report as ReportId | undefined;
       if (!report || !REPORT_IDS.includes(report)) {

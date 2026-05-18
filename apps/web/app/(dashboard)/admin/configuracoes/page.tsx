@@ -21,6 +21,36 @@ const DEFAULT_KEYS = [
     label: "Centro de distribuição",
     description: "Identificação do CD",
   },
+  {
+    key: "wave.enabled",
+    label: "Habilitar separação em onda",
+    description: "true ou false — exibe fluxo de onda no mobile",
+  },
+  {
+    key: "wave.autoRelease.enabled",
+    label: "Liberação automática da onda",
+    description: "true ou false — job diário no horário configurado",
+  },
+  {
+    key: "wave.autoRelease.time",
+    label: "Horário da liberação automática",
+    description: "HH:mm (America/Sao_Paulo), ex: 06:30",
+  },
+  {
+    key: "wave.autoRelease.maxOrders",
+    label: "Máximo de pedidos por onda",
+    description: "Número inteiro",
+  },
+  {
+    key: "wave.onlyDeadlineToday",
+    label: "Somente coleta hoje na onda",
+    description: "true restringe pedidos com deadline do dia",
+  },
+  {
+    key: "tiny.webhook.secret",
+    label: "Token do webhook Tiny",
+    description: "Enviado no header x-tiny-token; vazio = sem validação",
+  },
 ];
 
 export default function AdminConfiguracoesPage() {

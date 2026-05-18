@@ -40,6 +40,27 @@ export default function RootLayout() {
               }}
             />
             <Stack.Screen
+              name="wave-picking/index"
+              options={{
+                title: "Separação em onda",
+                headerLeft: () => <BackButton />,
+              }}
+            />
+            <Stack.Screen
+              name="wave-picking/[lineId]/pick"
+              options={{
+                title: "Pick consolidado",
+                headerLeft: () => <BackButton />,
+              }}
+            />
+            <Stack.Screen
+              name="wave-picking/[lineId]/sort"
+              options={{
+                title: "Packing",
+                headerLeft: () => <BackButton />,
+              }}
+            />
+            <Stack.Screen
               name="lookup/index"
               options={{
                 title: "Consulta rápida",

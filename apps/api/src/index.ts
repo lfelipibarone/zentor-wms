@@ -6,6 +6,8 @@ import { mobileRoutes } from "./routes/mobile.js";
 import { dashboardRoutes } from "./routes/dashboard.js";
 import { webRoutes } from "./routes/web.js";
 import { notificationRoutes } from "./routes/notifications.js";
+import { integrationRoutes } from "./routes/integrations.js";
+import { startWaveScheduler } from "./services/wave-scheduler.js";
 
 const PORT = Number(process.env.PORT ?? 3333);
 const HOST = process.env.HOST ?? "0.0.0.0";
@@ -23,6 +25,9 @@ async function main() {
   await app.register(dashboardRoutes);
   await app.register(webRoutes);
   await app.register(notificationRoutes);
+  await app.register(integrationRoutes);
+
+  startWaveScheduler();
 
   await app.listen({ port: PORT, host: HOST });
   console.log(`@wms/api rodando em http://${HOST}:${PORT}`);

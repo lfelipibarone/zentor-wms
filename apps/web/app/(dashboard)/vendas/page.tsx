@@ -95,6 +95,8 @@ export default function VendasPage() {
                 <TableHead>Separador</TableHead>
                 <TableHead>Cesta</TableHead>
                 <TableHead>Qtd</TableHead>
+                <TableHead>Coleta até</TableHead>
+                <TableHead>Marketplace</TableHead>
                 <TableHead>Prioridade</TableHead>
                 <TableHead>Atualizado</TableHead>
               </TableRow>
@@ -112,6 +114,15 @@ export default function VendasPage() {
                   <TableCell>
                     {o.qtyPicked}/{o.qtyOrdered}
                   </TableCell>
+                  <TableCell className="text-sm">
+                    {o.collectionDeadline
+                      ? new Date(o.collectionDeadline).toLocaleString("pt-BR", {
+                          dateStyle: "short",
+                          timeStyle: "short",
+                        })
+                      : "—"}
+                  </TableCell>
+                  <TableCell>{o.marketplace ?? "—"}</TableCell>
                   <TableCell>{o.priority}</TableCell>
                   <TableCell className="text-muted-foreground">
                     {new Date(o.updatedAt).toLocaleString("pt-BR")}

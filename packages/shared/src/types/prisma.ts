@@ -37,6 +37,8 @@ export const OrderTimeLogEvent = {
   PAUSE: "PAUSE",
   RESUME: "RESUME",
   END: "END",
+  PACK_START: "PACK_START",
+  PACK_END: "PACK_END",
 } as const;
 export type OrderTimeLogEvent =
   (typeof OrderTimeLogEvent)[keyof typeof OrderTimeLogEvent];

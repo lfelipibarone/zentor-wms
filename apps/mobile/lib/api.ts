@@ -206,4 +206,137 @@ export const api = {
       method: "POST",
       body: JSON.stringify({ productBarcode, quantity }),
     }),
+
+  transferReplenishment: (body: {
+    fromLocationBarcode: string;
+    toLocationBarcode: string;
+    productBarcode: string;
+    quantity: number;
+  }) =>
+    request<{
+      fromLocation: { id: string; barcode: string; currentQuantity: number };
+      toLocation: {
+        id: string;
+        barcode: string;
+        currentQuantity: number;
+        productId: string | null;
+      };
+      transferred: number;
+    }>("/mobile/replenishment/transfer", {
+      method: "POST",
+      body: JSON.stringify(body),
+    }),
+
+  getMobileConfig: () =>
+    request<{ waveEnabled: boolean }>("/mobile/config"),
+
+  getCurrentWave: () =>
+    request<{
+      wave: {
+        id: string;
+        name: string;
+        status: string;
+        releasedAt: string | null;
+        orderCount: number;
+        gondolaPasses: number;
+        acceptedById: string | null;
+        acceptedByName: string | null;
+        acceptedAt: string | null;
+        canAccept: boolean;
+        canWork: boolean;
+        isMine: boolean;
+      };
+      lines: WaveLineSummary[];
+    }>("/mobile/waves/current"),
+
+  acceptCurrentWave: () =>
+    request<{ waveId: string; acceptedAt: string }>(
+      "/mobile/waves/current/accept",
+      { method: "POST" }
+    ),
+
+  getWaveLine: (lineId: string) =>
+    request<{ line: WaveLineDetail }>(`/mobile/waves/lines/${lineId}`),
+
+  waveLinePick: (
+    lineId: string,
+    body: {
+      locationBarcode: string;
+      productBarcode?: string;
+      quantity: number;
+    }
+  ) =>
+    request<{
+      quantityPicked: number;
+      quantityTotal: number;
+      sortStatus: string;
+      readyForSort: boolean;
+    }>(`/mobile/waves/lines/${lineId}/pick`, {
+      method: "POST",
+      body: JSON.stringify(body),
+    }),
+
+  waveLineSort: (
+    lineId: string,
+    body: {
+      allocationId: string;
+      quantity: number;
+      basketBarcode?: string;
+    }
+  ) =>
+    request<{
+      quantitySorted: number;
+      allocationRemaining: number;
+      lineSortStatus: string;
+      basketCode: string | null;
+    }>(`/mobile/waves/lines/${lineId}/sort`, {
+      method: "POST",
+      body: JSON.stringify(body),
+    }),
 };
+
+export interface WaveLineSummary {
+  id: string;
+  sortStatus: string;
+  product: {
+    id: string;
+    sku: string;
+    name: string;
+    barcode: string | null;
+  };
+  pickLocation: {
+    id: string;
+    barcode: string;
+    label: string;
+    corridor: string;
+    row: string;
+    currentQuantity: number;
+  };
+  quantityTotal: number;
+  quantityPicked: number;
+  remaining: number;
+  ordersCount: number;
+  gondolaHint?: string;
+  orders: Array<{
+    orderId: string;
+    erpOrderId: string;
+    quantity: number;
+    basketCode: string | null;
+  }>;
+}
+
+export interface WaveLineDetail extends WaveLineSummary {
+  allocations: Array<{
+    id: string;
+    quantity: number;
+    quantitySorted: number;
+    remaining: number;
+    order: {
+      id: string;
+      erpOrderId: string;
+      priority: number;
+      basketCode: string | null;
+      basketId: string | null;
+    };
+  }>;
+}

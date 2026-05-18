@@ -7,6 +7,21 @@ import {
   LocationStockError,
   stockLocation,
 } from "../services/location-stock.js";
+import {
+  LocationTransferError,
+  transferPulmaoToPickFace,
+} from "../services/location-transfer.js";
+import {
+  PickWaveError,
+  acceptPickWave,
+  getCurrentReleasedWave,
+  getOrderIdsInActiveWave,
+  getWaveLineDetail,
+  mapWaveLineSummary,
+} from "../services/pick-wave.js";
+import { isWaveEnabled } from "../services/wave-settings.js";
+import { confirmConsolidatedPick } from "../services/pick-wave-pick.js";
+import { confirmSortAllocation } from "../services/pick-wave-sort.js";
 
 function formatLocation(loc: { corridor: string; row: string; barcode: string }) {
   return `${loc.corridor}-${loc.row} · ${loc.barcode}`;
@@ -20,9 +35,17 @@ export async function mobileRoutes(app: FastifyInstance) {
   // ---------------------------------------------------------------------------
 
   app.get("/mobile/orders/queue", async () => {
+    const waveOrderIds = await getOrderIdsInActiveWave();
     const orders = await prisma.order.findMany({
-      where: { status: OrderStatus.PENDING },
-      orderBy: [{ priority: "desc" }, { createdAt: "asc" }],
+      where: {
+        status: OrderStatus.PENDING,
+        ...(waveOrderIds.length > 0 ? { id: { notIn: waveOrderIds } } : {}),
+      },
+      orderBy: [
+        { priority: "desc" },
+        { collectionDeadline: { sort: "asc", nulls: "last" } },
+        { createdAt: "asc" },
+      ],
       include: {
         items: { include: { product: true } },
       },
@@ -435,4 +458,165 @@ export async function mobileRoutes(app: FastifyInstance) {
       }
     },
   );
+
+  app.post<{
+    Body: {
+      fromLocationBarcode?: string;
+      toLocationBarcode?: string;
+      productBarcode?: string;
+      quantity?: number;
+    };
+  }>("/mobile/replenishment/transfer", async (request, reply) => {
+    const userId = resolveUserId(request);
+    try {
+      const result = await transferPulmaoToPickFace({
+        fromLocationBarcode: request.body?.fromLocationBarcode ?? "",
+        toLocationBarcode: request.body?.toLocationBarcode ?? "",
+        productBarcode: request.body?.productBarcode ?? "",
+        quantity: Number(request.body?.quantity ?? 0),
+        userId,
+      });
+      return result;
+    } catch (e) {
+      if (e instanceof LocationTransferError) {
+        return reply.status(e.statusCode).send({ error: e.message });
+      }
+      throw e;
+    }
+  });
+
+  // ---------------------------------------------------------------------------
+  // Pick wave
+  // ---------------------------------------------------------------------------
+
+  app.get("/mobile/waves/current", async (request, reply) => {
+    const enabled = await isWaveEnabled();
+    if (!enabled) {
+      return reply.status(404).send({ error: "Separação em onda desabilitada" });
+    }
+
+    const userId = resolveUserId(request);
+    const wave = await getCurrentReleasedWave();
+    if (!wave) {
+      return reply.status(404).send({ error: "Nenhuma onda ativa" });
+    }
+
+    const canWork =
+      !wave.acceptedById || wave.acceptedById === userId;
+    const gondolaPasses = wave.lines.length;
+
+    return {
+      wave: {
+        id: wave.id,
+        name: wave.name,
+        status: wave.status,
+        releasedAt: wave.releasedAt,
+        orderCount: wave.orders.length,
+        gondolaPasses,
+        acceptedById: wave.acceptedById,
+        acceptedByName: wave.acceptedBy?.name ?? null,
+        acceptedAt: wave.acceptedAt,
+        canAccept: !wave.acceptedById,
+        canWork,
+        isMine: wave.acceptedById === userId,
+      },
+      lines: canWork ? wave.lines.map(mapWaveLineSummary) : [],
+    };
+  });
+
+  app.post("/mobile/waves/current/accept", async (request, reply) => {
+    const enabled = await isWaveEnabled();
+    if (!enabled) {
+      return reply.status(404).send({ error: "Separação em onda desabilitada" });
+    }
+
+    const userId = resolveUserId(request);
+    const wave = await getCurrentReleasedWave();
+    if (!wave) {
+      return reply.status(404).send({ error: "Nenhuma onda ativa" });
+    }
+
+    try {
+      const result = await acceptPickWave(wave.id, userId);
+      return result;
+    } catch (e) {
+      if (e instanceof PickWaveError) {
+        return reply.status(e.statusCode).send({ error: e.message });
+      }
+      throw e;
+    }
+  });
+
+  app.get("/mobile/config", async () => {
+    const waveEnabled = await isWaveEnabled();
+    return { waveEnabled };
+  });
+
+  app.get<{ Params: { lineId: string } }>(
+    "/mobile/waves/lines/:lineId",
+    async (request, reply) => {
+      try {
+        const line = await getWaveLineDetail(request.params.lineId);
+        if (!line) {
+          return reply.status(404).send({ error: "Linha não encontrada" });
+        }
+        return { line };
+      } catch (e) {
+        if (e instanceof PickWaveError) {
+          return reply.status(e.statusCode).send({ error: e.message });
+        }
+        throw e;
+      }
+    },
+  );
+
+  app.post<{
+    Params: { lineId: string };
+    Body: {
+      locationBarcode?: string;
+      productBarcode?: string;
+      quantity?: number;
+    };
+  }>("/mobile/waves/lines/:lineId/pick", async (request, reply) => {
+    const userId = resolveUserId(request);
+    try {
+      return await confirmConsolidatedPick({
+        lineId: request.params.lineId,
+        locationBarcode: request.body?.locationBarcode ?? "",
+        productBarcode: request.body?.productBarcode,
+        quantity: Number(request.body?.quantity ?? 0),
+        userId,
+      });
+    } catch (e) {
+      if (e instanceof PickWaveError) {
+        return reply.status(e.statusCode).send({ error: e.message });
+      }
+      throw e;
+    }
+  });
+
+  app.post<{
+    Params: { lineId: string };
+    Body: {
+      allocationId?: string;
+      quantity?: number;
+      basketBarcode?: string;
+    };
+  }>("/mobile/waves/lines/:lineId/sort", async (request, reply) => {
+    const userId = resolveUserId(request);
+    try {
+      return await confirmSortAllocation({
+        lineId: request.params.lineId,
+        allocationId: request.body?.allocationId ?? "",
+        quantity: Number(request.body?.quantity ?? 0),
+        basketBarcode: request.body?.basketBarcode,
+        userId,
+      });
+    } catch (e) {
+      if (e instanceof PickWaveError) {
+        return reply.status(e.statusCode).send({ error: e.message });
+      }
+      throw e;
+    }
+  });
 }

@@ -17,6 +17,8 @@ export interface OrderRow {
   customerName: string | null;
   status: string;
   priority: number;
+  collectionDeadline: string | null;
+  marketplace: string | null;
   pickerName: string | null;
   basketCode: string | null;
   itemCount: number;

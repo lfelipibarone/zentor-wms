@@ -39,7 +39,7 @@ export const PERMISSION_CATALOG: PermissionMeta[] = [
   { key: Permission.RECEIPTS_VIEW, label: "Recebimentos", group: "Operação" },
   { key: Permission.STOCK_VIEW, label: "Estoque", group: "Operação" },
   { key: Permission.SHIPPING_VIEW, label: "Expedição", group: "Operação" },
-  { key: Permission.REPORTS_VIEW, label: "Relatórios", group: "Operação" },
+  { key: Permission.REPORTS_VIEW, label: "Relatórios", group: "Admin" },
   { key: Permission.SYSTEM_VIEW, label: "Sistema", group: "Sistema" },
   { key: Permission.USERS_MANAGE, label: "Gerenciar usuários", group: "Admin" },
   {
@@ -73,7 +73,6 @@ const ROLE_DEFAULTS: Record<UserRole, PermissionKey[]> = {
     Permission.RECEIPTS_VIEW,
     Permission.STOCK_VIEW,
     Permission.SHIPPING_VIEW,
-    Permission.REPORTS_VIEW,
     Permission.SYSTEM_VIEW,
     Permission.OLIST_CONFIGURE,
     Permission.NOTIFICATIONS_VIEW,

@@ -14,6 +14,7 @@ import {
   Users,
   Warehouse,
   Link2,
+  Layers,
 } from "lucide-react";
 
 export interface NavItem {
@@ -56,6 +57,12 @@ export const MAIN_NAV: NavItem[] = [
     permission: Permission.SALES_VIEW,
   },
   {
+    href: "/ondas",
+    label: "Ondas",
+    icon: Layers,
+    permission: Permission.SALES_VIEW,
+  },
+  {
     href: "/recebimentos",
     label: "Recebimentos",
     icon: Box,
@@ -75,12 +82,6 @@ export const MAIN_NAV: NavItem[] = [
     permission: Permission.SHIPPING_VIEW,
   },
   {
-    href: "/relatorios",
-    label: "Relatórios",
-    icon: BarChart3,
-    permission: Permission.REPORTS_VIEW,
-  },
-  {
     href: "/sistema",
     label: "Sistema",
     icon: Settings,
@@ -92,9 +93,21 @@ export const MAIN_NAV: NavItem[] = [
     icon: Link2,
     permission: Permission.OLIST_CONFIGURE,
   },
+  {
+    href: "/integracoes/tiny",
+    label: "Tiny ERP",
+    icon: Link2,
+    permission: Permission.OLIST_CONFIGURE,
+  },
 ];
 
 export const ADMIN_NAV: NavItem[] = [
+  {
+    href: "/relatorios",
+    label: "Relatórios",
+    icon: BarChart3,
+    permission: Permission.USERS_MANAGE,
+  },
   {
     href: "/admin/usuarios",
     label: "Usuários e permissões",

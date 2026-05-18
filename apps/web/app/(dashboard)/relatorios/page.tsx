@@ -5,7 +5,8 @@ import { FileSpreadsheet, FileText } from "lucide-react";
 import { PageHeader } from "@/components/ops/page-header";
 import { DataState } from "@/components/ops/data-state";
 import { MOVEMENT_TYPE_LABEL, ORDER_STATUS_LABEL } from "@/lib/labels";
-import { OrderStatus } from "@wms/shared";
+import { OrderStatus, Permission } from "@wms/shared";
+import { useAuth } from "@/components/auth/auth-provider";
 import {
   Table,
   TableBody,
@@ -24,7 +25,37 @@ import {
 } from "@/lib/api/reports";
 import { exportReportPdf, exportReportXlsx } from "@/lib/reports-export";
 
+function ReportTypeButtons({
+  types,
+  reportId,
+  onSelect,
+}: {
+  types: ReportTypeMeta[];
+  reportId: ReportId;
+  onSelect: (id: ReportId) => void;
+}) {
+  return (
+    <div className="flex flex-wrap gap-2">
+      {types.map((t) => (
+        <button
+          key={t.id}
+          type="button"
+          onClick={() => onSelect(t.id)}
+          className={`rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
+            reportId === t.id
+              ? "bg-[#0d9488] text-white"
+              : "border bg-white hover:bg-slate-50"
+          }`}
+        >
+          {t.label}
+        </button>
+      ))}
+    </div>
+  );
+}
+
 export default function RelatoriosPage() {
+  const { can } = useAuth();
   const defaults = useMemo(() => defaultReportPeriod(), []);
   const [periodFrom, setPeriodFrom] = useState(defaults.from);
   const [periodTo, setPeriodTo] = useState(defaults.to);
@@ -41,12 +72,16 @@ export default function RelatoriosPage() {
 
   const selectedType = types.find((t) => t.id === reportId);
   const needsPeriod = reportId !== "low_stock";
+  const operationTypes = types.filter((t) => t.group === "operation_times");
+  const generalTypes = types.filter((t) => t.group !== "operation_times");
+  const allowed = can(Permission.USERS_MANAGE);
 
   useEffect(() => {
+    if (!allowed) return;
     fetchReportTypes()
       .then((r) => setTypes(r.types))
       .catch(() => {});
-  }, []);
+  }, [allowed]);
 
   const loadPreview = useCallback(async () => {
     setReportLoading(true);
@@ -79,9 +114,10 @@ export default function RelatoriosPage() {
   ]);
 
   useEffect(() => {
+    if (!allowed) return;
     const t = setTimeout(loadPreview, 350);
     return () => clearTimeout(t);
-  }, [loadPreview]);
+  }, [loadPreview, allowed]);
 
   const canExport = report && report.rows.length > 0 && !reportLoading;
 
@@ -111,6 +147,20 @@ export default function RelatoriosPage() {
     }
   };
 
+  if (!allowed) {
+    return (
+      <div className="space-y-6">
+        <PageHeader
+          title="Relatórios"
+          description="Área restrita a administradores."
+        />
+        <p className="text-sm text-muted-foreground">
+          Você não tem permissão para acessar relatórios.
+        </p>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
       <PageHeader
@@ -119,22 +169,31 @@ export default function RelatoriosPage() {
       />
 
       <section className="rounded-xl border bg-white p-4 shadow-sm">
-        <div className="mb-4 flex flex-wrap gap-2">
-          {types.map((t) => (
-            <button
-              key={t.id}
-              type="button"
-              onClick={() => setReportId(t.id)}
-              className={`rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
-                reportId === t.id
-                  ? "bg-[#0d9488] text-white"
-                  : "border bg-white hover:bg-slate-50"
-              }`}
-            >
-              {t.label}
-            </button>
-          ))}
-        </div>
+        {operationTypes.length > 0 ? (
+          <div className="mb-4">
+            <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+              Tempos de operação
+            </p>
+            <ReportTypeButtons
+              types={operationTypes}
+              reportId={reportId}
+              onSelect={setReportId}
+            />
+          </div>
+        ) : null}
+
+        {generalTypes.length > 0 ? (
+          <div className="mb-4">
+            <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+              Operação e estoque
+            </p>
+            <ReportTypeButtons
+              types={generalTypes}
+              reportId={reportId}
+              onSelect={setReportId}
+            />
+          </div>
+        ) : null}
 
         {selectedType ? (
           <p className="mb-4 text-sm text-muted-foreground">

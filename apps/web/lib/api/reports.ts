@@ -8,7 +8,11 @@ export type ReportId =
   | "orders"
   | "picking"
   | "movements"
-  | "low_stock";
+  | "low_stock"
+  | "picking_time_by_order"
+  | "picking_time_by_user"
+  | "packing_time_by_order"
+  | "packing_time_by_user";
 
 export interface ReportColumn {
   key: string;
@@ -30,6 +34,7 @@ export interface ReportTypeMeta {
   label: string;
   description: string;
   requiresPeriod: boolean;
+  group?: string;
 }
 
 export function defaultReportPeriod(): { from: string; to: string } {

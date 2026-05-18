@@ -4,172 +4,194 @@ import { BarcodeScanner } from "@/components/BarcodeScanner";
 import { FactoryButton } from "@/components/FactoryButton";
 import { QuantityInput } from "@/components/QuantityInput";
 import { ScreenShell } from "@/components/ScreenShell";
-import {
-  useLocationByBarcode,
-  useReplenish,
-} from "@/hooks/useReplenishment";
-import { ApiError } from "@/lib/api";
+import { api, ApiError } from "@/lib/api";
+import type { LocationLookup } from "@/lib/api";
 import { theme, spacing, typography } from "@/lib/theme";
 
-type Phase = "scan-shelf" | "add-stock" | "done";
+type Phase = "scan-pulmao" | "scan-product" | "scan-gondola" | "done";
+
+type ScannerMode = "pulmao" | "product" | "gondola" | null;
+
+function normalizeBarcode(code: string) {
+  return code.trim().toUpperCase();
+}
 
 export default function ReplenishmentScreen() {
-  const [phase, setPhase] = useState<Phase>("scan-shelf");
-  const [shelfBarcode, setShelfBarcode] = useState<string | null>(null);
+  const [phase, setPhase] = useState<Phase>("scan-pulmao");
+  const [pulmao, setPulmao] = useState<LocationLookup | null>(null);
+  const [gondola, setGondola] = useState<LocationLookup | null>(null);
+  const [productBarcode, setProductBarcode] = useState<string | null>(null);
+  const [quantity, setQuantity] = useState(0);
   const [scannerOpen, setScannerOpen] = useState(false);
-  const [productScans, setProductScans] = useState(0);
-  const [manualQty, setManualQty] = useState<number | null>(null);
+  const [scannerMode, setScannerMode] = useState<ScannerMode>(null);
+  const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
 
-  const { data: location, isLoading, error } =
-    useLocationByBarcode(shelfBarcode);
-  const replenish = useReplenish(location?.id ?? "");
+  const openScanner = (mode: ScannerMode) => {
+    setScannerMode(mode);
+    setScannerOpen(true);
+  };
 
-  const maxAdd = location
-    ? Math.max(0, location.capacity - location.currentQuantity)
-    : 0;
+  const loadLocation = async (barcode: string) => {
+    return api.getLocationByBarcode(barcode);
+  };
 
-  const handleShelfScan = (barcode: string) => {
+  const handlePulmaoScan = async (raw: string) => {
     setScannerOpen(false);
-    setShelfBarcode(barcode);
-    setPhase("add-stock");
-    setProductScans(0);
-    setManualQty(null);
+    setLoading(true);
     setMessage(null);
-  };
-
-  const handleProductScan = () => {
-    if (!location?.product) {
-      setMessage("Gôndola sem produto alocado");
-      return;
-    }
-    setProductScans((c) => c + 1);
-    setMessage(`Unidades bipadas: ${productScans + 1}`);
-  };
-
-  const handleConfirm = async () => {
-    if (!location) return;
-    const qty = manualQty ?? productScans;
-    if (qty <= 0) {
-      setMessage("Informe ou bipe ao menos 1 unidade");
-      return;
-    }
     try {
-      const result = await replenish.mutateAsync({
-        quantity: qty,
-        productBarcode: location.product?.barcode ?? undefined,
+      const loc = await loadLocation(normalizeBarcode(raw));
+      if (loc.type !== "PULMAO") {
+        setMessage("Bipe um pulmão (estoque de reserva)");
+        return;
+      }
+      setPulmao(loc);
+      setPhase("scan-product");
+      setMessage("Pulmão OK. Bipe o produto e informe a quantidade.");
+    } catch (e) {
+      setMessage(e instanceof ApiError ? e.message : "Pulmão não encontrado");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleProductScan = (raw: string) => {
+    setScannerOpen(false);
+    setProductBarcode(raw.trim());
+    setMessage(`Produto: ${raw.trim()}. Informe a quantidade retirada.`);
+  };
+
+  const handleGondolaScan = async (raw: string) => {
+    setScannerOpen(false);
+    if (!pulmao || !productBarcode || quantity <= 0) {
+      setMessage("Complete pulmão, produto e quantidade antes da gôndola");
+      return;
+    }
+    setLoading(true);
+    setMessage(null);
+    try {
+      const loc = await loadLocation(normalizeBarcode(raw));
+      if (loc.type !== "PICK_FACE") {
+        setMessage("Destino deve ser uma gôndola (pick face)");
+        return;
+      }
+      setGondola(loc);
+      const result = await api.transferReplenishment({
+        fromLocationBarcode: pulmao.barcode,
+        toLocationBarcode: loc.barcode,
+        productBarcode,
+        quantity,
       });
       setMessage(
-        `Reabastecido +${result.added} un. · Total na gôndola: ${result.currentQuantity}`
+        `Transferido ${result.transferred} un. · Pulmão: ${result.fromLocation.currentQuantity} · Gôndola: ${result.toLocation.currentQuantity}`,
       );
       setPhase("done");
     } catch (e) {
-      setMessage(e instanceof ApiError ? e.message : "Erro ao confirmar");
+      setMessage(e instanceof ApiError ? e.message : "Erro na transferência");
+    } finally {
+      setLoading(false);
     }
   };
 
+  const onScan = (code: string) => {
+    if (scannerMode === "pulmao") handlePulmaoScan(code);
+    else if (scannerMode === "product") handleProductScan(code);
+    else if (scannerMode === "gondola") handleGondolaScan(code);
+  };
+
   const reset = () => {
-    setPhase("scan-shelf");
-    setShelfBarcode(null);
-    setProductScans(0);
-    setManualQty(null);
+    setPhase("scan-pulmao");
+    setPulmao(null);
+    setGondola(null);
+    setProductBarcode(null);
+    setQuantity(0);
     setMessage(null);
   };
+
+  const maxFromPulmao = pulmao?.currentQuantity ?? 0;
 
   return (
     <ScreenShell scroll>
       <Text style={styles.pageHint}>
-        Traga produtos do pulmão para a pick face
+        Retire do pulmão e abasteça a gôndola (transferência com baixa no estoque)
       </Text>
-      {phase === "scan-shelf" ? (
+
+      {phase === "scan-pulmao" ? (
         <>
-          <Text style={styles.instruction}>
-            Escaneie a gôndola (pick face) que deseja reabastecer.
-          </Text>
+          <Text style={styles.instruction}>1. Bipe o pulmão de origem</Text>
           <FactoryButton
-            label="Bipar gôndola"
-            onPress={() => setScannerOpen(true)}
+            label="Bipar pulmão"
+            onPress={() => openScanner("pulmao")}
+            loading={loading}
           />
         </>
       ) : null}
 
-      {isLoading && shelfBarcode ? (
-        <Text style={styles.loading}>Carregando gôndola...</Text>
-      ) : null}
-
-      {error && shelfBarcode ? (
-        <Text style={styles.error}>
-          {error instanceof Error ? error.message : "Gôndola não encontrada"}
-        </Text>
-      ) : null}
-
-      {location && phase !== "scan-shelf" ? (
+      {pulmao ? (
         <View style={styles.card}>
-          <Text style={styles.locTitle}>{location.label}</Text>
-          {location.product ? (
-            <>
-              <Text style={styles.sku}>{location.product.sku}</Text>
-              <Text style={styles.name}>{location.product.name}</Text>
-            </>
-          ) : (
-            <Text style={styles.warn}>Sem produto alocado nesta gôndola</Text>
-          )}
-          <View style={styles.statsRow}>
-            <View style={styles.stat}>
-              <Text style={styles.statVal}>{location.currentQuantity}</Text>
-              <Text style={styles.statLbl}>Atual</Text>
-            </View>
-            <View style={styles.stat}>
-              <Text style={styles.statVal}>{location.capacity}</Text>
-              <Text style={styles.statLbl}>Capacidade</Text>
-            </View>
-            <View style={styles.stat}>
-              <Text style={[styles.statVal, location.needsReplenishment && styles.low]}>
-                {location.minThreshold}
-              </Text>
-              <Text style={styles.statLbl}>Mínimo</Text>
-            </View>
-          </View>
+          <Text style={styles.cardLabel}>PULMÃO</Text>
+          <Text style={styles.locTitle}>{pulmao.label}</Text>
+          <Text style={styles.meta}>
+            {pulmao.product?.sku ?? "—"} · Estoque: {pulmao.currentQuantity}
+          </Text>
         </View>
       ) : null}
 
-      {location && phase === "add-stock" ? (
+      {phase === "scan-product" && pulmao ? (
         <>
-          <Text style={styles.instruction}>
-            Bipe os produtos trazidos do pulmão ou digite a quantidade.
-          </Text>
+          <Text style={styles.instruction}>2. Bipe o produto e a quantidade</Text>
           <FactoryButton
-            label={`Bipar produto (+1) · ${productScans}`}
+            label={productBarcode ? `Produto: ${productBarcode}` : "Bipar produto"}
             variant="success"
-            onPress={handleProductScan}
-            disabled={!location.product}
+            onPress={() => openScanner("product")}
           />
           <QuantityInput
-            label="Ou digite a quantidade"
-            max={maxAdd}
+            label={`Quantidade (máx. ${maxFromPulmao})`}
+            max={maxFromPulmao}
             onConfirm={(q) => {
-              setManualQty(q);
-              setMessage(`Quantidade definida: ${q}`);
+              setQuantity(q);
+              setPhase("scan-gondola");
+              setMessage("3. Bipe a gôndola de destino");
             }}
           />
+        </>
+      ) : null}
+
+      {gondola ? (
+        <View style={styles.card}>
+          <Text style={styles.cardLabel}>GÔNDOLA</Text>
+          <Text style={styles.locTitle}>{gondola.label}</Text>
+        </View>
+      ) : null}
+
+      {phase === "scan-gondola" && pulmao && quantity > 0 ? (
+        <>
+          <Text style={styles.instruction}>3. Bipe a gôndola de destino</Text>
           <FactoryButton
-            label="Confirmar reabastecimento"
-            loading={replenish.isPending}
-            onPress={handleConfirm}
+            label="Bipar gôndola"
+            onPress={() => openScanner("gondola")}
+            loading={loading}
           />
         </>
       ) : null}
 
       {phase === "done" ? (
-        <FactoryButton label="Nova gôndola" onPress={reset} />
+        <FactoryButton label="Nova transferência" onPress={reset} />
       ) : null}
 
       {message ? <Text style={styles.message}>{message}</Text> : null}
 
       <BarcodeScanner
         visible={scannerOpen}
-        title="Bipar gôndola"
-        onScan={handleShelfScan}
+        title={
+          scannerMode === "pulmao"
+            ? "Bipar pulmão"
+            : scannerMode === "product"
+              ? "Bipar produto"
+              : "Bipar gôndola"
+        }
+        onScan={onScan}
         onClose={() => setScannerOpen(false)}
       />
     </ScreenShell>
@@ -185,44 +207,31 @@ const styles = StyleSheet.create({
   instruction: {
     fontSize: typography.body,
     color: theme.textMuted,
-    lineHeight: 24,
+    marginBottom: spacing.sm,
   },
-  loading: { color: theme.textMuted },
-  error: { color: theme.danger, fontWeight: "700" },
   card: {
     backgroundColor: theme.surface,
     borderRadius: 16,
     padding: spacing.lg,
-    gap: spacing.sm,
+    marginVertical: spacing.md,
     borderWidth: 2,
     borderColor: theme.border,
+  },
+  cardLabel: {
+    fontSize: typography.caption,
+    fontWeight: "800",
+    color: theme.textMuted,
+    letterSpacing: 1,
   },
   locTitle: {
     fontSize: typography.title,
     fontWeight: "900",
     color: theme.primary,
   },
-  sku: { color: theme.info, fontWeight: "800" },
-  name: { fontSize: typography.subtitle, color: theme.text, fontWeight: "700" },
-  warn: { color: theme.warning },
-  statsRow: { flexDirection: "row", marginTop: spacing.md, gap: spacing.sm },
-  stat: {
-    flex: 1,
-    backgroundColor: theme.bg,
-    borderRadius: 12,
-    padding: spacing.md,
-    alignItems: "center",
-  },
-  statVal: {
-    fontSize: 32,
-    fontWeight: "900",
-    color: theme.text,
-  },
-  statLbl: { color: theme.textMuted, fontSize: typography.caption },
-  low: { color: theme.danger },
+  meta: { color: theme.textMuted, marginTop: spacing.xs },
   message: {
+    marginTop: spacing.md,
     color: theme.success,
-    fontSize: typography.body,
     fontWeight: "700",
     textAlign: "center",
   },
