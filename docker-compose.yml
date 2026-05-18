@@ -1,0 +1,23 @@
+# PostgreSQL local para desenvolvimento (alternativa ao Postgres instalado no Windows).
+# Uso: docker compose up -d
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: wms-postgres
+    restart: unless-stopped
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: admin
+      POSTGRES_DB: wms
+    volumes:
+      - wms_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d wms"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  wms_pgdata:

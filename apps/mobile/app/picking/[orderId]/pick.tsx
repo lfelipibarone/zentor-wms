@@ -1,0 +1,371 @@
+import { useCallback, useEffect, useState } from "react";
+import { router, useLocalSearchParams } from "expo-router";
+import {
+  ActivityIndicator,
+  Alert,
+  StyleSheet,
+  Text,
+  View,
+} from "react-native";
+import { BarcodeScanner } from "@/components/BarcodeScanner";
+import { FactoryButton } from "@/components/FactoryButton";
+import { QuantityInput } from "@/components/QuantityInput";
+import { ProblemReportModal } from "@/components/ProblemReportModal";
+import { ScreenShell } from "@/components/ScreenShell";
+import {
+  useCompletePicking,
+  usePickItem,
+  usePickingSession,
+  useReportIssue,
+} from "@/hooks/usePicking";
+import { api, ApiError } from "@/lib/api";
+import { theme, spacing, typography } from "@/lib/theme";
+import { OrderStatus } from "@wms/shared";
+
+type PickStep = "location" | "product" | "quantity";
+
+export default function PickScreen() {
+  const { orderId, basketCode } = useLocalSearchParams<{
+    orderId: string;
+    basketCode?: string;
+  }>();
+
+  const { data: session, isLoading, refetch } = usePickingSession(orderId);
+  const pickItem = usePickItem(orderId);
+  const reportIssue = useReportIssue(orderId);
+  const completePicking = useCompletePicking(orderId);
+
+  const [step, setStep] = useState<PickStep>("location");
+  const [locationValidated, setLocationValidated] = useState(false);
+  const [scanCount, setScanCount] = useState(0);
+  const [scannerOpen, setScannerOpen] = useState(false);
+  const [scannerMode, setScannerMode] = useState<"location" | "product">(
+    "location"
+  );
+  const [problemOpen, setProblemOpen] = useState(false);
+  const [feedback, setFeedback] = useState<string | null>(null);
+
+  const next = session?.nextItem;
+  const itemId = next?.id ?? "";
+
+  const resetItemFlow = useCallback(() => {
+    setStep("location");
+    setLocationValidated(false);
+    setScanCount(0);
+    setFeedback(null);
+  }, []);
+
+  useEffect(() => {
+    resetItemFlow();
+  }, [itemId, resetItemFlow]);
+
+  const handleLocationScan = async (barcode: string) => {
+    setScannerOpen(false);
+    if (!itemId) return;
+    try {
+      await api.validateLocation(orderId, itemId, barcode);
+      setLocationValidated(true);
+      setStep("product");
+      setFeedback("Gôndola confirmada ✓");
+    } catch (e) {
+      setFeedback(e instanceof ApiError ? e.message : "Gôndola incorreta");
+    }
+  };
+
+  const handleProductScan = async (barcode: string) => {
+    setScannerOpen(false);
+    if (!next) return;
+
+    const expected = next.product.barcode;
+    if (expected && barcode !== expected) {
+      setFeedback(`Produto incorreto. Esperado: ${expected}`);
+      return;
+    }
+
+    const newCount = scanCount + 1;
+    setScanCount(newCount);
+
+    if (newCount >= next.remaining) {
+      await confirmPick(next.remaining);
+    } else {
+      setFeedback(`Bipado ${newCount} de ${next.remaining}`);
+    }
+  };
+
+  const confirmPick = async (qty: number) => {
+    if (!itemId) return;
+    try {
+      const result = await pickItem.mutateAsync({ itemId, quantity: qty });
+      await refetch();
+      resetItemFlow();
+      if (result.completed) {
+        setFeedback("Item concluído ✓");
+      }
+    } catch (e) {
+      setFeedback(e instanceof ApiError ? e.message : "Erro ao registrar pick");
+    }
+  };
+
+  const handleCompleteOrder = async () => {
+    try {
+      await completePicking.mutateAsync();
+      Alert.alert(
+        "Separação finalizada",
+        "Cesta enviada para Aguardando Conferência.",
+        [{ text: "OK", onPress: () => router.replace("/picking") }]
+      );
+    } catch (e) {
+      Alert.alert(
+        "Erro",
+        e instanceof ApiError ? e.message : "Não foi possível finalizar"
+      );
+    }
+  };
+
+  const handleReport = async (reason: string) => {
+    try {
+      await reportIssue.mutateAsync(reason);
+      setProblemOpen(false);
+      Alert.alert(
+        "Problema registrado",
+        "Pedido pausado. A equipe na Web foi notificada.",
+        [{ text: "OK", onPress: () => router.replace("/picking") }]
+      );
+    } catch (e) {
+      Alert.alert(
+        "Erro",
+        e instanceof ApiError ? e.message : "Falha ao reportar"
+      );
+    }
+  };
+
+  if (isLoading || !session) {
+    return (
+      <View style={styles.centered}>
+        <ActivityIndicator size="large" color={theme.primary} />
+      </View>
+    );
+  }
+
+  if (session.order.status === OrderStatus.PAUSED_ISSUE) {
+    return (
+      <ScreenShell title="Pedido pausado" subtitle={session.order.erpOrderId}>
+        <Text style={styles.paused}>
+          Este pedido está pausado por problema reportado.
+        </Text>
+        <FactoryButton
+          label="Voltar à fila"
+          onPress={() => router.replace("/picking")}
+        />
+      </ScreenShell>
+    );
+  }
+
+  if (session.allPicked || !next) {
+    return (
+      <ScreenShell
+        title="Pedido completo"
+        subtitle={`Cesta ${basketCode ?? session.order.basket?.code ?? "—"}`}
+      >
+        <Text style={styles.doneText}>
+          Todos os itens foram separados. Envie a cesta para conferência.
+        </Text>
+        <FactoryButton
+          label="Finalizar — Aguardando conferência"
+          variant="success"
+          loading={completePicking.isPending}
+          onPress={handleCompleteOrder}
+        />
+        <FactoryButton
+          label="Relatar problema"
+          variant="danger"
+          onPress={() => setProblemOpen(true)}
+        />
+        <ProblemReportModal
+          visible={problemOpen}
+          loading={reportIssue.isPending}
+          onSubmit={handleReport}
+          onClose={() => setProblemOpen(false)}
+        />
+      </ScreenShell>
+    );
+  }
+
+  const requiresScan = next.product.requiresItemScan;
+  const locLabel = next.pickLocation
+    ? (next.pickLocation.label ??
+      `${next.pickLocation.corridor}-${next.pickLocation.row}`)
+    : "—";
+
+  return (
+    <ScreenShell
+      scroll
+      title={session.order.erpOrderId}
+      subtitle={`Cesta ${basketCode ?? session.order.basket?.code ?? "—"} · Item ${next.lineNumber}`}
+    >
+      <View style={styles.locationCard}>
+        <Text style={styles.locLabel}>VÁ ATÉ</Text>
+        <Text style={styles.locValue}>{locLabel}</Text>
+        <Text style={styles.locBarcode}>
+          {next.pickLocation?.barcode ?? "Sem barcode"}
+        </Text>
+      </View>
+
+      <View style={styles.productCard}>
+        <Text style={styles.sku}>{next.product.sku}</Text>
+        <Text style={styles.productName}>{next.product.name}</Text>
+        <Text style={styles.qty}>
+          Separar: {next.remaining} de {next.quantityOrdered}
+        </Text>
+        {requiresScan ? (
+          <Text style={styles.scanHint}>
+            Bipe cada unidade ({scanCount}/{next.remaining})
+          </Text>
+        ) : (
+          <Text style={styles.scanHint}>Informe a quantidade coletada</Text>
+        )}
+      </View>
+
+      {feedback ? (
+        <Text
+          style={[
+            styles.feedback,
+            feedback.includes("✓") ? styles.feedbackOk : styles.feedbackErr,
+          ]}
+        >
+          {feedback}
+        </Text>
+      ) : null}
+
+      {step === "location" && !locationValidated ? (
+        <FactoryButton
+          label="Bipar gôndola"
+          onPress={() => {
+            setScannerMode("location");
+            setScannerOpen(true);
+          }}
+        />
+      ) : null}
+
+      {locationValidated && requiresScan ? (
+        <FactoryButton
+          label={`Bipar produto (${scanCount}/${next.remaining})`}
+          variant="success"
+          onPress={() => {
+            setScannerMode("product");
+            setScannerOpen(true);
+          }}
+          loading={pickItem.isPending}
+        />
+      ) : null}
+
+      {locationValidated && !requiresScan ? (
+        <QuantityInput
+          label="Quantidade coletada"
+          max={next.remaining}
+          loading={pickItem.isPending}
+          onConfirm={(qty) => confirmPick(qty)}
+        />
+      ) : null}
+
+      <FactoryButton
+        label="Relatar problema"
+        variant="danger"
+        onPress={() => setProblemOpen(true)}
+      />
+
+      <BarcodeScanner
+        visible={scannerOpen}
+        title={
+          scannerMode === "location" ? "Bipar gôndola" : "Bipar produto"
+        }
+        hint={
+          scannerMode === "location"
+            ? "Confirme que está na posição correta"
+            : "Bipe o código de cada unidade"
+        }
+        onScan={
+          scannerMode === "location" ? handleLocationScan : handleProductScan
+        }
+        onClose={() => setScannerOpen(false)}
+      />
+
+      <ProblemReportModal
+        visible={problemOpen}
+        loading={reportIssue.isPending}
+        onSubmit={handleReport}
+        onClose={() => setProblemOpen(false)}
+      />
+    </ScreenShell>
+  );
+}
+
+const styles = StyleSheet.create({
+  centered: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: theme.bg,
+  },
+  locationCard: {
+    backgroundColor: theme.primary,
+    borderRadius: 16,
+    padding: spacing.lg,
+    alignItems: "center",
+  },
+  locLabel: {
+    fontSize: typography.caption,
+    fontWeight: "900",
+    color: theme.primaryText,
+    letterSpacing: 2,
+  },
+  locValue: {
+    fontSize: 40,
+    fontWeight: "900",
+    color: theme.primaryText,
+    textAlign: "center",
+  },
+  locBarcode: {
+    fontSize: typography.body,
+    color: theme.primaryText,
+    opacity: 0.8,
+    marginTop: spacing.xs,
+  },
+  productCard: {
+    backgroundColor: theme.surface,
+    borderRadius: 16,
+    padding: spacing.lg,
+    gap: spacing.sm,
+    borderWidth: 2,
+    borderColor: theme.border,
+  },
+  sku: {
+    fontSize: typography.caption,
+    color: theme.info,
+    fontWeight: "800",
+  },
+  productName: {
+    fontSize: typography.subtitle,
+    fontWeight: "800",
+    color: theme.text,
+  },
+  qty: {
+    fontSize: typography.title,
+    fontWeight: "900",
+    color: theme.success,
+  },
+  scanHint: { color: theme.textMuted, fontSize: typography.body },
+  feedback: {
+    fontSize: typography.body,
+    fontWeight: "700",
+    textAlign: "center",
+  },
+  feedbackOk: { color: theme.success },
+  feedbackErr: { color: theme.danger },
+  doneText: {
+    fontSize: typography.body,
+    color: theme.text,
+    lineHeight: 26,
+  },
+  paused: { color: theme.warning, fontSize: typography.body },
+});

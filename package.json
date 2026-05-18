@@ -1,0 +1,24 @@
+{
+  "name": "wms-monorepo",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Warehouse Management System — monorepo",
+  "scripts": {
+    "dev": "pnpm run --parallel dev:api dev:web",
+    "dev:api": "pnpm --filter @wms/api dev",
+    "dev:web": "pnpm --filter @wms/web dev",
+    "dev:mobile": "pnpm --filter @wms/mobile dev",
+    "build": "pnpm -r build",
+    "db:generate": "pnpm --filter @wms/api db:generate",
+    "db:migrate": "pnpm --filter @wms/api db:migrate",
+    "db:push": "pnpm --filter @wms/api db:push",
+    "db:studio": "pnpm --filter @wms/api db:studio",
+    "lint": "pnpm -r lint",
+    "typecheck": "pnpm -r typecheck"
+  },
+  "engines": {
+    "node": ">=20.0.0",
+    "pnpm": ">=9.0.0"
+  },
+  "packageManager": "pnpm@9.15.0"
+}

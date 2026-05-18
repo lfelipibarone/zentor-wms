@@ -1,0 +1,15 @@
+node_modules
+mcps
+dist
+.next
+.expo
+.turbo
+*.log
+.env
+.env.*
+!.env.example
+coverage
+.DS_Store
+Thumbs.db
+*.tsbuildinfo
+apps/api/prisma/migrations

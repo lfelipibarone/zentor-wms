@@ -1,0 +1,35 @@
+{
+  "expo": {
+    "name": "WMS Mobile",
+    "slug": "wms-mobile",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "scheme": "wms",
+    "userInterfaceStyle": "dark",
+    "newArchEnabled": true,
+    "ios": {
+      "supportsTablet": true,
+      "infoPlist": {
+        "NSCameraUsageDescription": "A câmera é usada para ler códigos de barras no galpão."
+      }
+    },
+    "android": {
+      "adaptiveIcon": {
+        "backgroundColor": "#0B0F14"
+      },
+      "permissions": ["android.permission.CAMERA"]
+    },
+    "plugins": [
+      "expo-router",
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Permitir acesso à câmera para leitura de códigos de barras."
+        }
+      ]
+    ],
+    "experiments": {
+      "typedRoutes": true
+    }
+  }
+}

@@ -1,0 +1,357 @@
+// =============================================================================
+// WMS — Warehouse Management System
+// Schema Prisma — PostgreSQL
+// =============================================================================
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// -----------------------------------------------------------------------------
+// Enums
+// -----------------------------------------------------------------------------
+
+/// Papéis operacionais no galpão
+enum UserRole {
+  PICKER
+  EXPEDITER
+  REPLENISHER
+  ADMIN
+}
+
+/// Tipo físico da localização no layout do armazém
+enum LocationType {
+  PICK_FACE // Gôndola de separação (frente de picking)
+  PULMAO    // Estoque de reserva / reabastecimento
+}
+
+/// Ciclo de vida do pedido no WMS
+enum OrderStatus {
+  PENDING
+  PICKING
+  PAUSED_ISSUE
+  PICKED_AWAITING_CONFERENCE
+  DISPATCHING
+  DISPATCHED
+}
+
+/// Eventos de cronometragem da operação (separação / expedição)
+enum OrderTimeLogEvent {
+  START
+  PAUSE
+  RESUME
+  END
+}
+
+/// Tipos de movimentação de estoque (log imutável)
+enum InventoryMovementType {
+  ENTRY              // Entrada de mercadoria no armazém
+  EXIT               // Saída definitiva (expedição, perda, etc.)
+  TRANSFER           // Movimentação entre localizações (ex: PULMAO → PICK_FACE)
+  ADJUSTMENT         // Ajuste de inventário (contagem, correção)
+  PICK_ALLOCATION    // Reserva/baixa vinculada à separação de pedido
+  REPLENISHMENT      // Reabastecimento de pick face a partir do pulmão
+}
+
+// -----------------------------------------------------------------------------
+// User & Roles
+// -----------------------------------------------------------------------------
+
+model User {
+  id          String   @id @default(cuid())
+  email       String   @unique
+  name        String
+  password    String
+  role        UserRole @default(PICKER)
+  /// Permissões granulares do painel (chaves como web.access, users.manage)
+  permissions String[] @default([])
+  active      Boolean  @default(true)
+  /// URL da foto de perfil (opcional)
+  avatarUrl   String?
+  /// Token de integração Olist (por usuário)
+  olistToken  String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  /// Pedidos atribuídos a este operador
+  assignedOrders Order[] @relation("OrderAssignedPicker")
+
+  /// Movimentações de estoque registradas por este usuário
+  inventoryMovements InventoryMovement[]
+
+  /// Eventos de tempo registrados por este usuário
+  orderTimeLogs OrderTimeLog[]
+
+  notifications Notification[]
+  pushDevices   PushDevice[]
+
+  @@index([role])
+  @@map("users")
+}
+
+/// Notificações in-app e push para o usuário
+model Notification {
+  id        String    @id @default(cuid())
+  userId    String
+  title     String
+  body      String
+  /// ORDER | STOCK | SYSTEM | SHIPPING
+  category  String    @default("SYSTEM")
+  /// JSON com ids de pedido, sku, etc.
+  data      String?
+  readAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, readAt])
+  @@index([userId, createdAt])
+  @@map("notifications")
+}
+
+/// Token de dispositivo para push (Expo / Web)
+model PushDevice {
+  id        String   @id @default(cuid())
+  userId    String
+  /// expo | web
+  platform  String
+  token     String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, platform, token])
+  @@index([userId])
+  @@map("push_devices")
+}
+
+/// Configurações globais editáveis apenas por admin
+model SystemSetting {
+  key         String   @id
+  value       String
+  description String?
+  updatedAt   DateTime @updatedAt
+  updatedById String?
+
+  @@map("system_settings")
+}
+
+// -----------------------------------------------------------------------------
+// Product
+// -----------------------------------------------------------------------------
+
+model Product {
+  id                String  @id @default(cuid())
+  sku               String  @unique
+  name              String
+  /// Quando true, cada unidade deve ser bipada individualmente na separação.
+  /// Quando false, o operador informa apenas a quantidade (ex: parafusos a granel).
+  requiresItemScan  Boolean @default(false)
+  barcode           String? @unique
+  active            Boolean @default(true)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  locations         Location[]
+  orderItems        OrderItem[]
+  inventoryMovements InventoryMovement[]
+
+  @@index([sku])
+  @@map("products")
+}
+
+// -----------------------------------------------------------------------------
+// Location (Gôndolas / Pulmão)
+// -----------------------------------------------------------------------------
+
+model Location {
+  id              String       @id @default(cuid())
+  /// Corredor do galpão (ex: "A", "B", "01")
+  corridor        String
+  /// Fileira dentro do corredor (ex: "01", "02")
+  row             String
+  /// Código de barras físico da etiqueta da gôndola/pulmão
+  barcode         String       @unique
+  type            LocationType
+  /// Produto alocado nesta posição (opcional — pulmão pode estar vazio ou em transição)
+  productId       String?
+  /// Quantidade física atual nesta localização
+  currentQuantity Int          @default(0)
+  /// Capacidade máxima da posição
+  capacity        Int
+  /// Limite mínimo para disparar alerta de reabastecimento
+  minThreshold    Int          @default(0)
+  active          Boolean      @default(true)
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+
+  product Product? @relation(fields: [productId], references: [id], onDelete: SetNull)
+
+  /// Itens de pedido com pick sugerido nesta localização
+  orderItemsPickFrom OrderItem[] @relation("OrderItemPickLocation")
+
+  /// Movimentações com esta localização como origem
+  movementsFrom InventoryMovement[] @relation("MovementFromLocation")
+
+  /// Movimentações com esta localização como destino
+  movementsTo InventoryMovement[] @relation("MovementToLocation")
+
+  @@index([corridor, row])
+  @@index([type])
+  @@index([productId])
+  @@map("locations")
+}
+
+// -----------------------------------------------------------------------------
+// Basket / Tote (Cestas de Separação)
+// -----------------------------------------------------------------------------
+
+model Basket {
+  id        String   @id @default(cuid())
+  /// Identificador legível da cesta (ex: "CESTA-042")
+  code      String   @unique
+  /// Código de barras da cesta física
+  barcode   String   @unique
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  /// Pedidos atualmente vinculados a esta cesta durante a separação
+  orders Order[]
+
+  @@map("baskets")
+}
+
+// -----------------------------------------------------------------------------
+// Order & OrderItem
+// -----------------------------------------------------------------------------
+
+model Order {
+  id        String      @id @default(cuid())
+  /// Identificador do pedido no ERP (chave de integração)
+  erpOrderId String     @unique
+  status    OrderStatus @default(PENDING)
+  priority  Int         @default(0)
+
+  /// Cesta física atrelada durante a separação (opcional até o início do picking)
+  basketId  String?
+  /// Operador responsável pela separação/expedição
+  assignedPickerId String?
+
+  /// Metadados de integração ERP
+  customerName  String?
+  shippingLabel String?
+  notes         String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  /// Data/hora em que o pedido foi marcado como expedido
+  dispatchedAt DateTime?
+
+  basket         Basket? @relation(fields: [basketId], references: [id], onDelete: SetNull)
+  assignedPicker User?   @relation("OrderAssignedPicker", fields: [assignedPickerId], references: [id], onDelete: SetNull)
+
+  items              OrderItem[]
+  timeLogs           OrderTimeLog[]
+  inventoryMovements InventoryMovement[]
+
+  @@index([status])
+  @@index([dispatchedAt])
+  @@index([basketId])
+  @@index([assignedPickerId])
+  @@map("orders")
+}
+
+model OrderItem {
+  id        String @id @default(cuid())
+  orderId   String
+  productId String
+  /// Número da linha no pedido ERP
+  lineNumber Int
+
+  quantityOrdered Int @default(0)
+  quantityPicked  Int @default(0)
+
+  /// Localização sugerida para o pick (pick face alocado ao produto)
+  pickLocationId String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  order        Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  product      Product  @relation(fields: [productId], references: [id], onDelete: Restrict)
+  pickLocation Location? @relation("OrderItemPickLocation", fields: [pickLocationId], references: [id], onDelete: SetNull)
+
+  @@unique([orderId, lineNumber])
+  @@index([orderId])
+  @@index([productId])
+  @@map("order_items")
+}
+
+// -----------------------------------------------------------------------------
+// InventoryMovement — log imutável de estoque
+// -----------------------------------------------------------------------------
+
+model InventoryMovement {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now())
+
+  type      InventoryMovementType
+  quantity  Int
+
+  userId    String
+  productId String
+
+  /// Localização de origem (nulo em entradas externas)
+  fromLocationId String?
+  /// Localização de destino (nulo em saídas definitivas)
+  toLocationId   String?
+
+  /// Pedido relacionado (quando a movimentação é parte da separação)
+  orderId String?
+
+  /// Referência externa (NF, lote, motivo do ajuste)
+  reference String?
+  notes     String?
+
+  user         User      @relation(fields: [userId], references: [id], onDelete: Restrict)
+  product      Product   @relation(fields: [productId], references: [id], onDelete: Restrict)
+  fromLocation Location? @relation("MovementFromLocation", fields: [fromLocationId], references: [id], onDelete: SetNull)
+  toLocation   Location? @relation("MovementToLocation", fields: [toLocationId], references: [id], onDelete: SetNull)
+  order        Order?    @relation(fields: [orderId], references: [id], onDelete: SetNull)
+
+  @@index([createdAt])
+  @@index([productId])
+  @@index([userId])
+  @@index([orderId])
+  @@index([fromLocationId])
+  @@index([toLocationId])
+  @@map("inventory_movements")
+}
+
+// -----------------------------------------------------------------------------
+// OrderTimeLog — cronometragem de operação
+// -----------------------------------------------------------------------------
+
+model OrderTimeLog {
+  id        String            @id @default(cuid())
+  orderId   String
+  userId    String
+  event     OrderTimeLogEvent
+  /// Motivo opcional (ex: PAUSE por falta de estoque, divergência)
+  reason    String?
+  createdAt DateTime          @default(now())
+
+  order Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  user  User  @relation(fields: [userId], references: [id], onDelete: Restrict)
+
+  @@index([orderId, createdAt])
+  @@index([userId])
+  @@map("order_time_logs")
+}
