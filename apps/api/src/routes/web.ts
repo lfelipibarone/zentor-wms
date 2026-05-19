@@ -32,6 +32,29 @@ import {
 } from "../services/pick-wave.js";
 import { getWaveSettings, WAVE_SETTING_META } from "../services/wave-settings.js";
 import { enrichOrderPriority } from "../services/marketplace-priority.js";
+import {
+  getPurchaseReceiptDetailForWeb,
+  listPurchaseReceiptsForWeb,
+} from "../services/purchase-receipt-web.js";
+import {
+  getOrderDetail,
+  getOrdersBoard,
+  getWaveDetail,
+  type BoardKind,
+} from "../services/orders-board.js";
+import { tenantWhere } from "../lib/tenant-context.js";
+import {
+  completePacking,
+  confirmPackingItem,
+  findPackingOrderByQuery,
+  getPackingSession,
+  getWavePackingLine,
+  listPackingQueue,
+  listWavePackingLines,
+  scanPackingItem,
+  sortWaveAllocationWeb,
+  startPacking,
+} from "../services/order-packing.js";
 
 const guard = (p: string) => createPermissionGuard(p);
 
@@ -46,10 +69,12 @@ export async function webRoutes(app: FastifyInstance) {
         return { products: [], orders: [], locations: [] };
       }
       const contains = { contains: q, mode: "insensitive" as const };
+      const tw = tenantWhere(request);
 
       const [products, orders, locations] = await Promise.all([
         prisma.product.findMany({
           where: {
+            ...tw,
             active: true,
             OR: [{ sku: contains }, { name: contains }, { barcode: contains }],
           },
@@ -58,6 +83,7 @@ export async function webRoutes(app: FastifyInstance) {
         }),
         prisma.order.findMany({
           where: {
+            ...tw,
             OR: [
               { erpOrderId: contains },
               { customerName: contains },
@@ -69,6 +95,7 @@ export async function webRoutes(app: FastifyInstance) {
         }),
         prisma.location.findMany({
           where: {
+            ...tw,
             active: true,
             OR: [{ barcode: contains }, { corridor: contains }, { row: contains }],
           },
@@ -113,15 +140,18 @@ export async function webRoutes(app: FastifyInstance) {
     async (request) => {
       const q = request.query.q?.trim();
       const { page, pageSize, skip, take } = parsePagination(request.query);
-      const where: Prisma.ProductWhereInput = q
-        ? {
-            OR: [
-              { sku: { contains: q, mode: "insensitive" } },
-              { name: { contains: q, mode: "insensitive" } },
-              { barcode: { contains: q, mode: "insensitive" } },
-            ],
-          }
-        : {};
+      const where: Prisma.ProductWhereInput = {
+        ...tenantWhere(request),
+        ...(q
+          ? {
+              OR: [
+                { sku: { contains: q, mode: "insensitive" } },
+                { name: { contains: q, mode: "insensitive" } },
+                { barcode: { contains: q, mode: "insensitive" } },
+              ],
+            }
+          : {}),
+      };
       const [products, total] = await Promise.all([
         prisma.product.findMany({
           where,
@@ -153,6 +183,7 @@ export async function webRoutes(app: FastifyInstance) {
       try {
         const product = await prisma.product.create({
           data: {
+            tenantId: tenantWhere(request).tenantId,
             sku: sku.trim().toUpperCase(),
             name: name.trim(),
             barcode: barcode?.trim() || null,
@@ -201,7 +232,7 @@ export async function webRoutes(app: FastifyInstance) {
       const q = request.query.q?.trim();
       const status = request.query.status as OrderStatus | undefined;
       const { page, pageSize, skip, take } = parsePagination(request.query);
-      const where: Prisma.OrderWhereInput = {};
+      const where: Prisma.OrderWhereInput = { ...tenantWhere(request) };
       if (status && Object.values(OrderStatus).includes(status)) {
         where.status = status;
       }
@@ -245,6 +276,49 @@ export async function webRoutes(app: FastifyInstance) {
         })),
         pagination: buildPaginationMeta(total, page, pageSize),
       };
+    },
+  );
+
+  app.get<{
+    Querystring: {
+      status?: string;
+      q?: string;
+      page?: string;
+      pageSize?: string;
+      kind?: string;
+    };
+  }>(
+    "/api/orders/board",
+    { preHandler: guard(Permission.SALES_VIEW) },
+    async (request) => {
+      const kind = (request.query.kind as BoardKind | undefined) ?? "all";
+      const status = request.query.status as OrderStatus | undefined;
+      const q = request.query.q?.trim();
+      const { page, pageSize } = parsePagination(request.query);
+      const validKind = ["all", "order", "wave"].includes(kind) ? kind : "all";
+      return getOrdersBoard(tenantWhere(request).tenantId, {
+        kind: validKind as BoardKind,
+        status:
+          status && Object.values(OrderStatus).includes(status)
+            ? status
+            : undefined,
+        q: q || undefined,
+        page,
+        pageSize,
+      });
+    },
+  );
+
+  app.get<{ Params: { id: string } }>(
+    "/api/orders/:id",
+    { preHandler: guard(Permission.SALES_VIEW) },
+    async (request, reply) => {
+      const detail = await getOrderDetail(
+        tenantWhere(request).tenantId,
+        request.params.id,
+      );
+      if (!detail) return reply.status(404).send({ error: "Pedido não encontrado" });
+      return detail;
     },
   );
 
@@ -295,8 +369,8 @@ export async function webRoutes(app: FastifyInstance) {
   app.get(
     "/api/waves",
     { preHandler: guard(Permission.SALES_VIEW) },
-    async () => {
-      const waves = await listPickWaves();
+    async (request) => {
+      const waves = await listPickWaves(tenantWhere(request).tenantId);
       return {
         waves: waves.map((w) => ({
           id: w.id,
@@ -317,9 +391,9 @@ export async function webRoutes(app: FastifyInstance) {
   app.get(
     "/api/waves/preview",
     { preHandler: guard(Permission.SALES_VIEW) },
-    async () => {
+    async (request) => {
       try {
-        return await previewWaveRelease();
+        return await previewWaveRelease(tenantWhere(request).tenantId);
       } catch (e) {
         if (e instanceof PickWaveError) {
           return { orderCount: 0, lineCount: 0, gondolaPasses: 0, orders: [], lines: [], error: e.message };
@@ -332,8 +406,8 @@ export async function webRoutes(app: FastifyInstance) {
   app.get(
     "/api/waves/settings",
     { preHandler: guard(Permission.SETTINGS_MANAGE) },
-    async () => {
-      const settings = await getWaveSettings();
+    async (request) => {
+      const settings = await getWaveSettings(tenantWhere(request).tenantId);
       return { settings, meta: WAVE_SETTING_META };
     },
   );
@@ -341,9 +415,9 @@ export async function webRoutes(app: FastifyInstance) {
   app.get(
     "/api/integrations/tiny/events",
     { preHandler: guard(Permission.SALES_VIEW) },
-    async () => {
+    async (request) => {
       const events = await prisma.integrationEventLog.findMany({
-        where: { source: "TINY" },
+        where: { ...tenantWhere(request), source: "TINY" },
         orderBy: { createdAt: "desc" },
         take: 50,
       });
@@ -359,10 +433,14 @@ export async function webRoutes(app: FastifyInstance) {
     async (request, reply) => {
       const userId = request.authUser!.id;
       try {
-        const result = await releasePickWave(userId, {
-          orderIds: request.body?.orderIds,
-          auto: request.body?.auto ?? true,
-        });
+        const result = await releasePickWave(
+          tenantWhere(request).tenantId,
+          userId,
+          {
+            orderIds: request.body?.orderIds,
+            auto: request.body?.auto ?? true,
+          },
+        );
         return result;
       } catch (e) {
         if (e instanceof PickWaveError) {
@@ -370,6 +448,19 @@ export async function webRoutes(app: FastifyInstance) {
         }
         throw e;
       }
+    },
+  );
+
+  app.get<{ Params: { id: string } }>(
+    "/api/waves/:id",
+    { preHandler: guard(Permission.SALES_VIEW) },
+    async (request, reply) => {
+      const detail = await getWaveDetail(
+        tenantWhere(request).tenantId,
+        request.params.id,
+      );
+      if (!detail) return reply.status(404).send({ error: "Onda não encontrada" });
+      return detail;
     },
   );
 
@@ -396,14 +487,17 @@ export async function webRoutes(app: FastifyInstance) {
     async (request) => {
       const q = request.query.q?.trim();
       const { page, pageSize, skip, take } = parsePagination(request.query);
-      const where: Prisma.LocationWhereInput = q
-        ? {
-            OR: [
-              { barcode: { contains: q, mode: "insensitive" } },
-              { corridor: { contains: q, mode: "insensitive" } },
-            ],
-          }
-        : {};
+      const where: Prisma.LocationWhereInput = {
+        ...tenantWhere(request),
+        ...(q
+          ? {
+              OR: [
+                { barcode: { contains: q, mode: "insensitive" } },
+                { corridor: { contains: q, mode: "insensitive" } },
+              ],
+            }
+          : {}),
+      };
       const [locations, total] = await Promise.all([
         prisma.location.findMany({
           where,
@@ -442,6 +536,7 @@ export async function webRoutes(app: FastifyInstance) {
       try {
         const location = await prisma.location.create({
           data: {
+            tenantId: tenantWhere(request).tenantId,
             corridor: b.corridor,
             row: b.row,
             barcode: b.barcode.trim().toUpperCase(),
@@ -520,7 +615,11 @@ export async function webRoutes(app: FastifyInstance) {
         });
       }
 
-      const result = await importLocations(parsed, mode);
+      const result = await importLocations(
+        tenantWhere(request).tenantId,
+        parsed,
+        mode,
+      );
       return { ...result, errors: [...errors, ...result.errors] };
     },
   );
@@ -531,14 +630,16 @@ export async function webRoutes(app: FastifyInstance) {
     { preHandler: guard(Permission.REGISTERS_VIEW) },
     async (request) => {
       const { page, pageSize, skip, take } = parsePagination(request.query);
+      const tw = tenantWhere(request);
       const [baskets, total] = await Promise.all([
         prisma.basket.findMany({
+          where: tw,
           orderBy: { code: "asc" },
           skip,
           take,
           include: { _count: { select: { orders: true } } },
         }),
-        prisma.basket.count(),
+        prisma.basket.count({ where: tw }),
       ]);
       return {
         baskets: baskets.map((b) => ({
@@ -560,7 +661,11 @@ export async function webRoutes(app: FastifyInstance) {
       }
       try {
         const basket = await prisma.basket.create({
-          data: { code: code.trim().toUpperCase(), barcode: barcode.trim() },
+          data: {
+            tenantId: tenantWhere(request).tenantId,
+            code: code.trim().toUpperCase(),
+            barcode: barcode.trim(),
+          },
         });
         return reply.status(201).send({ basket });
       } catch {
@@ -571,23 +676,38 @@ export async function webRoutes(app: FastifyInstance) {
 
   // --- Estoque ---
   app.get<{
-    Querystring: { q?: string; lowOnly?: string; page?: string; pageSize?: string };
+    Querystring: {
+      q?: string;
+      lowOnly?: string;
+      type?: string;
+      page?: string;
+      pageSize?: string;
+    };
   }>(
     "/api/stock/locations",
     { preHandler: guard(Permission.STOCK_VIEW) },
     async (request) => {
       const q = request.query.q?.trim();
       const lowOnly = request.query.lowOnly === "true";
+      const typeFilter =
+        request.query.type === LocationType.PULMAO ||
+        request.query.type === LocationType.PICK_FACE
+          ? request.query.type
+          : undefined;
       const { page, pageSize, skip, take } = parsePagination(request.query);
 
-      const baseWhere: Prisma.LocationWhereInput = q
-        ? {
-            OR: [
-              { barcode: { contains: q, mode: "insensitive" } },
-              { product: { sku: { contains: q, mode: "insensitive" } } },
-            ],
-          }
-        : { active: true };
+      const baseWhere: Prisma.LocationWhereInput = {
+        ...tenantWhere(request),
+        ...(q
+          ? {
+              OR: [
+                { barcode: { contains: q, mode: "insensitive" } },
+                { product: { sku: { contains: q, mode: "insensitive" } } },
+              ],
+            }
+          : { active: true }),
+        ...(typeFilter ? { type: typeFilter } : {}),
+      };
 
       if (lowOnly) {
         const all = await prisma.location.findMany({
@@ -622,13 +742,32 @@ export async function webRoutes(app: FastifyInstance) {
     },
   );
 
-  app.get<{ Querystring: { page?: string; pageSize?: string } }>(
+  app.get<{
+    Querystring: { page?: string; pageSize?: string; type?: string };
+  }>(
     "/api/stock/movements",
     { preHandler: guard(Permission.STOCK_VIEW) },
     async (request) => {
       const { page, pageSize, skip, take } = parsePagination(request.query, 25);
+      const typeFilter =
+        request.query.type === LocationType.PULMAO ||
+        request.query.type === LocationType.PICK_FACE
+          ? request.query.type
+          : undefined;
+      const where: Prisma.InventoryMovementWhereInput = {
+        ...tenantWhere(request),
+        ...(typeFilter
+          ? {
+              OR: [
+                { toLocation: { type: typeFilter } },
+                { fromLocation: { type: typeFilter } },
+              ],
+            }
+          : {}),
+      };
       const [movements, total] = await Promise.all([
         prisma.inventoryMovement.findMany({
+          where,
           orderBy: { createdAt: "desc" },
           skip,
           take,
@@ -640,7 +779,7 @@ export async function webRoutes(app: FastifyInstance) {
             order: { select: { erpOrderId: true } },
           },
         }),
-        prisma.inventoryMovement.count(),
+        prisma.inventoryMovement.count({ where }),
       ]);
       return {
         movements,
@@ -655,7 +794,10 @@ export async function webRoutes(app: FastifyInstance) {
     { preHandler: guard(Permission.RECEIPTS_VIEW) },
     async (request) => {
       const { page, pageSize, skip, take } = parsePagination(request.query);
-      const where = { type: InventoryMovementType.ENTRY };
+      const where = {
+        ...tenantWhere(request),
+        type: InventoryMovementType.ENTRY,
+      };
       const [receipts, total] = await Promise.all([
         prisma.inventoryMovement.findMany({
           where,
@@ -700,6 +842,7 @@ export async function webRoutes(app: FastifyInstance) {
       const [movement] = await prisma.$transaction([
         prisma.inventoryMovement.create({
           data: {
+            tenantId: loc.tenantId,
             type: InventoryMovementType.ENTRY,
             quantity,
             userId: request.authUser!.id,
@@ -723,13 +866,193 @@ export async function webRoutes(app: FastifyInstance) {
     },
   );
 
-  // --- Expedição ---
+  app.get<{
+    Querystring: { page?: string; pageSize?: string; status?: string; userId?: string };
+  }>(
+    "/api/purchase-receipts",
+    { preHandler: guard(Permission.RECEIPTS_VIEW) },
+    async (request) => {
+      const { page, pageSize } = parsePagination(request.query);
+      return listPurchaseReceiptsForWeb({
+        tenantId: tenantWhere(request).tenantId,
+        page,
+        pageSize,
+        status: request.query.status,
+        userId: request.query.userId,
+      });
+    },
+  );
+
+  app.get<{ Params: { id: string } }>(
+    "/api/purchase-receipts/:id",
+    { preHandler: guard(Permission.RECEIPTS_VIEW) },
+    async (request, reply) => {
+      const detail = await getPurchaseReceiptDetailForWeb(request.params.id);
+      if (!detail) return reply.status(404).send({ error: "Sessão não encontrada" });
+      return detail;
+    },
+  );
+
+  // --- Packing (web) ---
+  app.get(
+    "/api/packing/orders/queue",
+    { preHandler: guard(Permission.SHIPPING_VIEW) },
+    async (request) => listPackingQueue(tenantWhere(request).tenantId),
+  );
+
+  app.get<{ Querystring: { q?: string } }>(
+    "/api/packing/orders/search",
+    { preHandler: guard(Permission.SHIPPING_VIEW) },
+    async (request, reply) => {
+      const q = request.query.q?.trim();
+      if (!q) return reply.status(400).send({ error: "Informe pedido ou cesta" });
+      const order = await findPackingOrderByQuery(
+        tenantWhere(request).tenantId,
+        q,
+      );
+      if (!order) return reply.status(404).send({ error: "Pedido não encontrado na fila de packing" });
+      return { order };
+    },
+  );
+
+  app.get<{ Params: { id: string } }>(
+    "/api/packing/orders/:id",
+    { preHandler: guard(Permission.SHIPPING_VIEW) },
+    async (request, reply) => {
+      try {
+        return await getPackingSession(request.params.id);
+      } catch (e) {
+        const message = e instanceof Error ? e.message : "Erro";
+        return reply.status(422).send({ error: message });
+      }
+    },
+  );
+
+  app.post<{ Params: { id: string } }>(
+    "/api/packing/orders/:id/start",
+    { preHandler: guard(Permission.SHIPPING_VIEW) },
+    async (request, reply) => {
+      try {
+        return await startPacking(request.params.id, request.authUser!.id);
+      } catch (e) {
+        const message = e instanceof Error ? e.message : "Erro";
+        return reply.status(422).send({ error: message });
+      }
+    },
+  );
+
+  app.post<{
+    Params: { id: string };
+    Body: { itemId?: string; quantity?: number };
+  }>(
+    "/api/packing/orders/:id/confirm-item",
+    { preHandler: guard(Permission.SHIPPING_VIEW) },
+    async (request, reply) => {
+      const { itemId, quantity } = request.body ?? {};
+      if (!itemId) return reply.status(400).send({ error: "itemId obrigatório" });
+      try {
+        return await confirmPackingItem(
+          request.params.id,
+          request.authUser!.id,
+          itemId,
+          Number(quantity ?? 1),
+        );
+      } catch (e) {
+        const message = e instanceof Error ? e.message : "Erro";
+        return reply.status(422).send({ error: message });
+      }
+    },
+  );
+
+  app.post<{
+    Params: { id: string };
+    Body: { barcode?: string; quantity?: number };
+  }>(
+    "/api/packing/orders/:id/scan",
+    { preHandler: guard(Permission.SHIPPING_VIEW) },
+    async (request, reply) => {
+      const barcode = request.body?.barcode?.trim();
+      if (!barcode) return reply.status(400).send({ error: "Código obrigatório" });
+      try {
+        return await scanPackingItem(
+          request.params.id,
+          request.authUser!.id,
+          barcode,
+          Number(request.body?.quantity ?? 1),
+        );
+      } catch (e) {
+        const message = e instanceof Error ? e.message : "Erro";
+        return reply.status(422).send({ error: message });
+      }
+    },
+  );
+
+  app.post<{ Params: { id: string } }>(
+    "/api/packing/orders/:id/complete",
+    { preHandler: guard(Permission.SHIPPING_VIEW) },
+    async (request, reply) => {
+      try {
+        return await completePacking(request.params.id, request.authUser!.id);
+      } catch (e) {
+        const message = e instanceof Error ? e.message : "Erro";
+        return reply.status(422).send({ error: message });
+      }
+    },
+  );
+
+  app.get(
+    "/api/packing/waves/lines",
+    { preHandler: guard(Permission.SHIPPING_VIEW) },
+    async (request) => listWavePackingLines(tenantWhere(request).tenantId),
+  );
+
+  app.get<{ Params: { lineId: string } }>(
+    "/api/packing/waves/lines/:lineId",
+    { preHandler: guard(Permission.SHIPPING_VIEW) },
+    async (request, reply) => {
+      try {
+        return await getWavePackingLine(request.params.lineId);
+      } catch (e) {
+        const message = e instanceof Error ? e.message : "Erro";
+        return reply.status(422).send({ error: message });
+      }
+    },
+  );
+
+  app.post<{
+    Params: { lineId: string };
+    Body: { allocationId?: string; quantity?: number; basketBarcode?: string };
+  }>(
+    "/api/packing/waves/lines/:lineId/sort",
+    { preHandler: guard(Permission.SHIPPING_VIEW) },
+    async (request, reply) => {
+      try {
+        return await sortWaveAllocationWeb(
+          request.params.lineId,
+          request.authUser!.id,
+          {
+            allocationId: request.body?.allocationId ?? "",
+            quantity: Number(request.body?.quantity ?? 0),
+            basketBarcode: request.body?.basketBarcode,
+          },
+        );
+      } catch (e) {
+        if (e instanceof PickWaveError) {
+          return reply.status(e.statusCode).send({ error: e.message });
+        }
+        const message = e instanceof Error ? e.message : "Erro";
+        return reply.status(422).send({ error: message });
+      }
+    },
+  );
+
   app.get<{ Querystring: { page?: string; pageSize?: string } }>(
     "/api/shipping/queue",
     { preHandler: guard(Permission.SHIPPING_VIEW) },
     async (request) => {
       const { page, pageSize, skip, take } = parsePagination(request.query);
       const where = {
+        ...tenantWhere(request),
         status: {
           in: [
             OrderStatus.PICKED_AWAITING_CONFERENCE,
@@ -766,8 +1089,8 @@ export async function webRoutes(app: FastifyInstance) {
     "/api/shipping/:id/advance",
     { preHandler: guard(Permission.SHIPPING_VIEW) },
     async (request, reply) => {
-      const order = await prisma.order.findUnique({
-        where: { id: request.params.id },
+      const order = await prisma.order.findFirst({
+        where: { id: request.params.id, ...tenantWhere(request) },
       });
       if (!order) return reply.status(404).send({ error: "Pedido não encontrado" });
 
@@ -818,8 +1141,9 @@ export async function webRoutes(app: FastifyInstance) {
   app.get(
     "/api/settings/public",
     { preHandler: guard(Permission.SYSTEM_VIEW) },
-    async () => {
+    async (request) => {
       const settings = await prisma.systemSetting.findMany({
+        where: tenantWhere(request),
         orderBy: { key: "asc" },
       });
       return { settings };
@@ -833,7 +1157,11 @@ export async function webRoutes(app: FastifyInstance) {
     "/api/reports/summary",
     { preHandler: guard(Permission.USERS_MANAGE) },
     async (request) => {
-      return getReportsSummary(request.query.from, request.query.to);
+      return getReportsSummary(
+        tenantWhere(request).tenantId,
+        request.query.from,
+        request.query.to,
+      );
     },
   );
 
@@ -922,6 +1250,7 @@ export async function webRoutes(app: FastifyInstance) {
 
       try {
         const result = await runReport({
+          tenantId: tenantWhere(request).tenantId,
           report,
           from: request.query.from,
           to: request.query.to,

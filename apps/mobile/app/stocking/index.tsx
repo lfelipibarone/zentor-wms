@@ -229,23 +229,39 @@ export default function StockingScreen() {
 
       {phase === "scan-product" && location ? (
         <>
-          <Text style={styles.instruction}>
-            Bipe o código de barras de cada unidade colocada na gôndola.
-          </Text>
-          <FactoryButton
-            label="Bipar produto (+1)"
-            variant="success"
-            onPress={openProductScanner}
-            disabled={maxAdd <= 0 || stock.isPending}
-            loading={stock.isPending}
-          />
           {location.product ? (
-            <QuantityInput
-              label={`Adicionar quantidade (máx. ${maxAdd})`}
-              max={maxAdd}
-              onConfirm={handleManualQty}
-            />
-          ) : null}
+            <>
+              <Text style={styles.instruction}>
+                Informe a quantidade a adicionar na gôndola.
+              </Text>
+              <QuantityInput
+                label={`Adicionar quantidade (máx. ${maxAdd})`}
+                max={maxAdd}
+                loading={stock.isPending}
+                onConfirm={handleManualQty}
+              />
+              <FactoryButton
+                label="Bipar produto (+1) — opcional"
+                variant="secondary"
+                onPress={openProductScanner}
+                disabled={maxAdd <= 0 || stock.isPending}
+                loading={stock.isPending}
+              />
+            </>
+          ) : (
+            <>
+              <Text style={styles.instruction}>
+                Bipe o produto ou informe a quantidade após o primeiro bip.
+              </Text>
+              <FactoryButton
+                label="Bipar produto"
+                variant="success"
+                onPress={openProductScanner}
+                disabled={maxAdd <= 0 || stock.isPending}
+                loading={stock.isPending}
+              />
+            </>
+          )}
           <FactoryButton
             label="Finalizar"
             variant="secondary"

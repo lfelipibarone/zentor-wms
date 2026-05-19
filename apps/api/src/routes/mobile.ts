@@ -22,6 +22,23 @@ import {
 import { isWaveEnabled } from "../services/wave-settings.js";
 import { confirmConsolidatedPick } from "../services/pick-wave-pick.js";
 import { confirmSortAllocation } from "../services/pick-wave-sort.js";
+import {
+  completePurchaseReceipt,
+  confirmReceiptItem,
+  getPurchaseReceiptSession,
+  isTinyConnectedError,
+  listPurchaseReceiptQueue,
+  markConferenceStarted,
+  scanPurchaseReceiptItem,
+  startPurchaseReceiptByBarcode,
+} from "../services/tiny-purchase-receipt.js";
+import {
+  completePutaway,
+  getPutawaySession,
+  listPutawayQueue,
+  startPutaway,
+  storePutawayItem,
+} from "../services/putaway.js";
 
 function formatLocation(loc: { corridor: string; row: string; barcode: string }) {
   return `${loc.corridor}-${loc.row} · ${loc.barcode}`;
@@ -34,10 +51,12 @@ export async function mobileRoutes(app: FastifyInstance) {
   // Picking — fila e aceite
   // ---------------------------------------------------------------------------
 
-  app.get("/mobile/orders/queue", async () => {
-    const waveOrderIds = await getOrderIdsInActiveWave();
+  app.get("/mobile/orders/queue", async (request) => {
+    const tenantId = request.authUser!.tenantId!;
+    const waveOrderIds = await getOrderIdsInActiveWave(tenantId);
     const orders = await prisma.order.findMany({
       where: {
+        tenantId,
         status: OrderStatus.PENDING,
         ...(waveOrderIds.length > 0 ? { id: { notIn: waveOrderIds } } : {}),
       },
@@ -66,10 +85,19 @@ export async function mobileRoutes(app: FastifyInstance) {
       const userId = resolveUserId(request);
       const { orderId } = request.params;
 
-      const order = await prisma.order.findUnique({ where: { id: orderId } });
+      const tenantId = request.authUser!.tenantId!;
+      const order = await prisma.order.findFirst({
+        where: { id: orderId, tenantId },
+        include: { waveOrders: true },
+      });
       if (!order) return reply.status(404).send({ error: "Pedido não encontrado" });
       if (order.status !== OrderStatus.PENDING) {
         return reply.status(409).send({ error: "Pedido não está na fila" });
+      }
+      if (order.waveOrders.length > 0) {
+        return reply.status(409).send({
+          error: "Pedido está em uma onda ativa — use separação em onda",
+        });
       }
 
       const updated = await prisma.order.update({
@@ -228,7 +256,11 @@ export async function mobileRoutes(app: FastifyInstance) {
 
       const item = await prisma.orderItem.findFirst({
         where: { id: itemId, orderId },
-        include: { product: true, pickLocation: true },
+        include: {
+          product: true,
+          pickLocation: true,
+          order: { select: { tenantId: true } },
+        },
       });
       if (!item) return reply.status(404).send({ error: "Item não encontrado" });
 
@@ -253,6 +285,7 @@ export async function mobileRoutes(app: FastifyInstance) {
           });
           await tx.inventoryMovement.create({
             data: {
+              tenantId: item.order.tenantId,
               type: InventoryMovementType.PICK_ALLOCATION,
               quantity: pickedDelta,
               userId,
@@ -415,6 +448,7 @@ export async function mobileRoutes(app: FastifyInstance) {
         if (location.productId) {
           await tx.inventoryMovement.create({
             data: {
+              tenantId: location.tenantId,
               type: InventoryMovementType.REPLENISHMENT,
               quantity: added,
               userId,
@@ -490,13 +524,14 @@ export async function mobileRoutes(app: FastifyInstance) {
   // ---------------------------------------------------------------------------
 
   app.get("/mobile/waves/current", async (request, reply) => {
-    const enabled = await isWaveEnabled();
+    const tenantId = request.authUser!.tenantId!;
+    const enabled = await isWaveEnabled(tenantId);
     if (!enabled) {
       return reply.status(404).send({ error: "Separação em onda desabilitada" });
     }
 
     const userId = resolveUserId(request);
-    const wave = await getCurrentReleasedWave();
+    const wave = await getCurrentReleasedWave(tenantId);
     if (!wave) {
       return reply.status(404).send({ error: "Nenhuma onda ativa" });
     }
@@ -525,13 +560,14 @@ export async function mobileRoutes(app: FastifyInstance) {
   });
 
   app.post("/mobile/waves/current/accept", async (request, reply) => {
-    const enabled = await isWaveEnabled();
+    const tenantId = request.authUser!.tenantId!;
+    const enabled = await isWaveEnabled(tenantId);
     if (!enabled) {
       return reply.status(404).send({ error: "Separação em onda desabilitada" });
     }
 
     const userId = resolveUserId(request);
-    const wave = await getCurrentReleasedWave();
+    const wave = await getCurrentReleasedWave(tenantId);
     if (!wave) {
       return reply.status(404).send({ error: "Nenhuma onda ativa" });
     }
@@ -547,8 +583,9 @@ export async function mobileRoutes(app: FastifyInstance) {
     }
   });
 
-  app.get("/mobile/config", async () => {
-    const waveEnabled = await isWaveEnabled();
+  app.get("/mobile/config", async (request) => {
+    const tenantId = request.authUser!.tenantId!;
+    const waveEnabled = await isWaveEnabled(tenantId);
     return { waveEnabled };
   });
 
@@ -619,4 +656,225 @@ export async function mobileRoutes(app: FastifyInstance) {
       throw e;
     }
   });
+
+  // ---------------------------------------------------------------------------
+  // Recebimento / conferência de compra (NF entrada — Tiny)
+  // ---------------------------------------------------------------------------
+
+  app.get("/mobile/purchase-receipts/queue", async (request, reply) => {
+    const tenantId = request.authUser!.tenantId!;
+    try {
+      const queue = await listPurchaseReceiptQueue(tenantId);
+      return { queue };
+    } catch (e) {
+      if (isTinyConnectedError(e)) {
+        return reply.status(503).send({
+          error:
+            "Tiny ERP não conectado. Peça ao administrador para conectar em Integrações.",
+        });
+      }
+      const message = e instanceof Error ? e.message : "Erro ao listar notas";
+      return reply.status(422).send({ error: message });
+    }
+  });
+
+  app.post<{ Body: { barcode?: string } }>(
+    "/mobile/purchase-receipts/start",
+    async (request, reply) => {
+      const userId = resolveUserId(request);
+      const barcode = request.body?.barcode?.trim();
+      if (!barcode) {
+        return reply.status(400).send({ error: "Código DANFE obrigatório" });
+      }
+      try {
+        const tenantId = request.authUser!.tenantId!;
+        return await startPurchaseReceiptByBarcode({
+          tenantId,
+          barcode,
+          userId,
+        });
+      } catch (e) {
+        if (isTinyConnectedError(e)) {
+          return reply.status(503).send({
+            error: "Tiny ERP não conectado.",
+          });
+        }
+        const message =
+          e instanceof Error ? e.message : "Erro ao iniciar recebimento";
+        return reply.status(422).send({ error: message });
+      }
+    },
+  );
+
+  app.get<{ Params: { sessionId: string } }>(
+    "/mobile/purchase-receipts/:sessionId",
+    async (request, reply) => {
+      try {
+        return await getPurchaseReceiptSession(request.params.sessionId);
+      } catch (e) {
+        const message = e instanceof Error ? e.message : "Sessão não encontrada";
+        return reply.status(404).send({ error: message });
+      }
+    },
+  );
+
+  app.post<{
+    Params: { sessionId: string };
+    Body: { barcode?: string; quantity?: number };
+  }>(
+    "/mobile/purchase-receipts/:sessionId/scan",
+    async (request, reply) => {
+      const barcode = request.body?.barcode?.trim();
+      if (!barcode) {
+        return reply.status(400).send({ error: "Código do produto obrigatório" });
+      }
+      try {
+        return await scanPurchaseReceiptItem({
+          sessionId: request.params.sessionId,
+          barcode,
+          quantity: request.body?.quantity,
+        });
+      } catch (e) {
+        const message = e instanceof Error ? e.message : "Erro ao registrar bip";
+        return reply.status(422).send({ error: message });
+      }
+    },
+  );
+
+  app.post<{
+    Params: { sessionId: string };
+    Body: { itemId?: string; quantity?: number };
+  }>(
+    "/mobile/purchase-receipts/:sessionId/confirm-item",
+    async (request, reply) => {
+      const { itemId, quantity } = request.body ?? {};
+      if (!itemId) {
+        return reply.status(400).send({ error: "itemId obrigatório" });
+      }
+      try {
+        return await confirmReceiptItem(
+          request.params.sessionId,
+          itemId,
+          Number(quantity ?? 1),
+        );
+      } catch (e) {
+        const message = e instanceof Error ? e.message : "Erro ao confirmar item";
+        return reply.status(422).send({ error: message });
+      }
+    },
+  );
+
+  app.post<{ Params: { sessionId: string } }>(
+    "/mobile/purchase-receipts/:sessionId/conference-start",
+    async (request, reply) => {
+      const userId = resolveUserId(request);
+      try {
+        await markConferenceStarted(request.params.sessionId, userId);
+        return { ok: true };
+      } catch (e) {
+        const message =
+          e instanceof Error ? e.message : "Erro ao iniciar conferência";
+        return reply.status(422).send({ error: message });
+      }
+    },
+  );
+
+  app.post<{ Params: { sessionId: string } }>(
+    "/mobile/purchase-receipts/:sessionId/complete",
+    async (request, reply) => {
+      const userId = resolveUserId(request);
+      try {
+        return await completePurchaseReceipt(request.params.sessionId, userId);
+      } catch (e) {
+        const message =
+          e instanceof Error ? e.message : "Erro ao finalizar conferência";
+        return reply.status(422).send({ error: message });
+      }
+    },
+  );
+
+  // ---------------------------------------------------------------------------
+  // Armazenagem (putaway pós-recebimento)
+  // ---------------------------------------------------------------------------
+
+  app.get("/mobile/putaway/queue", async (_request, reply) => {
+    try {
+      const queue = await listPutawayQueue();
+      return { queue };
+    } catch (e) {
+      const message = e instanceof Error ? e.message : "Erro ao listar fila";
+      return reply.status(422).send({ error: message });
+    }
+  });
+
+  app.post<{ Body: { purchaseReceiptId?: string } }>(
+    "/mobile/putaway/start",
+    async (request, reply) => {
+      const userId = resolveUserId(request);
+      const purchaseReceiptId = request.body?.purchaseReceiptId?.trim();
+      if (!purchaseReceiptId) {
+        return reply.status(400).send({ error: "purchaseReceiptId obrigatório" });
+      }
+      try {
+        return await startPutaway(purchaseReceiptId, userId);
+      } catch (e) {
+        const message = e instanceof Error ? e.message : "Erro ao iniciar armazenagem";
+        return reply.status(422).send({ error: message });
+      }
+    },
+  );
+
+  app.get<{ Params: { sessionId: string } }>(
+    "/mobile/putaway/:sessionId",
+    async (request, reply) => {
+      try {
+        return await getPutawaySession(request.params.sessionId);
+      } catch (e) {
+        const message = e instanceof Error ? e.message : "Sessão não encontrada";
+        return reply.status(404).send({ error: message });
+      }
+    },
+  );
+
+  app.post<{
+    Params: { sessionId: string };
+    Body: {
+      itemId?: string;
+      locationBarcode?: string;
+      productBarcode?: string;
+      quantity?: number;
+    };
+  }>("/mobile/putaway/:sessionId/store", async (request, reply) => {
+    const userId = resolveUserId(request);
+    const { itemId, locationBarcode, productBarcode } = request.body ?? {};
+    if (!itemId || !locationBarcode) {
+      return reply.status(400).send({ error: "itemId e local são obrigatórios" });
+    }
+    try {
+      return await storePutawayItem({
+        sessionId: request.params.sessionId,
+        itemId,
+        locationBarcode,
+        productBarcode: productBarcode?.trim() || undefined,
+        quantity: Number(request.body?.quantity ?? 1),
+        userId,
+      });
+    } catch (e) {
+      const message = e instanceof Error ? e.message : "Erro ao armazenar";
+      return reply.status(422).send({ error: message });
+    }
+  });
+
+  app.post<{ Params: { sessionId: string } }>(
+    "/mobile/putaway/:sessionId/complete",
+    async (request, reply) => {
+      try {
+        return await completePutaway(request.params.sessionId);
+      } catch (e) {
+        const message =
+          e instanceof Error ? e.message : "Erro ao finalizar armazenagem";
+        return reply.status(422).send({ error: message });
+      }
+    },
+  );
 }

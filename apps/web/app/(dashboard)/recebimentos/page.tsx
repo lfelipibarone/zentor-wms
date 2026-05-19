@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { PageHeader } from "@/components/ops/page-header";
 import { DataState } from "@/components/ops/data-state";
 import {
@@ -11,197 +12,337 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { apiFetch } from "@/lib/api/client";
 import { Pagination } from "@/components/ui/pagination";
 import type { PaginationMeta } from "@/lib/pagination";
 import {
-  fetchLocations,
-  fetchProducts,
-  fetchReceipts,
+  fetchMovements,
+  fetchPurchaseReceipts,
+  fetchStockLocations,
 } from "@/lib/api/operations";
+import { MOVEMENT_TYPE_LABEL } from "@/lib/labels";
+import { cn } from "@/lib/utils";
+
+type MainTab = "nfs" | "pulmao" | "movimentos";
+
+function formatDuration(ms: number | null) {
+  if (ms == null || ms < 0) return "—";
+  const sec = Math.floor(ms / 1000);
+  const m = Math.floor(sec / 60);
+  const s = sec % 60;
+  if (m >= 60) {
+    const h = Math.floor(m / 60);
+    return `${h}h ${m % 60}min`;
+  }
+  return m > 0 ? `${m}min ${s}s` : `${s}s`;
+}
+
+const STATUS_LABEL: Record<string, string> = {
+  IN_PROGRESS: "Em conferência",
+  COMPLETED: "Conferida",
+  CANCELLED: "Cancelada",
+};
+
+const PUTAWAY_LABEL: Record<string, string> = {
+  PENDING: "Aguardando",
+  IN_PROGRESS: "Em andamento",
+  COMPLETED: "Concluída",
+};
+
+const MAIN_TABS: { key: MainTab; label: string }[] = [
+  { key: "nfs", label: "Notas fiscais" },
+  { key: "pulmao", label: "Saldos no pulmão" },
+  { key: "movimentos", label: "Movimentações" },
+];
 
 export default function RecebimentosPage() {
-  const [receipts, setReceipts] = useState<
-    Awaited<ReturnType<typeof fetchReceipts>>["receipts"]
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const tabParam = searchParams.get("tab");
+  const mainTab: MainTab =
+    tabParam === "pulmao" || tabParam === "movimentos" ? tabParam : "nfs";
+
+  const setMainTab = (tab: MainTab) => {
+    const sp = new URLSearchParams(searchParams.toString());
+    if (tab === "nfs") sp.delete("tab");
+    else sp.set("tab", tab);
+    router.replace(`/recebimentos?${sp.toString()}`);
+  };
+
+  const [sessions, setSessions] = useState<
+    Awaited<ReturnType<typeof fetchPurchaseReceipts>>["sessions"]
   >([]);
   const [pagination, setPagination] = useState<PaginationMeta | null>(null);
   const [page, setPage] = useState(1);
-  const [products, setProducts] = useState<
-    Awaited<ReturnType<typeof fetchProducts>>["products"]
-  >([]);
+  const [statusFilter, setStatusFilter] = useState("");
   const [locations, setLocations] = useState<
-    Awaited<ReturnType<typeof fetchLocations>>["locations"]
+    Awaited<ReturnType<typeof fetchStockLocations>>["locations"]
   >([]);
+  const [movements, setMovements] = useState<
+    Awaited<ReturnType<typeof fetchMovements>>["movements"]
+  >([]);
+  const [lowOnly, setLowOnly] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [productId, setProductId] = useState("");
-  const [toLocationId, setToLocationId] = useState("");
-  const [quantity, setQuantity] = useState("");
-  const [reference, setReference] = useState("");
-  const [saving, setSaving] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
-      const [r, p, l] = await Promise.all([
-        fetchReceipts(page),
-        fetchProducts(undefined, 1, 100),
-        fetchLocations(undefined, 1, 100),
-      ]);
-      setReceipts(r.receipts);
-      setPagination(r.pagination);
-      setProducts(p.products);
-      setLocations(l.locations);
+      if (mainTab === "nfs") {
+        const data = await fetchPurchaseReceipts({
+          page,
+          status: statusFilter || undefined,
+        });
+        setSessions(data.sessions);
+        setPagination(data.pagination);
+      } else if (mainTab === "pulmao") {
+        const data = await fetchStockLocations(
+          undefined,
+          lowOnly,
+          page,
+          undefined,
+          "PULMAO",
+        );
+        setLocations(data.locations);
+        setPagination(data.pagination);
+      } else {
+        const data = await fetchMovements(page, undefined, "PULMAO");
+        setMovements(data.movements);
+        setPagination(data.pagination);
+      }
     } catch (e) {
       setError(e instanceof Error ? e.message : "Erro ao carregar");
     } finally {
       setLoading(false);
     }
-  }, [page]);
+  }, [mainTab, page, statusFilter, lowOnly]);
+
+  useEffect(() => {
+    setPage(1);
+  }, [mainTab, statusFilter, lowOnly]);
 
   useEffect(() => {
     load();
   }, [load]);
 
-  const submit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setSaving(true);
-    try {
-      await apiFetch("/api/receipts", {
-        method: "POST",
-        body: JSON.stringify({
-          productId,
-          toLocationId,
-          quantity: Number(quantity),
-          reference,
-        }),
-      });
-      setQuantity("");
-      setReference("");
-      await load();
-    } catch (err) {
-      alert(err instanceof Error ? err.message : "Erro");
-    } finally {
-      setSaving(false);
-    }
-  };
-
   return (
-    <div className="grid gap-8 lg:grid-cols-3">
-      <div className="lg:col-span-2">
-        <PageHeader
-          title="Recebimentos"
-          description="Entradas de mercadoria no armazém (beta)."
-        />
-        <DataState loading={loading} error={error} empty={!loading && receipts.length === 0}>
-          <div className="overflow-hidden rounded-xl border bg-white shadow-sm">
+    <div className="space-y-6">
+      <PageHeader
+        title="Recebimentos"
+        description="Entrada de mercadoria: conferência de NF no mobile, armazenagem no pulmão e movimentações vinculadas."
+      />
+
+      <div className="flex flex-wrap gap-2">
+        {MAIN_TABS.map((t) => (
+          <button
+            key={t.key}
+            type="button"
+            onClick={() => setMainTab(t.key)}
+            className={cn(
+              "rounded-lg px-3 py-1.5 text-sm font-medium",
+              mainTab === t.key
+                ? "bg-[#0d9488] text-white"
+                : "bg-slate-100 text-slate-700 hover:bg-slate-200",
+            )}
+          >
+            {t.label}
+          </button>
+        ))}
+      </div>
+
+      {mainTab === "nfs" ? (
+        <div className="flex flex-wrap gap-2">
+          {[
+            { value: "", label: "Todos" },
+            { value: "IN_PROGRESS", label: "Em conferência" },
+            { value: "COMPLETED", label: "Conferidas" },
+          ].map((opt) => (
+            <button
+              key={opt.value || "all"}
+              type="button"
+              onClick={() => {
+                setPage(1);
+                setStatusFilter(opt.value);
+              }}
+              className={cn(
+                "rounded-lg px-3 py-1.5 text-sm font-medium",
+                statusFilter === opt.value
+                  ? "bg-slate-700 text-white"
+                  : "bg-slate-100 text-slate-700 hover:bg-slate-200",
+              )}
+            >
+              {opt.label}
+            </button>
+          ))}
+        </div>
+      ) : null}
+
+      {mainTab === "pulmao" ? (
+        <label className="flex items-center gap-2 text-sm">
+          <input
+            type="checkbox"
+            checked={lowOnly}
+            onChange={(e) => setLowOnly(e.target.checked)}
+          />
+          Somente abaixo do mínimo
+        </label>
+      ) : null}
+
+      <DataState
+        loading={loading}
+        error={error}
+        empty={
+          !loading &&
+          (mainTab === "nfs"
+            ? sessions.length === 0
+            : mainTab === "pulmao"
+              ? locations.length === 0
+              : movements.length === 0)
+        }
+        emptyMessage="Nenhum registro nesta aba."
+      >
+        {mainTab === "nfs" ? (
+          <div className="rounded-xl border bg-white shadow-sm">
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Data</TableHead>
-                  <TableHead>NF / Ref.</TableHead>
-                  <TableHead>Produto</TableHead>
-                  <TableHead>Local</TableHead>
-                  <TableHead>Qtd</TableHead>
+                  <TableHead>NF</TableHead>
+                  <TableHead>Fornecedor</TableHead>
                   <TableHead>Operador</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead>Itens</TableHead>
+                  <TableHead>Tempo receb.</TableHead>
+                  <TableHead>Tempo conf.</TableHead>
+                  <TableHead>Armazenagem</TableHead>
+                  <TableHead>Tiny</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {receipts.map((r) => (
-                  <TableRow key={r.id}>
-                    <TableCell className="whitespace-nowrap text-muted-foreground">
-                      {new Date(r.createdAt).toLocaleString("pt-BR")}
+                {sessions.map((s) => (
+                  <TableRow key={s.id}>
+                    <TableCell className="font-mono font-semibold">
+                      {s.invoiceNumber ?? s.tinyNotaId}
                     </TableCell>
-                    <TableCell>{r.reference ?? "—"}</TableCell>
+                    <TableCell>{s.supplierName ?? "—"}</TableCell>
+                    <TableCell>{s.operatorName}</TableCell>
                     <TableCell>
-                      <span className="font-mono">{r.product.sku}</span>
-                      <span className="block text-xs text-muted-foreground">
-                        {r.product.name}
+                      <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium">
+                        {STATUS_LABEL[s.status] ?? s.status}
                       </span>
                     </TableCell>
-                    <TableCell className="font-mono">
-                      {r.toLocation.barcode}
+                    <TableCell>
+                      {s.itemsChecked}/{s.itemCount}
                     </TableCell>
-                    <TableCell>{r.quantity}</TableCell>
-                    <TableCell>{r.user.name}</TableCell>
+                    <TableCell>{formatDuration(s.receiptDurationMs)}</TableCell>
+                    <TableCell>{formatDuration(s.conferenceDurationMs)}</TableCell>
+                    <TableCell>
+                      {s.putaway ? (
+                        <div className="text-sm">
+                          <p>{PUTAWAY_LABEL[s.putaway.status] ?? s.putaway.status}</p>
+                          {s.putaway.operatorName ? (
+                            <p className="text-muted-foreground">
+                              {s.putaway.operatorName}
+                            </p>
+                          ) : null}
+                        </div>
+                      ) : s.status === "COMPLETED" ? (
+                        <span className="text-sm text-amber-700">Pendente</span>
+                      ) : (
+                        "—"
+                      )}
+                    </TableCell>
+                    <TableCell className="text-xs text-muted-foreground">
+                      {s.tinySyncStatus ?? "—"}
+                    </TableCell>
                   </TableRow>
                 ))}
               </TableBody>
             </Table>
-            {pagination && pagination.total > 0 ? (
-              <Pagination pagination={pagination} onPageChange={setPage} />
-            ) : null}
           </div>
-        </DataState>
-      </div>
+        ) : null}
 
-      <div>
-        <h2 className="mb-3 text-lg font-semibold">Registrar entrada</h2>
-        <form
-          onSubmit={submit}
-          className="space-y-3 rounded-xl border bg-white p-5 shadow-sm"
-        >
-          <label className="block text-sm">
-            Produto
-            <select
-              required
-              className="mt-1 w-full rounded-lg border px-3 py-2 text-sm"
-              value={productId}
-              onChange={(e) => setProductId(e.target.value)}
-            >
-              <option value="">Selecione…</option>
-              {products.map((p) => (
-                <option key={p.id} value={p.id}>
-                  {p.sku} — {p.name}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label className="block text-sm">
-            Local destino
-            <select
-              required
-              className="mt-1 w-full rounded-lg border px-3 py-2 text-sm"
-              value={toLocationId}
-              onChange={(e) => setToLocationId(e.target.value)}
-            >
-              <option value="">Selecione…</option>
-              {locations.map((l) => (
-                <option key={l.id} value={l.id}>
-                  {l.barcode} ({l.corridor}-{l.row})
-                </option>
-              ))}
-            </select>
-          </label>
-          <label className="block text-sm">
-            Quantidade
-            <input
-              type="number"
-              min={1}
-              required
-              className="mt-1 w-full rounded-lg border px-3 py-2 text-sm"
-              value={quantity}
-              onChange={(e) => setQuantity(e.target.value)}
-            />
-          </label>
-          <label className="block text-sm">
-            NF / Referência
-            <input
-              className="mt-1 w-full rounded-lg border px-3 py-2 text-sm"
-              value={reference}
-              onChange={(e) => setReference(e.target.value)}
-            />
-          </label>
-          <button
-            type="submit"
-            disabled={saving}
-            className="w-full rounded-lg bg-[#0d9488] py-2.5 text-sm font-semibold text-white disabled:opacity-50"
-          >
-            {saving ? "Salvando…" : "Confirmar recebimento"}
-          </button>
-        </form>
-      </div>
+        {mainTab === "pulmao" ? (
+          <div className="rounded-xl border bg-white shadow-sm">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Local</TableHead>
+                  <TableHead>SKU</TableHead>
+                  <TableHead>Quantidade</TableHead>
+                  <TableHead>Mínimo</TableHead>
+                  <TableHead>Alerta</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {locations.map((l) => {
+                  const alert = l.currentQuantity <= l.minThreshold;
+                  return (
+                    <TableRow key={l.id} className={alert ? "bg-amber-50" : ""}>
+                      <TableCell className="font-mono">{l.barcode}</TableCell>
+                      <TableCell>
+                        {l.product?.sku ?? "—"}
+                        {l.product?.name ? (
+                          <span className="block text-xs text-muted-foreground">
+                            {l.product.name}
+                          </span>
+                        ) : null}
+                      </TableCell>
+                      <TableCell>
+                        {l.currentQuantity} / {l.capacity}
+                      </TableCell>
+                      <TableCell>{l.minThreshold}</TableCell>
+                      <TableCell>{alert ? "Repor" : "OK"}</TableCell>
+                    </TableRow>
+                  );
+                })}
+              </TableBody>
+            </Table>
+          </div>
+        ) : null}
+
+        {mainTab === "movimentos" ? (
+          <div className="rounded-xl border bg-white shadow-sm">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Data</TableHead>
+                  <TableHead>Tipo</TableHead>
+                  <TableHead>SKU</TableHead>
+                  <TableHead>Qtd</TableHead>
+                  <TableHead>Origem</TableHead>
+                  <TableHead>Destino</TableHead>
+                  <TableHead>Ref. NF</TableHead>
+                  <TableHead>Operador</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {movements.map((m) => (
+                  <TableRow key={m.id}>
+                    <TableCell>
+                      {new Date(m.createdAt).toLocaleString("pt-BR")}
+                    </TableCell>
+                    <TableCell>
+                      {MOVEMENT_TYPE_LABEL[m.type] ?? m.type}
+                    </TableCell>
+                    <TableCell className="font-mono">{m.product.sku}</TableCell>
+                    <TableCell>{m.quantity}</TableCell>
+                    <TableCell>{m.fromLocation?.barcode ?? "—"}</TableCell>
+                    <TableCell>{m.toLocation?.barcode ?? "—"}</TableCell>
+                    <TableCell className="font-mono text-xs">
+                      {m.reference ?? "—"}
+                    </TableCell>
+                    <TableCell>{m.user.name}</TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+        ) : null}
+
+        {pagination && pagination.total > 0 ? (
+          <Pagination pagination={pagination} onPageChange={setPage} />
+        ) : null}
+      </DataState>
     </div>
   );
 }

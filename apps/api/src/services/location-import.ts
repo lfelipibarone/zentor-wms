@@ -130,10 +130,14 @@ export function normalizeImportRow(
   };
 }
 
-async function resolveProductId(sku?: string): Promise<string | null> {
+async function resolveProductId(
+  tenantId: string,
+  sku?: string,
+): Promise<string | null> {
   if (!sku) return null;
   const product = await prisma.product.findFirst({
     where: {
+      tenantId,
       OR: [
         { sku: { equals: sku, mode: "insensitive" } },
         { barcode: { equals: sku, mode: "insensitive" } },
@@ -145,6 +149,7 @@ async function resolveProductId(sku?: string): Promise<string | null> {
 }
 
 export async function importLocations(
+  tenantId: string,
   rows: LocationImportInput[],
   mode: LocationImportMode = "upsert",
 ): Promise<LocationImportResult> {
@@ -166,7 +171,10 @@ export async function importLocations(
       if (input.productSku) {
         const key = input.productSku.toLowerCase();
         if (!productCache.has(key)) {
-          productCache.set(key, await resolveProductId(input.productSku));
+          productCache.set(
+            key,
+            await resolveProductId(tenantId, input.productSku),
+          );
         }
         productId = productCache.get(key) ?? null;
         if (!productId) {
@@ -179,8 +187,8 @@ export async function importLocations(
         }
       }
 
-      const existing = await prisma.location.findUnique({
-        where: { barcode: input.barcode },
+      const existing = await prisma.location.findFirst({
+        where: { tenantId, barcode: input.barcode },
         select: { id: true },
       });
 
@@ -189,7 +197,8 @@ export async function importLocations(
         continue;
       }
 
-      const data: Prisma.LocationCreateInput = {
+      const data: Prisma.LocationUncheckedCreateInput = {
+        tenantId,
         corridor: input.corridor,
         row: input.row,
         barcode: input.barcode,

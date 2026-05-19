@@ -15,6 +15,7 @@ export const Permission = {
   REPORTS_VIEW: "reports.view",
   SYSTEM_VIEW: "system.view",
   USERS_MANAGE: "users.manage",
+  TENANTS_MANAGE: "tenants.manage",
   SETTINGS_MANAGE: "settings.manage",
   OLIST_CONFIGURE: "olist.configure",
   NOTIFICATIONS_VIEW: "notifications.view",
@@ -32,16 +33,19 @@ export const PERMISSION_CATALOG: PermissionMeta[] = [
   { key: Permission.MOBILE_ACCESS, label: "Acesso ao app mobile", group: "Geral" },
   { key: Permission.WEB_ACCESS, label: "Acesso ao painel web", group: "Geral" },
   { key: Permission.DASHBOARD_VIEW, label: "Dashboard", group: "Operação" },
-  { key: Permission.SEARCH_USE, label: "Pesquisa rápida", group: "Operação" },
   { key: Permission.REGISTERS_VIEW, label: "Cadastros", group: "Operação" },
-  { key: Permission.PRODUCTS_MANAGE, label: "Produtos", group: "Operação" },
-  { key: Permission.SALES_VIEW, label: "Vendas", group: "Operação" },
+  { key: Permission.SALES_VIEW, label: "Pedidos", group: "Operação" },
   { key: Permission.RECEIPTS_VIEW, label: "Recebimentos", group: "Operação" },
-  { key: Permission.STOCK_VIEW, label: "Estoque", group: "Operação" },
+  { key: Permission.STOCK_VIEW, label: "Pulmão / Estoque de giro", group: "Operação" },
   { key: Permission.SHIPPING_VIEW, label: "Expedição", group: "Operação" },
   { key: Permission.REPORTS_VIEW, label: "Relatórios", group: "Admin" },
   { key: Permission.SYSTEM_VIEW, label: "Sistema", group: "Sistema" },
   { key: Permission.USERS_MANAGE, label: "Gerenciar usuários", group: "Admin" },
+  {
+    key: Permission.TENANTS_MANAGE,
+    label: "Gerenciar clientes (plataforma)",
+    group: "Plataforma",
+  },
   {
     key: Permission.SETTINGS_MANAGE,
     label: "Configurações do sistema",
@@ -61,14 +65,30 @@ export const PERMISSION_CATALOG: PermissionMeta[] = [
 
 export const ALL_PERMISSION_KEYS = PERMISSION_CATALOG.map((p) => p.key);
 
+/** Super-admin da plataforma (sem tenant) — apenas gestão de clientes e acesso web */
+export const PLATFORM_ADMIN_PERMISSIONS: PermissionKey[] = [
+  Permission.WEB_ACCESS,
+  Permission.TENANTS_MANAGE,
+  Permission.NOTIFICATIONS_VIEW,
+];
+
+export function isPlatformOnlyAdmin(user: {
+  isPlatformAdmin?: boolean;
+  tenantId?: string | null;
+}): boolean {
+  return Boolean(user.isPlatformAdmin && !user.tenantId);
+}
+
+const TENANT_ADMIN_PERMISSIONS = ALL_PERMISSION_KEYS.filter(
+  (k) => k !== Permission.TENANTS_MANAGE,
+);
+
 const ROLE_DEFAULTS: Record<UserRole, PermissionKey[]> = {
-  ADMIN: [...ALL_PERMISSION_KEYS],
+  ADMIN: [...TENANT_ADMIN_PERMISSIONS],
   EXPEDITER: [
     Permission.WEB_ACCESS,
     Permission.DASHBOARD_VIEW,
-    Permission.SEARCH_USE,
     Permission.REGISTERS_VIEW,
-    Permission.PRODUCTS_MANAGE,
     Permission.SALES_VIEW,
     Permission.RECEIPTS_VIEW,
     Permission.STOCK_VIEW,
@@ -81,7 +101,6 @@ const ROLE_DEFAULTS: Record<UserRole, PermissionKey[]> = {
     Permission.MOBILE_ACCESS,
     Permission.WEB_ACCESS,
     Permission.STOCK_VIEW,
-    Permission.SEARCH_USE,
     Permission.NOTIFICATIONS_VIEW,
   ],
   PICKER: [Permission.MOBILE_ACCESS, Permission.NOTIFICATIONS_VIEW],
@@ -92,11 +111,20 @@ export function defaultPermissionsForRole(role: UserRole): PermissionKey[] {
 }
 
 export function hasPermission(
-  user: { role: string; permissions: string[] },
+  user: { role: string; permissions: string[]; isPlatformAdmin?: boolean },
   permission: PermissionKey,
 ): boolean {
-  if (user.role === "ADMIN") return true;
-  return user.permissions.includes(permission);
+  if (user.isPlatformAdmin) {
+    return PLATFORM_ADMIN_PERMISSIONS.includes(permission);
+  }
+  if (user.role === "ADMIN") {
+    return permission !== Permission.TENANTS_MANAGE;
+  }
+  const perms =
+    user.permissions.length > 0
+      ? user.permissions
+      : defaultPermissionsForRole(user.role as UserRole);
+  return perms.includes(permission);
 }
 
 export function canAccessWeb(user: {

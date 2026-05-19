@@ -2,6 +2,7 @@
 
 import { Loader2 } from "lucide-react";
 import { Sidebar } from "./sidebar";
+import { PlatformRouteGuard } from "./platform-route-guard";
 import { UserMenu } from "./user-menu";
 import { NotificationBell } from "./notification-bell";
 import { useAuth } from "@/components/auth/auth-provider";
@@ -25,7 +26,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           <NotificationBell />
           <UserMenu />
         </header>
-        <main className="flex-1 overflow-auto p-6 lg:p-8">{children}</main>
+        <main className="flex-1 overflow-auto p-6 lg:p-8">
+          <PlatformRouteGuard>{children}</PlatformRouteGuard>
+        </main>
       </div>
     </div>
   );

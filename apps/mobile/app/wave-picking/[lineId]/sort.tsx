@@ -43,7 +43,7 @@ export default function WaveSortScreen() {
       setActiveAllocId(null);
       await refetch();
       if (result.lineSortStatus === "SORTED") {
-        router.replace("/wave-picking/index");
+        router.replace("/picking");
       }
     } catch (e) {
       setMessage(e instanceof ApiError ? e.message : "Erro no packing");
@@ -107,7 +107,7 @@ export default function WaveSortScreen() {
       <FactoryButton
         label="Voltar à onda"
         variant="secondary"
-        onPress={() => router.replace("/wave-picking/index")}
+        onPress={() => router.replace("/picking")}
       />
 
       <BarcodeScanner

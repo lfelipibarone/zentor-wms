@@ -43,10 +43,8 @@ export default function WavePickScreen() {
         `Pick registrado: ${result.quantityPicked}/${result.quantityTotal}`,
       );
       if (result.readyForSort) {
-        router.replace({
-          pathname: "/wave-picking/[lineId]/sort",
-          params: { lineId },
-        });
+        setMessage("Pick concluído — finalize o packing no painel web.");
+        router.replace("/picking");
       }
     } catch (e) {
       setMessage(e instanceof ApiError ? e.message : "Erro no pick");
@@ -98,15 +96,9 @@ export default function WavePickScreen() {
       {message ? <Text style={styles.message}>{message}</Text> : null}
 
       {line.sortStatus === "PICKED" ? (
-        <FactoryButton
-          label="Ir para packing"
-          onPress={() =>
-            router.push({
-              pathname: "/wave-picking/[lineId]/sort",
-              params: { lineId },
-            })
-          }
-        />
+        <Text style={styles.message}>
+          Pick concluído — finalize o packing no painel web.
+        </Text>
       ) : null}
 
       <BarcodeScanner

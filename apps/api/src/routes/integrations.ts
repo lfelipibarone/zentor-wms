@@ -7,9 +7,38 @@ import {
   upsertOrderFromTiny,
 } from "../services/tiny-integration.js";
 
+async function resolveWebhookTenantId(
+  request: { query: Record<string, unknown>; headers: Record<string, unknown> },
+): Promise<string | null> {
+  const slug =
+    (typeof request.query.tenant === "string" ? request.query.tenant : null) ??
+    (typeof request.headers["x-tenant-slug"] === "string"
+      ? request.headers["x-tenant-slug"]
+      : null);
+
+  if (slug) {
+    const t = await prisma.tenant.findUnique({ where: { slug } });
+    return t?.active ? t.id : null;
+  }
+
+  const first = await prisma.tenant.findFirst({
+    where: { active: true },
+    orderBy: { createdAt: "asc" },
+  });
+  return first?.id ?? null;
+}
+
 export async function integrationRoutes(app: FastifyInstance) {
   app.post("/integrations/tiny/webhook", async (request, reply) => {
-    const secret = await getTinyWebhookSecret();
+    const tenantId = await resolveWebhookTenantId({
+      query: request.query as Record<string, unknown>,
+      headers: request.headers as Record<string, unknown>,
+    });
+    if (!tenantId) {
+      return reply.status(400).send({ error: "Cliente (tenant) não identificado" });
+    }
+
+    const secret = await getTinyWebhookSecret(tenantId);
     if (secret) {
       const header =
         (request.headers["x-tiny-token"] as string | undefined) ??
@@ -25,6 +54,7 @@ export async function integrationRoutes(app: FastifyInstance) {
 
     if (!parsed) {
       await logIntegrationEvent({
+        tenantId,
         source: "TINY",
         eventType: "webhook",
         status: "IGNORED",
@@ -35,8 +65,9 @@ export async function integrationRoutes(app: FastifyInstance) {
     }
 
     try {
-      const result = await upsertOrderFromTiny(parsed);
+      const result = await upsertOrderFromTiny(tenantId, parsed);
       await logIntegrationEvent({
+        tenantId,
         source: "TINY",
         eventType: "webhook",
         externalId: parsed.erpOrderId,
@@ -48,6 +79,7 @@ export async function integrationRoutes(app: FastifyInstance) {
     } catch (e) {
       const message = e instanceof Error ? e.message : "Erro ao processar";
       await logIntegrationEvent({
+        tenantId,
         source: "TINY",
         eventType: "webhook",
         externalId: parsed.erpOrderId,
@@ -58,5 +90,4 @@ export async function integrationRoutes(app: FastifyInstance) {
       return reply.status(422).send({ error: message });
     }
   });
-
 }

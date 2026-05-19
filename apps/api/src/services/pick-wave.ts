@@ -57,14 +57,18 @@ export async function resolvePickLocation(
 
 type OrderWithItems = Order & { items: OrderItem[] };
 
-export async function buildWaveCandidateOrders(opts?: {
-  orderIds?: string[];
-  maxOrders?: number;
-  onlyDeadlineToday?: boolean;
-}): Promise<OrderWithItems[]> {
+export async function buildWaveCandidateOrders(
+  tenantId: string,
+  opts?: {
+    orderIds?: string[];
+    maxOrders?: number;
+    onlyDeadlineToday?: boolean;
+  },
+): Promise<OrderWithItems[]> {
   if (opts?.orderIds?.length) {
     const orders = await prisma.order.findMany({
       where: {
+        tenantId,
         id: { in: opts.orderIds },
         status: OrderStatus.PENDING,
       },
@@ -79,7 +83,7 @@ export async function buildWaveCandidateOrders(opts?: {
     return orders;
   }
 
-  const settings = await getWaveSettings();
+  const settings = await getWaveSettings(tenantId);
   const maxOrders = opts?.maxOrders ?? settings.autoReleaseMaxOrders;
   const onlyToday = opts?.onlyDeadlineToday ?? settings.onlyDeadlineToday;
 
@@ -89,6 +93,7 @@ export async function buildWaveCandidateOrders(opts?: {
   endOfDay.setHours(23, 59, 59, 999);
 
   const where: Prisma.OrderWhereInput = {
+    tenantId,
     status: OrderStatus.PENDING,
     waveOrders: { none: {} },
   };
@@ -189,11 +194,14 @@ export async function buildWaveLinesFromOrders(
   }));
 }
 
-export async function previewWaveRelease(opts?: {
-  orderIds?: string[];
-  maxOrders?: number;
-}) {
-  const orders = await buildWaveCandidateOrders(opts);
+export async function previewWaveRelease(
+  tenantId: string,
+  opts?: {
+    orderIds?: string[];
+    maxOrders?: number;
+  },
+) {
+  const orders = await buildWaveCandidateOrders(tenantId, opts);
   const lines = await buildWaveLinesFromOrders(orders);
   return {
     orderCount: orders.length,
@@ -217,18 +225,19 @@ export async function previewWaveRelease(opts?: {
 }
 
 export async function releasePickWave(
+  tenantId: string,
   releasedById: string,
   opts?: { orderIds?: string[]; auto?: boolean },
 ): Promise<{ waveId: string; orderCount: number; lineCount: number }> {
   const enabled = await import("./wave-settings.js").then((m) =>
-    m.isWaveEnabled(),
+    m.isWaveEnabled(tenantId),
   );
   if (!enabled) {
     throw new PickWaveError("Separação em onda está desabilitada nas configurações");
   }
 
   const active = await prisma.pickWave.findFirst({
-    where: { status: PickWaveStatus.RELEASED },
+    where: { tenantId, status: PickWaveStatus.RELEASED },
   });
   if (active) {
     throw new PickWaveError(
@@ -236,7 +245,7 @@ export async function releasePickWave(
     );
   }
 
-  const orders = await buildWaveCandidateOrders({
+  const orders = await buildWaveCandidateOrders(tenantId, {
     orderIds: opts?.orderIds,
   });
 
@@ -254,6 +263,7 @@ export async function releasePickWave(
   const wave = await prisma.$transaction(async (tx) => {
     const w = await tx.pickWave.create({
       data: {
+        tenantId,
         name: waveName,
         status: PickWaveStatus.RELEASED,
         releasedAt: new Date(),
@@ -347,18 +357,18 @@ export async function assertWaveOperatorForMutation(
   }
 }
 
-export async function getOrderIdsInActiveWave(): Promise<string[]> {
+export async function getOrderIdsInActiveWave(tenantId: string): Promise<string[]> {
   const wave = await prisma.pickWave.findFirst({
-    where: { status: PickWaveStatus.RELEASED },
+    where: { tenantId, status: PickWaveStatus.RELEASED },
     include: { orders: { select: { orderId: true } } },
   });
   if (!wave) return [];
   return wave.orders.map((o) => o.orderId);
 }
 
-export async function getCurrentReleasedWave() {
+export async function getCurrentReleasedWave(tenantId: string) {
   return prisma.pickWave.findFirst({
-    where: { status: PickWaveStatus.RELEASED },
+    where: { tenantId, status: PickWaveStatus.RELEASED },
     include: {
       acceptedBy: { select: { id: true, name: true } },
       lines: {
@@ -509,8 +519,9 @@ export async function closePickWave(waveId: string) {
   });
 }
 
-export async function listPickWaves() {
+export async function listPickWaves(tenantId: string) {
   return prisma.pickWave.findMany({
+    where: { tenantId },
     orderBy: { createdAt: "desc" },
     take: 50,
     include: {

@@ -122,10 +122,11 @@ export function parseTinyWebhookPayload(body: unknown): TinyOrderPayload | null 
 }
 
 export async function upsertOrderFromTiny(
+  tenantId: string,
   payload: TinyOrderPayload,
 ): Promise<{ orderId: string; created: boolean }> {
-  const existing = await prisma.order.findUnique({
-    where: { erpOrderId: payload.erpOrderId },
+  const existing = await prisma.order.findFirst({
+    where: { tenantId, erpOrderId: payload.erpOrderId },
     include: { items: true },
   });
 
@@ -142,7 +143,7 @@ export async function upsertOrderFromTiny(
   let lineNum = 0;
   for (const item of payload.items) {
     const product = await prisma.product.findFirst({
-      where: { sku: item.sku, active: true },
+      where: { tenantId, sku: item.sku, active: true },
     });
     if (!product) continue;
     lineNum += 1;
@@ -184,6 +185,7 @@ export async function upsertOrderFromTiny(
 
   const order = await prisma.order.create({
     data: {
+      tenantId,
       erpOrderId: payload.erpOrderId,
       customerName: payload.customerName,
       marketplace: payload.marketplace,
@@ -205,6 +207,7 @@ export async function upsertOrderFromTiny(
 }
 
 export async function logIntegrationEvent(params: {
+  tenantId: string;
   source: string;
   eventType: string;
   externalId?: string;
@@ -214,6 +217,7 @@ export async function logIntegrationEvent(params: {
 }) {
   await prisma.integrationEventLog.create({
     data: {
+      tenantId: params.tenantId,
       source: params.source,
       eventType: params.eventType,
       externalId: params.externalId,
@@ -224,9 +228,9 @@ export async function logIntegrationEvent(params: {
   });
 }
 
-export async function getTinyWebhookSecret(): Promise<string | null> {
+export async function getTinyWebhookSecret(tenantId: string): Promise<string | null> {
   const row = await prisma.systemSetting.findUnique({
-    where: { key: "tiny.webhook.secret" },
+    where: { tenantId_key: { tenantId, key: "tiny.webhook.secret" } },
   });
   return row?.value?.trim() || null;
 }

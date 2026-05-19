@@ -92,6 +92,79 @@ export function fetchOrders(params?: {
   );
 }
 
+export type BoardKind = "all" | "order" | "wave";
+
+export type BoardOrderEntry = OrderRow & { kind: "order" };
+
+export interface BoardWaveEntry {
+  kind: "wave";
+  id: string;
+  name: string;
+  status: string;
+  orderCount: number;
+  lineCount: number;
+  qtyPicked: number;
+  qtyTotal: number;
+  releasedAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export type BoardEntry = BoardOrderEntry | BoardWaveEntry;
+
+export interface BoardCounts {
+  pending: number;
+  picking: number;
+  paused: number;
+  separated: number;
+  dispatching: number;
+  waves: number;
+  all: number;
+}
+
+export function fetchOrdersBoard(params?: {
+  kind?: BoardKind;
+  status?: string;
+  q?: string;
+  page?: number;
+  pageSize?: number;
+}) {
+  const sp = new URLSearchParams();
+  if (params?.kind) sp.set("kind", params.kind);
+  if (params?.status) sp.set("status", params.status);
+  if (params?.q) sp.set("q", params.q);
+  if (params?.page) sp.set("page", String(params.page));
+  sp.set("pageSize", String(params?.pageSize ?? DEFAULT_PAGE_SIZE));
+  return apiFetch<{
+    entries: BoardEntry[];
+    pagination: PaginationMeta;
+    counts: BoardCounts;
+  }>(`/api/orders/board?${sp}`);
+}
+
+export interface OrderDetail {
+  id: string;
+  erpOrderId: string;
+  customerName: string | null;
+  status: string;
+  priority: number;
+  collectionDeadline: string | null;
+  marketplace: string | null;
+  pickerName: string | null;
+  basketCode: string | null;
+  updatedAt: string;
+  items: Array<{
+    lineNumber: number;
+    quantityOrdered: number;
+    quantityPicked: number;
+    product: { sku: string; name: string };
+  }>;
+}
+
+export function fetchOrderDetail(id: string) {
+  return apiFetch<OrderDetail>(`/api/orders/${id}`);
+}
+
 export function fetchLocations(q?: string, page?: number, pageSize?: number) {
   const sp = new URLSearchParams();
   if (q) sp.set("q", q);
@@ -123,10 +196,12 @@ export function fetchStockLocations(
   lowOnly?: boolean,
   page?: number,
   pageSize?: number,
+  type?: "PULMAO" | "PICK_FACE",
 ) {
   const sp = new URLSearchParams();
   if (q) sp.set("q", q);
   if (lowOnly) sp.set("lowOnly", "true");
+  if (type) sp.set("type", type);
   if (page) sp.set("page", String(page));
   sp.set("pageSize", String(pageSize ?? DEFAULT_PAGE_SIZE));
   return apiFetch<{ locations: LocationRow[]; pagination: PaginationMeta }>(
@@ -134,9 +209,14 @@ export function fetchStockLocations(
   );
 }
 
-export function fetchMovements(page?: number, pageSize?: number) {
+export function fetchMovements(
+  page?: number,
+  pageSize?: number,
+  locationType?: "PULMAO" | "PICK_FACE",
+) {
   const sp = new URLSearchParams();
   if (page) sp.set("page", String(page));
+  if (locationType) sp.set("type", locationType);
   sp.set("pageSize", String(pageSize ?? DEFAULT_PAGE_SIZE));
   return apiFetch<{
     movements: Array<{
@@ -153,6 +233,65 @@ export function fetchMovements(page?: number, pageSize?: number) {
     }>;
     pagination: PaginationMeta;
   }>(`/api/stock/movements?${sp}`);
+}
+
+export function fetchPurchaseReceipts(params?: {
+  page?: number;
+  pageSize?: number;
+  status?: string;
+}) {
+  const sp = new URLSearchParams();
+  if (params?.page) sp.set("page", String(params.page));
+  if (params?.status) sp.set("status", params.status);
+  sp.set("pageSize", String(params?.pageSize ?? DEFAULT_PAGE_SIZE));
+  return apiFetch<{
+    sessions: Array<{
+      id: string;
+      tinyNotaId: number;
+      accessKey: string;
+      invoiceNumber: string | null;
+      supplierName: string | null;
+      status: string;
+      tinySyncStatus: string | null;
+      operatorName: string;
+      startedAt: string;
+      conferenceStartedAt: string | null;
+      conferenceEndedAt: string | null;
+      completedAt: string | null;
+      receiptDurationMs: number | null;
+      conferenceDurationMs: number | null;
+      itemCount: number;
+      itemsChecked: number;
+      putaway: {
+        status: string;
+        operatorName: string | null;
+        startedAt: string | null;
+        completedAt: string | null;
+        durationMs: number | null;
+      } | null;
+    }>;
+    pagination: PaginationMeta;
+  }>(`/api/purchase-receipts?${sp}`);
+}
+
+export function fetchPurchaseReceiptDetail(id: string) {
+  return apiFetch<{
+    id: string;
+    invoiceNumber: string | null;
+    supplierName: string | null;
+    accessKey: string;
+    status: string;
+    operatorName: string;
+    items: Array<{
+      lineNumber: number;
+      productCode: string | null;
+      description: string | null;
+      quantityExpected: number;
+      quantityChecked: number;
+    }>;
+    timeLogs: Array<{ event: string; at: string; userName: string }>;
+    putaway: unknown;
+  }>(`/api/purchase-receipts/${id}`);
 }
 
 export function fetchReceipts(page?: number, pageSize?: number) {
@@ -172,6 +311,93 @@ export function fetchReceipts(page?: number, pageSize?: number) {
     }>;
     pagination: PaginationMeta;
   }>(`/api/receipts?${sp}`);
+}
+
+export interface PackingOrder {
+  id: string;
+  erpOrderId: string;
+  customerName: string | null;
+  status: string;
+  basket: { id: string; code: string; barcode: string } | null;
+  assignedPicker: { name: string } | null;
+  allPacked: boolean;
+  items: Array<{
+    id: string;
+    lineNumber: number;
+    quantityOrdered: number;
+    quantityPicked: number;
+    quantityPacked: number;
+    remaining: number;
+    product: { id: string; sku: string; name: string; barcode: string | null };
+  }>;
+}
+
+export function fetchPackingQueue() {
+  return apiFetch<{ orders: PackingOrder[] }>("/api/packing/orders/queue");
+}
+
+export function searchPackingOrder(q: string) {
+  return apiFetch<{ order: PackingOrder }>(
+    `/api/packing/orders/search?q=${encodeURIComponent(q)}`,
+  );
+}
+
+export function fetchPackingSession(orderId: string) {
+  return apiFetch<PackingOrder>(`/api/packing/orders/${orderId}`);
+}
+
+export function confirmPackingItem(
+  orderId: string,
+  itemId: string,
+  quantity: number,
+) {
+  return apiFetch<PackingOrder>(`/api/packing/orders/${orderId}/confirm-item`, {
+    method: "POST",
+    body: JSON.stringify({ itemId, quantity }),
+  });
+}
+
+export function fetchWavePackingLines() {
+  return apiFetch<{
+    lines: Array<{
+      id: string;
+      waveId: string;
+      waveName: string;
+      sku: string;
+      productName: string;
+      locationBarcode: string;
+      quantityPicked: number;
+      quantityTotal: number;
+      sortStatus: string;
+    }>;
+  }>("/api/packing/waves/lines");
+}
+
+export function fetchWavePackingLine(lineId: string) {
+  return apiFetch<{
+    line: {
+      id: string;
+      waveId: string;
+      waveName: string;
+      product: { sku: string; name: string };
+      quantityPicked: number;
+      quantityTotal: number;
+      sortStatus: string;
+      allocations: Array<{
+        id: string;
+        quantity: number;
+        quantitySorted: number;
+        remaining: number;
+        order: {
+          id: string;
+          erpOrderId: string;
+          priority: number;
+          basketCode: string | null;
+          basketId: string | null;
+        };
+      }>;
+    };
+  }>(`/api/packing/waves/lines/${lineId}`);
 }
 
 export function fetchShippingQueue(page?: number, pageSize?: number) {

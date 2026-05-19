@@ -6,18 +6,33 @@ import { theme } from "@/lib/theme";
 interface BackButtonProps {
   onPress?: () => void;
   color?: string;
+  /** Se true (padrão), volta à tela inicial do app em vez do histórico */
+  toHome?: boolean;
 }
 
-/** Seta de voltar padrão do app (mesma em todas as telas) */
+/** Seta de voltar padrão — sem texto, mesma em todas as telas */
 export function BackButton({
   onPress,
   color = theme.headerTint,
+  toHome = true,
 }: BackButtonProps) {
   const router = useRouter();
 
+  const handlePress = () => {
+    if (onPress) {
+      onPress();
+      return;
+    }
+    if (toHome) {
+      router.replace("/");
+      return;
+    }
+    router.back();
+  };
+
   return (
     <Pressable
-      onPress={onPress ?? (() => router.back())}
+      onPress={handlePress}
       style={styles.hit}
       hitSlop={12}
       accessibilityRole="button"

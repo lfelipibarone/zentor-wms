@@ -3,7 +3,6 @@ import { StatusBar } from "expo-status-bar";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { AuthGate } from "@/components/AuthGate";
 import { AuthProvider } from "@/contexts/AuthContext";
-import { BackButton } from "@/components/BackButton";
 import { appStackScreenOptions } from "@/lib/navigation";
 
 const queryClient = new QueryClient({
@@ -27,59 +26,24 @@ export default function RootLayout() {
             />
             <Stack.Screen
               name="replenishment/index"
-              options={{
-                title: "Reabastecimento",
-                headerLeft: () => <BackButton />,
-              }}
+              options={{ title: "Reabastecimento" }}
             />
             <Stack.Screen
               name="stocking/index"
-              options={{
-                title: "Abastecer gôndola",
-                headerLeft: () => <BackButton />,
-              }}
+              options={{ title: "Abastecer gôndola" }}
             />
             <Stack.Screen
-              name="wave-picking/index"
-              options={{
-                title: "Separação em onda",
-                headerLeft: () => <BackButton />,
-              }}
+              name="purchase-receipt"
+              options={{ headerShown: false }}
             />
             <Stack.Screen
-              name="wave-picking/[lineId]/pick"
-              options={{
-                title: "Pick consolidado",
-                headerLeft: () => <BackButton />,
-              }}
+              name="putaway"
+              options={{ headerShown: false }}
             />
-            <Stack.Screen
-              name="wave-picking/[lineId]/sort"
-              options={{
-                title: "Packing",
-                headerLeft: () => <BackButton />,
-              }}
-            />
-            <Stack.Screen
-              name="lookup/index"
-              options={{
-                title: "Consulta rápida",
-                headerLeft: () => <BackButton />,
-              }}
-            />
-            <Stack.Screen
-              name="perfil"
-              options={{
-                title: "Meu perfil",
-                headerLeft: () => <BackButton />,
-              }}
-            />
+            <Stack.Screen name="perfil" options={{ title: "Meu perfil" }} />
             <Stack.Screen
               name="notifications"
-              options={{
-                title: "Notificações",
-                headerLeft: () => <BackButton />,
-              }}
+              options={{ title: "Notificações" }}
             />
           </Stack>
         </AuthGate>

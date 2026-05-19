@@ -1,0 +1,107 @@
+import { router } from "expo-router";
+import {
+  ActivityIndicator,
+  FlatList,
+  StyleSheet,
+  Text,
+  View,
+} from "react-native";
+import { FactoryButton } from "@/components/FactoryButton";
+import { ScreenShell } from "@/components/ScreenShell";
+import { usePutawayQueue, useStartPutaway } from "@/hooks/usePutaway";
+import { theme, spacing, typography } from "@/lib/theme";
+
+export default function PutawayListScreen() {
+  const { data, isLoading, error, refetch, isRefetching } = usePutawayQueue();
+  const start = useStartPutaway();
+
+  const openItem = async (purchaseReceiptId: string, putawaySessionId: string | null) => {
+    if (putawaySessionId) {
+      router.push(`/putaway/${putawaySessionId}`);
+      return;
+    }
+    const session = await start.mutateAsync(purchaseReceiptId);
+    router.push(`/putaway/${session.session.id}`);
+  };
+
+  return (
+    <ScreenShell
+      backToHome
+      title="Armazenagem"
+      style={styles.shell}
+      subtitle="NFs conferidas aguardando endereçamento no pulmão"
+    >
+      {isLoading ? (
+        <View style={styles.centered}>
+          <ActivityIndicator size="large" color={theme.primary} />
+        </View>
+      ) : error ? (
+        <Text style={styles.error}>
+          {error instanceof Error ? error.message : "Erro ao carregar fila"}
+        </Text>
+      ) : (
+        <>
+          <Text style={styles.count}>{data?.length ?? 0} NF(s) na fila</Text>
+          <FlatList
+            style={styles.listWrap}
+            data={data ?? []}
+            keyExtractor={(item) => item.purchaseReceiptId}
+            refreshing={isRefetching}
+            onRefresh={refetch}
+            contentContainerStyle={styles.list}
+            ListEmptyComponent={
+              <Text style={styles.empty}>Nenhuma NF aguardando armazenagem</Text>
+            }
+            renderItem={({ item }) => (
+              <View style={styles.card}>
+                <Text style={styles.numero}>
+                  NF {item.invoiceNumber ?? "—"}
+                </Text>
+                {item.supplierName ? (
+                  <Text style={styles.meta}>{item.supplierName}</Text>
+                ) : null}
+                <Text style={styles.meta}>
+                  {item.itemCount} itens · {item.receiptOperator}
+                </Text>
+                <FactoryButton
+                  label={
+                    item.putawaySessionId ? "Continuar" : "Iniciar armazenagem"
+                  }
+                  variant="secondary"
+                  onPress={() =>
+                    openItem(item.purchaseReceiptId, item.putawaySessionId)
+                  }
+                />
+              </View>
+            )}
+          />
+        </>
+      )}
+    </ScreenShell>
+  );
+}
+
+const styles = StyleSheet.create({
+  shell: { flex: 1 },
+  listWrap: { flex: 1, minHeight: 120 },
+  centered: { padding: spacing.xl, alignItems: "center" },
+  count: {
+    marginBottom: spacing.sm,
+    color: theme.textMuted,
+    fontSize: typography.caption,
+  },
+  list: { paddingBottom: spacing.xl },
+  card: {
+    backgroundColor: theme.surface,
+    borderRadius: 12,
+    padding: spacing.md,
+    marginBottom: spacing.sm,
+    borderWidth: 1,
+    borderColor: theme.border,
+    gap: spacing.sm,
+  },
+  numero: { fontWeight: "800", fontSize: typography.body, color: theme.text },
+  meta: { color: theme.textMuted, fontSize: typography.caption },
+  error: { color: theme.danger },
+  empty: { textAlign: "center", color: theme.textMuted, marginTop: spacing.lg },
+});

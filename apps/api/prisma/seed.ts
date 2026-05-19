@@ -6,6 +6,11 @@ import {
 } from "@prisma/client";
 import { ALL_PERMISSION_KEYS, defaultPermissionsForRole } from "@wms/shared";
 import { hashPassword } from "../src/lib/password.js";
+import {
+  DEMO_TENANT_CONFIGS,
+  printTestUsersGuide,
+  seedDemoTenant,
+} from "./seed-demo-tenants.js";
 
 const prisma = new PrismaClient();
 
@@ -23,6 +28,19 @@ function yesterdayAt(hour: number): Date {
 }
 
 async function main() {
+  const defaultTenant = await prisma.tenant.upsert({
+    where: { slug: "default" },
+    create: { name: "Default", slug: "default", active: true },
+    update: { active: true },
+  });
+  const TENANT_ID = defaultTenant.id;
+
+  await prisma.tinyConnection.upsert({
+    where: { tenantId: TENANT_ID },
+    create: { tenantId: TENANT_ID, name: "Tiny ERP" },
+    update: {},
+  });
+
   // --- Usuários ---
   const admin = await prisma.user.upsert({
     where: { email: "admin@wms.local" },
@@ -31,12 +49,16 @@ async function main() {
       name: "Administrador Help Route",
       password: hashPassword("admin123"),
       role: "ADMIN",
+      isPlatformAdmin: true,
+      tenantId: null,
       permissions: [...ALL_PERMISSION_KEYS],
     },
     update: {
       password: hashPassword("admin123"),
       role: "ADMIN",
       active: true,
+      isPlatformAdmin: true,
+      tenantId: null,
       permissions: [...ALL_PERMISSION_KEYS],
     },
   });
@@ -48,6 +70,8 @@ async function main() {
       name: "Felipe Figueiredo",
       password: hashPassword("operador123"),
       role: "EXPEDITER",
+      tenantId: TENANT_ID,
+      isPlatformAdmin: false,
       permissions: defaultPermissionsForRole("EXPEDITER"),
     },
     update: {
@@ -55,6 +79,8 @@ async function main() {
       name: "Felipe Figueiredo",
       role: "EXPEDITER",
       active: true,
+      tenantId: TENANT_ID,
+      isPlatformAdmin: false,
       permissions: defaultPermissionsForRole("EXPEDITER"),
     },
   });
@@ -68,9 +94,15 @@ async function main() {
       name: "João Separador",
       password: hashPassword("dev"),
       role: "PICKER",
+      tenantId: TENANT_ID,
+      isPlatformAdmin: false,
       permissions: pickerPerms,
     },
-    update: { password: hashPassword("dev"), permissions: pickerPerms },
+    update: {
+      password: hashPassword("dev"),
+      tenantId: TENANT_ID,
+      permissions: pickerPerms,
+    },
   });
 
   const pickerMaria = await prisma.user.upsert({
@@ -80,9 +112,15 @@ async function main() {
       name: "Maria Silva",
       password: hashPassword("dev"),
       role: "PICKER",
+      tenantId: TENANT_ID,
+      isPlatformAdmin: false,
       permissions: pickerPerms,
     },
-    update: { password: hashPassword("dev"), permissions: pickerPerms },
+    update: {
+      password: hashPassword("dev"),
+      tenantId: TENANT_ID,
+      permissions: pickerPerms,
+    },
   });
 
   const pickerCarlos = await prisma.user.upsert({
@@ -92,17 +130,24 @@ async function main() {
       name: "Carlos Mendes",
       password: hashPassword("dev"),
       role: "PICKER",
+      tenantId: TENANT_ID,
+      isPlatformAdmin: false,
       permissions: pickerPerms,
     },
-    update: { password: hashPassword("dev"), permissions: pickerPerms },
+    update: {
+      password: hashPassword("dev"),
+      tenantId: TENANT_ID,
+      permissions: pickerPerms,
+    },
   });
 
   const pickers = [pickerJoao, pickerMaria, pickerCarlos];
 
   // --- Configurações ---
   await prisma.systemSetting.upsert({
-    where: { key: "company.name" },
+    where: { tenantId_key: { tenantId: TENANT_ID, key: "company.name" } },
     create: {
+      tenantId: TENANT_ID,
       key: "company.name",
       value: "Help Route",
       description: "Nome exibido no sistema",
@@ -111,8 +156,9 @@ async function main() {
   });
 
   await prisma.systemSetting.upsert({
-    where: { key: "warehouse.label" },
+    where: { tenantId_key: { tenantId: TENANT_ID, key: "warehouse.label" } },
     create: {
+      tenantId: TENANT_ID,
       key: "warehouse.label",
       value: "CD Brasil · São Paulo",
       description: "Identificação do centro de distribuição",
@@ -149,8 +195,8 @@ async function main() {
     },
   ]) {
     await prisma.systemSetting.upsert({
-      where: { key: row.key },
-      create: row,
+      where: { tenantId_key: { tenantId: TENANT_ID, key: row.key } },
+      create: { tenantId: TENANT_ID, ...row },
       update: { value: row.value, description: row.description },
     });
   }
@@ -158,8 +204,9 @@ async function main() {
   // --- Produtos ---
   const products = await Promise.all([
     prisma.product.upsert({
-      where: { sku: "PAR-6X40" },
+      where: { tenantId_sku: { tenantId: TENANT_ID, sku: "PAR-6X40" } },
       create: {
+        tenantId: TENANT_ID,
         sku: "PAR-6X40",
         name: "Parafuso 6x40 (caixa)",
         requiresItemScan: false,
@@ -168,8 +215,9 @@ async function main() {
       update: {},
     }),
     prisma.product.upsert({
-      where: { sku: "MOT-220V" },
+      where: { tenantId_sku: { tenantId: TENANT_ID, sku: "MOT-220V" } },
       create: {
+        tenantId: TENANT_ID,
         sku: "MOT-220V",
         name: "Motor 220V",
         requiresItemScan: true,
@@ -178,8 +226,9 @@ async function main() {
       update: {},
     }),
     prisma.product.upsert({
-      where: { sku: "CAB-2M" },
+      where: { tenantId_sku: { tenantId: TENANT_ID, sku: "CAB-2M" } },
       create: {
+        tenantId: TENANT_ID,
         sku: "CAB-2M",
         name: "Cabo elétrico 2m",
         requiresItemScan: false,
@@ -188,8 +237,9 @@ async function main() {
       update: {},
     }),
     prisma.product.upsert({
-      where: { sku: "VAL-1/2" },
+      where: { tenantId_sku: { tenantId: TENANT_ID, sku: "VAL-1/2" } },
       create: {
+        tenantId: TENANT_ID,
         sku: "VAL-1/2",
         name: "Válvula 1/2 pol",
         requiresItemScan: true,
@@ -198,8 +248,9 @@ async function main() {
       update: {},
     }),
     prisma.product.upsert({
-      where: { sku: "FUN-150" },
+      where: { tenantId_sku: { tenantId: TENANT_ID, sku: "FUN-150" } },
       create: {
+        tenantId: TENANT_ID,
         sku: "FUN-150",
         name: "Filtro UV 150W",
         requiresItemScan: false,
@@ -214,8 +265,9 @@ async function main() {
   // --- Localizações (algumas abaixo do mínimo → alertas) ---
   const locations = await Promise.all([
     prisma.location.upsert({
-      where: { barcode: "LOC-A01-01" },
+      where: { tenantId_barcode: { tenantId: TENANT_ID, barcode: "LOC-A01-01" } },
       create: {
+        tenantId: TENANT_ID,
         corridor: "A",
         row: "01",
         barcode: "LOC-A01-01",
@@ -228,8 +280,9 @@ async function main() {
       update: { currentQuantity: 8 },
     }),
     prisma.location.upsert({
-      where: { barcode: "LOC-A02-01" },
+      where: { tenantId_barcode: { tenantId: TENANT_ID, barcode: "LOC-A02-01" } },
       create: {
+        tenantId: TENANT_ID,
         corridor: "A",
         row: "02",
         barcode: "LOC-A02-01",
@@ -242,8 +295,9 @@ async function main() {
       update: { currentQuantity: 1 },
     }),
     prisma.location.upsert({
-      where: { barcode: "LOC-B01-03" },
+      where: { tenantId_barcode: { tenantId: TENANT_ID, barcode: "LOC-B01-03" } },
       create: {
+        tenantId: TENANT_ID,
         corridor: "B",
         row: "01",
         barcode: "LOC-B01-03",
@@ -256,8 +310,9 @@ async function main() {
       update: { currentQuantity: 5 },
     }),
     prisma.location.upsert({
-      where: { barcode: "LOC-B02-02" },
+      where: { tenantId_barcode: { tenantId: TENANT_ID, barcode: "LOC-B02-02" } },
       create: {
+        tenantId: TENANT_ID,
         corridor: "B",
         row: "02",
         barcode: "LOC-B02-02",
@@ -270,8 +325,9 @@ async function main() {
       update: { currentQuantity: 12 },
     }),
     prisma.location.upsert({
-      where: { barcode: "LOC-C01-01" },
+      where: { tenantId_barcode: { tenantId: TENANT_ID, barcode: "LOC-C01-01" } },
       create: {
+        tenantId: TENANT_ID,
         corridor: "C",
         row: "01",
         barcode: "LOC-C01-01",
@@ -284,8 +340,9 @@ async function main() {
       update: { currentQuantity: 2 },
     }),
     prisma.location.upsert({
-      where: { barcode: "LOC-C02-04" },
+      where: { tenantId_barcode: { tenantId: TENANT_ID, barcode: "LOC-C02-04" } },
       create: {
+        tenantId: TENANT_ID,
         corridor: "C",
         row: "02",
         barcode: "LOC-C02-04",
@@ -303,8 +360,9 @@ async function main() {
 
   const pulmaoLocations = await Promise.all([
     prisma.location.upsert({
-      where: { barcode: "PUL-A01-01" },
+      where: { tenantId_barcode: { tenantId: TENANT_ID, barcode: "PUL-A01-01" } },
       create: {
+        tenantId: TENANT_ID,
         corridor: "P",
         row: "01",
         barcode: "PUL-A01-01",
@@ -317,8 +375,9 @@ async function main() {
       update: { currentQuantity: 500 },
     }),
     prisma.location.upsert({
-      where: { barcode: "PUL-B01-01" },
+      where: { tenantId_barcode: { tenantId: TENANT_ID, barcode: "PUL-B01-01" } },
       create: {
+        tenantId: TENANT_ID,
         corridor: "P",
         row: "02",
         barcode: "PUL-B01-01",
@@ -331,8 +390,9 @@ async function main() {
       update: { currentQuantity: 80 },
     }),
     prisma.location.upsert({
-      where: { barcode: "PUL-C01-01" },
+      where: { tenantId_barcode: { tenantId: TENANT_ID, barcode: "PUL-C01-01" } },
       create: {
+        tenantId: TENANT_ID,
         corridor: "P",
         row: "03",
         barcode: "PUL-C01-01",
@@ -349,8 +409,12 @@ async function main() {
   void pulmaoLocations;
 
   await prisma.basket.upsert({
-    where: { code: "CESTA-001" },
-    create: { code: "CESTA-001", barcode: "BASKET001" },
+    where: { tenantId_code: { tenantId: TENANT_ID, code: "CESTA-001" } },
+    create: {
+      tenantId: TENANT_ID,
+      code: "CESTA-001",
+      barcode: "BASKET001",
+    },
     update: {},
   });
 
@@ -360,7 +424,7 @@ async function main() {
   await prisma.pickWaveOrder.deleteMany({});
   await prisma.pickWave.deleteMany({});
   await prisma.order.deleteMany({
-    where: { erpOrderId: { startsWith: "ERP-DEMO-" } },
+    where: { tenantId: TENANT_ID, erpOrderId: { startsWith: "ERP-DEMO-" } },
   });
 
   const locCycle = [locA, locB, locC, locD, locE, locA];
@@ -387,6 +451,7 @@ async function main() {
 
     return prisma.order.create({
       data: {
+        tenantId: TENANT_ID,
         erpOrderId: `ERP-DEMO-${String(index).padStart(4, "0")}`,
         customerName: `Cliente Demo ${index + 1}`,
         status,
@@ -470,8 +535,11 @@ async function main() {
 
   // Pedido legado mobile
   await prisma.order.upsert({
-    where: { erpOrderId: "ERP-10042" },
+    where: {
+      tenantId_erpOrderId: { tenantId: TENANT_ID, erpOrderId: "ERP-10042" },
+    },
     create: {
+      tenantId: TENANT_ID,
       erpOrderId: "ERP-10042",
       customerName: "Cliente Demo Mobile",
       priority: 1,
@@ -529,6 +597,7 @@ async function main() {
     const loc = locCycle[slot.pickerIdx % locCycle.length]!;
     await prisma.inventoryMovement.create({
       data: {
+        tenantId: TENANT_ID,
         type: InventoryMovementType.PICK_ALLOCATION,
         quantity: slot.qty,
         userId: picker.id,
@@ -592,7 +661,7 @@ async function main() {
     "../src/services/pick-wave-sort.js"
   );
   try {
-    const wave = await releasePickWave(admin.id, { auto: true });
+    const wave = await releasePickWave(TENANT_ID, operador.id, { auto: true });
     console.log(
       `Onda demo liberada: ${wave.orderCount} pedidos, ${wave.lineCount} linhas consolidadas`,
     );
@@ -641,6 +710,10 @@ async function main() {
     console.warn("Onda demo:", e);
   }
 
+  for (const config of DEMO_TENANT_CONFIGS) {
+    await seedDemoTenant(prisma, config);
+  }
+
   const notifyUsers = [admin, operador, ...pickers];
   for (const u of notifyUsers) {
     await prisma.notification.createMany({
@@ -661,22 +734,13 @@ async function main() {
     });
   }
 
-  console.log("\n=== Help Route — dados de demonstração ===\n");
-  console.log("Administrador (acesso total):");
-  console.log("  E-mail: admin@wms.local");
-  console.log("  Senha:  admin123\n");
-  console.log("Operador comum (painel web, sem área admin):");
-  console.log("  E-mail: operador@wms.local");
-  console.log("  Senha:  operador123\n");
-  console.log("Separadores (app mobile):");
-  console.log("  picker@wms.local / dev");
-  console.log("  maria@wms.local / dev");
-  console.log("  carlos@wms.local / dev\n");
+  console.log("\n=== Help Route — tenant default (dados completos) ===\n");
   console.log("Dashboard esperado:");
   console.log("  Aguardando separação: ~24");
   console.log("  Aguardando conferência: ~11");
   console.log("  Prontos para expedir: ~18");
   console.log("  Alertas de gôndola: 4 localizações\n");
+  printTestUsersGuide();
 }
 
 main()

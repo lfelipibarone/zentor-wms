@@ -8,7 +8,7 @@ import { api, ApiError } from "@/lib/api";
 import type { LocationLookup } from "@/lib/api";
 import { theme, spacing, typography } from "@/lib/theme";
 
-type Phase = "scan-pulmao" | "scan-product" | "scan-gondola" | "done";
+type Phase = "scan-pulmao" | "scan-product" | "confirm-qty" | "scan-gondola" | "done";
 
 type ScannerMode = "pulmao" | "product" | "gondola" | null;
 
@@ -47,8 +47,16 @@ export default function ReplenishmentScreen() {
         return;
       }
       setPulmao(loc);
-      setPhase("scan-product");
-      setMessage("Pulmão OK. Bipe o produto e informe a quantidade.");
+      if (loc.product?.sku || loc.product?.barcode) {
+        setProductBarcode(loc.product.barcode ?? loc.product.sku);
+        setPhase("confirm-qty");
+        setMessage(
+          `${loc.product.sku} no pulmão — informe a quantidade a transferir.`,
+        );
+      } else {
+        setPhase("scan-product");
+        setMessage("Pulmão OK. Bipe o produto ou informe a quantidade.");
+      }
     } catch (e) {
       setMessage(e instanceof ApiError ? e.message : "Pulmão não encontrado");
     } finally {
@@ -60,6 +68,12 @@ export default function ReplenishmentScreen() {
     setScannerOpen(false);
     setProductBarcode(raw.trim());
     setMessage(`Produto: ${raw.trim()}. Informe a quantidade retirada.`);
+  };
+
+  const startGondolaPhase = (qty: number) => {
+    setQuantity(qty);
+    setPhase("scan-gondola");
+    setMessage("3. Bipe a gôndola de destino");
   };
 
   const handleGondolaScan = async (raw: string) => {
@@ -138,21 +152,39 @@ export default function ReplenishmentScreen() {
         </View>
       ) : null}
 
+      {phase === "confirm-qty" && pulmao ? (
+        <>
+          <Text style={styles.instruction}>2. Quantidade a retirar do pulmão</Text>
+          {productBarcode ? (
+            <Text style={styles.meta}>Produto: {productBarcode}</Text>
+          ) : null}
+          <QuantityInput
+            label={`Quantidade (máx. ${maxFromPulmao})`}
+            max={maxFromPulmao}
+            onConfirm={startGondolaPhase}
+          />
+        </>
+      ) : null}
+
       {phase === "scan-product" && pulmao ? (
         <>
-          <Text style={styles.instruction}>2. Bipe o produto e a quantidade</Text>
+          <Text style={styles.instruction}>
+            2. Bipe o produto (opcional) ou informe a quantidade
+          </Text>
           <FactoryButton
             label={productBarcode ? `Produto: ${productBarcode}` : "Bipar produto"}
-            variant="success"
+            variant="secondary"
             onPress={() => openScanner("product")}
           />
           <QuantityInput
             label={`Quantidade (máx. ${maxFromPulmao})`}
             max={maxFromPulmao}
             onConfirm={(q) => {
-              setQuantity(q);
-              setPhase("scan-gondola");
-              setMessage("3. Bipe a gôndola de destino");
+              if (!productBarcode) {
+                setMessage("Bipe o produto antes ou selecione pulmão com SKU");
+                return;
+              }
+              startGondolaPhase(q);
             }}
           />
         </>

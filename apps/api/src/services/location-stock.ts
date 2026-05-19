@@ -112,6 +112,7 @@ export async function stockLocation(
 
     await tx.inventoryMovement.create({
       data: {
+        tenantId: location.tenantId,
         type: movementType,
         quantity: added,
         userId: input.userId,

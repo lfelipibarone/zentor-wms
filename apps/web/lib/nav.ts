@@ -3,18 +3,17 @@ import type { LucideIcon } from "lucide-react";
 import {
   BarChart3,
   Box,
+  Building2,
   ClipboardList,
   LayoutDashboard,
-  Package,
-  Search,
+  Layers,
+  Link2,
   Settings,
   Shield,
   ShoppingCart,
-  Truck,
   Users,
-  Warehouse,
-  Link2,
-  Layers,
+  Package,
+  RotateCcw,
 } from "lucide-react";
 
 export interface NavItem {
@@ -33,26 +32,14 @@ export const MAIN_NAV: NavItem[] = [
     permission: Permission.DASHBOARD_VIEW,
   },
   {
-    href: "/pesquisa",
-    label: "Pesquisa rápida",
-    icon: Search,
-    permission: Permission.SEARCH_USE,
-  },
-  {
     href: "/cadastros",
     label: "Cadastros",
     icon: ClipboardList,
     permission: Permission.REGISTERS_VIEW,
   },
   {
-    href: "/produtos",
-    label: "Produtos",
-    icon: Package,
-    permission: Permission.PRODUCTS_MANAGE,
-  },
-  {
-    href: "/vendas",
-    label: "Vendas",
+    href: "/pedidos",
+    label: "Pedidos",
     icon: ShoppingCart,
     permission: Permission.SALES_VIEW,
   },
@@ -67,18 +54,17 @@ export const MAIN_NAV: NavItem[] = [
     label: "Recebimentos",
     icon: Box,
     permission: Permission.RECEIPTS_VIEW,
-    badge: "beta",
   },
   {
-    href: "/estoque",
-    label: "Estoque",
-    icon: Warehouse,
+    href: "/estoque-giro",
+    label: "Estoque de giro",
+    icon: RotateCcw,
     permission: Permission.STOCK_VIEW,
   },
   {
-    href: "/expedicao",
-    label: "Expedição",
-    icon: Truck,
+    href: "/packing",
+    label: "Packing",
+    icon: Package,
     permission: Permission.SHIPPING_VIEW,
   },
   {
@@ -88,16 +74,34 @@ export const MAIN_NAV: NavItem[] = [
     permission: Permission.SYSTEM_VIEW,
   },
   {
-    href: "/integracoes/olist",
-    label: "Olist",
-    icon: Link2,
-    permission: Permission.OLIST_CONFIGURE,
-  },
-  {
     href: "/integracoes/tiny",
     label: "Tiny ERP",
     icon: Link2,
     permission: Permission.OLIST_CONFIGURE,
+  },
+];
+
+export const PLATFORM_ONLY_NAV: NavItem[] = [
+  {
+    href: "/",
+    label: "Início",
+    icon: LayoutDashboard,
+    permission: Permission.WEB_ACCESS,
+  },
+  {
+    href: "/platform/tenants",
+    label: "Clientes",
+    icon: Building2,
+    permission: Permission.TENANTS_MANAGE,
+  },
+];
+
+export const PLATFORM_NAV: NavItem[] = [
+  {
+    href: "/platform/tenants",
+    label: "Clientes",
+    icon: Building2,
+    permission: Permission.TENANTS_MANAGE,
   },
 ];
 

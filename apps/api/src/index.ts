@@ -7,6 +7,7 @@ import { dashboardRoutes } from "./routes/dashboard.js";
 import { webRoutes } from "./routes/web.js";
 import { notificationRoutes } from "./routes/notifications.js";
 import { integrationRoutes } from "./routes/integrations.js";
+import { tinyRoutes } from "./routes/tiny.js";
 import { startWaveScheduler } from "./services/wave-scheduler.js";
 
 const PORT = Number(process.env.PORT ?? 3333);
@@ -21,11 +22,14 @@ async function main() {
 
   await app.register(authRoutes);
   await app.register(adminRoutes);
+  const { platformRoutes } = await import("./routes/platform.js");
+  await app.register(platformRoutes);
   await app.register(mobileRoutes);
   await app.register(dashboardRoutes);
   await app.register(webRoutes);
   await app.register(notificationRoutes);
   await app.register(integrationRoutes);
+  await app.register(tinyRoutes);
 
   startWaveScheduler();
 

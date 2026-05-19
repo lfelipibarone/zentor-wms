@@ -115,6 +115,7 @@ export async function transferPulmaoToPickFace(
     });
     await tx.inventoryMovement.create({
       data: {
+        tenantId: fromLoc.tenantId,
         type: InventoryMovementType.TRANSFER,
         quantity: transferred,
         userId: input.userId,

@@ -12,7 +12,7 @@ export default function LookupScreen() {
   const { data, isLoading, error, refetch } = useLookupLocation(barcode);
 
   return (
-    <ScreenShell>
+    <ScreenShell scroll>
       <Text style={styles.subtitle}>
         Bipe qualquer gôndola para ver produto e estoque
       </Text>

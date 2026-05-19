@@ -74,6 +74,56 @@ enum InventoryMovementType {
   REPLENISHMENT      // Reabastecimento de pick face a partir do pulmão
 }
 
+/// Status da conexão OAuth com Tiny ERP v3
+enum TinyConnectionStatus {
+  PENDING
+  CONNECTED
+  ERROR
+}
+
+/// Status da sessão de recebimento/conferência de compra no WMS
+enum PurchaseReceiptSessionStatus {
+  WAITING_ENTRY
+  READY_TO_CHECK
+  IN_CHECK
+  COMPLETED
+  ISSUE
+  CANCELLED
+}
+
+enum PutawaySessionStatus {
+  PENDING
+  IN_PROGRESS
+  COMPLETED
+}
+
+// -----------------------------------------------------------------------------
+// Tenant (cliente / empresa)
+// -----------------------------------------------------------------------------
+
+model Tenant {
+  id        String   @id @default(cuid())
+  name      String
+  slug      String   @unique
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  users                   User[]
+  tinyConnection          TinyConnection?
+  products                Product[]
+  locations               Location[]
+  baskets                 Basket[]
+  orders                  Order[]
+  pickWaves               PickWave[]
+  purchaseReceiptSessions PurchaseReceiptSession[]
+  inventoryMovements      InventoryMovement[]
+  integrationEventLogs    IntegrationEventLog[]
+  systemSettings          SystemSetting[]
+
+  @@map("tenants")
+}
+
 // -----------------------------------------------------------------------------
 // User & Roles
 // -----------------------------------------------------------------------------
@@ -87,12 +137,18 @@ model User {
   /// Permissões granulares do painel (chaves como web.access, users.manage)
   permissions String[] @default([])
   active      Boolean  @default(true)
+  /// Super-admin da plataforma (sem tenant; gerencia clientes)
+  isPlatformAdmin Boolean @default(false)
+  /// Cliente ao qual o usuário pertence (null apenas para isPlatformAdmin)
+  tenantId    String?
   /// URL da foto de perfil (opcional)
   avatarUrl   String?
   /// Token de integração Olist (por usuário)
   olistToken  String?
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
+
+  tenant Tenant? @relation(fields: [tenantId], references: [id], onDelete: Restrict)
 
   /// Pedidos atribuídos a este operador
   assignedOrders Order[] @relation("OrderAssignedPicker")
@@ -109,8 +165,12 @@ model User {
   acceptedWaves PickWave[] @relation("WaveAcceptedBy")
   waveLinesPicked     PickWaveLine[]     @relation("WaveLinePickedBy")
   waveAllocationsSorted PickWaveAllocation[] @relation("WaveAllocSortedBy")
+  purchaseReceiptSessions PurchaseReceiptSession[] @relation("PurchaseReceiptStartedBy")
+  purchaseReceiptTimeLogs PurchaseReceiptTimeLog[]
+  putawaySessions         PutawaySession[]         @relation("PutawayAssignedTo")
 
   @@index([role])
+  @@index([tenantId])
   @@map("users")
 }
 
@@ -151,14 +211,18 @@ model PushDevice {
   @@map("push_devices")
 }
 
-/// Configurações globais editáveis apenas por admin
+/// Configurações por tenant (ondas, etc.)
 model SystemSetting {
-  key         String   @id
+  tenantId    String
+  key         String
   value       String
   description String?
   updatedAt   DateTime @updatedAt
   updatedById String?
 
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@id([tenantId, key])
   @@map("system_settings")
 }
 
@@ -168,21 +232,26 @@ model SystemSetting {
 
 model Product {
   id                String  @id @default(cuid())
-  sku               String  @unique
+  tenantId          String
+  sku               String
   name              String
   /// Quando true, cada unidade deve ser bipada individualmente na separação.
   /// Quando false, o operador informa apenas a quantidade (ex: parafusos a granel).
   requiresItemScan  Boolean @default(false)
-  barcode           String? @unique
+  barcode           String?
   active            Boolean @default(true)
   createdAt         DateTime @default(now())
   updatedAt         DateTime @updatedAt
 
+  tenant            Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   locations         Location[]
   orderItems        OrderItem[]
   inventoryMovements InventoryMovement[]
   pickWaveLines     PickWaveLine[]
 
+  @@unique([tenantId, sku])
+  @@unique([tenantId, barcode])
+  @@index([tenantId])
   @@index([sku])
   @@map("products")
 }
@@ -193,12 +262,13 @@ model Product {
 
 model Location {
   id              String       @id @default(cuid())
+  tenantId        String
   /// Corredor do galpão (ex: "A", "B", "01")
   corridor        String
   /// Fileira dentro do corredor (ex: "01", "02")
   row             String
   /// Código de barras físico da etiqueta da gôndola/pulmão
-  barcode         String       @unique
+  barcode         String
   type            LocationType
   /// Produto alocado nesta posição (opcional — pulmão pode estar vazio ou em transição)
   productId       String?
@@ -212,6 +282,7 @@ model Location {
   createdAt       DateTime     @default(now())
   updatedAt       DateTime     @updatedAt
 
+  tenant  Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   product Product? @relation(fields: [productId], references: [id], onDelete: SetNull)
 
   /// Itens de pedido com pick sugerido nesta localização
@@ -224,7 +295,10 @@ model Location {
   movementsTo InventoryMovement[] @relation("MovementToLocation")
 
   pickWaveLines PickWaveLine[]
+  putawayItems  PutawayItem[]
 
+  @@unique([tenantId, barcode])
+  @@index([tenantId])
   @@index([corridor, row])
   @@index([type])
   @@index([productId])
@@ -237,17 +311,23 @@ model Location {
 
 model Basket {
   id        String   @id @default(cuid())
+  tenantId  String
   /// Identificador legível da cesta (ex: "CESTA-042")
-  code      String   @unique
+  code      String
   /// Código de barras da cesta física
-  barcode   String   @unique
+  barcode   String
   active    Boolean  @default(true)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
   /// Pedidos atualmente vinculados a esta cesta durante a separação
   orders Order[]
 
+  @@unique([tenantId, code])
+  @@unique([tenantId, barcode])
+  @@index([tenantId])
   @@map("baskets")
 }
 
@@ -257,8 +337,9 @@ model Basket {
 
 model Order {
   id        String      @id @default(cuid())
+  tenantId  String
   /// Identificador do pedido no ERP (chave de integração)
-  erpOrderId String     @unique
+  erpOrderId String
   status    OrderStatus @default(PENDING)
   priority  Int         @default(0)
 
@@ -283,6 +364,7 @@ model Order {
   /// Data/hora em que o pedido foi marcado como expedido
   dispatchedAt DateTime?
 
+  tenant         Tenant  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   basket         Basket? @relation(fields: [basketId], references: [id], onDelete: SetNull)
   assignedPicker User?   @relation("OrderAssignedPicker", fields: [assignedPickerId], references: [id], onDelete: SetNull)
 
@@ -291,7 +373,10 @@ model Order {
   inventoryMovements InventoryMovement[]
   waveOrders         PickWaveOrder[]
 
+  @@unique([tenantId, erpOrderId])
+  @@index([tenantId])
   @@index([status])
+  @@index([tenantId, status])
   @@index([status, collectionDeadline, priority])
   @@index([dispatchedAt])
   @@index([basketId])
@@ -308,6 +393,7 @@ model OrderItem {
 
   quantityOrdered Int @default(0)
   quantityPicked  Int @default(0)
+  quantityPacked  Int @default(0)
 
   /// Localização sugerida para o pick (pick face alocado ao produto)
   pickLocationId String?
@@ -332,6 +418,7 @@ model OrderItem {
 
 model InventoryMovement {
   id        String   @id @default(cuid())
+  tenantId  String
   createdAt DateTime @default(now())
 
   type      InventoryMovementType
@@ -352,12 +439,14 @@ model InventoryMovement {
   reference String?
   notes     String?
 
+  tenant       Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   user         User      @relation(fields: [userId], references: [id], onDelete: Restrict)
   product      Product   @relation(fields: [productId], references: [id], onDelete: Restrict)
   fromLocation Location? @relation("MovementFromLocation", fields: [fromLocationId], references: [id], onDelete: SetNull)
   toLocation   Location? @relation("MovementToLocation", fields: [toLocationId], references: [id], onDelete: SetNull)
   order        Order?    @relation(fields: [orderId], references: [id], onDelete: SetNull)
 
+  @@index([tenantId])
   @@index([createdAt])
   @@index([productId])
   @@index([userId])
@@ -394,6 +483,7 @@ model OrderTimeLog {
 
 model PickWave {
   id           String         @id @default(cuid())
+  tenantId     String
   name         String
   status       PickWaveStatus @default(DRAFT)
   releasedAt   DateTime?
@@ -403,20 +493,151 @@ model PickWave {
   createdAt    DateTime       @default(now())
   updatedAt    DateTime       @updatedAt
 
-  releasedBy User? @relation("WaveReleasedBy", fields: [releasedById], references: [id], onDelete: SetNull)
-  acceptedBy User? @relation("WaveAcceptedBy", fields: [acceptedById], references: [id], onDelete: SetNull)
+  tenant     Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  releasedBy User?  @relation("WaveReleasedBy", fields: [releasedById], references: [id], onDelete: SetNull)
+  acceptedBy User?  @relation("WaveAcceptedBy", fields: [acceptedById], references: [id], onDelete: SetNull)
   orders     PickWaveOrder[]
   lines      PickWaveLine[]
 
+  @@index([tenantId])
+  @@index([tenantId, status])
   @@index([status])
   @@index([releasedAt])
   @@index([acceptedById])
   @@map("pick_waves")
 }
 
+// -----------------------------------------------------------------------------
+// Tiny ERP — OAuth v3 (conexão única por instalação WMS)
+// -----------------------------------------------------------------------------
+
+model TinyConnection {
+  id                String               @id @default(cuid())
+  tenantId          String               @unique
+  name              String               @default("Tiny ERP")
+  status            TinyConnectionStatus @default(PENDING)
+  oauthClientId     String?
+  oauthClientSecret String?
+  oauthRedirectUri  String?
+  accessToken       String?
+  refreshToken      String?
+  tokenExpiresAt    DateTime?
+  companyName       String?
+  lastError         String?
+  createdAt         DateTime             @default(now())
+  updatedAt         DateTime             @updatedAt
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@map("tiny_connections")
+}
+
+// -----------------------------------------------------------------------------
+// Recebimento / conferência de compra (NF entrada via Tiny)
+// -----------------------------------------------------------------------------
+
+model PurchaseReceiptSession {
+  id              String                       @id @default(cuid())
+  tenantId        String
+  tinyNotaId      Int
+  accessKey       String
+  invoiceNumber   String?
+  supplierName    String?
+  status          PurchaseReceiptSessionStatus @default(READY_TO_CHECK)
+  tinySyncStatus  String?
+  tinySyncMessage String?
+  startedById          String
+  startedAt            DateTime                     @default(now())
+  conferenceStartedAt  DateTime?
+  conferenceEndedAt    DateTime?
+  completedAt          DateTime?
+  updatedAt            DateTime                     @updatedAt
+
+  tenant    Tenant                    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  startedBy User                      @relation("PurchaseReceiptStartedBy", fields: [startedById], references: [id], onDelete: Restrict)
+  items     PurchaseReceiptItem[]
+  timeLogs  PurchaseReceiptTimeLog[]
+  putaway   PutawaySession?
+
+  @@unique([tenantId, accessKey])
+  @@index([tenantId])
+  @@index([status])
+  @@index([startedAt])
+  @@map("purchase_receipt_sessions")
+}
+
+model PurchaseReceiptTimeLog {
+  id        String   @id @default(cuid())
+  sessionId String
+  userId    String
+  event     String
+  createdAt DateTime @default(now())
+
+  session PurchaseReceiptSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  user    User                    @relation(fields: [userId], references: [id], onDelete: Restrict)
+
+  @@index([sessionId, createdAt])
+  @@map("purchase_receipt_time_logs")
+}
+
+model PutawaySession {
+  id                String               @id @default(cuid())
+  purchaseReceiptId String               @unique
+  status            PutawaySessionStatus @default(PENDING)
+  assignedToId      String?
+  startedAt         DateTime?
+  completedAt       DateTime?
+  createdAt         DateTime             @default(now())
+  updatedAt         DateTime             @updatedAt
+
+  purchaseReceipt PurchaseReceiptSession @relation(fields: [purchaseReceiptId], references: [id], onDelete: Cascade)
+  assignedTo      User?                  @relation("PutawayAssignedTo", fields: [assignedToId], references: [id], onDelete: SetNull)
+  items           PutawayItem[]
+
+  @@index([status])
+  @@map("putaway_sessions")
+}
+
+model PutawayItem {
+  id               String  @id @default(cuid())
+  sessionId        String
+  receiptItemId    String?
+  productCode      String?
+  description      String?
+  barcode          String?
+  quantityExpected Decimal @db.Decimal(12, 3)
+  quantityStored   Decimal @default(0) @db.Decimal(12, 3)
+  locationId       String?
+
+  session  PutawaySession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  location Location?      @relation(fields: [locationId], references: [id], onDelete: SetNull)
+
+  @@index([sessionId])
+  @@map("putaway_items")
+}
+
+model PurchaseReceiptItem {
+  id               String  @id @default(cuid())
+  sessionId        String
+  lineNumber       Int
+  tinyItemId       String?
+  productCode      String?
+  description      String?
+  barcode          String?
+  quantityExpected Decimal @db.Decimal(12, 3)
+  quantityChecked  Decimal @default(0) @db.Decimal(12, 3)
+
+  session PurchaseReceiptSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  @@unique([sessionId, lineNumber])
+  @@index([sessionId])
+  @@map("purchase_receipt_items")
+}
+
 /// Log de eventos de integração (ex.: webhook Tiny)
 model IntegrationEventLog {
   id         String   @id @default(cuid())
+  tenantId   String
   source     String
   eventType  String
   externalId String?
@@ -425,7 +646,10 @@ model IntegrationEventLog {
   payload    Json?
   createdAt  DateTime @default(now())
 
-  @@index([source, createdAt])
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId])
+  @@index([tenantId, source, createdAt])
   @@map("integration_event_logs")
 }
 

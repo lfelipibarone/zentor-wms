@@ -3,7 +3,15 @@
 import { Suspense, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Loader2 } from "lucide-react";
-import { login } from "@/lib/auth";
+import { isPlatformOnlyAdmin } from "@wms/shared";
+import { login, type AuthUser } from "@/lib/auth";
+
+function loginRedirect(user: AuthUser, from: string): string {
+  if (isPlatformOnlyAdmin(user)) {
+    return "/platform/tenants";
+  }
+  return from.startsWith("/") ? from : "/";
+}
 
 function LoginForm() {
   const router = useRouter();
@@ -20,8 +28,9 @@ function LoginForm() {
     setLoading(true);
     setError(null);
     try {
-      await login(email.trim(), password);
-      router.replace(from.startsWith("/") ? from : "/");
+      const user = await login(email.trim(), password);
+      const target = loginRedirect(user, from);
+      router.replace(target);
       router.refresh();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Erro ao entrar");
@@ -93,11 +102,15 @@ function LoginForm() {
         </form>
 
         <p className="mt-6 text-center text-xs text-muted-foreground">
-          Admin: <span className="font-mono">admin@wms.local</span> /{" "}
+          Super-admin: <span className="font-mono">admin@wms.local</span> /{" "}
           <span className="font-mono">admin123</span>
           <br />
-          Operador: <span className="font-mono">operador@wms.local</span> /{" "}
-          <span className="font-mono">operador123</span>
+          <a
+            href="/docs/usuarios-teste"
+            className="mt-2 inline-block font-medium text-[#0d9488] hover:underline"
+          >
+            Ver usuários de teste
+          </a>
         </p>
       </div>
     </div>

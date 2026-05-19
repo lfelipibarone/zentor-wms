@@ -11,6 +11,37 @@ import {
 import { signSession } from "../lib/session-token.js";
 import { toPublicUser } from "../lib/user-dto.js";
 
+async function loadUserForAuth(email: string) {
+  return prisma.user.findUnique({
+    where: { email },
+    include: {
+      tenant: { select: { id: true, name: true, slug: true, active: true } },
+    },
+  });
+}
+
+function sessionUser(user: {
+  id: string;
+  email: string;
+  role: string;
+  permissions: string[];
+  tenantId: string | null;
+  isPlatformAdmin: boolean;
+}) {
+  const permissions = effectivePermissions(user);
+  return {
+    token: signSession({
+      id: user.id,
+      email: user.email,
+      role: user.role,
+      permissions,
+      tenantId: user.tenantId,
+      isPlatformAdmin: user.isPlatformAdmin,
+    }),
+    permissions,
+  };
+}
+
 export async function authRoutes(app: FastifyInstance) {
   app.post<{
     Body: { email?: string; password?: string };
@@ -22,9 +53,13 @@ export async function authRoutes(app: FastifyInstance) {
       return reply.status(400).send({ error: "E-mail e senha são obrigatórios" });
     }
 
-    const user = await prisma.user.findUnique({ where: { email } });
+    const user = await loadUserForAuth(email);
     if (!user || !user.active || !verifyPassword(password, user.password)) {
       return reply.status(401).send({ error: "Credenciais inválidas" });
+    }
+
+    if (user.tenantId && !user.tenant?.active) {
+      return reply.status(403).send({ error: "Cliente inativo" });
     }
 
     if (!canAccessWeb(user)) {
@@ -33,17 +68,14 @@ export async function authRoutes(app: FastifyInstance) {
       });
     }
 
-    const permissions = effectivePermissions(user);
-    const token = signSession({
-      id: user.id,
-      email: user.email,
-      role: user.role,
-      permissions,
-    });
+    const { token } = sessionUser(user);
 
     return {
       token,
-      user: toPublicUser(user),
+      user: toPublicUser({
+        ...user,
+        tenant: user.tenant,
+      }),
     };
   });
 
@@ -57,9 +89,19 @@ export async function authRoutes(app: FastifyInstance) {
       return reply.status(400).send({ error: "E-mail e senha são obrigatórios" });
     }
 
-    const user = await prisma.user.findUnique({ where: { email } });
+    const user = await loadUserForAuth(email);
     if (!user || !user.active || !verifyPassword(password, user.password)) {
       return reply.status(401).send({ error: "Credenciais inválidas" });
+    }
+
+    if (user.isPlatformAdmin && !user.tenantId) {
+      return reply.status(403).send({
+        error: "Super-admin da plataforma não acessa o app mobile",
+      });
+    }
+
+    if (user.tenantId && !user.tenant?.active) {
+      return reply.status(403).send({ error: "Cliente inativo" });
     }
 
     if (!canAccessMobile(user)) {
@@ -68,22 +110,31 @@ export async function authRoutes(app: FastifyInstance) {
       });
     }
 
-    const permissions = effectivePermissions(user);
-    const token = signSession({
-      id: user.id,
-      email: user.email,
-      role: user.role,
-      permissions,
-    });
+    const { token } = sessionUser(user);
 
     return {
       token,
-      user: toPublicUser(user),
+      user: toPublicUser({
+        ...user,
+        tenant: user.tenant,
+      }),
     };
   });
 
   app.get("/auth/me", { preHandler: requireAuth }, async (request) => {
-    return { user: toPublicUser(request.authUser!) };
+    const user = await prisma.user.findUnique({
+      where: { id: request.authUser!.id },
+      include: {
+        tenant: { select: { id: true, name: true, slug: true } },
+      },
+    });
+    if (!user) return { user: toPublicUser(request.authUser!) };
+    return {
+      user: toPublicUser({
+        ...user,
+        tenant: user.tenant,
+      }),
+    };
   });
 
   app.patch<{
@@ -143,9 +194,17 @@ export async function authRoutes(app: FastifyInstance) {
     const updated = await prisma.user.update({
       where: { id: user.id },
       data,
+      include: {
+        tenant: { select: { id: true, name: true, slug: true } },
+      },
     });
 
-    return { user: toPublicUser(updated) };
+    return {
+      user: toPublicUser({
+        ...updated,
+        tenant: updated.tenant,
+      }),
+    };
   });
 
   app.patch<{ Body: { token?: string } }>(
@@ -156,8 +215,14 @@ export async function authRoutes(app: FastifyInstance) {
       const updated = await prisma.user.update({
         where: { id: request.authUser!.id },
         data: { olistToken: token || null },
+        include: {
+          tenant: { select: { id: true, name: true, slug: true } },
+        },
       });
-      return { user: toPublicUser(updated), configured: Boolean(token) };
+      return {
+        user: toPublicUser({ ...updated, tenant: updated.tenant }),
+        configured: Boolean(token),
+      };
     },
   );
 

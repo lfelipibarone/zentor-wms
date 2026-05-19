@@ -72,11 +72,13 @@ function aggregateByUser(rows: OrderTimeRow[]): UserTimeRow[] {
 }
 
 async function fetchIndividualPickingRows(
+  tenantId: string,
   from: Date,
   to: Date,
 ): Promise<OrderTimeRow[]> {
   const logs = await prisma.orderTimeLog.findMany({
     where: {
+      order: { tenantId },
       event: {
         in: [
           OrderTimeLogEvent.START,
@@ -127,11 +129,13 @@ async function fetchIndividualPickingRows(
 }
 
 async function fetchWavePickingRows(
+  tenantId: string,
   from: Date,
   to: Date,
 ): Promise<OrderTimeRow[]> {
   const lines = await prisma.pickWaveLine.findMany({
     where: {
+      wave: { tenantId },
       pickCompletedAt: { gte: from, lte: to },
       pickStartedAt: { not: null },
     },
@@ -206,11 +210,13 @@ async function fetchWavePickingRows(
 }
 
 async function fetchIndividualPackingRows(
+  tenantId: string,
   from: Date,
   to: Date,
 ): Promise<OrderTimeRow[]> {
   const logs = await prisma.orderTimeLog.findMany({
     where: {
+      order: { tenantId },
       event: {
         in: [OrderTimeLogEvent.PACK_START, OrderTimeLogEvent.PACK_END],
       },
@@ -260,11 +266,13 @@ async function fetchIndividualPackingRows(
 }
 
 async function fetchWavePackingRows(
+  tenantId: string,
   from: Date,
   to: Date,
 ): Promise<OrderTimeRow[]> {
   const allocations = await prisma.pickWaveAllocation.findMany({
     where: {
+      waveLine: { wave: { tenantId } },
       sortCompletedAt: { gte: from, lte: to },
       sortStartedAt: { not: null },
     },
@@ -390,6 +398,7 @@ function toUserResult(
 }
 
 export async function buildOperationTimeReport(
+  tenantId: string,
   report: OperationTimeReportId,
   from: Date,
   to: Date,
@@ -397,8 +406,8 @@ export async function buildOperationTimeReport(
   switch (report) {
     case "picking_time_by_order": {
       const rows = [
-        ...(await fetchIndividualPickingRows(from, to)),
-        ...(await fetchWavePickingRows(from, to)),
+        ...(await fetchIndividualPickingRows(tenantId, from, to)),
+        ...(await fetchWavePickingRows(tenantId, from, to)),
       ].sort((a, b) => (a.pedidoErp ?? "").localeCompare(b.pedidoErp ?? ""));
       return toOrderResult(
         report,
@@ -410,8 +419,8 @@ export async function buildOperationTimeReport(
     }
     case "picking_time_by_user": {
       const orderRows = [
-        ...(await fetchIndividualPickingRows(from, to)),
-        ...(await fetchWavePickingRows(from, to)),
+        ...(await fetchIndividualPickingRows(tenantId, from, to)),
+        ...(await fetchWavePickingRows(tenantId, from, to)),
       ];
       return toUserResult(
         report,
@@ -423,8 +432,8 @@ export async function buildOperationTimeReport(
     }
     case "packing_time_by_order": {
       const rows = [
-        ...(await fetchIndividualPackingRows(from, to)),
-        ...(await fetchWavePackingRows(from, to)),
+        ...(await fetchIndividualPackingRows(tenantId, from, to)),
+        ...(await fetchWavePackingRows(tenantId, from, to)),
       ].sort((a, b) => (a.pedidoErp ?? "").localeCompare(b.pedidoErp ?? ""));
       return toOrderResult(
         report,
@@ -436,8 +445,8 @@ export async function buildOperationTimeReport(
     }
     case "packing_time_by_user": {
       const orderRows = [
-        ...(await fetchIndividualPackingRows(from, to)),
-        ...(await fetchWavePackingRows(from, to)),
+        ...(await fetchIndividualPackingRows(tenantId, from, to)),
+        ...(await fetchWavePackingRows(tenantId, from, to)),
       ];
       return toUserResult(
         report,

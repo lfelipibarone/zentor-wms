@@ -2,6 +2,7 @@ import type { FastifyInstance } from "fastify";
 import {
   ALL_PERMISSION_KEYS,
   defaultPermissionsForRole,
+  Permission,
   type UserRole,
 } from "@wms/shared";
 import { prisma } from "../lib/prisma.js";
@@ -10,6 +11,7 @@ import {
   requireUsersManage,
   requireSettingsManage,
 } from "../lib/auth-guard.js";
+import { tenantWhere } from "../lib/tenant-context.js";
 import { toPublicUser } from "../lib/user-dto.js";
 import { parsePagination, buildPaginationMeta } from "../lib/pagination.js";
 
@@ -22,14 +24,19 @@ export async function adminRoutes(app: FastifyInstance) {
     async (request) => {
       const q = request.query.q?.trim();
       const { page, pageSize, skip, take } = parsePagination(request.query);
-      const where = q
-        ? {
-            OR: [
-              { name: { contains: q, mode: "insensitive" as const } },
-              { email: { contains: q, mode: "insensitive" as const } },
-            ],
-          }
-        : {};
+      const tenantId = tenantWhere(request).tenantId;
+      const where = {
+        tenantId,
+        isPlatformAdmin: false,
+        ...(q
+          ? {
+              OR: [
+                { name: { contains: q, mode: "insensitive" as const } },
+                { email: { contains: q, mode: "insensitive" as const } },
+              ],
+            }
+          : {}),
+      };
       const [users, total] = await Promise.all([
         prisma.user.findMany({
           where,
@@ -56,6 +63,7 @@ export async function adminRoutes(app: FastifyInstance) {
       active?: boolean;
     };
   }>("/api/admin/users", { preHandler: requireUsersManage }, async (request, reply) => {
+    const tenantId = tenantWhere(request).tenantId;
     const email = request.body?.email?.trim().toLowerCase();
     const name = request.body?.name?.trim();
     const password = request.body?.password;
@@ -80,10 +88,12 @@ export async function adminRoutes(app: FastifyInstance) {
       return reply.status(409).send({ error: "E-mail já cadastrado" });
     }
 
-    const permissions =
+    let permissions =
       request.body?.permissions?.filter((p) =>
         ALL_PERMISSION_KEYS.includes(p as never),
       ) ?? defaultPermissionsForRole(role);
+
+    permissions = permissions.filter((p) => p !== Permission.TENANTS_MANAGE);
 
     const user = await prisma.user.create({
       data: {
@@ -93,6 +103,8 @@ export async function adminRoutes(app: FastifyInstance) {
         role,
         permissions,
         active: request.body?.active ?? true,
+        tenantId,
+        isPlatformAdmin: false,
       },
     });
 
@@ -113,8 +125,9 @@ export async function adminRoutes(app: FastifyInstance) {
     "/api/admin/users/:id",
     { preHandler: requireUsersManage },
     async (request, reply) => {
-      const existing = await prisma.user.findUnique({
-        where: { id: request.params.id },
+      const tenantId = tenantWhere(request).tenantId;
+      const existing = await prisma.user.findFirst({
+        where: { id: request.params.id, tenantId, isPlatformAdmin: false },
       });
       if (!existing) {
         return reply.status(404).send({ error: "Usuário não encontrado" });
@@ -155,9 +168,9 @@ export async function adminRoutes(app: FastifyInstance) {
         data.role = request.body.role as UserRole;
       }
       if (request.body?.permissions) {
-        data.permissions = request.body.permissions.filter((p) =>
-          ALL_PERMISSION_KEYS.includes(p as never),
-        );
+        data.permissions = request.body.permissions
+          .filter((p) => ALL_PERMISSION_KEYS.includes(p as never))
+          .filter((p) => p !== Permission.TENANTS_MANAGE);
       }
       if (typeof request.body?.active === "boolean") {
         data.active = request.body.active;
@@ -175,8 +188,10 @@ export async function adminRoutes(app: FastifyInstance) {
   app.get(
     "/api/admin/settings",
     { preHandler: requireSettingsManage },
-    async () => {
+    async (request) => {
+      const tenantId = tenantWhere(request).tenantId;
       const settings = await prisma.systemSetting.findMany({
+        where: { tenantId },
         orderBy: { key: "asc" },
       });
       return { settings };
@@ -189,6 +204,7 @@ export async function adminRoutes(app: FastifyInstance) {
     "/api/admin/settings",
     { preHandler: requireSettingsManage },
     async (request, reply) => {
+      const tenantId = tenantWhere(request).tenantId;
       const items = request.body?.settings;
       if (!items?.length) {
         return reply.status(400).send({ error: "Nenhuma configuração enviada" });
@@ -197,8 +213,11 @@ export async function adminRoutes(app: FastifyInstance) {
       const updated = await prisma.$transaction(
         items.map((item) =>
           prisma.systemSetting.upsert({
-            where: { key: item.key },
+            where: {
+              tenantId_key: { tenantId, key: item.key },
+            },
             create: {
+              tenantId,
               key: item.key,
               value: item.value,
               description: item.description,

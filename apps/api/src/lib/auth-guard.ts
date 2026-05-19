@@ -6,6 +6,7 @@ import {
   canAccessWeb,
   requirePermissionKey,
 } from "./permissions.js";
+import { requireTenantContext } from "./tenant-context.js";
 import { verifySession, type SessionPayload } from "./session-token.js";
 
 declare module "fastify" {
@@ -17,6 +18,8 @@ declare module "fastify" {
       name: string;
       role: string;
       permissions: string[];
+      tenantId: string | null;
+      isPlatformAdmin: boolean;
     };
   }
 }
@@ -32,9 +35,18 @@ async function loadAuthUser(request: FastifyRequest): Promise<boolean> {
       role: true,
       permissions: true,
       active: true,
+      tenantId: true,
+      isPlatformAdmin: true,
     },
   });
   if (!user || !user.active) return false;
+  if (user.tenantId) {
+    const tenant = await prisma.tenant.findUnique({
+      where: { id: user.tenantId },
+      select: { active: true },
+    });
+    if (!tenant?.active) return false;
+  }
   request.authUser = user;
   return true;
 }
@@ -86,9 +98,19 @@ export async function requireMobileAccess(
   await requireAuth(request, reply);
   if (reply.sent || !request.authUser) return;
 
+  if (request.authUser.isPlatformAdmin && !request.authUser.tenantId) {
+    reply.status(403).send({
+      error: "Super-admin da plataforma não acessa o app mobile",
+    });
+    return;
+  }
+
   if (!canAccessMobile(request.authUser)) {
     reply.status(403).send({ error: "Sem permissão para o app mobile" });
+    return;
   }
+
+  await requireTenantContext(request, reply);
 }
 
 export function createPermissionGuard(permission: string) {
@@ -98,7 +120,9 @@ export function createPermissionGuard(permission: string) {
 
     if (!requirePermissionKey(request.authUser, permission as never)) {
       reply.status(403).send({ error: "Permissão negada" });
+      return;
     }
+    await requireTenantContext(request, reply);
   };
 }
 

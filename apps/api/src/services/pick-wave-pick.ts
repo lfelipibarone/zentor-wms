@@ -125,6 +125,7 @@ export async function confirmConsolidatedPick(input: ConsolidatedPickInput) {
 
     await tx.inventoryMovement.create({
       data: {
+        tenantId: line.wave.tenantId,
         type: InventoryMovementType.PICK_ALLOCATION,
         quantity,
         userId: input.userId,

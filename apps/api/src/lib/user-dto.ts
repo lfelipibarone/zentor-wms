@@ -1,17 +1,22 @@
 import { effectivePermissions } from "./permissions.js";
 
-export function toPublicUser(user: {
-  id: string;
-  email: string;
-  name: string;
-  role: string;
-  permissions: string[];
-  active?: boolean;
-  avatarUrl?: string | null;
-  olistToken?: string | null;
-  createdAt?: Date;
-  updatedAt?: Date;
-}) {
+export function toPublicUser(
+  user: {
+    id: string;
+    email: string;
+    name: string;
+    role: string;
+    permissions: string[];
+    active?: boolean;
+    avatarUrl?: string | null;
+    olistToken?: string | null;
+    tenantId?: string | null;
+    isPlatformAdmin?: boolean;
+    createdAt?: Date;
+    updatedAt?: Date;
+    tenant?: { id: string; name: string; slug: string } | null;
+  },
+) {
   return {
     id: user.id,
     email: user.email,
@@ -21,6 +26,9 @@ export function toPublicUser(user: {
     active: user.active ?? true,
     avatarUrl: user.avatarUrl ?? null,
     olistConfigured: Boolean(user.olistToken?.trim()),
+    tenantId: user.tenantId ?? null,
+    isPlatformAdmin: user.isPlatformAdmin ?? false,
+    tenant: user.tenant ?? null,
     createdAt: user.createdAt,
     updatedAt: user.updatedAt,
   };

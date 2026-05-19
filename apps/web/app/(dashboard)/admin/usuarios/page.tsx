@@ -8,7 +8,6 @@ import {
   defaultPermissionsForRole,
   type PermissionKey,
 } from "@wms/shared";
-import type { UserRole } from "@wms/shared";
 import { apiFetch } from "@/lib/api/client";
 import type { AuthUser } from "@/lib/auth";
 

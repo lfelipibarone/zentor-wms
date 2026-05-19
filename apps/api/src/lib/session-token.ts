@@ -7,6 +7,8 @@ export interface SessionPayload {
   email: string;
   role: string;
   permissions: string[];
+  tenantId: string | null;
+  isPlatformAdmin: boolean;
   exp: number;
 }
 
@@ -15,7 +17,14 @@ function secret(): string {
 }
 
 export function signSession(
-  user: { id: string; email: string; role: string; permissions: string[] },
+  user: {
+    id: string;
+    email: string;
+    role: string;
+    permissions: string[];
+    tenantId?: string | null;
+    isPlatformAdmin?: boolean;
+  },
   ttlSec = DEFAULT_TTL_SEC,
 ): string {
   const payload: SessionPayload = {
@@ -23,6 +32,8 @@ export function signSession(
     email: user.email,
     role: user.role,
     permissions: user.permissions,
+    tenantId: user.tenantId ?? null,
+    isPlatformAdmin: user.isPlatformAdmin ?? false,
     exp: Math.floor(Date.now() / 1000) + ttlSec,
   };
   const body = Buffer.from(JSON.stringify(payload)).toString("base64url");
@@ -46,6 +57,8 @@ export function verifySession(token: string): SessionPayload | null {
     if (!Array.isArray(payload.permissions)) {
       payload.permissions = [];
     }
+    if (payload.tenantId === undefined) payload.tenantId = null;
+    if (payload.isPlatformAdmin === undefined) payload.isPlatformAdmin = false;
     return payload;
   } catch {
     return null;

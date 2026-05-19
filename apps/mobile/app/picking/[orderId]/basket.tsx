@@ -29,7 +29,10 @@ export default function BasketScanScreen() {
   };
 
   return (
-    <ScreenShell subtitle="Vincule uma cesta física ao pedido para iniciar o cronômetro">
+    <ScreenShell
+      scroll
+      subtitle="Vincule uma cesta física ao pedido para iniciar o cronômetro"
+    >
       <View style={styles.infoBox}>
         <Text style={styles.info}>
           Aponte a câmera para o código de barras da cesta de separação.

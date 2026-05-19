@@ -5,17 +5,15 @@ import { FactoryButton } from "@/components/FactoryButton";
 import { UserAvatarMenu } from "@/components/UserAvatarMenu";
 import { NotificationBell } from "@/components/NotificationBell";
 import { useAuth } from "@/contexts/AuthContext";
-import { useMobileConfig } from "@/hooks/useMobileConfig";
 import { theme, spacing, typography } from "@/lib/theme";
 import { getApiBaseUrl } from "@/lib/api";
 
 export default function HomeScreen() {
   const { user } = useAuth();
-  const { data: mobileConfig } = useMobileConfig();
-  const waveEnabled = mobileConfig?.waveEnabled !== false;
 
   return (
     <ScreenShell
+      scroll
       title="Help Route"
       subtitle={user ? `${user.name} · ${user.role}` : "Operações de galpão"}
     >
@@ -28,16 +26,19 @@ export default function HomeScreen() {
         <Text style={styles.heroText}>Selecione o fluxo</Text>
       </View>
 
-      {waveEnabled ? (
-        <FactoryButton
-          label="Separação em onda"
-          onPress={() => router.push("/wave-picking/index")}
-        />
-      ) : null}
       <FactoryButton
-        label="Separação (pedido a pedido)"
-        variant={waveEnabled ? "secondary" : "primary"}
+        label="Separação"
         onPress={() => router.push("/picking")}
+      />
+      <FactoryButton
+        label="Recebimento (NF — caminhão)"
+        variant="secondary"
+        onPress={() => router.push("/purchase-receipt")}
+      />
+      <FactoryButton
+        label="Armazenagem (pulmão)"
+        variant="secondary"
+        onPress={() => router.push("/putaway")}
       />
       <FactoryButton
         label="Pulmão → gôndola"
@@ -45,13 +46,8 @@ export default function HomeScreen() {
         onPress={() => router.push("/replenishment")}
       />
       <FactoryButton
-        label="Abastecer gôndola"
-        onPress={() => router.push("/stocking/index")}
-      />
-      <FactoryButton
-        label="Consulta rápida"
-        variant="secondary"
-        onPress={() => router.push("/lookup")}
+        label="Abastecer gôndola (giro)"
+        onPress={() => router.push("/stocking")}
       />
 
       <Text style={styles.apiHint}>API: {getApiBaseUrl()}</Text>
@@ -82,7 +78,7 @@ const styles = StyleSheet.create({
     textAlign: "center",
   },
   apiHint: {
-    marginTop: "auto",
+    marginTop: spacing.lg,
     color: theme.textMuted,
     fontSize: typography.caption,
     textAlign: "center",

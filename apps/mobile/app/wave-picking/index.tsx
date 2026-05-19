@@ -14,7 +14,7 @@ import { theme, spacing, typography } from "@/lib/theme";
 
 function statusLabel(line: WaveLineSummary) {
   if (line.sortStatus === "SORTED") return "Concluído";
-  if (line.sortStatus === "PICKED") return "Packing";
+  if (line.sortStatus === "PICKED") return "Packing no web";
   if (line.quantityPicked > 0) return "Em andamento";
   return "Pendente";
 }
@@ -118,16 +118,12 @@ export default function WavePickingListScreen() {
             ]}
             onPress={() => {
               if (item.sortStatus === "PICKED") {
-                router.push({
-                  pathname: "/wave-picking/[lineId]/sort",
-                  params: { lineId: item.id },
-                });
-              } else {
-                router.push({
-                  pathname: "/wave-picking/[lineId]/pick",
-                  params: { lineId: item.id },
-                });
+                return;
               }
+              router.push({
+                pathname: "/wave-picking/[lineId]/pick",
+                params: { lineId: item.id },
+              });
             }}
           >
             <View style={styles.cardTop}>
@@ -152,7 +148,9 @@ export default function WavePickingListScreen() {
                 Faltam {item.remaining} un. na gôndola
               </Text>
             ) : item.sortStatus === "PICKED" ? (
-              <Text style={styles.hint}>Toque para packing nas cestas</Text>
+              <Text style={styles.hint}>
+                Pick concluído — finalize o packing no painel web
+              </Text>
             ) : null}
           </Pressable>
         )}

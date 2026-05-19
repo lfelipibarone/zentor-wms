@@ -8,6 +8,8 @@ export interface SortAllocationInput {
   quantity: number;
   basketBarcode?: string;
   userId: string;
+  /** Packing pelo painel web — não exige ser o operador que aceitou a onda no mobile */
+  webPacking?: boolean;
 }
 
 async function checkOrderComplete(orderId: string, tx: Parameters<Parameters<typeof prisma.$transaction>[0]>[0]) {
@@ -45,7 +47,9 @@ export async function confirmSortAllocation(input: SortAllocationInput) {
   if (line.wave.status !== PickWaveStatus.RELEASED) {
     throw new PickWaveError("Onda não está ativa");
   }
-  await assertWaveOperatorForMutation(line.waveId, input.userId);
+  if (!input.webPacking) {
+    await assertWaveOperatorForMutation(line.waveId, input.userId);
+  }
   if (line.quantityPicked < line.quantityTotal) {
     throw new PickWaveError("Conclua o pick na gôndola antes do packing");
   }

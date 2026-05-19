@@ -293,7 +293,173 @@ export const api = {
       method: "POST",
       body: JSON.stringify(body),
     }),
+
+  getPurchaseReceiptQueue: () =>
+    request<{ queue: PurchaseReceiptQueueItem[] }>(
+      "/mobile/purchase-receipts/queue"
+    ),
+
+  startPurchaseReceipt: (barcode: string) =>
+    request<PurchaseReceiptSessionDto>("/mobile/purchase-receipts/start", {
+      method: "POST",
+      body: JSON.stringify({ barcode }),
+    }),
+
+  getPurchaseReceiptSession: (sessionId: string) =>
+    request<PurchaseReceiptSessionDto>(
+      `/mobile/purchase-receipts/${sessionId}`
+    ),
+
+  scanPurchaseReceiptItem: (
+    sessionId: string,
+    barcode: string,
+    quantity?: number
+  ) =>
+    request<PurchaseReceiptSessionDto>(
+      `/mobile/purchase-receipts/${sessionId}/scan`,
+      {
+        method: "POST",
+        body: JSON.stringify({ barcode, quantity }),
+      }
+    ),
+
+  confirmPurchaseReceiptItem: (
+    sessionId: string,
+    itemId: string,
+    quantity: number
+  ) =>
+    request<PurchaseReceiptSessionDto>(
+      `/mobile/purchase-receipts/${sessionId}/confirm-item`,
+      {
+        method: "POST",
+        body: JSON.stringify({ itemId, quantity }),
+      }
+    ),
+
+  completePurchaseReceipt: (sessionId: string) =>
+    request<PurchaseReceiptSessionDto>(
+      `/mobile/purchase-receipts/${sessionId}/complete`,
+      { method: "POST" }
+    ),
+
+  markPurchaseReceiptConferenceStart: (sessionId: string) =>
+    request<{ ok: boolean }>(
+      `/mobile/purchase-receipts/${sessionId}/conference-start`,
+      { method: "POST" }
+    ),
+
+  getPutawayQueue: () =>
+    request<{ queue: PutawayQueueItem[] }>("/mobile/putaway/queue"),
+
+  startPutaway: (purchaseReceiptId: string) =>
+    request<PutawaySessionDto>("/mobile/putaway/start", {
+      method: "POST",
+      body: JSON.stringify({ purchaseReceiptId }),
+    }),
+
+  getPutawaySession: (sessionId: string) =>
+    request<PutawaySessionDto>(`/mobile/putaway/${sessionId}`),
+
+  storePutawayItem: (
+    sessionId: string,
+    body: {
+      itemId: string;
+      locationBarcode: string;
+      productBarcode?: string;
+      quantity?: number;
+    }
+  ) =>
+    request<PutawaySessionDto>(`/mobile/putaway/${sessionId}/store`, {
+      method: "POST",
+      body: JSON.stringify(body),
+    }),
+
+  completePutaway: (sessionId: string) =>
+    request<PutawaySessionDto>(`/mobile/putaway/${sessionId}/complete`, {
+      method: "POST",
+    }),
 };
+
+export interface PurchaseReceiptQueueItem {
+  tinyNotaId: number;
+  accessKey: string | null;
+  invoiceNumber: string | null;
+  supplierName: string | null;
+  issueDate: string | null;
+  value: number | null;
+}
+
+export interface PutawayQueueItem {
+  purchaseReceiptId: string;
+  putawaySessionId: string | null;
+  invoiceNumber: string | null;
+  supplierName: string | null;
+  completedAt: string | null;
+  receiptOperator: string;
+  itemCount: number;
+  status: string;
+}
+
+export interface PutawaySessionDto {
+  session: {
+    id: string;
+    purchaseReceiptId: string;
+    status: string;
+    startedAt: string | null;
+  };
+  items: Array<{
+    id: string;
+    productCode: string | null;
+    description: string | null;
+    barcode: string | null;
+    quantityExpected: number;
+    quantityStored: number;
+    locationBarcode: string | null;
+    completed: boolean;
+  }>;
+  nextItem: {
+    id: string;
+    productCode: string | null;
+    description: string | null;
+    barcode: string | null;
+    remaining: number;
+  } | null;
+  allStored: boolean;
+}
+
+export interface PurchaseReceiptSessionDto {
+  session: {
+    id: string;
+    tinyNotaId: number;
+    accessKey: string;
+    invoiceNumber: string | null;
+    supplierName: string | null;
+    status: string;
+    tinySyncStatus: string | null;
+    tinySyncMessage: string | null;
+  };
+  items: Array<{
+    id: string;
+    lineNumber: number;
+    productCode: string | null;
+    description: string | null;
+    barcode: string | null;
+    quantityExpected: number;
+    quantityChecked: number;
+    completed: boolean;
+  }>;
+  nextItem: {
+    id: string;
+    lineNumber: number;
+    productCode: string | null;
+    description: string | null;
+    barcode: string | null;
+    quantityExpected: number;
+    quantityChecked: number;
+    remaining: number;
+  } | null;
+  allChecked: boolean;
+}
 
 export interface WaveLineSummary {
   id: string;

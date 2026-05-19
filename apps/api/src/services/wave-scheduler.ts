@@ -3,7 +3,7 @@ import { prisma } from "../lib/prisma.js";
 import { releasePickWave } from "./pick-wave.js";
 import { getWaveSettings } from "./wave-settings.js";
 
-let lastAutoRunDateKey: string | null = null;
+const lastAutoRunByTenant = new Map<string, string>();
 
 function todayKeyInSaoPaulo(): string {
   return new Date().toLocaleDateString("en-CA", {
@@ -29,36 +29,46 @@ function parseTimeToMinutes(time: string): number {
   return h * 60 + m;
 }
 
-export async function tryAutoReleaseWave(): Promise<void> {
-  const settings = await getWaveSettings();
+async function tryAutoReleaseForTenant(tenantId: string): Promise<void> {
+  const settings = await getWaveSettings(tenantId);
   if (!settings.enabled || !settings.autoReleaseEnabled) return;
 
   const today = todayKeyInSaoPaulo();
-  if (lastAutoRunDateKey === today) return;
+  if (lastAutoRunByTenant.get(tenantId) === today) return;
 
   const target = parseTimeToMinutes(settings.autoReleaseTime);
   const now = currentMinutesInSaoPaulo();
   if (now < target) return;
 
   const active = await prisma.pickWave.findFirst({
-    where: { status: PickWaveStatus.RELEASED },
+    where: { tenantId, status: PickWaveStatus.RELEASED },
   });
   if (active) {
-    lastAutoRunDateKey = today;
+    lastAutoRunByTenant.set(tenantId, today);
     return;
   }
 
   const admin = await prisma.user.findFirst({
-    where: { role: "ADMIN", active: true },
+    where: { tenantId, role: "ADMIN", active: true, isPlatformAdmin: false },
   });
   if (!admin) return;
 
   try {
-    await releasePickWave(admin.id, { auto: true });
-    lastAutoRunDateKey = today;
-    console.log("[wave-scheduler] Onda automática liberada");
+    await releasePickWave(tenantId, admin.id, { auto: true });
+    lastAutoRunByTenant.set(tenantId, today);
+    console.log(`[wave-scheduler] Onda automática liberada (${tenantId})`);
   } catch (e) {
-    console.warn("[wave-scheduler]", e);
+    console.warn(`[wave-scheduler] ${tenantId}`, e);
+  }
+}
+
+export async function tryAutoReleaseWave(): Promise<void> {
+  const tenants = await prisma.tenant.findMany({
+    where: { active: true },
+    select: { id: true },
+  });
+  for (const t of tenants) {
+    await tryAutoReleaseForTenant(t.id);
   }
 }
 

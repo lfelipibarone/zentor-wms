@@ -4,6 +4,8 @@ import {
   canAccessWeb,
   defaultPermissionsForRole,
   hasPermission,
+  Permission,
+  PLATFORM_ADMIN_PERMISSIONS,
   type PermissionKey,
   type UserRole,
 } from "@wms/shared";
@@ -21,16 +23,19 @@ export {
 export function effectivePermissions(user: {
   role: string;
   permissions: string[];
+  isPlatformAdmin?: boolean;
 }): string[] {
-  if (user.role === "ADMIN") return [...ALL_PERMISSION_KEYS];
+  if (user.isPlatformAdmin) return [...PLATFORM_ADMIN_PERMISSIONS];
+  if (user.role === "ADMIN") {
+    return ALL_PERMISSION_KEYS.filter((k) => k !== Permission.TENANTS_MANAGE);
+  }
   if (user.permissions.length > 0) return user.permissions;
   return defaultPermissionsForRole(user.role as UserRole);
 }
 
 export function requirePermissionKey(
-  user: { role: string; permissions: string[] },
+  user: { role: string; permissions: string[]; isPlatformAdmin?: boolean },
   permission: PermissionKey,
 ): boolean {
-  const perms = effectivePermissions(user);
-  return user.role === "ADMIN" || perms.includes(permission);
+  return hasPermission(user, permission);
 }

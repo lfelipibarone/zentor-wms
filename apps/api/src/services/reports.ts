@@ -99,45 +99,54 @@ export function reportTitle(id: ReportId): string {
 }
 
 export async function runReport(params: {
+  tenantId: string;
   report: ReportId;
   from?: string;
   to?: string;
   status?: string;
   movementType?: string;
 }): Promise<ReportResult> {
-  const { report, from: fromStr, to: toStr, status, movementType } = params;
+  const { tenantId, report, from: fromStr, to: toStr, status, movementType } =
+    params;
 
   if (report === "low_stock") {
-    return buildLowStockReport();
+    return buildLowStockReport(tenantId);
   }
 
   const { from, to } = parseDateRange(fromStr, toStr);
 
   switch (report) {
     case "dispatched":
-      return buildDispatchedReport(from, to);
+      return buildDispatchedReport(tenantId, from, to);
     case "orders":
-      return buildOrdersReport(from, to, status);
+      return buildOrdersReport(tenantId, from, to, status);
     case "picking":
-      return buildPickingReport(from, to);
+      return buildPickingReport(tenantId, from, to);
     case "movements":
-      return buildMovementsReport(from, to, movementType);
+      return buildMovementsReport(tenantId, from, to, movementType);
     case "picking_time_by_order":
     case "picking_time_by_user":
     case "packing_time_by_order":
     case "packing_time_by_user":
-      return (await buildOperationTimeReport(report, from, to)) as ReportResult;
+      return (await buildOperationTimeReport(
+        tenantId,
+        report,
+        from,
+        to,
+      )) as ReportResult;
     default:
       throw new Error("Relatório desconhecido");
   }
 }
 
 async function buildDispatchedReport(
+  tenantId: string,
   from: Date,
   to: Date,
 ): Promise<ReportResult> {
   const orders = await prisma.order.findMany({
     where: {
+      tenantId,
       status: OrderStatus.DISPATCHED,
       OR: [
         { dispatchedAt: { gte: from, lte: to } },
@@ -196,6 +205,7 @@ async function buildDispatchedReport(
 }
 
 async function buildOrdersReport(
+  tenantId: string,
   from: Date,
   to: Date,
   statusFilter?: string,
@@ -207,6 +217,7 @@ async function buildOrdersReport(
 
   const orders = await prisma.order.findMany({
     where: {
+      tenantId,
       ...(status ? { status } : {}),
       OR: [
         { createdAt: { gte: from, lte: to } },
@@ -266,11 +277,13 @@ async function buildOrdersReport(
 }
 
 async function buildPickingReport(
+  tenantId: string,
   from: Date,
   to: Date,
 ): Promise<ReportResult> {
   const movements = await prisma.inventoryMovement.findMany({
     where: {
+      tenantId,
       type: InventoryMovementType.PICK_ALLOCATION,
       createdAt: { gte: from, lte: to },
     },
@@ -315,6 +328,7 @@ async function buildPickingReport(
 }
 
 async function buildMovementsReport(
+  tenantId: string,
   from: Date,
   to: Date,
   movementType?: string,
@@ -326,6 +340,7 @@ async function buildMovementsReport(
 
   const movements = await prisma.inventoryMovement.findMany({
     where: {
+      tenantId,
       createdAt: { gte: from, lte: to },
       ...(type ? { type } : {}),
     },
@@ -377,9 +392,9 @@ async function buildMovementsReport(
   };
 }
 
-async function buildLowStockReport(): Promise<ReportResult> {
+async function buildLowStockReport(tenantId: string): Promise<ReportResult> {
   const locations = await prisma.location.findMany({
-    where: { active: true, type: LocationType.PICK_FACE },
+    where: { tenantId, active: true, type: LocationType.PICK_FACE },
     include: { product: { select: { sku: true, name: true } } },
     orderBy: [{ corridor: "asc" }, { row: "asc" }],
   });
@@ -434,7 +449,11 @@ export function reportToCsv(result: ReportResult): string {
   return `\uFEFF${[header, ...lines].join("\r\n")}`;
 }
 
-export async function getReportsSummary(fromStr?: string, toStr?: string) {
+export async function getReportsSummary(
+  tenantId: string,
+  fromStr?: string,
+  toStr?: string,
+) {
   const { from, to } = parseDateRange(fromStr, toStr);
 
   const [
@@ -447,19 +466,21 @@ export async function getReportsSummary(fromStr?: string, toStr?: string) {
   ] = await Promise.all([
     prisma.order.groupBy({
       by: ["status"],
+      where: { tenantId },
       _count: { id: true },
     }),
-    prisma.product.count({ where: { active: true } }),
+    prisma.product.count({ where: { tenantId, active: true } }),
     prisma.location.findMany({
-      where: { active: true, type: LocationType.PICK_FACE },
+      where: { tenantId, active: true, type: LocationType.PICK_FACE },
       include: { product: { select: { sku: true } } },
     }),
     prisma.inventoryMovement.count({
-      where: { createdAt: { gte: from, lte: to } },
+      where: { tenantId, createdAt: { gte: from, lte: to } },
     }),
     prisma.inventoryMovement.groupBy({
       by: ["userId"],
       where: {
+        tenantId,
         type: InventoryMovementType.PICK_ALLOCATION,
         createdAt: { gte: from, lte: to },
       },
@@ -469,6 +490,7 @@ export async function getReportsSummary(fromStr?: string, toStr?: string) {
     }),
     prisma.order.count({
       where: {
+        tenantId,
         status: OrderStatus.DISPATCHED,
         OR: [
           { dispatchedAt: { gte: from, lte: to } },

@@ -125,7 +125,7 @@ export default function CadastrosPage() {
                   <TableHead>Corredor</TableHead>
                   <TableHead>Fileira</TableHead>
                   <TableHead>Tipo</TableHead>
-                  <TableHead>Produto</TableHead>
+                  <TableHead>SKU</TableHead>
                   <TableHead>Qtd / Cap.</TableHead>
                   <TableHead>Mín.</TableHead>
                 </TableRow>
@@ -290,7 +290,7 @@ function LocationFormModal({
           </select>
         </label>
         <label className="text-sm sm:col-span-2">
-          Produto
+          SKU
           <select
             className="mt-1 w-full rounded-lg border px-3 py-2"
             value={productId}

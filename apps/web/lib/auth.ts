@@ -1,6 +1,12 @@
 const TOKEN_COOKIE = "wms_token";
 const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3333";
 
+export interface AuthTenant {
+  id: string;
+  name: string;
+  slug: string;
+}
+
 export interface AuthUser {
   id: string;
   email: string;
@@ -10,6 +16,9 @@ export interface AuthUser {
   active?: boolean;
   avatarUrl?: string | null;
   olistConfigured?: boolean;
+  tenantId?: string | null;
+  isPlatformAdmin?: boolean;
+  tenant?: AuthTenant | null;
 }
 
 export function getAuthToken(): string | null {

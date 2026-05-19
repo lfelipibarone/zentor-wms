@@ -149,7 +149,11 @@ export default function PickScreen() {
 
   if (session.order.status === OrderStatus.PAUSED_ISSUE) {
     return (
-      <ScreenShell title="Pedido pausado" subtitle={session.order.erpOrderId}>
+      <ScreenShell
+        scroll
+        title="Pedido pausado"
+        subtitle={session.order.erpOrderId}
+      >
         <Text style={styles.paused}>
           Este pedido está pausado por problema reportado.
         </Text>
@@ -164,6 +168,7 @@ export default function PickScreen() {
   if (session.allPicked || !next) {
     return (
       <ScreenShell
+        scroll
         title="Pedido completo"
         subtitle={`Cesta ${basketCode ?? session.order.basket?.code ?? "—"}`}
       >
@@ -217,13 +222,10 @@ export default function PickScreen() {
         <Text style={styles.qty}>
           Separar: {next.remaining} de {next.quantityOrdered}
         </Text>
-        {requiresScan ? (
-          <Text style={styles.scanHint}>
-            Bipe cada unidade ({scanCount}/{next.remaining})
-          </Text>
-        ) : (
-          <Text style={styles.scanHint}>Informe a quantidade coletada</Text>
-        )}
+        <Text style={styles.scanHint}>
+          Informe a quantidade coletada
+          {requiresScan ? " ou bipe o produto (opcional)" : ""}
+        </Text>
       </View>
 
       {feedback ? (
@@ -247,25 +249,28 @@ export default function PickScreen() {
         />
       ) : null}
 
-      {locationValidated && requiresScan ? (
-        <FactoryButton
-          label={`Bipar produto (${scanCount}/${next.remaining})`}
-          variant="success"
-          onPress={() => {
-            setScannerMode("product");
-            setScannerOpen(true);
-          }}
-          loading={pickItem.isPending}
-        />
-      ) : null}
-
-      {locationValidated && !requiresScan ? (
-        <QuantityInput
-          label="Quantidade coletada"
-          max={next.remaining}
-          loading={pickItem.isPending}
-          onConfirm={(qty) => confirmPick(qty)}
-        />
+      {locationValidated ? (
+        <>
+          <QuantityInput
+            label="Quantidade coletada"
+            max={next.remaining}
+            loading={pickItem.isPending}
+            onConfirm={(qty) => confirmPick(qty)}
+          />
+          <FactoryButton
+            label={
+              requiresScan
+                ? `Bipar produto (+1) · ${scanCount}/${next.remaining}`
+                : "Bipar produto (opcional)"
+            }
+            variant="secondary"
+            onPress={() => {
+              setScannerMode("product");
+              setScannerOpen(true);
+            }}
+            loading={pickItem.isPending}
+          />
+        </>
       ) : null}
 
       <FactoryButton

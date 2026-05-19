@@ -6,25 +6,35 @@ import {
   View,
   type ViewProps,
 } from "react-native";
+import { BackButton } from "@/components/BackButton";
 import { theme, spacing, typography } from "@/lib/theme";
 
 interface ScreenShellProps extends ViewProps {
   title?: string;
   subtitle?: string;
+  /** Conteúdo rolável quando passa da altura da tela */
   scroll?: boolean;
+  /** Exibe seta de voltar para a tela inicial (sem texto) */
+  backToHome?: boolean;
   children: React.ReactNode;
 }
 
 export function ScreenShell({
   title,
   subtitle,
-  scroll,
+  scroll = false,
+  backToHome = false,
   children,
   style,
   ...rest
 }: ScreenShellProps) {
   const content = (
     <>
+      {backToHome ? (
+        <View style={styles.backRow}>
+          <BackButton color={theme.text} />
+        </View>
+      ) : null}
       {title || subtitle ? (
         <View style={styles.header}>
           {title ? <Text style={styles.title}>{title}</Text> : null}
@@ -36,11 +46,12 @@ export function ScreenShell({
   );
 
   return (
-    <SafeAreaView style={styles.safe} edges={["left", "right", "bottom"]}>
+    <SafeAreaView style={styles.safe} edges={["top", "left", "right", "bottom"]}>
       {scroll ? (
         <ScrollView
-          contentContainerStyle={[styles.container, style]}
+          contentContainerStyle={[styles.scrollContent, style]}
           keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator
           {...rest}
         >
           {content}
@@ -60,6 +71,16 @@ const styles = StyleSheet.create({
     flex: 1,
     padding: spacing.md,
     gap: spacing.md,
+  },
+  scrollContent: {
+    flexGrow: 1,
+    padding: spacing.md,
+    gap: spacing.md,
+    paddingBottom: spacing.xl,
+  },
+  backRow: {
+    alignSelf: "flex-start",
+    marginBottom: spacing.xs,
   },
   header: { gap: spacing.xs, marginBottom: spacing.sm },
   title: {

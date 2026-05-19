@@ -34,9 +34,9 @@ function parseIntSafe(v: string | undefined, fallback: number): number {
   return Number.isFinite(n) && n > 0 ? Math.floor(n) : fallback;
 }
 
-export async function getWaveSettings(): Promise<WaveSettings> {
+export async function getWaveSettings(tenantId: string): Promise<WaveSettings> {
   const rows = await prisma.systemSetting.findMany({
-    where: { key: { in: Object.values(KEYS) } },
+    where: { tenantId, key: { in: Object.values(KEYS) } },
   });
   const map = new Map(rows.map((r) => [r.key, r.value]));
 
@@ -58,8 +58,8 @@ export async function getWaveSettings(): Promise<WaveSettings> {
   };
 }
 
-export async function isWaveEnabled(): Promise<boolean> {
-  const s = await getWaveSettings();
+export async function isWaveEnabled(tenantId: string): Promise<boolean> {
+  const s = await getWaveSettings(tenantId);
   return s.enabled;
 }
 

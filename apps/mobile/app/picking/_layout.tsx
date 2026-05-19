@@ -1,30 +1,17 @@
 import { Stack } from "expo-router";
-import { BackButton } from "@/components/BackButton";
 import { appStackScreenOptions } from "@/lib/navigation";
 
 export default function PickingLayout() {
   return (
     <Stack screenOptions={appStackScreenOptions}>
-      <Stack.Screen
-        name="index"
-        options={{
-          title: "Separação",
-          headerLeft: () => <BackButton />,
-        }}
-      />
+      <Stack.Screen name="index" options={{ title: "Separação" }} />
       <Stack.Screen
         name="[orderId]/basket"
-        options={{
-          title: "Escanear cesta",
-          headerLeft: () => <BackButton />,
-        }}
+        options={{ title: "Escanear cesta" }}
       />
       <Stack.Screen
         name="[orderId]/pick"
-        options={{
-          title: "Separar itens",
-          headerLeft: () => <BackButton />,
-        }}
+        options={{ title: "Separar itens" }}
       />
     </Stack>
   );

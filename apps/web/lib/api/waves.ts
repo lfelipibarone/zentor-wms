@@ -38,6 +38,33 @@ export function fetchWaves() {
   return apiFetch<{ waves: WaveRow[] }>("/api/waves");
 }
 
+export interface WaveDetail {
+  id: string;
+  name: string;
+  status: string;
+  releasedAt: string | null;
+  updatedAt: string;
+  lines: Array<{
+    id: string;
+    sku: string;
+    productName: string;
+    locationBarcode: string;
+    quantityPicked: number;
+    quantityTotal: number;
+    sortStatus: string;
+  }>;
+  orders: Array<{
+    id: string;
+    erpOrderId: string;
+    customerName: string | null;
+    status: string;
+  }>;
+}
+
+export function fetchWaveDetail(id: string) {
+  return apiFetch<WaveDetail>(`/api/waves/${id}`);
+}
+
 export function fetchWavePreview() {
   return apiFetch<WavePreview>("/api/waves/preview");
 }

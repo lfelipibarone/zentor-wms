@@ -68,7 +68,9 @@ function emptyHourlyBuckets(): Map<string, { picked: number; conferenced: number
   return map;
 }
 
-export async function getDashboardProductivity(): Promise<DashboardProductivityDto> {
+export async function getDashboardProductivity(
+  tenantId: string,
+): Promise<DashboardProductivityDto> {
   const now = new Date();
   const todayStart = startOfDay(now);
   const todayEnd = endOfDay(now);
@@ -91,14 +93,15 @@ export async function getDashboardProductivity(): Promise<DashboardProductivityD
     enteredDispatchToday,
     enteredDispatchYesterday,
   ] = await Promise.all([
-    prisma.order.count({ where: { status: OrderStatus.PENDING } }),
+    prisma.order.count({ where: { tenantId, status: OrderStatus.PENDING } }),
     prisma.order.count({
-      where: { status: OrderStatus.PICKED_AWAITING_CONFERENCE },
+      where: { tenantId, status: OrderStatus.PICKED_AWAITING_CONFERENCE },
     }),
-    prisma.order.count({ where: { status: OrderStatus.DISPATCHING } }),
+    prisma.order.count({ where: { tenantId, status: OrderStatus.DISPATCHING } }),
 
     prisma.inventoryMovement.findMany({
       where: {
+        tenantId,
         type: InventoryMovementType.PICK_ALLOCATION,
         createdAt: { gte: todayStart, lte: todayEnd },
       },
@@ -106,6 +109,7 @@ export async function getDashboardProductivity(): Promise<DashboardProductivityD
     }),
     prisma.order.findMany({
       where: {
+        tenantId,
         status: { in: [OrderStatus.DISPATCHING, OrderStatus.DISPATCHED] },
         updatedAt: { gte: todayStart, lte: todayEnd },
       },
@@ -114,6 +118,7 @@ export async function getDashboardProductivity(): Promise<DashboardProductivityD
     prisma.inventoryMovement.groupBy({
       by: ["userId"],
       where: {
+        tenantId,
         type: InventoryMovementType.PICK_ALLOCATION,
         createdAt: { gte: todayStart, lte: todayEnd },
       },
@@ -121,33 +126,38 @@ export async function getDashboardProductivity(): Promise<DashboardProductivityD
     }),
 
     prisma.order.count({
-      where: { createdAt: { gte: todayStart, lte: todayEnd } },
+      where: { tenantId, createdAt: { gte: todayStart, lte: todayEnd } },
     }),
     prisma.order.count({
       where: {
+        tenantId,
         createdAt: { gte: yesterdayStart, lte: yesterdayEnd },
       },
     }),
     prisma.orderTimeLog.count({
       where: {
+        order: { tenantId },
         event: OrderTimeLogEvent.END,
         createdAt: { gte: todayStart, lte: todayEnd },
       },
     }),
     prisma.orderTimeLog.count({
       where: {
+        order: { tenantId },
         event: OrderTimeLogEvent.END,
         createdAt: { gte: yesterdayStart, lte: yesterdayEnd },
       },
     }),
     prisma.order.count({
       where: {
+        tenantId,
         status: OrderStatus.DISPATCHING,
         updatedAt: { gte: todayStart, lte: todayEnd },
       },
     }),
     prisma.order.count({
       where: {
+        tenantId,
         status: OrderStatus.DISPATCHING,
         updatedAt: { gte: yesterdayStart, lte: yesterdayEnd },
       },
@@ -157,7 +167,7 @@ export async function getDashboardProductivity(): Promise<DashboardProductivityD
   // Prisma não suporta comparar duas colunas no where — filtro em memória
   const shelfAlerts = (
     await prisma.location.findMany({
-      where: { active: true, type: LocationType.PICK_FACE },
+      where: { tenantId, active: true, type: LocationType.PICK_FACE },
       include: { product: true },
     })
   )

@@ -7,6 +7,7 @@ import {
   Text,
   View,
 } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 import { useAcceptOrder, useOrderQueue } from "@/hooks/usePicking";
 import { FactoryButton } from "@/components/FactoryButton";
 import { theme, spacing, typography } from "@/lib/theme";
@@ -29,113 +30,119 @@ export default function OrderQueueScreen() {
 
   if (isLoading) {
     return (
-      <View style={styles.centered}>
-        <ActivityIndicator size="large" color={theme.primary} />
-        <Text style={styles.loadingText}>Carregando fila...</Text>
-      </View>
+      <SafeAreaView style={styles.safe} edges={["bottom", "left", "right"]}>
+        <View style={styles.centered}>
+          <ActivityIndicator size="large" color={theme.primary} />
+          <Text style={styles.loadingText}>Carregando fila...</Text>
+        </View>
+      </SafeAreaView>
     );
   }
 
   return (
-    <View style={styles.container}>
-      <Text style={styles.count}>
-        {data?.length ?? 0} pedido(s) na fila
-      </Text>
-
-      {error ? (
-        <Text style={styles.error}>
-          {error instanceof Error ? error.message : "Erro ao carregar fila"}
+    <SafeAreaView style={styles.safe} edges={["bottom", "left", "right"]}>
+      <View style={styles.container}>
+        <Text style={styles.count}>
+          {data?.length ?? 0} pedido(s) na fila
         </Text>
-      ) : null}
 
-      <FlatList
-        data={data ?? []}
-        keyExtractor={(item) => item.id}
-        contentContainerStyle={styles.list}
-        refreshing={isRefetching}
-        onRefresh={refetch}
-        ListEmptyComponent={
-          <Text style={styles.empty}>Nenhum pedido pendente</Text>
-        }
-        renderItem={({ item }) => (
-          <Pressable
-            style={styles.card}
-            onPress={() => handleAccept(item)}
-            disabled={accept.isPending}
-          >
-            <Text style={styles.erp}>{item.erpOrderId}</Text>
-            {item.customerName ? (
-              <Text style={styles.customer}>{item.customerName}</Text>
-            ) : null}
-            <View style={styles.meta}>
-              <Text style={styles.metaText}>
-                {item.itemCount} itens · {item.totalUnits} un.
-              </Text>
-              {item.priority > 0 ? (
-                <Text style={styles.priority}>PRIORIDADE {item.priority}</Text>
+        {error ? (
+          <Text style={styles.error}>
+            {error instanceof Error ? error.message : "Erro ao carregar fila"}
+          </Text>
+        ) : null}
+
+        <FlatList
+          data={data ?? []}
+          keyExtractor={(item) => item.id}
+          contentContainerStyle={styles.list}
+          refreshing={isRefetching}
+          onRefresh={refetch}
+          ListEmptyComponent={
+            <Text style={styles.empty}>Nenhum pedido pendente</Text>
+          }
+          renderItem={({ item }) => (
+            <Pressable
+              style={styles.card}
+              onPress={() => handleAccept(item)}
+              disabled={accept.isPending}
+            >
+              <Text style={styles.erp}>{item.erpOrderId}</Text>
+              {item.customerName ? (
+                <Text style={styles.customer}>{item.customerName}</Text>
               ) : null}
-            </View>
-            <Text style={styles.tapHint}>TOQUE PARA ACEITAR</Text>
-          </Pressable>
-        )}
-      />
+              <View style={styles.meta}>
+                <Text style={styles.metaText}>
+                  {item.itemCount} itens · {item.totalUnits} un.
+                </Text>
+                {item.priority > 0 ? (
+                  <Text style={styles.priority}>PRIORIDADE {item.priority}</Text>
+                ) : null}
+              </View>
+              <Text style={styles.tapHint}>TOQUE PARA ACEITAR</Text>
+            </Pressable>
+          )}
+        />
 
-      <FactoryButton
-        label="Atualizar fila"
-        variant="secondary"
-        onPress={() => refetch()}
-        loading={isRefetching}
-      />
-    </View>
+        <FactoryButton
+          label="Atualizar fila"
+          variant="secondary"
+          onPress={() => refetch()}
+          loading={isRefetching}
+        />
+      </View>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: theme.bg, padding: spacing.md },
+  safe: { flex: 1, backgroundColor: theme.bg },
+  container: { flex: 1, padding: spacing.md, gap: spacing.sm },
   centered: {
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
-    backgroundColor: theme.bg,
     gap: spacing.md,
   },
   loadingText: { color: theme.textMuted, fontSize: typography.body },
   count: {
-    fontSize: typography.subtitle,
     fontWeight: "800",
-    color: theme.primary,
-    marginBottom: spacing.md,
+    fontSize: typography.body,
+    color: theme.text,
   },
-  list: { gap: spacing.md, paddingBottom: spacing.md },
+  list: { paddingBottom: spacing.md, flexGrow: 1 },
   card: {
     backgroundColor: theme.surface,
-    borderRadius: 16,
-    padding: spacing.lg,
+    borderRadius: 12,
+    padding: spacing.md,
+    marginBottom: spacing.sm,
     borderWidth: 2,
     borderColor: theme.border,
-    gap: spacing.sm,
   },
   erp: {
-    fontSize: typography.title,
+    fontSize: typography.hero,
     fontWeight: "900",
     color: theme.text,
   },
-  customer: { fontSize: typography.body, color: theme.textMuted },
-  meta: { flexDirection: "row", justifyContent: "space-between" },
-  metaText: { color: theme.text, fontSize: typography.body, fontWeight: "600" },
-  priority: { color: theme.warning, fontWeight: "900" },
+  customer: { marginTop: 4, color: theme.textMuted },
+  meta: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    marginTop: spacing.sm,
+  },
+  metaText: { color: theme.textMuted, fontSize: typography.caption },
+  priority: {
+    color: theme.danger,
+    fontWeight: "800",
+    fontSize: typography.caption,
+  },
   tapHint: {
     marginTop: spacing.sm,
-    color: theme.primary,
-    fontWeight: "900",
-    fontSize: typography.caption,
-    letterSpacing: 1,
-  },
-  empty: {
-    color: theme.textMuted,
     textAlign: "center",
-    fontSize: typography.body,
-    padding: spacing.xl,
+    fontWeight: "800",
+    color: theme.primary,
+    fontSize: typography.caption,
   },
-  error: { color: theme.danger, marginBottom: spacing.md },
+  error: { color: theme.danger },
+  empty: { textAlign: "center", color: theme.textMuted, marginTop: spacing.lg },
 });

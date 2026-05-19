@@ -1,0 +1,234 @@
+import { OrderStatus, PrismaClient } from "@prisma/client";
+import { defaultPermissionsForRole } from "@wms/shared";
+import { hashPassword } from "../src/lib/password.js";
+
+const ADMIN_PASSWORD = "admin123";
+const PICKER_PASSWORD = "dev";
+
+export type DemoTenantSeedConfig = {
+  slug: string;
+  name: string;
+  prefix: string;
+  adminEmail: string;
+  pickerEmail: string;
+};
+
+export const DEMO_TENANT_CONFIGS: DemoTenantSeedConfig[] = [
+  {
+    slug: "demo-loja-a",
+    name: "Loja Demo A",
+    prefix: "LOJA-A",
+    adminEmail: "admin@loja-a.local",
+    pickerEmail: "picker@loja-a.local",
+  },
+  {
+    slug: "demo-loja-b",
+    name: "Loja Demo B",
+    prefix: "LOJA-B",
+    adminEmail: "admin@loja-b.local",
+    pickerEmail: "picker@loja-b.local",
+  },
+  {
+    slug: "demo-loja-c",
+    name: "Loja Demo C",
+    prefix: "LOJA-C",
+    adminEmail: "admin@loja-c.local",
+    pickerEmail: "picker@loja-c.local",
+  },
+];
+
+export async function seedDemoTenant(
+  prisma: PrismaClient,
+  config: DemoTenantSeedConfig,
+) {
+  const tenant = await prisma.tenant.upsert({
+    where: { slug: config.slug },
+    create: { name: config.name, slug: config.slug, active: true },
+    update: { name: config.name, active: true },
+  });
+  const tenantId = tenant.id;
+
+  await prisma.tinyConnection.upsert({
+    where: { tenantId },
+    create: { tenantId, name: "Tiny ERP" },
+    update: {},
+  });
+
+  const adminPerms = defaultPermissionsForRole("ADMIN");
+  const pickerPerms = defaultPermissionsForRole("PICKER");
+
+  const admin = await prisma.user.upsert({
+    where: { email: config.adminEmail },
+    create: {
+      email: config.adminEmail,
+      name: `Admin ${config.name}`,
+      password: hashPassword(ADMIN_PASSWORD),
+      role: "ADMIN",
+      tenantId,
+      isPlatformAdmin: false,
+      permissions: adminPerms,
+      active: true,
+    },
+    update: {
+      password: hashPassword(ADMIN_PASSWORD),
+      tenantId,
+      isPlatformAdmin: false,
+      permissions: adminPerms,
+      active: true,
+    },
+  });
+
+  const picker = await prisma.user.upsert({
+    where: { email: config.pickerEmail },
+    create: {
+      email: config.pickerEmail,
+      name: `Separador ${config.name}`,
+      password: hashPassword(PICKER_PASSWORD),
+      role: "PICKER",
+      tenantId,
+      isPlatformAdmin: false,
+      permissions: pickerPerms,
+      active: true,
+    },
+    update: {
+      password: hashPassword(PICKER_PASSWORD),
+      tenantId,
+      isPlatformAdmin: false,
+      permissions: pickerPerms,
+      active: true,
+    },
+  });
+
+  await prisma.systemSetting.upsert({
+    where: { tenantId_key: { tenantId, key: "company.name" } },
+    create: {
+      tenantId,
+      key: "company.name",
+      value: config.name,
+      description: "Nome exibido no sistema",
+    },
+    update: { value: config.name },
+  });
+
+  const product = await prisma.product.upsert({
+    where: { tenantId_sku: { tenantId, sku: `${config.prefix}-SKU-01` } },
+    create: {
+      tenantId,
+      sku: `${config.prefix}-SKU-01`,
+      name: `Produto 01 — ${config.name}`,
+      barcode: `${config.prefix}0001`,
+    },
+    update: {},
+  });
+
+  const product2 = await prisma.product.upsert({
+    where: { tenantId_sku: { tenantId, sku: `${config.prefix}-SKU-02` } },
+    create: {
+      tenantId,
+      sku: `${config.prefix}-SKU-02`,
+      name: `Produto 02 — ${config.name}`,
+      barcode: `${config.prefix}0002`,
+    },
+    update: {},
+  });
+
+  const loc = await prisma.location.upsert({
+    where: {
+      tenantId_barcode: { tenantId, barcode: `${config.prefix}-GON-01` },
+    },
+    create: {
+      tenantId,
+      corridor: "A",
+      row: "01",
+      barcode: `${config.prefix}-GON-01`,
+      type: "PICK_FACE",
+      productId: product.id,
+      currentQuantity: 50,
+      capacity: 100,
+      minThreshold: 10,
+    },
+    update: { productId: product.id, currentQuantity: 50 },
+  });
+
+  await prisma.location.upsert({
+    where: {
+      tenantId_barcode: { tenantId, barcode: `${config.prefix}-GON-02` },
+    },
+    create: {
+      tenantId,
+      corridor: "A",
+      row: "02",
+      barcode: `${config.prefix}-GON-02`,
+      type: "PICK_FACE",
+      productId: product2.id,
+      currentQuantity: 30,
+      capacity: 80,
+      minThreshold: 8,
+    },
+    update: { productId: product2.id, currentQuantity: 30 },
+  });
+
+  await prisma.basket.upsert({
+    where: { tenantId_code: { tenantId, code: `${config.prefix}-CESTA` } },
+    create: {
+      tenantId,
+      code: `${config.prefix}-CESTA`,
+      barcode: `${config.prefix}BASKET`,
+    },
+    update: {},
+  });
+
+  const statuses: OrderStatus[] = [
+    OrderStatus.PENDING,
+    OrderStatus.PENDING,
+    OrderStatus.PICKED_AWAITING_CONFERENCE,
+    OrderStatus.DISPATCHING,
+    OrderStatus.DISPATCHED,
+    OrderStatus.PENDING,
+    OrderStatus.PENDING,
+  ];
+
+  for (let i = 1; i <= statuses.length; i++) {
+    const erpOrderId = `${config.prefix}-${String(i).padStart(3, "0")}`;
+    const status = statuses[i - 1]!;
+    await prisma.order.upsert({
+      where: { tenantId_erpOrderId: { tenantId, erpOrderId } },
+      create: {
+        tenantId,
+        erpOrderId,
+        customerName: `Cliente ${config.prefix} ${i}`,
+        status,
+        priority: i % 3,
+        items: {
+          create: [
+            {
+              lineNumber: 1,
+              productId: product.id,
+              quantityOrdered: 5 + i,
+              quantityPicked:
+                status === OrderStatus.PENDING ? 0 : 5 + i,
+              pickLocationId: loc.id,
+            },
+          ],
+        },
+      },
+      update: { status, customerName: `Cliente ${config.prefix} ${i}` },
+    });
+  }
+
+  return { tenant, admin, picker };
+}
+
+export function printTestUsersGuide() {
+  console.log("\n=== Credenciais de teste (detalhes em docs/usuarios-teste.md) ===\n");
+  console.log("Plataforma (só painel Clientes):");
+  console.log("  admin@wms.local / admin123\n");
+  console.log("Tenant default (dados completos):");
+  console.log("  admin via plataforma ou operador@wms.local / operador123");
+  console.log("  picker@wms.local / dev\n");
+  for (const c of DEMO_TENANT_CONFIGS) {
+    console.log(`${c.name} (${c.slug}):`);
+    console.log(`  ${c.adminEmail} / ${ADMIN_PASSWORD}  (web — admin)`);
+    console.log(`  ${c.pickerEmail} / ${PICKER_PASSWORD}  (mobile — picker)\n`);
+  }
+}

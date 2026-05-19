@@ -1,6 +1,9 @@
 import { theme } from "@/lib/theme";
 
-/** Opções de header compartilhadas — seta de voltar sem texto (evita "index") */
+import React from "react";
+import { BackButton } from "@/components/BackButton";
+
+/** Header padrão: seta sem texto, volta à tela inicial */
 export const appStackScreenOptions = {
   headerStyle: { backgroundColor: theme.headerBg },
   headerTintColor: theme.headerTint,
@@ -12,6 +15,8 @@ export const appStackScreenOptions = {
   headerBackButtonDisplayMode: "minimal" as const,
   headerShadowVisible: false,
   headerBackTitle: "",
+  headerBackVisible: false,
+  headerLeft: () => React.createElement(BackButton),
   contentStyle: { backgroundColor: theme.bg },
   animation: "slide_from_right" as const,
 };
