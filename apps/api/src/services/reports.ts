@@ -351,6 +351,12 @@ async function buildMovementsReport(
       order: { select: { erpOrderId: true } },
       fromLocation: { select: { barcode: true } },
       toLocation: { select: { barcode: true } },
+      cargoTransfer: {
+        select: {
+          withdrawnBy: { select: { name: true } },
+          depositedBy: { select: { name: true } },
+        },
+      },
     },
   });
 
@@ -367,6 +373,14 @@ async function buildMovementsReport(
     pedidoErp: m.order?.erpOrderId ?? null,
     referencia: m.reference,
     observacao: m.notes,
+    duracaoSegundos:
+      m.startedAt && m.completedAt
+        ? Math.round(
+            (m.completedAt.getTime() - m.startedAt.getTime()) / 1000,
+          )
+        : null,
+    transporteRetirada: m.cargoTransfer?.withdrawnBy.name ?? null,
+    transporteDeposito: m.cargoTransfer?.depositedBy?.name ?? null,
   }));
 
   return {
@@ -386,6 +400,9 @@ async function buildMovementsReport(
       { key: "pedidoErp", header: "Pedido ERP" },
       { key: "referencia", header: "Referência" },
       { key: "observacao", header: "Observação" },
+      { key: "duracaoSegundos", header: "Duração (s)" },
+      { key: "transporteRetirada", header: "Retirada por" },
+      { key: "transporteDeposito", header: "Depósito por" },
     ],
     rows,
     totalRows: rows.length,

@@ -168,6 +168,24 @@ export async function seedDemoTenant(
     update: { productId: product2.id, currentQuantity: 30 },
   });
 
+  await prisma.location.upsert({
+    where: {
+      tenantId_barcode: { tenantId, barcode: `${config.prefix}-PUL-01` },
+    },
+    create: {
+      tenantId,
+      corridor: "P",
+      row: "01",
+      barcode: `${config.prefix}-PUL-01`,
+      type: "PULMAO",
+      productId: product.id,
+      currentQuantity: 200,
+      capacity: 500,
+      minThreshold: 0,
+    },
+    update: { productId: product.id, currentQuantity: 200 },
+  });
+
   await prisma.basket.upsert({
     where: { tenantId_code: { tenantId, code: `${config.prefix}-CESTA` } },
     create: {

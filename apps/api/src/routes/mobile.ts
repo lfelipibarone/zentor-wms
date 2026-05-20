@@ -12,6 +12,13 @@ import {
   transferPulmaoToPickFace,
 } from "../services/location-transfer.js";
 import {
+  CargoTransferError,
+  depositCargoTransfer,
+  getCargoTransfer,
+  listPendingCargoTransfers,
+  withdrawCargoTransfer,
+} from "../services/cargo-transfer.js";
+import {
   PickWaveError,
   acceptPickWave,
   getCurrentReleasedWave,
@@ -501,18 +508,111 @@ export async function mobileRoutes(app: FastifyInstance) {
       quantity?: number;
     };
   }>("/mobile/replenishment/transfer", async (request, reply) => {
+    const tenantId = request.authUser!.tenantId!;
     const userId = resolveUserId(request);
     try {
-      const result = await transferPulmaoToPickFace({
+      const from = request.body?.fromLocationBarcode ?? "";
+      const to = request.body?.toLocationBarcode ?? "";
+      const productBarcode = request.body?.productBarcode ?? "";
+      const quantity = Number(request.body?.quantity ?? 0);
+      const withdrawn = await withdrawCargoTransfer({
+        tenantId,
+        userId,
+        fromLocationBarcode: from,
+        productBarcode,
+        quantity,
+      });
+      const deposited = await depositCargoTransfer({
+        tenantId,
+        userId,
+        transferId: withdrawn.transfer.id,
+        toLocationBarcode: to,
+        productBarcode,
+        quantity,
+      });
+      return {
+        transfer: deposited.transfer,
+        fromLocation: withdrawn.fromLocation,
+        toLocation: deposited.toLocation,
+        transferred: quantity,
+        legacy: true,
+      };
+    } catch (e) {
+      if (e instanceof CargoTransferError || e instanceof LocationTransferError) {
+        return reply.status(e.statusCode).send({ error: e.message });
+      }
+      throw e;
+    }
+  });
+
+  app.post<{
+    Body: {
+      fromLocationBarcode?: string;
+      productBarcode?: string;
+      quantity?: number;
+    };
+  }>("/mobile/cargo-transfers/withdraw", async (request, reply) => {
+    const tenantId = request.authUser!.tenantId!;
+    const userId = resolveUserId(request);
+    try {
+      return await withdrawCargoTransfer({
+        tenantId,
+        userId,
         fromLocationBarcode: request.body?.fromLocationBarcode ?? "",
-        toLocationBarcode: request.body?.toLocationBarcode ?? "",
         productBarcode: request.body?.productBarcode ?? "",
         quantity: Number(request.body?.quantity ?? 0),
-        userId,
       });
-      return result;
     } catch (e) {
-      if (e instanceof LocationTransferError) {
+      if (e instanceof CargoTransferError) {
+        return reply.status(e.statusCode).send({ error: e.message });
+      }
+      throw e;
+    }
+  });
+
+  app.get("/mobile/cargo-transfers/pending", async (request) => {
+    const tenantId = request.authUser!.tenantId!;
+    return {
+      transfers: await listPendingCargoTransfers(tenantId),
+    };
+  });
+
+  app.get<{ Params: { id: string } }>(
+    "/mobile/cargo-transfers/:id",
+    async (request, reply) => {
+      const tenantId = request.authUser!.tenantId!;
+      try {
+        return await getCargoTransfer(tenantId, request.params.id);
+      } catch (e) {
+        if (e instanceof CargoTransferError) {
+          return reply.status(e.statusCode).send({ error: e.message });
+        }
+        throw e;
+      }
+    },
+  );
+
+  app.post<{
+    Params: { id: string };
+    Body: {
+      toLocationBarcode?: string;
+      productBarcode?: string;
+      quantity?: number;
+    };
+  }>("/mobile/cargo-transfers/:id/deposit", async (request, reply) => {
+    const tenantId = request.authUser!.tenantId!;
+    const userId = resolveUserId(request);
+    try {
+      return await depositCargoTransfer({
+        tenantId,
+        userId,
+        transferId: request.params.id,
+        toLocationBarcode: request.body?.toLocationBarcode ?? "",
+        productBarcode: request.body?.productBarcode,
+        quantity: request.body?.quantity,
+      });
+    } catch (e) {
+      if (e instanceof CargoTransferError) {
         return reply.status(e.statusCode).send({ error: e.message });
       }
       throw e;

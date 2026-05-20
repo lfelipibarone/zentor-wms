@@ -111,6 +111,24 @@ export interface LocationLookup {
   needsReplenishment: boolean;
 }
 
+export interface CargoTransferSummary {
+  id: string;
+  status: string;
+  quantity: number;
+  withdrawnAt: string;
+  depositedAt: string | null;
+  durationSeconds: number;
+  product: {
+    id: string;
+    sku: string;
+    name: string;
+    barcode: string | null;
+  };
+  fromLocation: { id: string; barcode: string; label: string };
+  toLocation: { id: string; barcode: string; label: string } | null;
+  withdrawnByName: string;
+}
+
 export const api = {
   getQueue: () => request<QueueOrder[]>("/mobile/orders/queue"),
 
@@ -223,6 +241,43 @@ export const api = {
       };
       transferred: number;
     }>("/mobile/replenishment/transfer", {
+      method: "POST",
+      body: JSON.stringify(body),
+    }),
+
+  withdrawCargoTransfer: (body: {
+    fromLocationBarcode: string;
+    productBarcode: string;
+    quantity: number;
+  }) =>
+    request<{
+      transfer: CargoTransferSummary;
+      fromLocation: { barcode: string; currentQuantity: number };
+    }>("/mobile/cargo-transfers/withdraw", {
+      method: "POST",
+      body: JSON.stringify(body),
+    }),
+
+  listPendingCargoTransfers: () =>
+    request<{ transfers: CargoTransferSummary[] }>(
+      "/mobile/cargo-transfers/pending",
+    ),
+
+  getCargoTransfer: (id: string) =>
+    request<CargoTransferSummary>(`/mobile/cargo-transfers/${id}`),
+
+  depositCargoTransfer: (
+    id: string,
+    body: {
+      toLocationBarcode: string;
+      productBarcode?: string;
+      quantity?: number;
+    },
+  ) =>
+    request<{
+      transfer: CargoTransferSummary;
+      toLocation: { barcode: string; currentQuantity: number };
+    }>(`/mobile/cargo-transfers/${id}/deposit`, {
       method: "POST",
       body: JSON.stringify(body),
     }),

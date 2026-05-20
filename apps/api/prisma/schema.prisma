@@ -97,6 +97,13 @@ enum PutawaySessionStatus {
   COMPLETED
 }
 
+/// Transporte de carga pulmão → gôndola (duas etapas)
+enum CargoTransferStatus {
+  IN_TRANSIT
+  COMPLETED
+  CANCELLED
+}
+
 // -----------------------------------------------------------------------------
 // Tenant (cliente / empresa)
 // -----------------------------------------------------------------------------
@@ -118,6 +125,7 @@ model Tenant {
   pickWaves               PickWave[]
   purchaseReceiptSessions PurchaseReceiptSession[]
   inventoryMovements      InventoryMovement[]
+  cargoTransfers          CargoTransfer[]
   integrationEventLogs    IntegrationEventLog[]
   systemSettings          SystemSetting[]
 
@@ -168,6 +176,9 @@ model User {
   purchaseReceiptSessions PurchaseReceiptSession[] @relation("PurchaseReceiptStartedBy")
   purchaseReceiptTimeLogs PurchaseReceiptTimeLog[]
   putawaySessions         PutawaySession[]         @relation("PutawayAssignedTo")
+  putawayTimeLogs         PutawayTimeLog[]
+  cargoTransfersWithdrawn CargoTransfer[]          @relation("CargoTransferWithdrawnBy")
+  cargoTransfersDeposited CargoTransfer[]          @relation("CargoTransferDepositedBy")
 
   @@index([role])
   @@index([tenantId])
@@ -248,6 +259,7 @@ model Product {
   orderItems        OrderItem[]
   inventoryMovements InventoryMovement[]
   pickWaveLines     PickWaveLine[]
+  cargoTransfers    CargoTransfer[]
 
   @@unique([tenantId, sku])
   @@unique([tenantId, barcode])
@@ -294,8 +306,10 @@ model Location {
   /// Movimentações com esta localização como destino
   movementsTo InventoryMovement[] @relation("MovementToLocation")
 
-  pickWaveLines PickWaveLine[]
-  putawayItems  PutawayItem[]
+  pickWaveLines      PickWaveLine[]
+  putawayItems       PutawayItem[]
+  cargoTransfersFrom CargoTransfer[] @relation("CargoTransferFrom")
+  cargoTransfersTo   CargoTransfer[] @relation("CargoTransferTo")
 
   @@unique([tenantId, barcode])
   @@index([tenantId])
@@ -439,12 +453,25 @@ model InventoryMovement {
   reference String?
   notes     String?
 
+  cargoTransferId          String?
+  putawaySessionId         String?
+  purchaseReceiptSessionId String?
+  pickWaveLineId           String?
+  startedAt                DateTime?
+  completedAt              DateTime?
+
   tenant       Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   user         User      @relation(fields: [userId], references: [id], onDelete: Restrict)
   product      Product   @relation(fields: [productId], references: [id], onDelete: Restrict)
   fromLocation Location? @relation("MovementFromLocation", fields: [fromLocationId], references: [id], onDelete: SetNull)
   toLocation   Location? @relation("MovementToLocation", fields: [toLocationId], references: [id], onDelete: SetNull)
   order        Order?    @relation(fields: [orderId], references: [id], onDelete: SetNull)
+  cargoTransfer CargoTransfer? @relation(fields: [cargoTransferId], references: [id], onDelete: SetNull)
+  putawaySession PutawaySession? @relation(fields: [putawaySessionId], references: [id], onDelete: SetNull)
+  purchaseReceiptSession PurchaseReceiptSession? @relation(fields: [purchaseReceiptSessionId], references: [id], onDelete: SetNull)
+  pickWaveLine PickWaveLine? @relation(fields: [pickWaveLineId], references: [id], onDelete: SetNull)
+  withdrawForCargoTransfer CargoTransfer? @relation("CargoWithdrawMovement")
+  depositForCargoTransfer  CargoTransfer? @relation("CargoDepositMovement")
 
   @@index([tenantId])
   @@index([createdAt])
@@ -453,7 +480,45 @@ model InventoryMovement {
   @@index([orderId])
   @@index([fromLocationId])
   @@index([toLocationId])
+  @@index([cargoTransferId])
   @@map("inventory_movements")
+}
+
+// -----------------------------------------------------------------------------
+// CargoTransfer — transporte de carga (pulmão → trânsito → gôndola)
+// -----------------------------------------------------------------------------
+
+model CargoTransfer {
+  id        String              @id @default(cuid())
+  tenantId  String
+  status    CargoTransferStatus @default(IN_TRANSIT)
+  productId String
+  quantity  Int
+
+  fromLocationId String
+  toLocationId   String?
+
+  withdrawnById String
+  withdrawnAt   DateTime @default(now())
+  depositedById String?
+  depositedAt   DateTime?
+
+  withdrawMovementId String? @unique
+  depositMovementId  String? @unique
+
+  tenant         Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  product        Product   @relation(fields: [productId], references: [id], onDelete: Restrict)
+  fromLocation   Location  @relation("CargoTransferFrom", fields: [fromLocationId], references: [id], onDelete: Restrict)
+  toLocation     Location? @relation("CargoTransferTo", fields: [toLocationId], references: [id], onDelete: SetNull)
+  withdrawnBy    User      @relation("CargoTransferWithdrawnBy", fields: [withdrawnById], references: [id], onDelete: Restrict)
+  depositedBy    User?     @relation("CargoTransferDepositedBy", fields: [depositedById], references: [id], onDelete: SetNull)
+  withdrawMovement InventoryMovement? @relation("CargoWithdrawMovement", fields: [withdrawMovementId], references: [id], onDelete: SetNull)
+  depositMovement  InventoryMovement? @relation("CargoDepositMovement", fields: [depositMovementId], references: [id], onDelete: SetNull)
+  movements        InventoryMovement[]
+
+  @@index([tenantId, status])
+  @@index([withdrawnById])
+  @@map("cargo_transfers")
 }
 
 // -----------------------------------------------------------------------------
@@ -558,6 +623,7 @@ model PurchaseReceiptSession {
   items     PurchaseReceiptItem[]
   timeLogs  PurchaseReceiptTimeLog[]
   putaway   PutawaySession?
+  inventoryMovements InventoryMovement[]
 
   @@unique([tenantId, accessKey])
   @@index([tenantId])
@@ -593,9 +659,25 @@ model PutawaySession {
   purchaseReceipt PurchaseReceiptSession @relation(fields: [purchaseReceiptId], references: [id], onDelete: Cascade)
   assignedTo      User?                  @relation("PutawayAssignedTo", fields: [assignedToId], references: [id], onDelete: SetNull)
   items           PutawayItem[]
+  timeLogs        PutawayTimeLog[]
+  inventoryMovements InventoryMovement[]
 
   @@index([status])
   @@map("putaway_sessions")
+}
+
+model PutawayTimeLog {
+  id        String   @id @default(cuid())
+  sessionId String
+  userId    String
+  event     String
+  createdAt DateTime @default(now())
+
+  session PutawaySession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  user    User           @relation(fields: [userId], references: [id], onDelete: Restrict)
+
+  @@index([sessionId, createdAt])
+  @@map("putaway_time_logs")
 }
 
 model PutawayItem {
@@ -686,6 +768,7 @@ model PickWaveLine {
   pickLocation Location             @relation(fields: [pickLocationId], references: [id], onDelete: Restrict)
   pickedBy     User?                @relation("WaveLinePickedBy", fields: [pickedById], references: [id], onDelete: SetNull)
   allocations  PickWaveAllocation[]
+  inventoryMovements InventoryMovement[]
 
   @@index([pickCompletedAt])
 

@@ -123,6 +123,9 @@ export async function confirmConsolidatedPick(input: ConsolidatedPickInput) {
       });
     }
 
+    const now = new Date();
+    const firstOrderId = line.allocations[0]?.orderItem?.orderId ?? null;
+
     await tx.inventoryMovement.create({
       data: {
         tenantId: line.wave.tenantId,
@@ -131,11 +134,14 @@ export async function confirmConsolidatedPick(input: ConsolidatedPickInput) {
         userId: input.userId,
         productId: line.productId,
         fromLocationId: line.pickLocationId,
+        orderId: firstOrderId,
+        pickWaveLineId: line.id,
+        startedAt: line.pickStartedAt ?? now,
+        completedAt: now,
         notes: `Pick consolidado onda · linha ${line.id}`,
       },
     });
 
-    const now = new Date();
     const lineComplete = newLinePicked >= line.quantityTotal;
     await tx.pickWaveLine.update({
       where: { id: line.id },

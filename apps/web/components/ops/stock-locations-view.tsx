@@ -186,6 +186,8 @@ export function StockLocationsView({
                   <TableHead>Origem</TableHead>
                   <TableHead>Destino</TableHead>
                   <TableHead>Operador</TableHead>
+                  <TableHead>Duração</TableHead>
+                  <TableHead>Transporte</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -201,7 +203,21 @@ export function StockLocationsView({
                     <TableCell>{m.quantity}</TableCell>
                     <TableCell>{m.fromLocation?.barcode ?? "—"}</TableCell>
                     <TableCell>{m.toLocation?.barcode ?? "—"}</TableCell>
-                    <TableCell>{m.user.name}</TableCell>
+                    <TableCell>{m.userName}</TableCell>
+                    <TableCell>
+                      {m.durationSeconds != null
+                        ? `${m.durationSeconds}s`
+                        : "—"}
+                    </TableCell>
+                    <TableCell className="text-xs">
+                      {m.cargoTransfer
+                        ? `${m.cargoTransfer.withdrawnByName}${
+                            m.cargoTransfer.depositedByName
+                              ? ` → ${m.cargoTransfer.depositedByName}`
+                              : " (em trânsito)"
+                          }`
+                        : "—"}
+                    </TableCell>
                   </TableRow>
                 ))}
               </TableBody>

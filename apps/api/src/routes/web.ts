@@ -774,15 +774,59 @@ export async function webRoutes(app: FastifyInstance) {
           include: {
             product: { select: { sku: true, name: true } },
             user: { select: { name: true } },
-            fromLocation: { select: { barcode: true } },
-            toLocation: { select: { barcode: true } },
+            fromLocation: { select: { barcode: true, type: true } },
+            toLocation: { select: { barcode: true, type: true } },
             order: { select: { erpOrderId: true } },
+            cargoTransfer: {
+              select: {
+                id: true,
+                status: true,
+                withdrawnAt: true,
+                depositedAt: true,
+                withdrawnBy: { select: { name: true } },
+                depositedBy: { select: { name: true } },
+              },
+            },
           },
         }),
         prisma.inventoryMovement.count({ where }),
       ]);
       return {
-        movements,
+        movements: movements.map((m) => ({
+          id: m.id,
+          type: m.type,
+          quantity: m.quantity,
+          createdAt: m.createdAt,
+          reference: m.reference,
+          notes: m.notes,
+          product: m.product,
+          userName: m.user.name,
+          fromLocation: m.fromLocation,
+          toLocation: m.toLocation,
+          orderErpId: m.order?.erpOrderId ?? null,
+          cargoTransferId: m.cargoTransferId,
+          putawaySessionId: m.putawaySessionId,
+          purchaseReceiptSessionId: m.purchaseReceiptSessionId,
+          pickWaveLineId: m.pickWaveLineId,
+          startedAt: m.startedAt,
+          completedAt: m.completedAt,
+          durationSeconds:
+            m.startedAt && m.completedAt
+              ? Math.round(
+                  (m.completedAt.getTime() - m.startedAt.getTime()) / 1000,
+                )
+              : null,
+          cargoTransfer: m.cargoTransfer
+            ? {
+                id: m.cargoTransfer.id,
+                status: m.cargoTransfer.status,
+                withdrawnByName: m.cargoTransfer.withdrawnBy.name,
+                depositedByName: m.cargoTransfer.depositedBy?.name ?? null,
+                withdrawnAt: m.cargoTransfer.withdrawnAt,
+                depositedAt: m.cargoTransfer.depositedAt,
+              }
+            : null,
+        })),
         pagination: buildPaginationMeta(total, page, pageSize),
       };
     },

@@ -225,11 +225,20 @@ export function fetchMovements(
       quantity: number;
       createdAt: string;
       reference: string | null;
+      notes: string | null;
       product: { sku: string; name: string };
-      user: { name: string };
-      fromLocation: { barcode: string } | null;
-      toLocation: { barcode: string } | null;
-      order: { erpOrderId: string } | null;
+      userName: string;
+      fromLocation: { barcode: string; type?: string } | null;
+      toLocation: { barcode: string; type?: string } | null;
+      orderErpId: string | null;
+      cargoTransferId: string | null;
+      durationSeconds: number | null;
+      cargoTransfer: {
+        id: string;
+        status: string;
+        withdrawnByName: string;
+        depositedByName: string | null;
+      } | null;
     }>;
     pagination: PaginationMeta;
   }>(`/api/stock/movements?${sp}`);

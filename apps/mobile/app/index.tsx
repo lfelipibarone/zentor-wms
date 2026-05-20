@@ -41,12 +41,12 @@ export default function HomeScreen() {
         onPress={() => router.push("/putaway")}
       />
       <FactoryButton
-        label="Pulmão → gôndola"
+        label="Transporte de carga"
         variant="success"
-        onPress={() => router.push("/replenishment")}
+        onPress={() => router.push("/cargo-transport")}
       />
       <FactoryButton
-        label="Abastecer gôndola (giro)"
+        label="Abastecer estoque de giro"
         onPress={() => router.push("/stocking")}
       />
 

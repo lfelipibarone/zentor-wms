@@ -1,294 +1,225 @@
-import { useState } from "react";
-import { StyleSheet, Text, View } from "react-native";
+import { useCallback, useState } from "react";
+import {
+  ActivityIndicator,
+  FlatList,
+  Pressable,
+  StyleSheet,
+  Text,
+  View,
+} from "react-native";
+import { useFocusEffect } from "expo-router";
 import { BarcodeScanner } from "@/components/BarcodeScanner";
 import { FactoryButton } from "@/components/FactoryButton";
 import { QuantityInput } from "@/components/QuantityInput";
 import { ScreenShell } from "@/components/ScreenShell";
-import { useStockLocation } from "@/hooks/useGondolaStocking";
 import { api, ApiError } from "@/lib/api";
-import type { LocationLookup } from "@/lib/api";
+import type { CargoTransferSummary } from "@/lib/api";
 import { theme, spacing, typography } from "@/lib/theme";
 
-type Phase =
-  | "scan-shelf"
-  | "confirm-shelf"
-  | "scan-product"
-  | "done";
-
-type ScannerTarget = "shelf" | "product" | null;
+type Phase = "list" | "scan-gondola" | "confirm-qty" | "done";
 
 function normalizeBarcode(code: string) {
   return code.trim().toUpperCase();
 }
 
+function formatAgo(seconds: number) {
+  if (seconds < 60) return `${seconds}s`;
+  if (seconds < 3600) return `${Math.floor(seconds / 60)} min`;
+  return `${Math.floor(seconds / 3600)} h`;
+}
+
 export default function StockingScreen() {
-  const [phase, setPhase] = useState<Phase>("scan-shelf");
-  const [shelfBarcode, setShelfBarcode] = useState<string | null>(null);
-  const [locationSnapshot, setLocationSnapshot] = useState<LocationLookup | null>(
-    null,
-  );
+  const [phase, setPhase] = useState<Phase>("list");
+  const [transfers, setTransfers] = useState<CargoTransferSummary[]>([]);
+  const [loadingList, setLoadingList] = useState(true);
+  const [selected, setSelected] = useState<CargoTransferSummary | null>(null);
+  const [toBarcode, setToBarcode] = useState<string | null>(null);
   const [scannerOpen, setScannerOpen] = useState(false);
-  const [scannerTarget, setScannerTarget] = useState<ScannerTarget>(null);
+  const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
 
-  const location = locationSnapshot;
-  const stock = useStockLocation(location?.id ?? "");
+  const loadPending = useCallback(async () => {
+    setLoadingList(true);
+    try {
+      const data = await api.listPendingCargoTransfers();
+      setTransfers(data.transfers);
+    } catch (e) {
+      setMessage(e instanceof ApiError ? e.message : "Erro ao carregar");
+    } finally {
+      setLoadingList(false);
+    }
+  }, []);
 
-  const maxAdd = location
-    ? Math.max(0, location.capacity - location.currentQuantity)
-    : 0;
+  useFocusEffect(
+    useCallback(() => {
+      if (phase === "list") loadPending();
+    }, [phase, loadPending]),
+  );
 
-  const openShelfScanner = () => {
-    setScannerTarget("shelf");
-    setScannerOpen(true);
+  const openTransfer = (t: CargoTransferSummary) => {
+    setSelected(t);
+    setToBarcode(null);
+    setPhase("scan-gondola");
+    setMessage(
+      `${t.product.sku} · ${t.quantity} un. do ${t.fromLocation.label}`,
+    );
   };
 
-  const openProductScanner = () => {
-    setScannerTarget("product");
-    setScannerOpen(true);
-  };
-
-  const applyLocation = (loc: LocationLookup) => {
-    setLocationSnapshot(loc);
-    setShelfBarcode(loc.barcode);
-  };
-
-  const handleShelfScan = async (raw: string) => {
-    const code = normalizeBarcode(raw);
+  const handleGondolaScan = async (raw: string) => {
     setScannerOpen(false);
+    if (!selected) return;
+    setLoading(true);
     setMessage(null);
-
-    if (phase === "confirm-shelf") {
-      if (code !== normalizeBarcode(shelfBarcode ?? "")) {
-        setMessage("Gôndola diferente. Bipe a mesma etiqueta.");
+    try {
+      const loc = await api.getLocationByBarcode(normalizeBarcode(raw));
+      if (loc.type !== "PICK_FACE") {
+        setMessage("Bipe uma gôndola de estoque de giro");
         return;
       }
-      setPhase("scan-product");
-      setMessage("Gôndola confirmada. Bipe os produtos.");
-      return;
-    }
-
-    try {
-      const loc = await api.getLocationByBarcode(code);
-      applyLocation(loc);
-      if (loc.product) {
-        setPhase("scan-product");
-        setMessage("Produto na gôndola. Bipe para adicionar unidades.");
-      } else {
-        setPhase("confirm-shelf");
-        setMessage(
-          "Gôndola sem produto. Bipe a etiqueta novamente para confirmar.",
-        );
-      }
+      setToBarcode(loc.barcode);
+      setPhase("confirm-qty");
+      setMessage(`Gôndola ${loc.label}. Confirme ${selected.quantity} un.`);
     } catch (e) {
-      setPhase("scan-shelf");
-      setShelfBarcode(null);
-      setLocationSnapshot(null);
-      setMessage(
-        e instanceof ApiError ? e.message : "Gôndola não encontrada no sistema",
-      );
+      setMessage(e instanceof ApiError ? e.message : "Gôndola não encontrada");
+    } finally {
+      setLoading(false);
     }
   };
 
-  const handleProductScan = async (raw: string) => {
-    if (!location) return;
-    setScannerOpen(false);
-    setMessage(null);
-
-    try {
-      const result = await stock.mutateAsync({
-        productBarcode: raw.trim(),
-        quantity: 1,
-      });
-      applyLocation({
-        ...location,
-        currentQuantity: result.location.currentQuantity,
-        product: result.location.product,
-        needsReplenishment:
-          result.location.currentQuantity <= result.location.minThreshold,
-      });
-      setMessage(
-        `+${result.added} un. · Total: ${result.location.currentQuantity} / ${result.location.capacity}`,
-      );
-      if (result.location.currentQuantity >= result.location.capacity) {
-        setPhase("done");
-        setMessage("Capacidade máxima atingida.");
-      }
-    } catch (e) {
-      setMessage(e instanceof ApiError ? e.message : "Erro ao registrar");
-    }
-  };
-
-  const handleManualQty = async (qty: number) => {
-    if (!location?.product?.barcode && !location?.product?.sku) {
-      setMessage("Bipe ao menos um produto antes de informar quantidade.");
-      return;
-    }
-    const barcode =
-      location.product.barcode ?? location.product.sku;
+  const confirmDeposit = async () => {
+    if (!selected || !toBarcode) return;
+    setLoading(true);
     setMessage(null);
     try {
-      const result = await stock.mutateAsync({
-        productBarcode: barcode,
-        quantity: qty,
-      });
-      applyLocation({
-        ...location,
-        currentQuantity: result.location.currentQuantity,
-        product: result.location.product,
-        needsReplenishment:
-          result.location.currentQuantity <= result.location.minThreshold,
+      const result = await api.depositCargoTransfer(selected.id, {
+        toLocationBarcode: toBarcode,
+        productBarcode: selected.product.barcode ?? selected.product.sku,
+        quantity: selected.quantity,
       });
       setMessage(
-        `Total: ${result.location.currentQuantity} / ${result.location.capacity}`,
+        `Abastecido ${result.transfer.quantity} un. na gôndola (saldo: ${result.toLocation.currentQuantity})`,
       );
-      if (result.location.currentQuantity >= result.location.capacity) {
-        setPhase("done");
-      }
+      setPhase("done");
     } catch (e) {
-      setMessage(e instanceof ApiError ? e.message : "Erro ao registrar");
+      setMessage(e instanceof ApiError ? e.message : "Erro ao abastecer");
+    } finally {
+      setLoading(false);
     }
   };
 
-  const reset = () => {
-    setPhase("scan-shelf");
-    setShelfBarcode(null);
-    setLocationSnapshot(null);
+  const backToList = () => {
+    setPhase("list");
+    setSelected(null);
+    setToBarcode(null);
     setMessage(null);
-    setScannerTarget(null);
+    loadPending();
   };
 
-  const onScan =
-    scannerTarget === "product" ? handleProductScan : handleShelfScan;
+  if (phase === "list") {
+    return (
+      <ScreenShell scroll backToHome>
+        <Text style={styles.pageHint}>
+          Transportes pendentes do pulmão. Selecione um para bipar a gôndola de
+          destino.
+        </Text>
+
+        {loadingList ? (
+          <ActivityIndicator size="large" color={theme.primary} />
+        ) : transfers.length === 0 ? (
+          <Text style={styles.empty}>
+            Nenhum transporte em trânsito. Use Transporte de carga no menu.
+          </Text>
+        ) : (
+          <FlatList
+            data={transfers}
+            keyExtractor={(item) => item.id}
+            scrollEnabled={false}
+            renderItem={({ item }) => (
+              <Pressable style={styles.card} onPress={() => openTransfer(item)}>
+                <Text style={styles.cardTitle}>{item.product.sku}</Text>
+                <Text style={styles.meta}>{item.product.name}</Text>
+                <Text style={styles.meta}>
+                  {item.quantity} un. · de {item.fromLocation.label}
+                </Text>
+                <Text style={styles.meta}>
+                  {item.withdrawnByName} · há{" "}
+                  {formatAgo(item.durationSeconds)}
+                </Text>
+              </Pressable>
+            )}
+          />
+        )}
+
+        {message ? <Text style={styles.message}>{message}</Text> : null}
+        <FactoryButton
+          label="Atualizar lista"
+          variant="secondary"
+          onPress={loadPending}
+        />
+      </ScreenShell>
+    );
+  }
 
   return (
-    <ScreenShell scroll>
-      <Text style={styles.pageHint}>
-        Alocar produto e registrar quantidade na gôndola
-      </Text>
-
-      {phase === "scan-shelf" ? (
-        <>
-          <Text style={styles.instruction}>
-            Escaneie a etiqueta da gôndola para consultar o cadastro.
-          </Text>
-          <FactoryButton label="Bipar gôndola" onPress={openShelfScanner} />
-        </>
-      ) : null}
-
-      {location && phase !== "scan-shelf" ? (
+    <ScreenShell scroll backToHome>
+      {selected ? (
         <View style={styles.card}>
-          <Text style={styles.locTitle}>{location.label}</Text>
-          <Text style={styles.barcode}>{location.barcode}</Text>
-
-          {location.product ? (
-            <View style={styles.productBlock}>
-              <Text style={styles.blockLabel}>PRODUTO NA GÔNDOLA</Text>
-              <Text style={styles.sku}>{location.product.sku}</Text>
-              <Text style={styles.name}>{location.product.name}</Text>
-            </View>
-          ) : (
-            <Text style={styles.warn}>Sem produto alocado</Text>
-          )}
-
-          <View style={styles.statsRow}>
-            <View style={styles.stat}>
-              <Text style={styles.statVal}>{location.currentQuantity}</Text>
-              <Text style={styles.statLbl}>Atual</Text>
-            </View>
-            <View style={styles.stat}>
-              <Text style={styles.statVal}>{location.capacity}</Text>
-              <Text style={styles.statLbl}>Capacidade</Text>
-            </View>
-            <View style={styles.stat}>
-              <Text
-                style={[
-                  styles.statVal,
-                  location.needsReplenishment && styles.low,
-                ]}
-              >
-                {location.minThreshold}
-              </Text>
-              <Text style={styles.statLbl}>Mínimo</Text>
-            </View>
-          </View>
+          <Text style={styles.cardTitle}>{selected.product.sku}</Text>
+          <Text style={styles.meta}>
+            {selected.quantity} un. · origem {selected.fromLocation.label}
+          </Text>
         </View>
       ) : null}
 
-      {phase === "confirm-shelf" ? (
+      {phase === "scan-gondola" ? (
         <>
-          <Text style={styles.instruction}>
-            Para abastecer uma gôndola vazia, bipe a mesma etiqueta outra vez.
-          </Text>
+          <Text style={styles.instruction}>Bipe a gôndola de destino</Text>
           <FactoryButton
-            label="Confirmar gôndola (bipar de novo)"
-            onPress={openShelfScanner}
+            label="Bipar gôndola"
+            onPress={() => setScannerOpen(true)}
+            loading={loading}
           />
         </>
       ) : null}
 
-      {phase === "scan-product" && location ? (
+      {phase === "confirm-qty" && selected ? (
         <>
-          {location.product ? (
-            <>
-              <Text style={styles.instruction}>
-                Informe a quantidade a adicionar na gôndola.
-              </Text>
-              <QuantityInput
-                label={`Adicionar quantidade (máx. ${maxAdd})`}
-                max={maxAdd}
-                loading={stock.isPending}
-                onConfirm={handleManualQty}
-              />
-              <FactoryButton
-                label="Bipar produto (+1) — opcional"
-                variant="secondary"
-                onPress={openProductScanner}
-                disabled={maxAdd <= 0 || stock.isPending}
-                loading={stock.isPending}
-              />
-            </>
-          ) : (
-            <>
-              <Text style={styles.instruction}>
-                Bipe o produto ou informe a quantidade após o primeiro bip.
-              </Text>
-              <FactoryButton
-                label="Bipar produto"
-                variant="success"
-                onPress={openProductScanner}
-                disabled={maxAdd <= 0 || stock.isPending}
-                loading={stock.isPending}
-              />
-            </>
-          )}
+          <Text style={styles.instruction}>
+            Gôndola {toBarcode} — confirme a quantidade
+          </Text>
+          <QuantityInput
+            label={`Quantidade (${selected.quantity})`}
+            max={selected.quantity}
+            onConfirm={confirmDeposit}
+          />
           <FactoryButton
-            label="Finalizar"
+            label="Bipar produto (+1)"
             variant="secondary"
-            onPress={() => setPhase("done")}
+            onPress={() => setScannerOpen(true)}
           />
         </>
       ) : null}
 
       {phase === "done" ? (
-        <FactoryButton label="Nova gôndola" onPress={reset} />
+        <FactoryButton label="Voltar à lista" onPress={backToList} />
+      ) : null}
+
+      {phase !== "done" ? (
+        <FactoryButton
+          label="Cancelar"
+          variant="secondary"
+          onPress={backToList}
+        />
       ) : null}
 
       {message ? <Text style={styles.message}>{message}</Text> : null}
 
       <BarcodeScanner
         visible={scannerOpen}
-        title={
-          scannerTarget === "product" ? "Bipar produto" : "Bipar gôndola"
-        }
-        hint={
-          scannerTarget === "product"
-            ? "Cada bip adiciona 1 unidade na gôndola"
-            : phase === "confirm-shelf"
-              ? "Confirme a mesma gôndola"
-              : "Etiqueta da posição"
-        }
-        onScan={onScan}
+        title={phase === "scan-gondola" ? "Bipar gôndola" : "Bipar produto"}
+        onScan={(code) => {
+          if (phase === "scan-gondola") handleGondolaScan(code);
+        }}
         onClose={() => setScannerOpen(false)}
       />
     </ScreenShell>
@@ -304,69 +235,31 @@ const styles = StyleSheet.create({
   instruction: {
     fontSize: typography.body,
     color: theme.textMuted,
-    lineHeight: 24,
     marginBottom: spacing.sm,
   },
-  loading: { color: theme.textMuted, marginVertical: spacing.sm },
-  error: { color: theme.danger, fontWeight: "700", marginVertical: spacing.sm },
+  empty: {
+    textAlign: "center",
+    color: theme.textMuted,
+    marginVertical: spacing.lg,
+  },
   card: {
     backgroundColor: theme.surface,
     borderRadius: 16,
     padding: spacing.lg,
-    gap: spacing.sm,
+    marginBottom: spacing.md,
     borderWidth: 2,
     borderColor: theme.border,
-    marginVertical: spacing.md,
   },
-  locTitle: {
+  cardTitle: {
     fontSize: typography.title,
-    fontWeight: "900",
+    fontWeight: "800",
     color: theme.primary,
   },
-  barcode: {
-    fontFamily: "monospace",
-    color: theme.textMuted,
-    fontSize: typography.caption,
-  },
-  productBlock: {
-    marginTop: spacing.sm,
-    paddingTop: spacing.sm,
-    borderTopWidth: 1,
-    borderTopColor: theme.border,
-  },
-  blockLabel: {
-    fontSize: typography.caption,
-    fontWeight: "800",
-    color: theme.textMuted,
-    letterSpacing: 1,
-  },
-  sku: { color: theme.info, fontWeight: "800", marginTop: spacing.xs },
-  name: {
-    fontSize: typography.subtitle,
-    color: theme.text,
-    fontWeight: "700",
-  },
-  warn: { color: theme.warning, fontWeight: "600" },
-  statsRow: { flexDirection: "row", marginTop: spacing.md, gap: spacing.sm },
-  stat: {
-    flex: 1,
-    backgroundColor: theme.bg,
-    borderRadius: 12,
-    padding: spacing.md,
-    alignItems: "center",
-  },
-  statVal: {
-    fontSize: 32,
-    fontWeight: "900",
-    color: theme.text,
-  },
-  statLbl: { color: theme.textMuted, fontSize: typography.caption },
-  low: { color: theme.danger },
+  meta: { color: theme.textMuted, marginTop: spacing.xs },
   message: {
+    marginTop: spacing.md,
     color: theme.success,
-    fontSize: typography.body,
     fontWeight: "700",
     textAlign: "center",
-    marginTop: spacing.md,
   },
 });

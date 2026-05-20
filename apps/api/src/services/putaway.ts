@@ -48,13 +48,17 @@ async function ensurePutawaySession(purchaseReceiptId: string, userId: string) {
 
   if (receipt.putaway) {
     if (receipt.putaway.status === PutawaySessionStatus.PENDING) {
+      const startedAt = new Date();
       await prisma.putawaySession.update({
         where: { id: receipt.putaway.id },
         data: {
           status: PutawaySessionStatus.IN_PROGRESS,
           assignedToId: userId,
-          startedAt: new Date(),
+          startedAt,
         },
+      });
+      await prisma.putawayTimeLog.create({
+        data: { sessionId: receipt.putaway.id, userId, event: "START" },
       });
     }
     return prisma.putawaySession.findUnique({
@@ -66,12 +70,13 @@ async function ensurePutawaySession(purchaseReceiptId: string, userId: string) {
     });
   }
 
-  return prisma.putawaySession.create({
+  const startedAt = new Date();
+  const session = await prisma.putawaySession.create({
     data: {
       purchaseReceiptId,
       status: PutawaySessionStatus.IN_PROGRESS,
       assignedToId: userId,
-      startedAt: new Date(),
+      startedAt,
       items: {
         create: receipt.items.map((it) => ({
           receiptItemId: it.id,
@@ -87,6 +92,10 @@ async function ensurePutawaySession(purchaseReceiptId: string, userId: string) {
       purchaseReceipt: { include: { items: true } },
     },
   });
+  await prisma.putawayTimeLog.create({
+    data: { sessionId: session.id, userId, event: "START" },
+  });
+  return session;
 }
 
 function formatPutaway(session: NonNullable<Awaited<ReturnType<typeof ensurePutawaySession>>>) {
@@ -218,6 +227,8 @@ export async function storePutawayItem(params: {
   );
   if (qty <= 0) throw new Error("Quantidade já armazenada");
 
+  const storeStartedAt = new Date();
+
   await prisma.$transaction([
     prisma.putawayItem.update({
       where: { id: item.id },
@@ -241,8 +252,19 @@ export async function storePutawayItem(params: {
         userId: params.userId,
         productId: product.id,
         toLocationId: location.id,
+        putawaySessionId: params.sessionId,
+        purchaseReceiptSessionId: session.purchaseReceiptId,
+        startedAt: storeStartedAt,
+        completedAt: storeStartedAt,
         reference: session.purchaseReceiptId,
         notes: "Armazenagem pós-recebimento",
+      },
+    }),
+    prisma.putawayTimeLog.create({
+      data: {
+        sessionId: params.sessionId,
+        userId: params.userId,
+        event: "STORE_ITEM",
       },
     }),
   ]);
@@ -255,12 +277,26 @@ export async function completePutaway(sessionId: string) {
   if (!data.allStored) {
     throw new Error("Ainda há itens pendentes de armazenagem");
   }
+  const completedAt = new Date();
   await prisma.putawaySession.update({
     where: { id: sessionId },
     data: {
       status: PutawaySessionStatus.COMPLETED,
-      completedAt: new Date(),
+      completedAt,
     },
   });
+  const session = await prisma.putawaySession.findUnique({
+    where: { id: sessionId },
+    select: { assignedToId: true },
+  });
+  if (session?.assignedToId) {
+    await prisma.putawayTimeLog.create({
+      data: {
+        sessionId,
+        userId: session.assignedToId,
+        event: "COMPLETE",
+      },
+    });
+  }
   return getPutawaySession(sessionId);
 }
