@@ -11,6 +11,7 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useAcceptOrder, useOrderQueue } from "@/hooks/usePicking";
 import { FactoryButton } from "@/components/FactoryButton";
+import { CollectionDeadlineRow } from "@/components/CollectionDeadlineRow";
 import { WavePickingPanel } from "@/components/WavePickingPanel";
 import { theme, spacing, typography } from "@/lib/theme";
 import type { QueueOrder } from "@/lib/api";
@@ -93,6 +94,7 @@ export default function PickingHubScreen() {
                 disabled={accept.isPending}
               >
                 <Text style={styles.erp}>{item.erpOrderId}</Text>
+                <CollectionDeadlineRow deadline={item.collectionDeadline} />
                 {item.customerName ? (
                   <Text style={styles.customer}>{item.customerName}</Text>
                 ) : null}

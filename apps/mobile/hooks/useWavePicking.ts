@@ -1,6 +1,23 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 
+export function useReleasedWaves() {
+  return useQuery({
+    queryKey: ["wave", "released"],
+    queryFn: () => api.listReleasedWaves(),
+    retry: false,
+  });
+}
+
+export function useWaveById(waveId: string | null) {
+  return useQuery({
+    queryKey: ["wave", waveId],
+    queryFn: () => api.getWaveById(waveId!),
+    enabled: !!waveId,
+    retry: false,
+  });
+}
+
 export function useCurrentWave() {
   return useQuery({
     queryKey: ["wave", "current"],
@@ -9,14 +26,20 @@ export function useCurrentWave() {
   });
 }
 
-export function useAcceptWave() {
+export function useAcceptWave(waveId?: string | null) {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: () => api.acceptCurrentWave(),
+    mutationFn: () =>
+      waveId ? api.acceptWave(waveId) : api.acceptCurrentWave(),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["wave"] });
     },
   });
+}
+
+/** @deprecated use useAcceptWave */
+export function useAcceptCurrentWave() {
+  return useAcceptWave(null);
 }
 
 export function useWaveLine(lineId: string | null) {

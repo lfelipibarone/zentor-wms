@@ -8,6 +8,10 @@ import {
   stockLocation,
 } from "../services/location-stock.js";
 import {
+  LocationAdjustError,
+  adjustLocationQuantity,
+} from "../services/location-adjust.js";
+import {
   LocationTransferError,
   transferPulmaoToPickFace,
 } from "../services/location-transfer.js";
@@ -22,6 +26,8 @@ import {
   PickWaveError,
   acceptPickWave,
   getCurrentReleasedWave,
+  getReleasedWaveById,
+  listReleasedWaves,
   getOrderIdsInActiveWave,
   getWaveLineDetail,
   mapWaveLineSummary,
@@ -81,6 +87,7 @@ export async function mobileRoutes(app: FastifyInstance) {
       erpOrderId: o.erpOrderId,
       priority: o.priority,
       customerName: o.customerName,
+      collectionDeadline: o.collectionDeadline?.toISOString() ?? null,
       itemCount: o.items.length,
       totalUnits: o.items.reduce((s, i) => s + i.quantityOrdered, 0),
     }));
@@ -107,14 +114,19 @@ export async function mobileRoutes(app: FastifyInstance) {
         });
       }
 
-      const updated = await prisma.order.update({
-        where: { id: orderId },
+      const result = await prisma.order.updateMany({
+        where: { id: orderId, tenantId, status: OrderStatus.PENDING },
         data: {
           status: OrderStatus.PICKING,
           assignedPickerId: userId,
         },
       });
-      return { id: updated.id, status: updated.status };
+      if (result.count === 0) {
+        return reply.status(409).send({
+          error: "Pedido já aceito ou indisponível na fila",
+        });
+      }
+      return { id: orderId, status: OrderStatus.PICKING };
     }
   );
 
@@ -174,9 +186,36 @@ export async function mobileRoutes(app: FastifyInstance) {
       });
       if (!order) return reply.status(404).send({ error: "Pedido não encontrado" });
 
-      const nextItem = order.items.find(
-        (i) => i.quantityPicked < i.quantityOrdered
+      const { pickNextItemByRoute, sortPendingItemsByRoute } = await import(
+        "../services/location-route.js"
       );
+
+      const isPending = (i: (typeof order.items)[0]) =>
+        i.quantityPicked < i.quantityOrdered;
+
+      const mapPickLoc = (loc: (typeof order.items)[0]["pickLocation"]) =>
+        loc
+          ? {
+              id: loc.id,
+              corridor: loc.corridor,
+              row: loc.row,
+              barcode: loc.barcode,
+              label: formatLocation(loc),
+              currentQuantity: loc.currentQuantity,
+              capacity: loc.capacity,
+              minThreshold: loc.minThreshold,
+            }
+          : null;
+
+      const nextItem =
+        pickNextItemByRoute(order.items, isPending, null) ??
+        order.items.find(isPending);
+
+      const routeQueue = sortPendingItemsByRoute(order.items, isPending, null);
+
+      const remaining = nextItem
+        ? nextItem.quantityOrdered - nextItem.quantityPicked
+        : 0;
 
       return {
         order: {
@@ -184,6 +223,7 @@ export async function mobileRoutes(app: FastifyInstance) {
           erpOrderId: order.erpOrderId,
           status: order.status,
           basket: order.basket,
+          collectionDeadline: order.collectionDeadline?.toISOString() ?? null,
         },
         items: order.items.map((item) => ({
           id: item.id,
@@ -191,13 +231,13 @@ export async function mobileRoutes(app: FastifyInstance) {
           quantityOrdered: item.quantityOrdered,
           quantityPicked: item.quantityPicked,
           product: item.product,
-          pickLocation: item.pickLocation
-            ? {
-                ...item.pickLocation,
-                label: formatLocation(item.pickLocation),
-              }
-            : null,
+          pickLocation: mapPickLoc(item.pickLocation),
           completed: item.quantityPicked >= item.quantityOrdered,
+        })),
+        routeQueue: routeQueue.slice(0, 5).map((item) => ({
+          id: item.id,
+          lineNumber: item.lineNumber,
+          pickLocation: mapPickLoc(item.pickLocation),
         })),
         nextItem: nextItem
           ? {
@@ -205,14 +245,14 @@ export async function mobileRoutes(app: FastifyInstance) {
               lineNumber: nextItem.lineNumber,
               quantityOrdered: nextItem.quantityOrdered,
               quantityPicked: nextItem.quantityPicked,
-              remaining: nextItem.quantityOrdered - nextItem.quantityPicked,
+              remaining,
               product: nextItem.product,
-              pickLocation: nextItem.pickLocation
-                ? {
-                    ...nextItem.pickLocation,
-                    label: formatLocation(nextItem.pickLocation),
-                  }
-                : null,
+              pickLocation: mapPickLoc(nextItem.pickLocation),
+              stockMismatchHint:
+                nextItem.pickLocation &&
+                nextItem.pickLocation.currentQuantity < remaining
+                  ? `Saldo na gôndola (${nextItem.pickLocation.currentQuantity}) menor que o pendente (${remaining})`
+                  : null,
             }
           : null,
         allPicked: !nextItem,
@@ -409,6 +449,78 @@ export async function mobileRoutes(app: FastifyInstance) {
 
   app.post<{
     Params: { locationId: string };
+    Body: {
+      countedQuantity?: number;
+      productBarcode?: string;
+      reason?: string;
+      orderId?: string;
+      itemId?: string;
+      waveLineId?: string;
+    };
+  }>(
+    "/mobile/locations/:locationId/adjust-quantity",
+    async (request, reply) => {
+      const tenantId = request.authUser!.tenantId!;
+      const userId = resolveUserId(request);
+      try {
+        return await adjustLocationQuantity({
+          tenantId,
+          userId,
+          locationId: request.params.locationId,
+          countedQuantity: Number(request.body?.countedQuantity),
+          productBarcode: request.body?.productBarcode,
+          reason: request.body?.reason,
+          orderId: request.body?.orderId,
+          itemId: request.body?.itemId,
+          waveLineId: request.body?.waveLineId,
+        });
+      } catch (e) {
+        if (e instanceof LocationAdjustError) {
+          return reply.status(e.statusCode).send({ error: e.message });
+        }
+        throw e;
+      }
+    },
+  );
+
+  app.post<{
+    Params: { barcode: string };
+    Body: {
+      countedQuantity?: number;
+      productBarcode?: string;
+      reason?: string;
+      orderId?: string;
+      itemId?: string;
+      waveLineId?: string;
+    };
+  }>(
+    "/mobile/locations/barcode/:barcode/adjust-quantity",
+    async (request, reply) => {
+      const tenantId = request.authUser!.tenantId!;
+      const userId = resolveUserId(request);
+      try {
+        return await adjustLocationQuantity({
+          tenantId,
+          userId,
+          barcode: decodeURIComponent(request.params.barcode),
+          countedQuantity: Number(request.body?.countedQuantity),
+          productBarcode: request.body?.productBarcode,
+          reason: request.body?.reason,
+          orderId: request.body?.orderId,
+          itemId: request.body?.itemId,
+          waveLineId: request.body?.waveLineId,
+        });
+      } catch (e) {
+        if (e instanceof LocationAdjustError) {
+          return reply.status(e.statusCode).send({ error: e.message });
+        }
+        throw e;
+      }
+    },
+  );
+
+  app.post<{
+    Params: { locationId: string };
     Body: { quantity: number; productBarcode?: string };
   }>(
     "/mobile/locations/:locationId/replenish",
@@ -545,11 +657,20 @@ export async function mobileRoutes(app: FastifyInstance) {
     }
   });
 
+  app.get("/mobile/replenishment/needs", async (request) => {
+    const tenantId = request.authUser!.tenantId!;
+    const { listReplenishmentNeeds } = await import(
+      "../services/replenishment-queue.js"
+    );
+    return { needs: await listReplenishmentNeeds(tenantId) };
+  });
+
   app.post<{
     Body: {
       fromLocationBarcode?: string;
       productBarcode?: string;
       quantity?: number;
+      targetPickFaceId?: string;
     };
   }>("/mobile/cargo-transfers/withdraw", async (request, reply) => {
     const tenantId = request.authUser!.tenantId!;
@@ -561,6 +682,7 @@ export async function mobileRoutes(app: FastifyInstance) {
         fromLocationBarcode: request.body?.fromLocationBarcode ?? "",
         productBarcode: request.body?.productBarcode ?? "",
         quantity: Number(request.body?.quantity ?? 0),
+        targetPickFaceId: request.body?.targetPickFaceId,
       });
     } catch (e) {
       if (e instanceof CargoTransferError) {
@@ -583,6 +705,44 @@ export async function mobileRoutes(app: FastifyInstance) {
       const tenantId = request.authUser!.tenantId!;
       try {
         return await getCargoTransfer(tenantId, request.params.id);
+      } catch (e) {
+        if (e instanceof CargoTransferError) {
+          return reply.status(e.statusCode).send({ error: e.message });
+        }
+        throw e;
+      }
+    },
+  );
+
+  app.get<{ Params: { id: string } }>(
+    "/mobile/cargo-transfers/:id/suggest-face",
+    async (request, reply) => {
+      const tenantId = request.authUser!.tenantId!;
+      try {
+        const transfer = await getCargoTransfer(tenantId, request.params.id);
+        const { suggestPickFaceDeposit } = await import(
+          "../services/pick-face-resolve.js"
+        );
+        const loc = await suggestPickFaceDeposit(
+          tenantId,
+          transfer.product.id,
+          transfer.quantity,
+        );
+        if (!loc) {
+          return reply.status(404).send({
+            error: "Nenhum endereço de estoque de giro disponível",
+          });
+        }
+        return {
+          suggested: {
+            barcode: loc.barcode,
+            corridor: loc.corridor,
+            row: loc.row,
+            currentQuantity: loc.currentQuantity,
+            capacity: loc.capacity,
+            label: `${loc.corridor}-${loc.row}`,
+          },
+        };
       } catch (e) {
         if (e instanceof CargoTransferError) {
           return reply.status(e.statusCode).send({ error: e.message });
@@ -623,6 +783,93 @@ export async function mobileRoutes(app: FastifyInstance) {
   // Pick wave
   // ---------------------------------------------------------------------------
 
+  function mapWaveMobilePayload(
+    wave: NonNullable<Awaited<ReturnType<typeof getReleasedWaveById>>>,
+    userId: string,
+  ) {
+    const canWork = !wave.acceptedById || wave.acceptedById === userId;
+    const waveOrders = wave.orders.map((wo) => wo.order);
+    let collectionDeadline: Date | null = null;
+    for (const o of waveOrders) {
+      if (o.collectionDeadline) {
+        if (
+          !collectionDeadline ||
+          o.collectionDeadline.getTime() < collectionDeadline.getTime()
+        ) {
+          collectionDeadline = o.collectionDeadline;
+        }
+      }
+    }
+    return {
+      wave: {
+        id: wave.id,
+        name: wave.name,
+        status: wave.status,
+        releasedAt: wave.releasedAt,
+        orderCount: wave.orders.length,
+        gondolaPasses: wave.lines.length,
+        acceptedById: wave.acceptedById,
+        acceptedByName: wave.acceptedBy?.name ?? null,
+        acceptedAt: wave.acceptedAt,
+        canAccept: !wave.acceptedById,
+        canWork,
+        isMine: wave.acceptedById === userId,
+        collectionDeadline: collectionDeadline?.toISOString() ?? null,
+      },
+      lines: canWork ? wave.lines.map(mapWaveLineSummary) : [],
+    };
+  }
+
+  app.get("/mobile/waves/released", async (request, reply) => {
+    const tenantId = request.authUser!.tenantId!;
+    const enabled = await isWaveEnabled(tenantId);
+    if (!enabled) {
+      return reply.status(404).send({ error: "Separação em onda desabilitada" });
+    }
+
+    const { scorePackingUrgency } = await import(
+      "../services/packing-queue-sort.js"
+    );
+    const waves = await listReleasedWaves(tenantId);
+    const summaries = waves.map((w) => {
+      const orders = w.orders.map((wo) => wo.order);
+      const urgency = Math.max(
+        ...orders.map((o) =>
+          scorePackingUrgency({
+            priority: o.priority,
+            collectionDeadline: o.collectionDeadline,
+            marketplace: o.marketplace,
+          }),
+        ),
+        0,
+      );
+      let collectionDeadline: Date | null = null;
+      for (const o of orders) {
+        if (o.collectionDeadline) {
+          if (
+            !collectionDeadline ||
+            o.collectionDeadline.getTime() < collectionDeadline.getTime()
+          ) {
+            collectionDeadline = o.collectionDeadline;
+          }
+        }
+      }
+      return {
+        id: w.id,
+        name: w.name,
+        releasedAt: w.releasedAt,
+        orderCount: w._count.orders,
+        lineCount: w._count.lines,
+        acceptedById: w.acceptedById,
+        acceptedByName: w.acceptedBy?.name ?? null,
+        packingUrgency: urgency,
+        collectionDeadline: collectionDeadline?.toISOString() ?? null,
+      };
+    });
+    summaries.sort((a, b) => b.packingUrgency - a.packingUrgency);
+    return { waves: summaries };
+  });
+
   app.get("/mobile/waves/current", async (request, reply) => {
     const tenantId = request.authUser!.tenantId!;
     const enabled = await isWaveEnabled(tenantId);
@@ -636,27 +883,7 @@ export async function mobileRoutes(app: FastifyInstance) {
       return reply.status(404).send({ error: "Nenhuma onda ativa" });
     }
 
-    const canWork =
-      !wave.acceptedById || wave.acceptedById === userId;
-    const gondolaPasses = wave.lines.length;
-
-    return {
-      wave: {
-        id: wave.id,
-        name: wave.name,
-        status: wave.status,
-        releasedAt: wave.releasedAt,
-        orderCount: wave.orders.length,
-        gondolaPasses,
-        acceptedById: wave.acceptedById,
-        acceptedByName: wave.acceptedBy?.name ?? null,
-        acceptedAt: wave.acceptedAt,
-        canAccept: !wave.acceptedById,
-        canWork,
-        isMine: wave.acceptedById === userId,
-      },
-      lines: canWork ? wave.lines.map(mapWaveLineSummary) : [],
-    };
+    return mapWaveMobilePayload(wave, userId);
   });
 
   app.post("/mobile/waves/current/accept", async (request, reply) => {
@@ -682,6 +909,45 @@ export async function mobileRoutes(app: FastifyInstance) {
       throw e;
     }
   });
+
+  app.get<{ Params: { waveId: string } }>(
+    "/mobile/waves/:waveId",
+    async (request, reply) => {
+      const tenantId = request.authUser!.tenantId!;
+      const enabled = await isWaveEnabled(tenantId);
+      if (!enabled) {
+        return reply.status(404).send({ error: "Separação em onda desabilitada" });
+      }
+
+      const userId = resolveUserId(request);
+      const wave = await getReleasedWaveById(tenantId, request.params.waveId);
+      if (!wave) {
+        return reply.status(404).send({ error: "Onda não encontrada" });
+      }
+      return mapWaveMobilePayload(wave, userId);
+    },
+  );
+
+  app.post<{ Params: { waveId: string } }>(
+    "/mobile/waves/:waveId/accept",
+    async (request, reply) => {
+      const tenantId = request.authUser!.tenantId!;
+      const enabled = await isWaveEnabled(tenantId);
+      if (!enabled) {
+        return reply.status(404).send({ error: "Separação em onda desabilitada" });
+      }
+
+      const userId = resolveUserId(request);
+      try {
+        return await acceptPickWave(request.params.waveId, userId);
+      } catch (e) {
+        if (e instanceof PickWaveError) {
+          return reply.status(e.statusCode).send({ error: e.message });
+        }
+        throw e;
+      }
+    },
+  );
 
   app.get("/mobile/config", async (request) => {
     const tenantId = request.authUser!.tenantId!;
@@ -888,6 +1154,97 @@ export async function mobileRoutes(app: FastifyInstance) {
       } catch (e) {
         const message =
           e instanceof Error ? e.message : "Erro ao finalizar conferência";
+        return reply.status(422).send({ error: message });
+      }
+    },
+  );
+
+  // Devolução (recebimento caminhão)
+  app.post<{ Body: { reference?: string } }>(
+    "/mobile/purchase-receipts/return/start",
+    async (request, reply) => {
+      const tenantId = request.authUser!.tenantId!;
+      const userId = resolveUserId(request);
+      try {
+        const { startReturnReceiptSession } = await import(
+          "../services/purchase-receipt-return.js"
+        );
+        return await startReturnReceiptSession({
+          tenantId,
+          userId,
+          reference: request.body?.reference,
+        });
+      } catch (e) {
+        const message = e instanceof Error ? e.message : "Erro ao iniciar devolução";
+        return reply.status(422).send({ error: message });
+      }
+    },
+  );
+
+  app.get<{ Params: { sessionId: string } }>(
+    "/mobile/purchase-receipts/return/:sessionId",
+    async (request, reply) => {
+      try {
+        const { getReturnReceiptSession } = await import(
+          "../services/purchase-receipt-return.js"
+        );
+        return await getReturnReceiptSession(request.params.sessionId);
+      } catch (e) {
+        const message = e instanceof Error ? e.message : "Sessão não encontrada";
+        return reply.status(404).send({ error: message });
+      }
+    },
+  );
+
+  app.post<{
+    Params: { sessionId: string };
+    Body: { barcode?: string; quantity?: number };
+  }>(
+    "/mobile/purchase-receipts/return/:sessionId/scan",
+    async (request, reply) => {
+      const barcode = request.body?.barcode?.trim();
+      if (!barcode) {
+        return reply.status(400).send({ error: "Código do produto obrigatório" });
+      }
+      try {
+        const { scanReturnReceiptProduct } = await import(
+          "../services/purchase-receipt-return.js"
+        );
+        return await scanReturnReceiptProduct({
+          sessionId: request.params.sessionId,
+          barcode,
+          quantity: request.body?.quantity,
+        });
+      } catch (e) {
+        const message = e instanceof Error ? e.message : "Erro ao registrar bip";
+        return reply.status(422).send({ error: message });
+      }
+    },
+  );
+
+  app.post<{
+    Params: { sessionId: string };
+    Body: { pulmaoLocationBarcode?: string };
+  }>(
+    "/mobile/purchase-receipts/return/:sessionId/complete",
+    async (request, reply) => {
+      const userId = resolveUserId(request);
+      const pulmaoLocationBarcode = request.body?.pulmaoLocationBarcode?.trim();
+      if (!pulmaoLocationBarcode) {
+        return reply.status(400).send({ error: "Bipe o pulmão de destino" });
+      }
+      try {
+        const { completeReturnReceipt } = await import(
+          "../services/purchase-receipt-return.js"
+        );
+        return await completeReturnReceipt({
+          sessionId: request.params.sessionId,
+          userId,
+          pulmaoLocationBarcode,
+        });
+      } catch (e) {
+        const message =
+          e instanceof Error ? e.message : "Erro ao finalizar devolução";
         return reply.status(422).send({ error: message });
       }
     },

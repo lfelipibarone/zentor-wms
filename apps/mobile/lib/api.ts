@@ -55,6 +55,7 @@ export interface QueueOrder {
   erpOrderId: string;
   priority: number;
   customerName: string | null;
+  collectionDeadline: string | null;
   itemCount: number;
   totalUnits: number;
 }
@@ -65,6 +66,9 @@ export interface PickLocationDto {
   row: string;
   barcode: string;
   label: string;
+  currentQuantity?: number;
+  capacity?: number;
+  minThreshold?: number;
 }
 
 export interface PickingItemDto {
@@ -83,8 +87,14 @@ export interface PickingSession {
     erpOrderId: string;
     status: OrderStatus;
     basket: { id: string; code: string; barcode: string } | null;
+    collectionDeadline: string | null;
   };
   items: PickingItemDto[];
+  routeQueue?: Array<{
+    id: string;
+    lineNumber: number;
+    pickLocation: PickLocationDto | null;
+  }>;
   nextItem: {
     id: string;
     lineNumber: number;
@@ -93,8 +103,45 @@ export interface PickingSession {
     remaining: number;
     product: Product;
     pickLocation: PickLocationDto | null;
+    stockMismatchHint?: string | null;
   } | null;
   allPicked: boolean;
+}
+
+export interface AdjustLocationResult {
+  location: {
+    id: string;
+    barcode: string;
+    type: string;
+    currentQuantity: number;
+    capacity: number;
+    label: string;
+    product: { id: string; sku: string; name: string; barcode: string | null } | null;
+  };
+  previousQuantity: number;
+  adjustmentDelta: number;
+  reconciliation: {
+    pulmaoOnly: boolean;
+    orderItems: Array<{
+      orderItemId: string;
+      orderId: string;
+      erpOrderId: string;
+      oldLocationBarcode: string | null;
+      newLocationBarcode: string;
+    }>;
+    waveLines: Array<{
+      waveLineId: string;
+      waveName: string;
+      action: string;
+      message?: string;
+      newLocationBarcode: string | null;
+    }>;
+    warnings: string[];
+    pickingSession?: Pick<
+      PickingSession,
+      "order" | "nextItem" | "routeQueue" | "allPicked"
+    >;
+  };
 }
 
 export interface LocationLookup {
@@ -111,6 +158,26 @@ export interface LocationLookup {
   needsReplenishment: boolean;
 }
 
+export interface ReplenishmentNeed {
+  id: string;
+  pickFaceId: string;
+  pickFaceBarcode: string;
+  routeLabel: string;
+  productId: string;
+  sku: string;
+  productName: string;
+  currentQuantity: number;
+  minThreshold: number;
+  capacity: number;
+  deficit: number;
+  suggestedPulmao: {
+    id: string;
+    barcode: string;
+    label: string;
+    currentQuantity: number;
+  } | null;
+}
+
 export interface CargoTransferSummary {
   id: string;
   status: string;
@@ -118,6 +185,7 @@ export interface CargoTransferSummary {
   withdrawnAt: string;
   depositedAt: string | null;
   durationSeconds: number;
+  targetPickFaceId: string | null;
   product: {
     id: string;
     sku: string;
@@ -126,6 +194,7 @@ export interface CargoTransferSummary {
   };
   fromLocation: { id: string; barcode: string; label: string };
   toLocation: { id: string; barcode: string; label: string } | null;
+  targetPickFace: { id: string; barcode: string; label: string } | null;
   withdrawnByName: string;
 }
 
@@ -225,6 +294,30 @@ export const api = {
       body: JSON.stringify({ productBarcode, quantity }),
     }),
 
+  adjustLocationQuantity: (params: {
+    locationId: string;
+    countedQuantity: number;
+    productBarcode?: string | null;
+    reason?: string;
+    orderId?: string;
+    itemId?: string;
+    waveLineId?: string;
+  }) =>
+    request<AdjustLocationResult>(
+      `/mobile/locations/${params.locationId}/adjust-quantity`,
+      {
+        method: "POST",
+        body: JSON.stringify({
+          countedQuantity: params.countedQuantity,
+          productBarcode: params.productBarcode ?? undefined,
+          reason: params.reason,
+          orderId: params.orderId,
+          itemId: params.itemId,
+          waveLineId: params.waveLineId,
+        }),
+      },
+    ),
+
   transferReplenishment: (body: {
     fromLocationBarcode: string;
     toLocationBarcode: string;
@@ -245,10 +338,14 @@ export const api = {
       body: JSON.stringify(body),
     }),
 
+  listReplenishmentNeeds: () =>
+    request<{ needs: ReplenishmentNeed[] }>("/mobile/replenishment/needs"),
+
   withdrawCargoTransfer: (body: {
     fromLocationBarcode: string;
     productBarcode: string;
     quantity: number;
+    targetPickFaceId?: string;
   }) =>
     request<{
       transfer: CargoTransferSummary;
@@ -285,6 +382,47 @@ export const api = {
   getMobileConfig: () =>
     request<{ waveEnabled: boolean }>("/mobile/config"),
 
+  listReleasedWaves: () =>
+    request<{
+      waves: Array<{
+        id: string;
+        name: string;
+        releasedAt: string | null;
+        orderCount: number;
+        lineCount: number;
+        acceptedById: string | null;
+        acceptedByName: string | null;
+        packingUrgency: number;
+        collectionDeadline: string | null;
+      }>;
+    }>("/mobile/waves/released"),
+
+  getWaveById: (waveId: string) =>
+    request<{
+      wave: {
+        id: string;
+        name: string;
+        status: string;
+        releasedAt: string | null;
+        orderCount: number;
+        gondolaPasses: number;
+        acceptedById: string | null;
+        acceptedByName: string | null;
+        acceptedAt: string | null;
+        canAccept: boolean;
+        canWork: boolean;
+        isMine: boolean;
+        collectionDeadline: string | null;
+      };
+      lines: WaveLineSummary[];
+    }>(`/mobile/waves/${waveId}`),
+
+  acceptWave: (waveId: string) =>
+    request<{ waveId: string; acceptedAt: string }>(
+      `/mobile/waves/${waveId}/accept`,
+      { method: "POST" },
+    ),
+
   getCurrentWave: () =>
     request<{
       wave: {
@@ -300,6 +438,7 @@ export const api = {
         canAccept: boolean;
         canWork: boolean;
         isMine: boolean;
+        collectionDeadline: string | null;
       };
       lines: WaveLineSummary[];
     }>("/mobile/waves/current"),
@@ -307,7 +446,7 @@ export const api = {
   acceptCurrentWave: () =>
     request<{ waveId: string; acceptedAt: string }>(
       "/mobile/waves/current/accept",
-      { method: "POST" }
+      { method: "POST" },
     ),
 
   getWaveLine: (lineId: string) =>
@@ -396,6 +535,54 @@ export const api = {
       `/mobile/purchase-receipts/${sessionId}/complete`,
       { method: "POST" }
     ),
+
+  startReturnReceipt: (reference?: string) =>
+    request<ReturnReceiptSessionDto>("/mobile/purchase-receipts/return/start", {
+      method: "POST",
+      body: JSON.stringify({ reference }),
+    }),
+
+  getReturnReceiptSession: (sessionId: string) =>
+    request<ReturnReceiptSessionDto>(
+      `/mobile/purchase-receipts/return/${sessionId}`,
+    ),
+
+  scanReturnReceiptProduct: (
+    sessionId: string,
+    barcode: string,
+    quantity?: number,
+  ) =>
+    request<ReturnReceiptSessionDto>(
+      `/mobile/purchase-receipts/return/${sessionId}/scan`,
+      {
+        method: "POST",
+        body: JSON.stringify({ barcode, quantity }),
+      },
+    ),
+
+  completeReturnReceipt: (
+    sessionId: string,
+    pulmaoLocationBarcode: string,
+  ) =>
+    request<ReturnReceiptSessionDto>(
+      `/mobile/purchase-receipts/return/${sessionId}/complete`,
+      {
+        method: "POST",
+        body: JSON.stringify({ pulmaoLocationBarcode }),
+      },
+    ),
+
+  suggestCargoTransferFace: (transferId: string) =>
+    request<{
+      suggested: {
+        barcode: string;
+        corridor: string;
+        row: string;
+        label: string;
+        currentQuantity: number;
+        capacity: number;
+      };
+    }>(`/mobile/cargo-transfers/${transferId}/suggest-face`),
 
   markPurchaseReceiptConferenceStart: (sessionId: string) =>
     request<{ ok: boolean }>(
@@ -516,6 +703,27 @@ export interface PurchaseReceiptSessionDto {
   allChecked: boolean;
 }
 
+export interface ReturnReceiptSessionDto {
+  session: {
+    id: string;
+    kind: string;
+    reference: string | null;
+    status: string;
+    startedAt: string;
+  };
+  items: Array<{
+    id: string;
+    lineNumber: number;
+    productCode: string | null;
+    description: string | null;
+    barcode: string | null;
+    quantityExpected: number;
+    quantityChecked: number;
+  }>;
+  totalUnits: number;
+  hasItems: boolean;
+}
+
 export interface WaveLineSummary {
   id: string;
   sortStatus: string;
@@ -532,11 +740,14 @@ export interface WaveLineSummary {
     corridor: string;
     row: string;
     currentQuantity: number;
+    capacity?: number;
+    minThreshold?: number;
   };
   quantityTotal: number;
   quantityPicked: number;
   remaining: number;
   ordersCount: number;
+  collectionDeadline: string | null;
   gondolaHint?: string;
   orders: Array<{
     orderId: string;

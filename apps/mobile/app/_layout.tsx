@@ -30,7 +30,11 @@ export default function RootLayout() {
             />
             <Stack.Screen
               name="stocking/index"
-              options={{ title: "Estoque de giro" }}
+              options={{ title: "Abastecer estoque" }}
+            />
+            <Stack.Screen
+              name="replenishment/index"
+              options={{ title: "Reposição" }}
             />
             <Stack.Screen
               name="purchase-receipt"

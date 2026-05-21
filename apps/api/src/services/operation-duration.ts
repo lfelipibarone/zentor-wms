@@ -11,6 +11,7 @@ const PICK_PAUSE = new Set<string>([
 const PACK_ACTIVE = new Set<string>([OrderTimeLogEvent.PACK_START]);
 const PACK_PAUSE = new Set<string>([
   OrderTimeLogEvent.PACK_END,
+  OrderTimeLogEvent.PACK_CANCEL,
 ]);
 
 function durationFromLogs(

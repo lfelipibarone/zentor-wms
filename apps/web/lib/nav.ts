@@ -56,8 +56,8 @@ export const MAIN_NAV: NavItem[] = [
     permission: Permission.RECEIPTS_VIEW,
   },
   {
-    href: "/estoque-giro",
-    label: "Estoque de giro",
+    href: "/estoque",
+    label: "Estoque",
     icon: RotateCcw,
     permission: Permission.STOCK_VIEW,
   },
@@ -110,7 +110,7 @@ export const ADMIN_NAV: NavItem[] = [
     href: "/relatorios",
     label: "Relatórios",
     icon: BarChart3,
-    permission: Permission.USERS_MANAGE,
+    permission: Permission.REPORTS_VIEW,
   },
   {
     href: "/admin/usuarios",

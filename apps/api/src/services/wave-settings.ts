@@ -6,6 +6,9 @@ export interface WaveSettings {
   autoReleaseTime: string;
   autoReleaseMaxOrders: number;
   onlyDeadlineToday: boolean;
+  partitionEnabled: boolean;
+  minOrdersPerWave: number;
+  maxWavesPerBatch: number;
 }
 
 const DEFAULTS: WaveSettings = {
@@ -14,6 +17,9 @@ const DEFAULTS: WaveSettings = {
   autoReleaseTime: "06:30",
   autoReleaseMaxOrders: 50,
   onlyDeadlineToday: false,
+  partitionEnabled: true,
+  minOrdersPerWave: 3,
+  maxWavesPerBatch: 10,
 };
 
 const KEYS = {
@@ -22,6 +28,9 @@ const KEYS = {
   autoReleaseTime: "wave.autoRelease.time",
   autoReleaseMaxOrders: "wave.autoRelease.maxOrders",
   onlyDeadlineToday: "wave.onlyDeadlineToday",
+  partitionEnabled: "wave.partition.enabled",
+  minOrdersPerWave: "wave.partition.minOrdersPerWave",
+  maxWavesPerBatch: "wave.partition.maxWavesPerBatch",
 } as const;
 
 function parseBool(v: string | undefined, fallback: boolean): boolean {
@@ -54,6 +63,18 @@ export async function getWaveSettings(tenantId: string): Promise<WaveSettings> {
     onlyDeadlineToday: parseBool(
       map.get(KEYS.onlyDeadlineToday),
       DEFAULTS.onlyDeadlineToday,
+    ),
+    partitionEnabled: parseBool(
+      map.get(KEYS.partitionEnabled),
+      DEFAULTS.partitionEnabled,
+    ),
+    minOrdersPerWave: parseIntSafe(
+      map.get(KEYS.minOrdersPerWave),
+      DEFAULTS.minOrdersPerWave,
+    ),
+    maxWavesPerBatch: parseIntSafe(
+      map.get(KEYS.maxWavesPerBatch),
+      DEFAULTS.maxWavesPerBatch,
     ),
   };
 }
@@ -88,5 +109,20 @@ export const WAVE_SETTING_META = [
     key: KEYS.onlyDeadlineToday,
     label: "Somente pedidos com coleta hoje",
     description: "Restringe elegibilidade à data de coleta do dia",
+  },
+  {
+    key: KEYS.partitionEnabled,
+    label: "Dividir liberação em várias ondas",
+    description: "Agrupa pedidos por produto consolidado (greedy por SKU)",
+  },
+  {
+    key: KEYS.minOrdersPerWave,
+    label: "Mínimo de pedidos por onda",
+    description: "Grupos menores são fundidos ou ignorados na partição",
+  },
+  {
+    key: KEYS.maxWavesPerBatch,
+    label: "Máximo de ondas por liberação",
+    description: "Limite de ondas criadas em um único release",
   },
 ] as const;

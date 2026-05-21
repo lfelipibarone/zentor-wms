@@ -7,11 +7,17 @@ import {
   Text,
   View,
 } from "react-native";
+import {
+  AdjustStockModal,
+  type AdjustStockContext,
+} from "@/components/AdjustStockModal";
 import { BarcodeScanner } from "@/components/BarcodeScanner";
 import { FactoryButton } from "@/components/FactoryButton";
 import { QuantityInput } from "@/components/QuantityInput";
 import { ProblemReportModal } from "@/components/ProblemReportModal";
+import { CollectionDeadlineRow } from "@/components/CollectionDeadlineRow";
 import { ScreenShell } from "@/components/ScreenShell";
+import { useAdjustLocationStock } from "@/hooks/useAdjustLocationStock";
 import {
   useCompletePicking,
   usePickItem,
@@ -34,6 +40,7 @@ export default function PickScreen() {
   const pickItem = usePickItem(orderId);
   const reportIssue = useReportIssue(orderId);
   const completePicking = useCompletePicking(orderId);
+  const adjustStock = useAdjustLocationStock();
 
   const [step, setStep] = useState<PickStep>("location");
   const [locationValidated, setLocationValidated] = useState(false);
@@ -43,6 +50,7 @@ export default function PickScreen() {
     "location"
   );
   const [problemOpen, setProblemOpen] = useState(false);
+  const [adjustOpen, setAdjustOpen] = useState(false);
   const [feedback, setFeedback] = useState<string | null>(null);
 
   const next = session?.nextItem;
@@ -58,6 +66,59 @@ export default function PickScreen() {
   useEffect(() => {
     resetItemFlow();
   }, [itemId, resetItemFlow]);
+
+  const adjustContext: AdjustStockContext | null =
+    next?.pickLocation
+      ? {
+          locationId: next.pickLocation.id,
+          locationLabel: next.pickLocation.label,
+          systemQuantity: next.pickLocation.currentQuantity ?? 0,
+          capacity: next.pickLocation.capacity ?? 9999,
+          productBarcode: next.product.barcode,
+          orderId,
+          itemId: next.id,
+        }
+      : null;
+
+  const handleAdjustStock = async (countedQuantity: number, reason: string) => {
+    if (!adjustContext) return;
+    try {
+      const result = await adjustStock.mutateAsync({
+        locationId: adjustContext.locationId,
+        countedQuantity,
+        productBarcode: adjustContext.productBarcode,
+        reason,
+        orderId,
+        itemId: next?.id,
+      });
+      setAdjustOpen(false);
+
+      const changed = result.reconciliation.orderItems.find(
+        (r) => r.orderItemId === next?.id,
+      );
+      if (changed) {
+        setFeedback(
+          `Estoque ajustado. Novo endereço: ${changed.newLocationBarcode}`,
+        );
+        resetItemFlow();
+      } else {
+        setFeedback(`Estoque ajustado: ${result.location.currentQuantity} un.`);
+      }
+
+      if (result.reconciliation.warnings.length > 0) {
+        Alert.alert(
+          "Rotas atualizadas",
+          result.reconciliation.warnings.slice(0, 3).join("\n"),
+        );
+      }
+
+      await refetch();
+    } catch (e) {
+      setFeedback(
+        e instanceof ApiError ? e.message : "Erro ao ajustar estoque",
+      );
+    }
+  };
 
   const handleLocationScan = async (barcode: string) => {
     setScannerOpen(false);
@@ -206,15 +267,44 @@ export default function PickScreen() {
     <ScreenShell
       scroll
       title={session.order.erpOrderId}
-      subtitle={`Cesta ${basketCode ?? session.order.basket?.code ?? "—"} · Item ${next.lineNumber}`}
+      subtitle={`Cesta ${basketCode ?? session.order.basket?.code ?? "—"} · rota otimizada`}
     >
+      <CollectionDeadlineRow deadline={session.order.collectionDeadline} />
+      {session.routeQueue && session.routeQueue.length > 1 ? (
+        <Text style={styles.routeHint}>
+          Depois:{" "}
+          {session.routeQueue
+            .slice(1, 3)
+            .map((r) => r.pickLocation?.label ?? "?")
+            .join(" → ")}
+        </Text>
+      ) : null}
       <View style={styles.locationCard}>
         <Text style={styles.locLabel}>VÁ ATÉ</Text>
         <Text style={styles.locValue}>{locLabel}</Text>
         <Text style={styles.locBarcode}>
           {next.pickLocation?.barcode ?? "Sem barcode"}
         </Text>
+        {next.pickLocation?.currentQuantity != null ? (
+          <Text style={styles.locStock}>
+            Sistema: {next.pickLocation.currentQuantity} un.
+            {next.pickLocation.capacity != null
+              ? ` · cap. ${next.pickLocation.capacity}`
+              : ""}
+          </Text>
+        ) : null}
+        {next.stockMismatchHint ? (
+          <Text style={styles.stockWarn}>{next.stockMismatchHint}</Text>
+        ) : null}
       </View>
+
+      {adjustContext ? (
+        <FactoryButton
+          label="Corrigir estoque na gôndola"
+          variant="secondary"
+          onPress={() => setAdjustOpen(true)}
+        />
+      ) : null}
 
       <View style={styles.productCard}>
         <Text style={styles.sku}>{next.product.sku}</Text>
@@ -301,6 +391,14 @@ export default function PickScreen() {
         onSubmit={handleReport}
         onClose={() => setProblemOpen(false)}
       />
+
+      <AdjustStockModal
+        visible={adjustOpen}
+        loading={adjustStock.isPending}
+        context={adjustContext}
+        onSubmit={handleAdjustStock}
+        onClose={() => setAdjustOpen(false)}
+      />
     </ScreenShell>
   );
 }
@@ -336,6 +434,19 @@ const styles = StyleSheet.create({
     opacity: 0.8,
     marginTop: spacing.xs,
   },
+  locStock: {
+    color: theme.primaryText,
+    fontWeight: "700",
+    marginTop: spacing.sm,
+    fontSize: typography.body,
+  },
+  stockWarn: {
+    color: "#fef3c7",
+    fontWeight: "600",
+    marginTop: spacing.xs,
+    textAlign: "center",
+    fontSize: typography.caption,
+  },
   productCard: {
     backgroundColor: theme.surface,
     borderRadius: 16,
@@ -358,6 +469,11 @@ const styles = StyleSheet.create({
     fontSize: typography.title,
     fontWeight: "900",
     color: theme.success,
+  },
+  routeHint: {
+    color: theme.textMuted,
+    fontSize: typography.caption,
+    marginBottom: spacing.sm,
   },
   scanHint: { color: theme.textMuted, fontSize: typography.body },
   feedback: {

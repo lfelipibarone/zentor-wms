@@ -155,6 +155,7 @@ export async function listPurchaseReceiptQueue(tenantId: string) {
   const activeSessions = await prisma.purchaseReceiptSession.findMany({
     where: {
       tenantId,
+      kind: "ENTRY",
       status: {
         in: [
           PurchaseReceiptSessionStatus.WAITING_ENTRY,
@@ -165,7 +166,9 @@ export async function listPurchaseReceiptQueue(tenantId: string) {
     },
     select: { accessKey: true, tinyNotaId: true },
   });
-  const busyKeys = new Set(activeSessions.map((s) => s.accessKey));
+  const busyKeys = new Set(
+    activeSessions.map((s) => s.accessKey).filter((k): k is string => !!k),
+  );
 
   const page = await client.listEntryInvoices({
     dataInicial: formatDate(start),

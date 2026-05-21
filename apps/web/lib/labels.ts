@@ -11,8 +11,13 @@ export const ORDER_STATUS_LABEL: Record<OrderStatusType, string> = {
 };
 
 export const LOCATION_TYPE_LABEL: Record<string, string> = {
-  PICK_FACE: "Gôndola",
+  PICK_FACE: "Estoque de giro",
   PULMAO: "Pulmão",
+};
+
+export const RECEIPT_KIND_LABEL: Record<string, string> = {
+  ENTRY: "NF de entrada",
+  RETURN: "Devolução",
 };
 
 export const MOVEMENT_TYPE_LABEL: Record<string, string> = {

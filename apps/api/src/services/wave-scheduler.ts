@@ -1,4 +1,3 @@
-import { PickWaveStatus } from "@prisma/client";
 import { prisma } from "../lib/prisma.js";
 import { releasePickWave } from "./pick-wave.js";
 import { getWaveSettings } from "./wave-settings.js";
@@ -39,14 +38,6 @@ async function tryAutoReleaseForTenant(tenantId: string): Promise<void> {
   const target = parseTimeToMinutes(settings.autoReleaseTime);
   const now = currentMinutesInSaoPaulo();
   if (now < target) return;
-
-  const active = await prisma.pickWave.findFirst({
-    where: { tenantId, status: PickWaveStatus.RELEASED },
-  });
-  if (active) {
-    lastAutoRunByTenant.set(tenantId, today);
-    return;
-  }
 
   const admin = await prisma.user.findFirst({
     where: { tenantId, role: "ADMIN", active: true, isPlatformAdmin: false },

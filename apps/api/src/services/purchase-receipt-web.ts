@@ -1,4 +1,8 @@
-import { PurchaseReceiptSessionStatus, Prisma } from "@prisma/client";
+import {
+  PurchaseReceiptKind,
+  PurchaseReceiptSessionStatus,
+  Prisma,
+} from "@prisma/client";
 import { prisma } from "../lib/prisma.js";
 import { parsePagination, buildPaginationMeta } from "../lib/pagination.js";
 
@@ -12,6 +16,7 @@ export async function listPurchaseReceiptsForWeb(params: {
   page?: number;
   pageSize?: number;
   status?: string;
+  kind?: PurchaseReceiptKind;
   userId?: string;
 }) {
   const { page, pageSize, skip, take } = parsePagination({
@@ -30,6 +35,7 @@ export async function listPurchaseReceiptsForWeb(params: {
     where.status = params.status as PurchaseReceiptSessionStatus;
   }
   if (params.userId) where.startedById = params.userId;
+  if (params.kind) where.kind = params.kind;
 
   const [rows, total] = await Promise.all([
     prisma.purchaseReceiptSession.findMany({
@@ -57,8 +63,10 @@ export async function listPurchaseReceiptsForWeb(params: {
   return {
     sessions: rows.map((s) => ({
       id: s.id,
+      kind: s.kind,
       tinyNotaId: s.tinyNotaId,
       accessKey: s.accessKey,
+      reference: s.reference,
       invoiceNumber: s.invoiceNumber,
       supplierName: s.supplierName,
       status: s.status,
@@ -106,6 +114,8 @@ export async function getPurchaseReceiptDetailForWeb(id: string) {
   if (!s) return null;
   return {
     id: s.id,
+    kind: s.kind,
+    reference: s.reference,
     invoiceNumber: s.invoiceNumber,
     supplierName: s.supplierName,
     accessKey: s.accessKey,

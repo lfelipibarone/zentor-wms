@@ -8,6 +8,7 @@ import {
   View,
 } from "react-native";
 import { FactoryButton } from "@/components/FactoryButton";
+import { CollectionDeadlineRow } from "@/components/CollectionDeadlineRow";
 import { useAcceptWave, useCurrentWave } from "@/hooks/useWavePicking";
 import type { WaveLineSummary } from "@/lib/api";
 import { theme, spacing, typography } from "@/lib/theme";
@@ -21,7 +22,7 @@ function statusLabel(line: WaveLineSummary) {
 
 export function WavePickingPanel() {
   const { data, isLoading, error, refetch, isRefetching } = useCurrentWave();
-  const acceptWave = useAcceptWave();
+  const acceptWave = useAcceptWave(data?.wave.id);
 
   if (isLoading) {
     return (
@@ -56,6 +57,7 @@ export function WavePickingPanel() {
     return (
       <View style={styles.centered}>
         <Text style={styles.waveName}>{wave.name}</Text>
+        <CollectionDeadlineRow deadline={wave.collectionDeadline} />
         <Text style={styles.waveMeta}>
           {wave.orderCount} pedidos · {wave.gondolaPasses} passagens na gôndola
         </Text>
@@ -97,6 +99,7 @@ export function WavePickingPanel() {
     <View style={styles.container}>
       <View style={styles.header}>
         <Text style={styles.waveName}>{wave.name}</Text>
+        <CollectionDeadlineRow deadline={wave.collectionDeadline} />
         <Text style={styles.waveMeta}>
           {wave.orderCount} pedidos · {pending.length} linhas pendentes
         </Text>
@@ -128,6 +131,10 @@ export function WavePickingPanel() {
               <Text style={styles.sku}>{item.product.sku}</Text>
               <Text style={styles.badge}>{statusLabel(item)}</Text>
             </View>
+            <CollectionDeadlineRow
+              deadline={item.collectionDeadline}
+              compact
+            />
             <Text style={styles.productName} numberOfLines={2}>
               {item.product.name}
             </Text>

@@ -6,6 +6,10 @@ import {
   PurchaseReceiptSessionStatus,
 } from "@prisma/client";
 import { prisma } from "../lib/prisma.js";
+import {
+  pickNextItemByRoute,
+  sortPendingItemsByRoute,
+} from "./location-route.js";
 
 export async function listPutawayQueue() {
   const sessions = await prisma.purchaseReceiptSession.findMany({
@@ -64,7 +68,13 @@ async function ensurePutawaySession(purchaseReceiptId: string, userId: string) {
     return prisma.putawaySession.findUnique({
       where: { id: receipt.putaway.id },
       include: {
-        items: { include: { location: { select: { barcode: true } } } },
+        items: {
+          include: {
+            location: {
+              select: { barcode: true, corridor: true, row: true },
+            },
+          },
+        },
         purchaseReceipt: { include: { items: true } },
       },
     });
@@ -99,8 +109,29 @@ async function ensurePutawaySession(purchaseReceiptId: string, userId: string) {
 }
 
 function formatPutaway(session: NonNullable<Awaited<ReturnType<typeof ensurePutawaySession>>>) {
-  const next = session.items.find(
-    (it) => Number(it.quantityStored) < Number(it.quantityExpected),
+  const isPending = (it: (typeof session.items)[0]) =>
+    Number(it.quantityStored) < Number(it.quantityExpected);
+
+  const lastStoredLoc = [...session.items]
+    .filter((it) => it.location && Number(it.quantityStored) > 0)
+    .sort(
+      (a, b) =>
+        (b.location?.barcode ?? "").localeCompare(a.location?.barcode ?? ""),
+    )[0]?.location;
+
+  const pendingWithLoc = session.items.filter(isPending).map((it) => ({
+    ...it,
+    pickLocation: it.location ?? null,
+  }));
+
+  const next =
+    pickNextItemByRoute(pendingWithLoc, isPending, lastStoredLoc) ??
+    session.items.find(isPending);
+
+  const routeQueue = sortPendingItemsByRoute(
+    pendingWithLoc,
+    isPending,
+    lastStoredLoc,
   );
   return {
     session: {
@@ -132,6 +163,11 @@ function formatPutaway(session: NonNullable<Awaited<ReturnType<typeof ensurePuta
     allStored: session.items.every(
       (it) => Number(it.quantityStored) >= Number(it.quantityExpected),
     ),
+    routeQueue: routeQueue.slice(0, 5).map((it) => ({
+      id: it.id,
+      productCode: it.productCode,
+      locationBarcode: it.location?.barcode ?? null,
+    })),
   };
 }
 

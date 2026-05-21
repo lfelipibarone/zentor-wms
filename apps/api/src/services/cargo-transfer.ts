@@ -24,12 +24,13 @@ function formatLocationLabel(loc: {
   return `${loc.corridor}-${loc.row} (${loc.barcode})`;
 }
 
-export function mapCargoTransferSummary(transfer: {
+type TransferRow = {
   id: string;
   status: CargoTransferStatus;
   quantity: number;
   withdrawnAt: Date;
   depositedAt: Date | null;
+  targetPickFaceId: string | null;
   product: { id: string; sku: string; name: string; barcode: string | null };
   fromLocation: { id: string; barcode: string; corridor: string; row: string };
   toLocation: {
@@ -38,8 +39,16 @@ export function mapCargoTransferSummary(transfer: {
     corridor: string;
     row: string;
   } | null;
+  targetPickFace: {
+    id: string;
+    barcode: string;
+    corridor: string;
+    row: string;
+  } | null;
   withdrawnBy: { id: string; name: string };
-}) {
+};
+
+export function mapCargoTransferSummary(transfer: TransferRow) {
   const durationSeconds =
     transfer.depositedAt != null
       ? Math.round(
@@ -55,6 +64,7 @@ export function mapCargoTransferSummary(transfer: {
     withdrawnAt: transfer.withdrawnAt.toISOString(),
     depositedAt: transfer.depositedAt?.toISOString() ?? null,
     durationSeconds,
+    targetPickFaceId: transfer.targetPickFaceId,
     product: {
       id: transfer.product.id,
       sku: transfer.product.sku,
@@ -73,6 +83,13 @@ export function mapCargoTransferSummary(transfer: {
           label: formatLocationLabel(transfer.toLocation),
         }
       : null,
+    targetPickFace: transfer.targetPickFace
+      ? {
+          id: transfer.targetPickFace.id,
+          barcode: transfer.targetPickFace.barcode,
+          label: formatLocationLabel(transfer.targetPickFace),
+        }
+      : null,
     withdrawnByName: transfer.withdrawnBy.name,
   };
 }
@@ -85,6 +102,9 @@ const transferInclude = {
   toLocation: {
     select: { id: true, barcode: true, corridor: true, row: true },
   },
+  targetPickFace: {
+    select: { id: true, barcode: true, corridor: true, row: true },
+  },
   withdrawnBy: { select: { id: true, name: true } },
 } as const;
 
@@ -94,6 +114,7 @@ export async function withdrawCargoTransfer(input: {
   fromLocationBarcode: string;
   productBarcode: string;
   quantity: number;
+  targetPickFaceId?: string;
 }) {
   const quantity = Math.floor(Number(input.quantity));
   if (quantity <= 0) {
@@ -130,6 +151,40 @@ export async function withdrawCargoTransfer(input: {
     );
   }
 
+  let targetPickFaceId: string | null = input.targetPickFaceId ?? null;
+  if (targetPickFaceId) {
+    const face = await prisma.location.findFirst({
+      where: {
+        id: targetPickFaceId,
+        tenantId: input.tenantId,
+        active: true,
+        type: LocationType.PICK_FACE,
+      },
+    });
+    if (!face) {
+      throw new CargoTransferError("Gôndola alvo não encontrada", 404);
+    }
+    if (face.productId && face.productId !== product.id) {
+      throw new CargoTransferError(
+        "Produto do pulmão não corresponde à gôndola alvo",
+      );
+    }
+
+    const existing = await prisma.cargoTransfer.findFirst({
+      where: {
+        tenantId: input.tenantId,
+        status: CargoTransferStatus.IN_TRANSIT,
+        targetPickFaceId: face.id,
+      },
+    });
+    if (existing) {
+      throw new CargoTransferError(
+        "Já existe transporte em andamento para esta gôndola",
+        409,
+      );
+    }
+  }
+
   const withdrawnAt = new Date();
 
   const result = await prisma.$transaction(async (tx) => {
@@ -140,6 +195,7 @@ export async function withdrawCargoTransfer(input: {
         productId: product.id,
         quantity,
         fromLocationId: fromLoc.id,
+        targetPickFaceId,
         withdrawnById: input.userId,
         withdrawnAt,
       },
@@ -202,11 +258,20 @@ export async function listPendingCargoTransfers(
       status: CargoTransferStatus.IN_TRANSIT,
       ...(opts?.userId ? { withdrawnById: opts.userId } : {}),
     },
-    orderBy: { withdrawnAt: "asc" },
     include: transferInclude,
   });
 
-  return transfers.map(mapCargoTransferSummary);
+  const { sortLocationsByRoute } = await import("./location-route.js");
+  const tagged = transfers.map((t) => {
+    const anchor = t.targetPickFace ?? t.fromLocation;
+    return { ...anchor, transferId: t.id };
+  });
+  const sortedLocs = sortLocationsByRoute(tagged);
+  const sorted = sortedLocs.map(
+    (loc) => transfers.find((tr) => tr.id === loc.transferId)!,
+  );
+
+  return sorted.map(mapCargoTransferSummary);
 }
 
 export async function getCargoTransfer(tenantId: string, id: string) {
@@ -237,6 +302,7 @@ export async function depositCargoTransfer(input: {
     include: {
       product: true,
       fromLocation: true,
+      targetPickFace: true,
     },
   });
 
@@ -261,6 +327,12 @@ export async function depositCargoTransfer(input: {
   }
   if (toLoc.productId && toLoc.productId !== transfer.productId) {
     throw new CargoTransferError("Gôndola já alocada para outro produto");
+  }
+
+  if (transfer.targetPickFaceId && toLoc.id !== transfer.targetPickFaceId) {
+    throw new CargoTransferError(
+      `Bipe a gôndola alvo (${transfer.targetPickFace?.barcode ?? "definida no transporte"})`,
+    );
   }
 
   if (input.productBarcode?.trim()) {

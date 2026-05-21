@@ -56,13 +56,27 @@ export default function StockingScreen() {
     }, [phase, loadPending]),
   );
 
-  const openTransfer = (t: CargoTransferSummary) => {
+  const openTransfer = async (t: CargoTransferSummary) => {
     setSelected(t);
     setToBarcode(null);
     setPhase("scan-gondola");
-    setMessage(
-      `${t.product.sku} · ${t.quantity} un. do ${t.fromLocation.label}`,
-    );
+    if (t.targetPickFace) {
+      setMessage(
+        `${t.product.sku} · ${t.quantity} un. · Bipe a gôndola ${t.targetPickFace.label}`,
+      );
+    } else {
+      setMessage(
+        `${t.product.sku} · ${t.quantity} un. do ${t.fromLocation.label}`,
+      );
+      try {
+        const { suggested } = await api.suggestCargoTransferFace(t.id);
+        setMessage(
+          `Sugestão: gôndola ${suggested.label} — bip obrigatório`,
+        );
+      } catch {
+        /* operador bipa manualmente */
+      }
+    }
   };
 
   const handleGondolaScan = async (raw: string) => {
@@ -73,7 +87,7 @@ export default function StockingScreen() {
     try {
       const loc = await api.getLocationByBarcode(normalizeBarcode(raw));
       if (loc.type !== "PICK_FACE") {
-        setMessage("Bipe uma gôndola de estoque de giro");
+        setMessage("Bipe um endereço de estoque de giro");
         return;
       }
       setToBarcode(loc.barcode);
@@ -119,8 +133,8 @@ export default function StockingScreen() {
     return (
       <ScreenShell scroll backToHome>
         <Text style={styles.pageHint}>
-          Transportes pendentes do pulmão. Selecione um para bipar a gôndola de
-          destino.
+          Itens retirados do pulmão aguardando gôndola. Bipe sempre a gôndola de
+          destino antes de confirmar.
         </Text>
 
         {loadingList ? (
@@ -141,6 +155,11 @@ export default function StockingScreen() {
                 <Text style={styles.meta}>
                   {item.quantity} un. · de {item.fromLocation.label}
                 </Text>
+                {item.targetPickFace ? (
+                  <Text style={styles.target}>
+                    Gôndola alvo: {item.targetPickFace.label}
+                  </Text>
+                ) : null}
                 <Text style={styles.meta}>
                   {item.withdrawnByName} · há{" "}
                   {formatAgo(item.durationSeconds)}
@@ -256,6 +275,12 @@ const styles = StyleSheet.create({
     color: theme.primary,
   },
   meta: { color: theme.textMuted, marginTop: spacing.xs },
+  target: {
+    color: theme.info,
+    fontWeight: "700",
+    marginTop: spacing.xs,
+    fontSize: typography.caption,
+  },
   message: {
     marginTop: spacing.md,
     color: theme.success,

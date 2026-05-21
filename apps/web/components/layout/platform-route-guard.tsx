@@ -12,6 +12,7 @@ const OPERATIONAL_PREFIXES = [
   "/pedidos",
   "/ondas",
   "/recebimentos",
+  "/estoque",
   "/estoque-giro",
   "/packing",
   "/sistema",

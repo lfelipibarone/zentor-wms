@@ -17,6 +17,16 @@ export interface WavePreview {
   orderCount: number;
   lineCount: number;
   gondolaPasses: number;
+  waveCount?: number;
+  waves?: Array<{
+    index: number;
+    orderCount: number;
+    lineCount: number;
+    gondolaPasses: number;
+    orderIds: string[];
+    orders: WavePreview["orders"];
+    lines: WavePreview["lines"];
+  }>;
   error?: string;
   orders: Array<{
     id: string;
@@ -74,6 +84,8 @@ export function releaseWave(body?: { orderIds?: string[]; auto?: boolean }) {
     waveId: string;
     orderCount: number;
     lineCount: number;
+    waveCount?: number;
+    waves?: Array<{ waveId: string; orderCount: number; lineCount: number; name: string }>;
   }>("/api/waves/release", {
     method: "POST",
     body: JSON.stringify(body ?? { auto: true }),

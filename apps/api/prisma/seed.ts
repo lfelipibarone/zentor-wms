@@ -4,13 +4,18 @@ import {
   OrderTimeLogEvent,
   PrismaClient,
 } from "@prisma/client";
-import { ALL_PERMISSION_KEYS, defaultPermissionsForRole } from "@wms/shared";
+import {
+  ALL_PERMISSION_KEYS,
+  defaultPermissionsForRole,
+  Permission,
+} from "@wms/shared";
 import { hashPassword } from "../src/lib/password.js";
 import {
   DEMO_TENANT_CONFIGS,
   printTestUsersGuide,
   seedDemoTenant,
 } from "./seed-demo-tenants.js";
+import { seedPurchaseReceiptDemos } from "./seed-purchase-receipts.js";
 
 const prisma = new PrismaClient();
 
@@ -63,6 +68,15 @@ async function main() {
     },
   });
 
+  const felipePermissions = [
+    ...new Set([
+      ...defaultPermissionsForRole("EXPEDITER"),
+      Permission.REGISTERS_VIEW,
+      Permission.PRODUCTS_MANAGE,
+      Permission.REPORTS_VIEW,
+    ]),
+  ];
+
   const operador = await prisma.user.upsert({
     where: { email: "operador@wms.local" },
     create: {
@@ -72,16 +86,15 @@ async function main() {
       role: "EXPEDITER",
       tenantId: TENANT_ID,
       isPlatformAdmin: false,
-      permissions: defaultPermissionsForRole("EXPEDITER"),
+      permissions: felipePermissions,
     },
     update: {
       password: hashPassword("operador123"),
       name: "Felipe Figueiredo",
-      role: "EXPEDITER",
       active: true,
       tenantId: TENANT_ID,
       isPlatformAdmin: false,
-      permissions: defaultPermissionsForRole("EXPEDITER"),
+      permissions: felipePermissions,
     },
   });
 
@@ -408,7 +421,7 @@ async function main() {
 
   void pulmaoLocations;
 
-  await prisma.basket.upsert({
+  const basket1 = await prisma.basket.upsert({
     where: { tenantId_code: { tenantId: TENANT_ID, code: "CESTA-001" } },
     create: {
       tenantId: TENANT_ID,
@@ -416,6 +429,25 @@ async function main() {
       barcode: "BASKET001",
     },
     update: {},
+  });
+  const basket2 = await prisma.basket.upsert({
+    where: { tenantId_code: { tenantId: TENANT_ID, code: "CESTA-002" } },
+    create: {
+      tenantId: TENANT_ID,
+      code: "CESTA-002",
+      barcode: "BASKET002",
+    },
+    update: {},
+  });
+
+  await seedPurchaseReceiptDemos(prisma, {
+    tenantId: TENANT_ID,
+    startedById: operador.id,
+    products: products.map((p) => ({
+      sku: p.sku,
+      name: p.name,
+      barcode: p.barcode,
+    })),
   });
 
   // Limpa ondas e pedidos demo para re-seed idempotente
@@ -442,6 +474,7 @@ async function main() {
       collectionDeadline?: Date;
       marketplace?: string;
       priority?: number;
+      basketId?: string;
     },
   ) {
     const loc = locCycle[index % locCycle.length]!;
@@ -459,6 +492,7 @@ async function main() {
         marketplace: opts?.marketplace ?? "MERCADO_LIVRE",
         collectionDeadline: opts?.collectionDeadline,
         assignedPickerId: opts?.assignedPickerId,
+        basketId: opts?.basketId,
         createdAt: opts?.createdAt ?? new Date(),
         updatedAt: opts?.updatedAt ?? new Date(),
         dispatchedAt:
@@ -498,10 +532,13 @@ async function main() {
     });
   }
 
-  // KPI: aguardando conferência (~11)
+  // KPI: aguardando conferência (~11) — primeiros com cesta para packing por bip
   for (let i = 24; i < 35; i++) {
+    const basketId =
+      i < 29 ? basket1.id : i < 31 ? basket2.id : undefined;
     await createDemoOrder(i, OrderStatus.PICKED_AWAITING_CONFERENCE, {
       assignedPickerId: pickers[i % pickers.length]!.id,
+      basketId,
       createdAt: atToday(8),
       updatedAt: atToday(10 + (i % 6)),
     });

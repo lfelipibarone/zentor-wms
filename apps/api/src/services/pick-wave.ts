@@ -8,6 +8,12 @@ import {
   type Prisma,
 } from "@prisma/client";
 import { prisma } from "../lib/prisma.js";
+import { allocateQuantityAcrossPickFaces } from "./pick-allocation.js";
+import {
+  partitionOrdersIntoWaves,
+  waveSettingsToPartition,
+  type OrderWithItems,
+} from "./pick-wave-partition.js";
 import { getWaveSettings } from "./wave-settings.js";
 
 export class PickWaveError extends Error {
@@ -36,26 +42,21 @@ export type WaveLineBuild = {
   allocations: { orderItemId: string; quantity: number; erpOrderId: string }[];
 };
 
+/** @deprecated Use resolvePickFaceForProduct from pick-face-resolve.ts */
 export async function resolvePickLocation(
   productId: string,
 ): Promise<Location> {
-  const loc = await prisma.location.findFirst({
-    where: {
-      type: "PICK_FACE",
-      active: true,
-      productId,
-    },
-    orderBy: { currentQuantity: "desc" },
-  });
-  if (!loc) {
+  const { resolvePickFaceForProduct } = await import("./pick-face-resolve.js");
+  try {
+    return await resolvePickFaceForProduct(productId);
+  } catch (e) {
     throw new PickWaveError(
-      "Nenhuma gôndola ativa encontrada para este produto. Cadastre ou abasteça a pick face.",
+      e instanceof Error
+        ? e.message
+        : "Nenhuma gôndola ativa encontrada para este produto.",
     );
   }
-  return loc;
 }
-
-type OrderWithItems = Order & { items: OrderItem[] };
 
 export async function buildWaveCandidateOrders(
   tenantId: string,
@@ -118,72 +119,111 @@ export async function buildWaveCandidateOrders(
 
 export async function buildWaveLinesFromOrders(
   orders: OrderWithItems[],
+  tenantId?: string,
 ): Promise<WaveLineBuild[]> {
   const lineMap = new Map<string, WaveLineBuild>();
+  const tid = tenantId ?? orders[0]?.tenantId;
+  if (!tid) throw new PickWaveError("Tenant não identificado para alocação");
 
   for (const order of orders) {
     for (const item of order.items) {
       const remaining = item.quantityOrdered - item.quantityPicked;
       if (remaining <= 0) continue;
 
-      let pickLocationId = item.pickLocationId;
-      let locationBarcode = "";
-      let locationLabel = "";
-
-      if (!pickLocationId) {
-        const loc = await resolvePickLocation(item.productId);
-        pickLocationId = loc.id;
-        locationBarcode = loc.barcode;
-        locationLabel = formatLocation(loc);
-        await prisma.orderItem.update({
-          where: { id: item.id },
-          data: { pickLocationId: loc.id },
-        });
-      } else {
-        const loc = await prisma.location.findUnique({
-          where: { id: pickLocationId },
-        });
-        if (loc) {
-          locationBarcode = loc.barcode;
-          locationLabel = formatLocation(loc);
-        }
-      }
-
       const product = await prisma.product.findUnique({
         where: { id: item.productId },
         select: { sku: true, name: true },
       });
 
-      const key = `${item.productId}:${pickLocationId}`;
-      const existing = lineMap.get(key);
-      if (existing) {
-        existing.quantityTotal += remaining;
-        existing.allocations.push({
-          orderItemId: item.id,
-          quantity: remaining,
-          erpOrderId: order.erpOrderId,
+      let segments: Awaited<
+        ReturnType<typeof allocateQuantityAcrossPickFaces>
+      >["segments"];
+
+      if (item.pickLocationId && remaining > 0) {
+        const loc = await prisma.location.findUnique({
+          where: { id: item.pickLocationId },
         });
-        existing.orderCount = new Set(
-          existing.allocations.map((a) => a.erpOrderId),
-        ).size;
-      } else {
-        lineMap.set(key, {
-          productId: item.productId,
-          pickLocationId,
-          productSku: product?.sku ?? "—",
-          productName: product?.name ?? "—",
-          locationBarcode,
-          locationLabel,
-          quantityTotal: remaining,
-          orderCount: 1,
-          allocations: [
+        if (loc) {
+          segments = [
             {
-              orderItemId: item.id,
+              locationId: loc.id,
+              barcode: loc.barcode,
+              corridor: loc.corridor,
+              row: loc.row,
               quantity: remaining,
-              erpOrderId: order.erpOrderId,
+              label: formatLocation(loc),
             },
-          ],
+          ];
+        } else {
+          const alloc = await allocateQuantityAcrossPickFaces(
+            item.productId,
+            tid!,
+            remaining,
+          );
+          segments = alloc.segments;
+        }
+      } else {
+        const alloc = await allocateQuantityAcrossPickFaces(
+          item.productId,
+          tid!,
+          remaining,
+        );
+        segments = alloc.segments;
+        if (segments[0]) {
+          await prisma.orderItem.update({
+            where: { id: item.id },
+            data: { pickLocationId: segments[0].locationId },
+          });
+        }
+      }
+
+      if (segments.length === 0) {
+        const loc = await resolvePickLocation(item.productId);
+        segments = [
+          {
+            locationId: loc.id,
+            barcode: loc.barcode,
+            corridor: loc.corridor,
+            row: loc.row,
+            quantity: remaining,
+            label: formatLocation(loc),
+          },
+        ];
+        await prisma.orderItem.update({
+          where: { id: item.id },
+          data: { pickLocationId: loc.id },
         });
+      }
+
+      for (const seg of segments) {
+        const key = `${item.productId}:${seg.locationId}`;
+        const existing = lineMap.get(key);
+        if (existing) {
+          existing.quantityTotal += seg.quantity;
+          existing.allocations.push({
+            orderItemId: item.id,
+            quantity: seg.quantity,
+            erpOrderId: order.erpOrderId,
+          });
+        } else {
+          lineMap.set(key, {
+            productId: item.productId,
+            pickLocationId: seg.locationId,
+            productSku: product?.sku ?? "—",
+            productName: product?.name ?? "—",
+            locationBarcode: seg.barcode,
+            locationLabel: seg.label,
+            quantityTotal: seg.quantity,
+            orderCount: 1,
+            allocations: [
+              {
+                orderItemId: item.id,
+                quantity: seg.quantity,
+                erpOrderId: order.erpOrderId,
+              },
+            ],
+          });
+        }
       }
     }
   }
@@ -201,12 +241,47 @@ export async function previewWaveRelease(
     maxOrders?: number;
   },
 ) {
+  const settings = await getWaveSettings(tenantId);
   const orders = await buildWaveCandidateOrders(tenantId, opts);
-  const lines = await buildWaveLinesFromOrders(orders);
+  const groups = partitionOrdersIntoWaves(
+    orders,
+    waveSettingsToPartition(settings),
+  );
+
+  const waves = await Promise.all(
+    groups.map(async (group, index) => {
+      const lines = await buildWaveLinesFromOrders(group, tenantId);
+      return {
+        index: index + 1,
+        orderCount: group.length,
+        lineCount: lines.length,
+        gondolaPasses: lines.length,
+        orderIds: group.map((o) => o.id),
+        orders: group.map((o) => ({
+          id: o.id,
+          erpOrderId: o.erpOrderId,
+          priority: o.priority,
+          collectionDeadline: o.collectionDeadline,
+          marketplace: o.marketplace,
+        })),
+        lines: lines.map((l) => ({
+          productSku: l.productSku,
+          productName: l.productName,
+          locationLabel: l.locationLabel,
+          quantityTotal: l.quantityTotal,
+          orderCount: l.orderCount,
+        })),
+      };
+    }),
+  );
+
+  const lineCount = waves.reduce((s, w) => s + w.lineCount, 0);
   return {
     orderCount: orders.length,
-    lineCount: lines.length,
-    gondolaPasses: lines.length,
+    lineCount,
+    gondolaPasses: lineCount,
+    waveCount: waves.length,
+    waves,
     orders: orders.map((o) => ({
       id: o.id,
       erpOrderId: o.erpOrderId,
@@ -214,57 +289,26 @@ export async function previewWaveRelease(
       collectionDeadline: o.collectionDeadline,
       marketplace: o.marketplace,
     })),
-    lines: lines.map((l) => ({
-      productSku: l.productSku,
-      productName: l.productName,
-      locationLabel: l.locationLabel,
-      quantityTotal: l.quantityTotal,
-      orderCount: l.orderCount,
-    })),
+    lines: waves.flatMap((w) => w.lines),
   };
 }
 
-export async function releasePickWave(
+async function createReleasedWave(
   tenantId: string,
   releasedById: string,
-  opts?: { orderIds?: string[]; auto?: boolean },
-): Promise<{ waveId: string; orderCount: number; lineCount: number }> {
-  const enabled = await import("./wave-settings.js").then((m) =>
-    m.isWaveEnabled(tenantId),
-  );
-  if (!enabled) {
-    throw new PickWaveError("Separação em onda está desabilitada nas configurações");
-  }
-
-  const active = await prisma.pickWave.findFirst({
-    where: { tenantId, status: PickWaveStatus.RELEASED },
-  });
-  if (active) {
-    throw new PickWaveError(
-      `Já existe uma onda ativa: ${active.name}. Feche-a antes de liberar outra.`,
-    );
-  }
-
-  const orders = await buildWaveCandidateOrders(tenantId, {
-    orderIds: opts?.orderIds,
-  });
-
-  if (orders.length === 0) {
-    throw new PickWaveError("Nenhum pedido pendente disponível para a onda");
-  }
-
-  const lineBuilds = await buildWaveLinesFromOrders(orders);
+  orders: OrderWithItems[],
+  waveLabel: string,
+) {
+  const lineBuilds = await buildWaveLinesFromOrders(orders, tenantId);
   if (lineBuilds.length === 0) {
     throw new PickWaveError("Pedidos sem itens pendentes para separar");
   }
 
-  const waveName = `Onda ${new Date().toLocaleDateString("pt-BR")} ${new Date().toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}`;
-
-  const wave = await prisma.$transaction(async (tx) => {
+  return prisma.$transaction(async (tx) => {
     const w = await tx.pickWave.create({
       data: {
         tenantId,
-        name: waveName,
+        name: waveLabel,
         status: PickWaveStatus.RELEASED,
         releasedAt: new Date(),
         releasedById,
@@ -292,13 +336,94 @@ export async function releasePickWave(
       });
     }
 
-    return w;
+    return { wave: w, lineCount: lineBuilds.length };
+  });
+}
+
+export async function releasePickWaves(
+  tenantId: string,
+  releasedById: string,
+  opts?: { orderIds?: string[]; auto?: boolean },
+): Promise<{
+  waves: Array<{ waveId: string; orderCount: number; lineCount: number; name: string }>;
+  orderCount: number;
+  lineCount: number;
+}> {
+  const enabled = await import("./wave-settings.js").then((m) =>
+    m.isWaveEnabled(tenantId),
+  );
+  if (!enabled) {
+    throw new PickWaveError("Separação em onda está desabilitada nas configurações");
+  }
+
+  const orders = await buildWaveCandidateOrders(tenantId, {
+    orderIds: opts?.orderIds,
   });
 
+  if (orders.length === 0) {
+    throw new PickWaveError("Nenhum pedido pendente disponível para a onda");
+  }
+
+  const settings = await getWaveSettings(tenantId);
+  const groups = partitionOrdersIntoWaves(
+    orders,
+    waveSettingsToPartition(settings),
+  );
+
+  const baseTime = new Date().toLocaleTimeString("pt-BR", {
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+  const baseDate = new Date().toLocaleDateString("pt-BR");
+
+  const created: Array<{
+    waveId: string;
+    orderCount: number;
+    lineCount: number;
+    name: string;
+  }> = [];
+
+  for (let i = 0; i < groups.length; i++) {
+    const group = groups[i]!;
+    const suffix = groups.length > 1 ? ` (${i + 1}/${groups.length})` : "";
+    const waveLabel = `Onda ${baseDate} ${baseTime}${suffix}`;
+    const { wave, lineCount } = await createReleasedWave(
+      tenantId,
+      releasedById,
+      group,
+      waveLabel,
+    );
+    created.push({
+      waveId: wave.id,
+      orderCount: group.length,
+      lineCount,
+      name: wave.name,
+    });
+  }
+
+  const lineCount = created.reduce((s, w) => s + w.lineCount, 0);
   return {
-    waveId: wave.id,
+    waves: created,
     orderCount: orders.length,
-    lineCount: lineBuilds.length,
+    lineCount,
+  };
+}
+
+export async function releasePickWave(
+  tenantId: string,
+  releasedById: string,
+  opts?: { orderIds?: string[]; auto?: boolean },
+): Promise<{ waveId: string; orderCount: number; lineCount: number; waveCount?: number }> {
+  const result = await releasePickWaves(tenantId, releasedById, opts);
+  const first = result.waves[0];
+  if (!first) {
+    throw new PickWaveError("Nenhuma onda foi criada");
+  }
+  return {
+    waveId: first.waveId,
+    orderCount: result.orderCount,
+    lineCount: result.lineCount,
+    waveCount: result.waves.length,
   };
 }
 
@@ -358,17 +483,42 @@ export async function assertWaveOperatorForMutation(
 }
 
 export async function getOrderIdsInActiveWave(tenantId: string): Promise<string[]> {
-  const wave = await prisma.pickWave.findFirst({
+  const waves = await prisma.pickWave.findMany({
     where: { tenantId, status: PickWaveStatus.RELEASED },
     include: { orders: { select: { orderId: true } } },
   });
-  if (!wave) return [];
-  return wave.orders.map((o) => o.orderId);
+  const ids = new Set<string>();
+  for (const w of waves) {
+    for (const o of w.orders) ids.add(o.orderId);
+  }
+  return [...ids];
 }
 
-export async function getCurrentReleasedWave(tenantId: string) {
-  return prisma.pickWave.findFirst({
+export async function listReleasedWaves(tenantId: string) {
+  return prisma.pickWave.findMany({
     where: { tenantId, status: PickWaveStatus.RELEASED },
+    orderBy: { releasedAt: "asc" },
+    include: {
+      acceptedBy: { select: { id: true, name: true } },
+      _count: { select: { orders: true, lines: true } },
+      orders: {
+        include: {
+          order: {
+            select: {
+              priority: true,
+              collectionDeadline: true,
+              marketplace: true,
+            },
+          },
+        },
+      },
+    },
+  });
+}
+
+export async function getReleasedWaveById(tenantId: string, waveId: string) {
+  return prisma.pickWave.findFirst({
+    where: { tenantId, id: waveId, status: PickWaveStatus.RELEASED },
     include: {
       acceptedBy: { select: { id: true, name: true } },
       lines: {
@@ -379,7 +529,14 @@ export async function getCurrentReleasedWave(tenantId: string) {
             include: {
               orderItem: {
                 include: {
-                  order: { include: { basket: true } },
+                  order: {
+                    select: {
+                      id: true,
+                      erpOrderId: true,
+                      collectionDeadline: true,
+                      basket: { select: { code: true } },
+                    },
+                  },
                 },
               },
             },
@@ -398,12 +555,47 @@ export async function getCurrentReleasedWave(tenantId: string) {
               erpOrderId: true,
               priority: true,
               collectionDeadline: true,
+              marketplace: true,
             },
           },
         },
       },
     },
   });
+}
+
+export async function getCurrentReleasedWave(tenantId: string) {
+  const waves = await listReleasedWaves(tenantId);
+  if (waves.length === 0) return null;
+
+  const { scorePackingUrgency } = await import("./packing-queue-sort.js");
+  const sorted = [...waves].sort((a, b) => {
+    const ordersA = a.orders.map((wo) => wo.order);
+    const ordersB = b.orders.map((wo) => wo.order);
+    const urgA = Math.max(
+      ...ordersA.map((o) =>
+        scorePackingUrgency({
+          collectionDeadline: o.collectionDeadline,
+          marketplace: o.marketplace,
+          priority: o.priority,
+        }),
+      ),
+      0,
+    );
+    const urgB = Math.max(
+      ...ordersB.map((o) =>
+        scorePackingUrgency({
+          collectionDeadline: o.collectionDeadline,
+          marketplace: o.marketplace,
+          priority: o.priority,
+        }),
+      ),
+      0,
+    );
+    return urgB - urgA;
+  });
+
+  return getReleasedWaveById(tenantId, sorted[0]!.id);
 }
 
 export function mapWaveLineSummary(
@@ -413,7 +605,18 @@ export function mapWaveLineSummary(
       pickLocation: true;
       allocations: {
         include: {
-          orderItem: { include: { order: { include: { basket: true } } } };
+          orderItem: {
+            include: {
+              order: {
+                select: {
+                  id: true,
+                  erpOrderId: true,
+                  collectionDeadline: true,
+                  basket: { select: { code: true } },
+                },
+              },
+            },
+          };
         };
       };
     };
@@ -425,8 +628,18 @@ export function mapWaveLineSummary(
     { orderId: string; erpOrderId: string; quantity: number; basketCode: string | null }
   >();
 
+  let collectionDeadline: Date | null = null;
+
   for (const alloc of line.allocations) {
     const order = alloc.orderItem.order;
+    if (order.collectionDeadline) {
+      if (
+        !collectionDeadline ||
+        order.collectionDeadline.getTime() < collectionDeadline.getTime()
+      ) {
+        collectionDeadline = order.collectionDeadline;
+      }
+    }
     const prev = ordersMap.get(order.id);
     if (prev) {
       prev.quantity += alloc.quantity;
@@ -456,12 +669,15 @@ export function mapWaveLineSummary(
       row: line.pickLocation.row,
       label: formatLocation(line.pickLocation),
       currentQuantity: line.pickLocation.currentQuantity,
+      capacity: line.pickLocation.capacity,
+      minThreshold: line.pickLocation.minThreshold,
     },
     quantityTotal: line.quantityTotal,
     quantityPicked: line.quantityPicked,
     remaining,
     ordersCount: ordersMap.size,
     orders: [...ordersMap.values()],
+    collectionDeadline: collectionDeadline?.toISOString() ?? null,
     gondolaHint: `${ordersMap.size} pedido(s) · mesma gôndola · ${line.quantityTotal} un. total`,
   };
 }

@@ -1,4 +1,5 @@
 import { router } from "expo-router";
+import { useState } from "react";
 import {
   ActivityIndicator,
   FlatList,
@@ -8,7 +9,12 @@ import {
   View,
 } from "react-native";
 import { FactoryButton } from "@/components/FactoryButton";
-import { useAcceptWave, useCurrentWave } from "@/hooks/useWavePicking";
+import { CollectionDeadlineRow } from "@/components/CollectionDeadlineRow";
+import {
+  useAcceptWave,
+  useReleasedWaves,
+  useWaveById,
+} from "@/hooks/useWavePicking";
 import type { WaveLineSummary } from "@/lib/api";
 import { theme, spacing, typography } from "@/lib/theme";
 
@@ -20,8 +26,79 @@ function statusLabel(line: WaveLineSummary) {
 }
 
 export default function WavePickingListScreen() {
-  const { data, isLoading, error, refetch, isRefetching } = useCurrentWave();
-  const acceptWave = useAcceptWave();
+  const released = useReleasedWaves();
+  const [selectedWaveId, setSelectedWaveId] = useState<string | null>(null);
+
+  const waves = released.data?.waves ?? [];
+  const activeWaveId = selectedWaveId ?? waves[0]?.id ?? null;
+
+  const { data, isLoading, error, refetch, isRefetching } =
+    useWaveById(activeWaveId);
+  const acceptWave = useAcceptWave(activeWaveId);
+
+  if (released.isLoading) {
+    return (
+      <View style={styles.centered}>
+        <ActivityIndicator size="large" color={theme.primary} />
+        <Text style={styles.loadingText}>Carregando ondas...</Text>
+      </View>
+    );
+  }
+
+  if (released.error || waves.length === 0) {
+    return (
+      <View style={styles.centered}>
+        <Text style={styles.error}>
+          {released.error instanceof Error
+            ? released.error.message
+            : "Nenhuma onda ativa. Libere ondas no painel web."}
+        </Text>
+        <FactoryButton
+          label="Atualizar"
+          variant="secondary"
+          onPress={() => released.refetch()}
+        />
+      </View>
+    );
+  }
+
+  if (waves.length > 1 && !selectedWaveId) {
+    return (
+      <View style={styles.container}>
+        <Text style={styles.waveName}>Ondas liberadas</Text>
+        <Text style={styles.waveMeta}>
+          Escolha a onda para separar (ordenadas por urgência de coleta)
+        </Text>
+        <FlatList
+          data={waves}
+          keyExtractor={(w) => w.id}
+          contentContainerStyle={styles.list}
+          renderItem={({ item }) => (
+            <Pressable
+              style={styles.card}
+              onPress={() => setSelectedWaveId(item.id)}
+            >
+              <Text style={styles.sku}>{item.name}</Text>
+              <CollectionDeadlineRow deadline={item.collectionDeadline} />
+              <Text style={styles.location}>
+                {item.orderCount} pedidos · {item.lineCount} linhas
+              </Text>
+              {item.acceptedByName ? (
+                <Text style={styles.hint}>Aceita por {item.acceptedByName}</Text>
+              ) : (
+                <Text style={styles.remaining}>Disponível para aceite</Text>
+              )}
+            </Pressable>
+          )}
+        />
+        <FactoryButton
+          label="Atualizar"
+          variant="secondary"
+          onPress={() => released.refetch()}
+        />
+      </View>
+    );
+  }
 
   if (isLoading) {
     return (
@@ -36,14 +113,12 @@ export default function WavePickingListScreen() {
     return (
       <View style={styles.centered}>
         <Text style={styles.error}>
-          {error instanceof Error
-            ? error.message
-            : "Nenhuma onda ativa. Libere uma onda no painel web."}
+          {error instanceof Error ? error.message : "Erro ao carregar onda"}
         </Text>
         <FactoryButton
-          label="Atualizar"
+          label="Voltar"
           variant="secondary"
-          onPress={() => refetch()}
+          onPress={() => setSelectedWaveId(null)}
         />
       </View>
     );
@@ -55,13 +130,20 @@ export default function WavePickingListScreen() {
   if (wave.canAccept) {
     return (
       <View style={styles.centered}>
+        {waves.length > 1 ? (
+          <FactoryButton
+            label="Trocar onda"
+            variant="secondary"
+            onPress={() => setSelectedWaveId(null)}
+          />
+        ) : null}
         <Text style={styles.waveName}>{wave.name}</Text>
+        <CollectionDeadlineRow deadline={wave.collectionDeadline} />
         <Text style={styles.waveMeta}>
           {wave.orderCount} pedidos · {wave.gondolaPasses} passagens na gôndola
         </Text>
         <Text style={styles.acceptHint}>
-          Mesmo SKU agrupado — você fará o pick consolidado e depois o packing
-          nas cestas de cada pedido.
+          Mesmo SKU agrupado — pick consolidado; packing nas cestas no web.
         </Text>
         <FactoryButton
           label="Aceitar esta onda"
@@ -96,7 +178,15 @@ export default function WavePickingListScreen() {
   return (
     <View style={styles.container}>
       <View style={styles.header}>
+        {waves.length > 1 ? (
+          <FactoryButton
+            label="Trocar onda"
+            variant="secondary"
+            onPress={() => setSelectedWaveId(null)}
+          />
+        ) : null}
         <Text style={styles.waveName}>{wave.name}</Text>
+        <CollectionDeadlineRow deadline={wave.collectionDeadline} />
         <Text style={styles.waveMeta}>
           {wave.orderCount} pedidos · {wave.gondolaPasses} gôndolas ·{" "}
           {pending.length} linhas pendentes
@@ -130,6 +220,10 @@ export default function WavePickingListScreen() {
               <Text style={styles.sku}>{item.product.sku}</Text>
               <Text style={styles.badge}>{statusLabel(item)}</Text>
             </View>
+            <CollectionDeadlineRow
+              deadline={item.collectionDeadline}
+              compact
+            />
             <Text style={styles.productName} numberOfLines={2}>
               {item.product.name}
             </Text>

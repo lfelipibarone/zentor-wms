@@ -36,7 +36,7 @@ export const PERMISSION_CATALOG: PermissionMeta[] = [
   { key: Permission.REGISTERS_VIEW, label: "Cadastros", group: "Operação" },
   { key: Permission.SALES_VIEW, label: "Pedidos", group: "Operação" },
   { key: Permission.RECEIPTS_VIEW, label: "Recebimentos", group: "Operação" },
-  { key: Permission.STOCK_VIEW, label: "Pulmão / Estoque de giro", group: "Operação" },
+  { key: Permission.STOCK_VIEW, label: "Estoque", group: "Operação" },
   { key: Permission.SHIPPING_VIEW, label: "Expedição", group: "Operação" },
   { key: Permission.REPORTS_VIEW, label: "Relatórios", group: "Admin" },
   { key: Permission.SYSTEM_VIEW, label: "Sistema", group: "Sistema" },

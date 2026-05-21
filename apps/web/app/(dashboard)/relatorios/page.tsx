@@ -74,7 +74,7 @@ export default function RelatoriosPage() {
   const needsPeriod = reportId !== "low_stock";
   const operationTypes = types.filter((t) => t.group === "operation_times");
   const generalTypes = types.filter((t) => t.group !== "operation_times");
-  const allowed = can(Permission.USERS_MANAGE);
+  const allowed = can(Permission.REPORTS_VIEW);
 
   useEffect(() => {
     if (!allowed) return;

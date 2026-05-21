@@ -24,6 +24,10 @@ import {
   type LocationImportMode,
 } from "../services/location-import.js";
 import {
+  assertMaxPickFaceLocations,
+  LocationRuleError,
+} from "../services/location-rules.js";
+import {
   PickWaveError,
   listPickWaves,
   previewWaveRelease,
@@ -50,10 +54,13 @@ import {
   getPackingSession,
   getWavePackingLine,
   listPackingQueue,
+  listUnifiedPackingQueue,
   listWavePackingLines,
   scanPackingItem,
   sortWaveAllocationWeb,
   startPacking,
+  cancelPacking,
+  PackingSessionError,
 } from "../services/order-packing.js";
 
 const guard = (p: string) => createPermissionGuard(p);
@@ -171,12 +178,16 @@ export async function webRoutes(app: FastifyInstance) {
       name?: string;
       barcode?: string;
       requiresItemScan?: boolean;
+      imageUrl?: string | null;
+      unit?: string | null;
+      weight?: number | null;
     };
   }>(
     "/api/products",
     { preHandler: guard(Permission.PRODUCTS_MANAGE) },
     async (request, reply) => {
-      const { sku, name, barcode, requiresItemScan } = request.body ?? {};
+      const { sku, name, barcode, requiresItemScan, imageUrl, unit, weight } =
+        request.body ?? {};
       if (!sku?.trim() || !name?.trim()) {
         return reply.status(400).send({ error: "SKU e nome são obrigatórios" });
       }
@@ -188,6 +199,9 @@ export async function webRoutes(app: FastifyInstance) {
             name: name.trim(),
             barcode: barcode?.trim() || null,
             requiresItemScan: requiresItemScan ?? false,
+            imageUrl: imageUrl?.trim() || null,
+            unit: unit?.trim() || null,
+            weight: weight != null ? weight : null,
           },
         });
         return reply.status(201).send({ product });
@@ -204,18 +218,31 @@ export async function webRoutes(app: FastifyInstance) {
       barcode?: string;
       requiresItemScan?: boolean;
       active?: boolean;
+      imageUrl?: string | null;
+      unit?: string | null;
+      weight?: number | null;
     };
   }>(
     "/api/products/:id",
     { preHandler: guard(Permission.PRODUCTS_MANAGE) },
     async (request, reply) => {
+      const b = request.body ?? {};
       const product = await prisma.product.update({
         where: { id: request.params.id },
         data: {
-          name: request.body?.name?.trim(),
-          barcode: request.body?.barcode?.trim() || null,
-          requiresItemScan: request.body?.requiresItemScan,
-          active: request.body?.active,
+          ...(b.name !== undefined ? { name: b.name.trim() } : {}),
+          ...(b.barcode !== undefined
+            ? { barcode: b.barcode?.trim() || null }
+            : {}),
+          ...(b.requiresItemScan !== undefined
+            ? { requiresItemScan: b.requiresItemScan }
+            : {}),
+          ...(b.active !== undefined ? { active: b.active } : {}),
+          ...(b.imageUrl !== undefined
+            ? { imageUrl: b.imageUrl?.trim() || null }
+            : {}),
+          ...(b.unit !== undefined ? { unit: b.unit?.trim() || null } : {}),
+          ...(b.weight !== undefined ? { weight: b.weight } : {}),
         },
       });
       return { product };
@@ -481,14 +508,22 @@ export async function webRoutes(app: FastifyInstance) {
   );
 
   // --- Localizações (Cadastros) ---
-  app.get<{ Querystring: { q?: string; page?: string; pageSize?: string } }>(
+  app.get<{
+    Querystring: { q?: string; page?: string; pageSize?: string; type?: string };
+  }>(
     "/api/locations",
     { preHandler: guard(Permission.REGISTERS_VIEW) },
     async (request) => {
       const q = request.query.q?.trim();
+      const typeFilter =
+        request.query.type === LocationType.PULMAO ||
+        request.query.type === LocationType.PICK_FACE
+          ? request.query.type
+          : undefined;
       const { page, pageSize, skip, take } = parsePagination(request.query);
       const where: Prisma.LocationWhereInput = {
         ...tenantWhere(request),
+        ...(typeFilter ? { type: typeFilter } : {}),
         ...(q
           ? {
               OR: [
@@ -534,9 +569,15 @@ export async function webRoutes(app: FastifyInstance) {
         return reply.status(400).send({ error: "Campos obrigatórios faltando" });
       }
       try {
+        const tenantId = tenantWhere(request).tenantId;
+        await assertMaxPickFaceLocations(
+          tenantId,
+          b.productId,
+          b.type,
+        );
         const location = await prisma.location.create({
           data: {
-            tenantId: tenantWhere(request).tenantId,
+            tenantId,
             corridor: b.corridor,
             row: b.row,
             barcode: b.barcode.trim().toUpperCase(),
@@ -549,7 +590,10 @@ export async function webRoutes(app: FastifyInstance) {
           include: { product: { select: { sku: true, name: true } } },
         });
         return reply.status(201).send({ location });
-      } catch {
+      } catch (e) {
+        if (e instanceof LocationRuleError) {
+          return reply.status(400).send({ error: e.message });
+        }
         return reply.status(409).send({ error: "Código de barras já existe" });
       }
     },
@@ -566,13 +610,37 @@ export async function webRoutes(app: FastifyInstance) {
   }>(
     "/api/locations/:id",
     { preHandler: guard(Permission.REGISTERS_VIEW) },
-    async (request) => {
-      const location = await prisma.location.update({
-        where: { id: request.params.id },
-        data: request.body,
-        include: { product: { select: { sku: true, name: true } } },
-      });
-      return { location };
+    async (request, reply) => {
+      try {
+        const existing = await prisma.location.findUnique({
+          where: { id: request.params.id },
+        });
+        if (!existing) {
+          return reply.status(404).send({ error: "Localização não encontrada" });
+        }
+        const productId =
+          request.body.productId !== undefined
+            ? request.body.productId
+            : existing.productId;
+        const type = existing.type;
+        await assertMaxPickFaceLocations(
+          existing.tenantId,
+          productId,
+          type,
+          existing.id,
+        );
+        const location = await prisma.location.update({
+          where: { id: request.params.id },
+          data: request.body,
+          include: { product: { select: { sku: true, name: true } } },
+        });
+        return { location };
+      } catch (e) {
+        if (e instanceof LocationRuleError) {
+          return reply.status(400).send({ error: e.message });
+        }
+        throw e;
+      }
     },
   );
 
@@ -911,17 +979,28 @@ export async function webRoutes(app: FastifyInstance) {
   );
 
   app.get<{
-    Querystring: { page?: string; pageSize?: string; status?: string; userId?: string };
+    Querystring: {
+      page?: string;
+      pageSize?: string;
+      status?: string;
+      userId?: string;
+      kind?: string;
+    };
   }>(
     "/api/purchase-receipts",
     { preHandler: guard(Permission.RECEIPTS_VIEW) },
     async (request) => {
       const { page, pageSize } = parsePagination(request.query);
+      const kind =
+        request.query.kind === "ENTRY" || request.query.kind === "RETURN"
+          ? request.query.kind
+          : undefined;
       return listPurchaseReceiptsForWeb({
         tenantId: tenantWhere(request).tenantId,
         page,
         pageSize,
         status: request.query.status,
+        kind,
         userId: request.query.userId,
       });
     },
@@ -942,6 +1021,33 @@ export async function webRoutes(app: FastifyInstance) {
     "/api/packing/orders/queue",
     { preHandler: guard(Permission.SHIPPING_VIEW) },
     async (request) => listPackingQueue(tenantWhere(request).tenantId),
+  );
+
+  app.get(
+    "/api/packing/queue/unified",
+    { preHandler: guard(Permission.SHIPPING_VIEW) },
+    async (request) => listUnifiedPackingQueue(tenantWhere(request).tenantId),
+  );
+
+  app.post<{ Body: { barcode?: string } }>(
+    "/api/packing/baskets/scan",
+    { preHandler: guard(Permission.SHIPPING_VIEW) },
+    async (request, reply) => {
+      const barcode = request.body?.barcode?.trim();
+      if (!barcode) {
+        return reply.status(400).send({ error: "Código da cesta obrigatório" });
+      }
+      const order = await findPackingOrderByQuery(
+        tenantWhere(request).tenantId,
+        barcode,
+      );
+      if (!order) {
+        return reply
+          .status(404)
+          .send({ error: "Nenhum pedido aguardando packing para esta cesta" });
+      }
+      return { order };
+    },
   );
 
   app.get<{ Querystring: { q?: string } }>(
@@ -979,6 +1085,25 @@ export async function webRoutes(app: FastifyInstance) {
       try {
         return await startPacking(request.params.id, request.authUser!.id);
       } catch (e) {
+        if (e instanceof PackingSessionError) {
+          return reply.status(e.statusCode).send({ error: e.message });
+        }
+        const message = e instanceof Error ? e.message : "Erro";
+        return reply.status(422).send({ error: message });
+      }
+    },
+  );
+
+  app.post<{ Params: { id: string } }>(
+    "/api/packing/orders/:id/cancel",
+    { preHandler: guard(Permission.SHIPPING_VIEW) },
+    async (request, reply) => {
+      try {
+        return await cancelPacking(request.params.id, request.authUser!.id);
+      } catch (e) {
+        if (e instanceof PackingSessionError) {
+          return reply.status(e.statusCode).send({ error: e.message });
+        }
         const message = e instanceof Error ? e.message : "Erro";
         return reply.status(422).send({ error: message });
       }
@@ -1199,7 +1324,7 @@ export async function webRoutes(app: FastifyInstance) {
     Querystring: { from?: string; to?: string };
   }>(
     "/api/reports/summary",
-    { preHandler: guard(Permission.USERS_MANAGE) },
+    { preHandler: guard(Permission.REPORTS_VIEW) },
     async (request) => {
       return getReportsSummary(
         tenantWhere(request).tenantId,
@@ -1209,7 +1334,7 @@ export async function webRoutes(app: FastifyInstance) {
     },
   );
 
-  app.get("/api/reports/types", { preHandler: guard(Permission.USERS_MANAGE) }, async () => ({
+  app.get("/api/reports/types", { preHandler: guard(Permission.REPORTS_VIEW) }, async () => ({
     types: [
       {
         id: "dispatched",
@@ -1283,7 +1408,7 @@ export async function webRoutes(app: FastifyInstance) {
     };
   }>(
     "/api/reports/data",
-    { preHandler: guard(Permission.USERS_MANAGE) },
+    { preHandler: guard(Permission.REPORTS_VIEW) },
     async (request, reply) => {
       const report = request.query.report as ReportId | undefined;
       if (!report || !REPORT_IDS.includes(report)) {

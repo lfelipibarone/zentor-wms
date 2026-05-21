@@ -1,5 +1,6 @@
 import { LocationType, Prisma } from "@prisma/client";
 import { prisma } from "../lib/prisma.js";
+import { assertMaxPickFaceLocations } from "./location-rules.js";
 
 export interface LocationImportInput {
   barcode: string;
@@ -32,6 +33,7 @@ function parseLocationType(raw: string): LocationType | null {
   const v = raw.trim().toUpperCase().normalize("NFD").replace(/\p{M}/gu, "");
   if (v === "PICK_FACE" || v === "GONDOLA") return "PICK_FACE";
   if (v === "PULMAO" || v === "PULMAO_RESERVA") return "PULMAO";
+  if (v.includes("GIRO") || v.includes("ESTOQUE")) return "PICK_FACE";
   if (v.includes("GOND") || v.includes("PICK") || v === "FRENTE") return "PICK_FACE";
   if (v.includes("PULM") || v.includes("RESERV")) return "PULMAO";
   return null;
@@ -81,7 +83,7 @@ export function normalizeImportRow(
       error: {
         row: rowIndex,
         barcode,
-        message: `Tipo inválido: "${typeRaw}". Use Gôndola ou Pulmão`,
+        message: `Tipo inválido: "${typeRaw}". Use Estoque de giro ou Pulmão`,
       },
     };
   }
@@ -209,6 +211,15 @@ export async function importLocations(
         active: input.active ?? true,
         ...(productId ? { product: { connect: { id: productId } } } : {}),
       };
+
+      if (productId && input.type === "PICK_FACE") {
+        await assertMaxPickFaceLocations(
+          tenantId,
+          productId,
+          input.type,
+          existing?.id,
+        );
+      }
 
       if (existing) {
         await prisma.location.update({
