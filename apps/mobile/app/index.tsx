@@ -42,8 +42,11 @@ export default function HomeScreen() {
       <FactoryButton
         label="Armazenagem pulmão"
         variant="secondary"
-        onPress={() => router.push("/armazenagem-pulmao")}
+        onPress={() => router.push("/putaway")}
       />
+      <Text style={styles.putawayHint}>
+        NFs conferidas no recebimento — endereçamento no pulmão
+      </Text>
 
       <Text style={styles.apiHint}>API: {getApiBaseUrl()}</Text>
     </ScreenShell>
@@ -71,6 +74,14 @@ const styles = StyleSheet.create({
     fontWeight: "900",
     color: theme.primary,
     textAlign: "center",
+  },
+  putawayHint: {
+    marginTop: -spacing.xs,
+    marginBottom: spacing.sm,
+    color: theme.textMuted,
+    fontSize: typography.caption,
+    textAlign: "center",
+    fontWeight: "600",
   },
   apiHint: {
     marginTop: spacing.lg,

@@ -26,12 +26,24 @@ export const REPORT_IDS = [
   "dispatched",
   "orders",
   "picking",
+  "pickings",
+  "packings",
+  "replenishments",
   "movements",
   "low_stock",
   "packing_issues",
   "volume_by_marketplace",
   ...OPERATION_TIME_REPORT_IDS,
 ] as const;
+
+/** Aceita aliases legados na query string (ex.: report=picking). */
+export function resolveReportId(id: string): ReportId | null {
+  if (id === "picking") return "pickings";
+  if ((REPORT_IDS as readonly string[]).includes(id)) {
+    return id as ReportId;
+  }
+  return null;
+}
 
 export type ReportId = (typeof REPORT_IDS)[number];
 
@@ -112,7 +124,10 @@ export function reportTitle(id: ReportId): string {
   const titles: Record<ReportId, string> = {
     dispatched: "Pedidos expedidos",
     orders: "Pedidos no período",
-    picking: "Separação (movimentações)",
+    picking: "Pickings",
+    pickings: "Pickings",
+    packings: "Packings",
+    replenishments: "Ressuprimentos",
     movements: "Movimentações de estoque",
     low_stock: "Gôndolas abaixo do mínimo",
     packing_issues: "Incidentes no packing",
@@ -156,7 +171,12 @@ export async function runReport(params: {
     case "orders":
       return buildOrdersReport(tenantId, from, to, status, marketplace);
     case "picking":
-      return buildPickingReport(tenantId, from, to);
+    case "pickings":
+      return buildPickingReport(tenantId, from, to, "pickings");
+    case "packings":
+      return buildPackingsReport(tenantId, from, to);
+    case "replenishments":
+      return buildReplenishmentsReport(tenantId, from, to);
     case "movements":
       return buildMovementsReport(tenantId, from, to, movementType);
     case "packing_issues":
@@ -332,6 +352,7 @@ async function buildPickingReport(
   tenantId: string,
   from: Date,
   to: Date,
+  reportId: "picking" | "pickings" = "pickings",
 ): Promise<ReportResult> {
   const movements = await prisma.inventoryMovement.findMany({
     where: {
@@ -360,8 +381,8 @@ async function buildPickingReport(
   }));
 
   return {
-    report: "picking",
-    title: reportTitle("picking"),
+    report: reportId,
+    title: reportTitle(reportId),
     from: from.toISOString().slice(0, 10),
     to: to.toISOString().slice(0, 10),
     columns: [
@@ -377,6 +398,96 @@ async function buildPickingReport(
     rows,
     totalRows: rows.length,
   };
+}
+
+async function buildPackingsReport(
+  tenantId: string,
+  from: Date,
+  to: Date,
+): Promise<ReportResult> {
+  const orders = await prisma.order.findMany({
+    where: {
+      tenantId,
+      timeLogs: {
+        some: {
+          event: {
+            in: [OrderTimeLogEvent.PACK_START, OrderTimeLogEvent.PACK_END],
+          },
+          createdAt: { gte: from, lte: to },
+        },
+      },
+    },
+    include: {
+      items: {
+        where: { quantityPacked: { gt: 0 } },
+        include: { product: true },
+      },
+      timeLogs: {
+        where: {
+          event: {
+            in: [OrderTimeLogEvent.PACK_START, OrderTimeLogEvent.PACK_END],
+          },
+          createdAt: { gte: from, lte: to },
+        },
+        orderBy: { createdAt: "desc" },
+        take: 1,
+        include: { user: { select: { name: true } } },
+      },
+    },
+    orderBy: { updatedAt: "desc" },
+  });
+
+  const rows: Record<string, string | number | null>[] = [];
+  for (const order of orders) {
+    const packLog = order.timeLogs[0];
+    const operator = packLog?.user.name ?? "—";
+    const dataHora = packLog
+      ? fmtDateBr(packLog.createdAt)
+      : fmtDateBr(order.updatedAt);
+    for (const item of order.items) {
+      rows.push({
+        dataHora,
+        operador: operator,
+        pedidoErp: order.erpOrderId,
+        sku: item.product.sku,
+        produto: item.product.name,
+        quantidadeConferida: item.quantityPacked,
+        quantidadeSeparada: item.quantityPicked,
+      });
+    }
+  }
+
+  return {
+    report: "packings",
+    title: reportTitle("packings"),
+    from: from.toISOString().slice(0, 10),
+    to: to.toISOString().slice(0, 10),
+    columns: [
+      { key: "dataHora", header: "Data/hora" },
+      { key: "operador", header: "Operador" },
+      { key: "pedidoErp", header: "Pedido ERP" },
+      { key: "sku", header: "SKU" },
+      { key: "produto", header: "Produto" },
+      { key: "quantidadeConferida", header: "Qtd conferida" },
+      { key: "quantidadeSeparada", header: "Qtd separada" },
+    ],
+    rows,
+    totalRows: rows.length,
+  };
+}
+
+async function buildReplenishmentsReport(
+  tenantId: string,
+  from: Date,
+  to: Date,
+): Promise<ReportResult> {
+  return buildMovementsReport(
+    tenantId,
+    from,
+    to,
+    InventoryMovementType.REPLENISHMENT,
+    "replenishments",
+  );
 }
 
 async function buildPackingIssuesReport(
@@ -560,6 +671,7 @@ async function buildMovementsReport(
   from: Date,
   to: Date,
   movementType?: string,
+  reportId: "movements" | "replenishments" = "movements",
 ): Promise<ReportResult> {
   const type =
     movementType && movementType in InventoryMovementType
@@ -612,8 +724,8 @@ async function buildMovementsReport(
   }));
 
   return {
-    report: "movements",
-    title: reportTitle("movements"),
+    report: reportId,
+    title: reportTitle(reportId),
     from: from.toISOString().slice(0, 10),
     to: to.toISOString().slice(0, 10),
     columns: [

@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { router } from "expo-router";
 import {
   ActivityIndicator,
+  Alert,
   FlatList,
   Pressable,
   ScrollView,
@@ -12,17 +13,26 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useQuery } from "@tanstack/react-query";
 import { OrderStatus } from "@wms/shared";
-import { useAcceptOrder, useOrderQueue } from "@/hooks/usePicking";
+import {
+  useAcceptOrder,
+  useAcceptOrdersBatch,
+  useCreateWaveFromOrders,
+  useMobileConfig,
+  useOrderQueue,
+} from "@/hooks/usePicking";
 import { FactoryButton } from "@/components/FactoryButton";
 import { CollectionDeadlineRow } from "@/components/CollectionDeadlineRow";
 import { WavePickingPanel } from "@/components/WavePickingPanel";
 import { BackButton } from "@/components/BackButton";
-import { showErrorAlert } from "@/lib/app-alert";
+import { showErrorAlert, showInfoAlert } from "@/lib/app-alert";
 import { theme, spacing, typography } from "@/lib/theme";
 import {
   api,
   ApiError,
+  type PickingIssueDetail,
   type ProblemOrder,
+  type ProblemWave,
+  type ProblemWaveOrder,
   type ProximityGroupDto,
   type QueueOrder,
 } from "@/lib/api";
@@ -169,6 +179,7 @@ export default function PickingHubScreen() {
             refreshing={isRefetching}
             onRefresh={refetch}
             onPressOrder={handleOrderPress}
+            onGoToWaves={() => setTab("wave")}
           />
         )}
       </View>
@@ -182,13 +193,97 @@ function OrdersQueuePanel({
   refreshing,
   onRefresh,
   onPressOrder,
+  onGoToWaves,
 }: {
   orders: QueueOrder[];
   proximityGroups: ProximityGroupDto[];
   refreshing: boolean;
   onRefresh: () => void;
   onPressOrder: (o: QueueOrder) => void;
+  onGoToWaves: () => void;
 }) {
+  const { data: config } = useMobileConfig();
+  const acceptBatch = useAcceptOrdersBatch();
+  const createWave = useCreateWaveFromOrders();
+
+  const handleAcceptBatch = async (group: ProximityGroupDto) => {
+    try {
+      const result = await acceptBatch.mutateAsync(group.orderIds);
+      await onRefresh();
+      if (result.accepted.length === 0) {
+        const firstErr = result.errors[0]?.message ?? "Nenhum pedido aceito";
+        showErrorAlert(firstErr);
+        return;
+      }
+      if (result.errors.length > 0) {
+        showInfoAlert(
+          `${result.accepted.length} aceito(s). ${result.errors.length} não puderam ser aceitos.`,
+        );
+      } else {
+        showInfoAlert(`${result.accepted.length} pedido(s) aceito(s).`);
+      }
+      const firstId = result.accepted[0]!;
+      const firstOrder =
+        group.orders.find((o) => o.id === firstId) ??
+        orders.find((o) => o.id === firstId);
+      if (firstOrder) {
+        router.push(`/picking/${firstId}/basket`);
+      }
+    } catch (e) {
+      showErrorAlert(
+        e instanceof ApiError ? e.message : "Erro ao aceitar pedidos",
+      );
+    }
+  };
+
+  const runCreateWave = async (
+    orderIds: string[],
+    appendToWaveId?: string,
+  ) => {
+    try {
+      const result = await createWave.mutateAsync({ orderIds, appendToWaveId });
+      await onRefresh();
+      showInfoAlert(
+        `Onda criada com ${result.orderCount} pedido(s) e ${result.lineCount} linha(s). Aceite na aba Ondas.`,
+      );
+      onGoToWaves();
+    } catch (e) {
+      showErrorAlert(
+        e instanceof ApiError ? e.message : "Erro ao criar onda",
+      );
+    }
+  };
+
+  const handleCreateWave = async (group: ProximityGroupDto) => {
+    try {
+      const { wave: openWave } = await api.getOpenWave();
+      if (openWave) {
+        Alert.alert(
+          "Onda aberta",
+          `Adicionar ${group.orderIds.length} pedido(s) à onda "${openWave.name}" ou criar nova onda?`,
+          [
+            { text: "Cancelar", style: "cancel" },
+            {
+              text: "Criar nova",
+              onPress: () => void runCreateWave(group.orderIds),
+            },
+            {
+              text: "Adicionar à atual",
+              onPress: () =>
+                void runCreateWave(group.orderIds, openWave.id),
+            },
+          ],
+        );
+        return;
+      }
+      await runCreateWave(group.orderIds);
+    } catch (e) {
+      showErrorAlert(
+        e instanceof ApiError ? e.message : "Erro ao verificar ondas",
+      );
+    }
+  };
+
   const header = (
     <View style={styles.listHeader}>
       <Text style={styles.count}>{orders.length} pedido(s) na fila</Text>
@@ -206,6 +301,21 @@ function OrdersQueuePanel({
               <Text style={styles.recOrders} numberOfLines={2}>
                 {g.orders.map((o) => o.erpOrderId).join(" · ")}
               </Text>
+              <View style={styles.recActions}>
+                {config?.waveEnabled ? (
+                  <FactoryButton
+                    label="Criar onda com este grupo"
+                    onPress={() => void handleCreateWave(g)}
+                    loading={createWave.isPending}
+                  />
+                ) : null}
+                <FactoryButton
+                  label="Aceitar todos (avulso)"
+                  variant="secondary"
+                  onPress={() => void handleAcceptBatch(g)}
+                  loading={acceptBatch.isPending}
+                />
+              </View>
             </View>
           ))}
         </View>
@@ -224,7 +334,7 @@ function OrdersQueuePanel({
       ListHeaderComponent={header}
       ListFooterComponent={
         <FactoryButton
-          label="Atualizar fila"
+          label="Atualizar"
           variant="secondary"
           onPress={onRefresh}
           loading={refreshing}
@@ -243,6 +353,29 @@ function OrdersQueuePanel({
   );
 }
 
+function waveOrderToProblem(
+  o: ProblemWaveOrder,
+  waveName: string,
+): ProblemOrder {
+  return {
+    id: o.id,
+    erpOrderId: o.erpOrderId,
+    status: o.status as OrderStatus,
+    priority: 0,
+    customerName: o.customerName,
+    marketplaceLabel: o.marketplaceLabel,
+    collectionDeadline: null,
+    returnedFromPacking: o.returnedFromPacking,
+    pausedIssue: o.pausedIssue,
+    issueSummary: o.issueSummary,
+    issueDetail: o.issueDetail,
+    waveName,
+    itemCount: 0,
+    totalUnits: 0,
+    qtyPicked: 0,
+  };
+}
+
 function ProblemsPanel({
   loading,
   orders,
@@ -253,15 +386,7 @@ function ProblemsPanel({
 }: {
   loading: boolean;
   orders: ProblemOrder[];
-  waves: Array<{
-    id: string;
-    name: string;
-    problemOrders: Array<{
-      id: string;
-      erpOrderId: string;
-      issueSummary: string | null;
-    }>;
-  }>;
+  waves: ProblemWave[];
   onPressOrder: (o: ProblemOrder) => void;
   onRefresh: () => void;
   refreshing: boolean;
@@ -282,26 +407,17 @@ function ProblemsPanel({
             {waves.length} onda(s) com problema
           </Text>
           {waves.map((wave) => (
-            <View key={wave.id} style={styles.waveCard}>
-              <Text style={styles.waveName}>{wave.name}</Text>
+            <View key={wave.id} style={styles.waveSection}>
+              <Text style={styles.waveSectionTitle}>{wave.name}</Text>
               {wave.problemOrders.map((o) => (
-                <Pressable
+                <OrderCard
                   key={o.id}
-                  style={styles.waveOrderRow}
-                  onPress={() =>
-                    onPressOrder({
-                      id: o.id,
-                      erpOrderId: o.erpOrderId,
-                      issueSummary: o.issueSummary,
-                    } as ProblemOrder)
-                  }
-                >
-                  <Text style={styles.erpSmall}>{o.erpOrderId}</Text>
-                  {o.issueSummary ? (
-                    <Text style={styles.issueSummary}>{o.issueSummary}</Text>
-                  ) : null}
-                  <Text style={styles.tapHintSmall}>TOQUE PARA CONTINUAR</Text>
-                </Pressable>
+                  item={waveOrderToProblem(o, wave.name)}
+                  problem
+                  resume
+                  inWave
+                  onPress={() => onPressOrder(waveOrderToProblem(o, wave.name))}
+                />
               ))}
             </View>
           ))}
@@ -347,22 +463,61 @@ function ProblemsPanel({
   );
 }
 
+function PickingIssueBlock({ detail }: { detail: PickingIssueDetail }) {
+  const title =
+    detail.source === "PACKING"
+      ? "Problema no packing"
+      : "Problema na separação";
+  return (
+    <View style={styles.issueBlock}>
+      <Text style={styles.issueBlockTitle}>{title}</Text>
+      <Text style={styles.issueBlockLine}>
+        <Text style={styles.issueBlockLabel}>Tipo: </Text>
+        {detail.typeLabel}
+      </Text>
+      {detail.sku ? (
+        <Text style={styles.issueBlockLine}>
+          <Text style={styles.issueBlockLabel}>SKU: </Text>
+          {detail.sku}
+          {detail.productName ? ` — ${detail.productName}` : ""}
+        </Text>
+      ) : null}
+      {detail.quantity > 0 ? (
+        <Text style={styles.issueBlockLine}>
+          <Text style={styles.issueBlockLabel}>Qtd.: </Text>
+          {detail.quantity} un.
+        </Text>
+      ) : null}
+      {detail.description ? (
+        <Text style={styles.issueBlockDesc}>{detail.description}</Text>
+      ) : null}
+    </View>
+  );
+}
+
 function OrderCard({
   item,
   onPress,
   problem,
   resume,
+  inWave,
 }: {
   item: QueueOrder | ProblemOrder;
   onPress: () => void;
   problem?: boolean;
   resume?: boolean;
+  inWave?: boolean;
 }) {
   const returned =
     "returnedFromPacking" in item && item.returnedFromPacking;
   const paused = "pausedIssue" in item && item.pausedIssue;
-  const issueSummary =
-    "issueSummary" in item ? item.issueSummary : null;
+  const issueDetail =
+    "issueDetail" in item ? item.issueDetail : null;
+  const waveName = "waveName" in item ? item.waveName : null;
+  const itemCount = item.itemCount ?? 0;
+  const totalUnits = item.totalUnits ?? 0;
+  const qtyPicked =
+    "qtyPicked" in item ? (item as ProblemOrder).qtyPicked : 0;
 
   return (
     <Pressable
@@ -382,6 +537,13 @@ function OrderCard({
           <Text style={styles.returnBadgeText}>PAUSADO</Text>
         </View>
       ) : null}
+      {inWave || waveName ? (
+        <View style={[styles.returnBadge, { backgroundColor: theme.info }]}>
+          <Text style={styles.returnBadgeText}>
+            {waveName ? `ONDA ${waveName}` : "EM ONDA"}
+          </Text>
+        </View>
+      ) : null}
       <Text style={styles.erp}>{item.erpOrderId}</Text>
       {"routeHint" in item && item.routeHint ? (
         <Text style={styles.routeHint}>{item.routeHint}</Text>
@@ -399,14 +561,14 @@ function OrderCard({
       {"customerName" in item && item.customerName ? (
         <Text style={styles.customer}>{item.customerName}</Text>
       ) : null}
-      {issueSummary ? (
-        <Text style={styles.issueSummary}>{issueSummary}</Text>
-      ) : null}
+      {issueDetail ? <PickingIssueBlock detail={issueDetail} /> : null}
       <View style={styles.meta}>
         <Text style={styles.metaText}>
-          {problem
-            ? `Separado ${(item as ProblemOrder).qtyPicked}/${item.totalUnits} un.`
-            : `${item.itemCount} itens · ${item.totalUnits} un.`}
+          {problem && totalUnits > 0
+            ? `Separado ${qtyPicked}/${totalUnits} un.`
+            : itemCount > 0
+              ? `${itemCount} itens · ${totalUnits} un.`
+              : "Toque para continuar"}
         </Text>
         {item.priority > 0 ? (
           <Text style={styles.priority}>PRIORIDADE {item.priority}</Text>
@@ -528,6 +690,10 @@ const styles = StyleSheet.create({
     fontSize: typography.caption,
     color: theme.textMuted,
   },
+  recActions: {
+    marginTop: spacing.sm,
+    gap: spacing.xs,
+  },
   routeHint: {
     marginTop: 2,
     fontSize: typography.caption,
@@ -570,18 +736,36 @@ const styles = StyleSheet.create({
     fontWeight: "900",
     fontSize: typography.caption,
   },
-  issueSummary: {
-    marginTop: 4,
-    color: "#92400e",
-    fontWeight: "700",
+  issueBlock: {
+    marginTop: spacing.sm,
+    padding: spacing.sm,
+    borderRadius: 8,
+    backgroundColor: "#fff7ed",
+    borderWidth: 1,
+    borderColor: "#fdba74",
+    gap: 4,
+  },
+  issueBlockTitle: {
+    fontWeight: "900",
     fontSize: typography.caption,
+    color: "#9a3412",
+  },
+  issueBlockLine: {
+    fontSize: typography.caption,
+    color: "#78350f",
+  },
+  issueBlockLabel: { fontWeight: "800" },
+  issueBlockDesc: {
+    marginTop: 2,
+    fontSize: typography.caption,
+    color: "#92400e",
+    fontStyle: "italic",
   },
   erp: {
     fontSize: typography.hero,
     fontWeight: "900",
     color: theme.text,
   },
-  erpSmall: { fontSize: typography.body, fontWeight: "800" },
   customer: { color: theme.textMuted, marginTop: 4 },
   marketplace: { color: theme.info, fontWeight: "700", marginTop: 2 },
   meta: {
@@ -602,29 +786,15 @@ const styles = StyleSheet.create({
     color: theme.primary,
     fontSize: typography.caption,
   },
-  tapHintSmall: {
-    marginTop: spacing.xs,
-    fontWeight: "700",
-    color: theme.primary,
-    fontSize: typography.caption - 1,
-  },
   empty: { textAlign: "center", color: theme.textMuted, marginTop: spacing.lg },
-  waveCard: {
-    backgroundColor: theme.surface,
-    borderRadius: 12,
-    padding: spacing.md,
+  waveSection: {
+    gap: spacing.xs,
     marginBottom: spacing.sm,
-    borderWidth: 2,
-    borderColor: "#f59e0b",
   },
-  waveName: {
+  waveSectionTitle: {
     fontWeight: "900",
     fontSize: typography.subtitle,
-    marginBottom: spacing.sm,
-  },
-  waveOrderRow: {
-    paddingVertical: spacing.sm,
-    borderTopWidth: 1,
-    borderTopColor: theme.border,
+    color: theme.text,
+    marginBottom: spacing.xs,
   },
 });

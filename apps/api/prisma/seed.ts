@@ -833,8 +833,13 @@ async function main() {
         event: OrderTimeLogEvent.PACK_REPORT_ISSUE,
         reason: JSON.stringify({
           sku: screw.sku,
+          productName: screw.name,
           type: i % 2 === 0 ? "MISSING" : "DAMAGED",
           quantity: 1 + i,
+          description:
+            i % 2 === 0
+              ? "Item não encontrado na cesta na conferência"
+              : "Embalagem danificada no packing",
         }),
       },
     });

@@ -379,6 +379,11 @@ export default function PurchaseReceiptDetailPage() {
                     : ""}
                 </p>
               </div>
+            ) : isCompleted && !isReturn ? (
+              <div className="rounded-xl border border-amber-200 bg-amber-50/80 p-4 text-sm text-amber-900">
+                Armazenagem no pulmão: conclua no app mobile (Putaway ou
+                Armazenagem pulmão).
+              </div>
             ) : null}
 
             {!isCompleted ? (

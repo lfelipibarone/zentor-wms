@@ -17,21 +17,17 @@ import {
 import { Pagination } from "@/components/ui/pagination";
 import type { PaginationMeta } from "@/lib/pagination";
 import {
-  fetchMovements,
   fetchPurchaseReceipts,
   syncPurchaseReceipts,
   type PurchaseReceiptListSession,
 } from "@/lib/api/operations";
 import {
-  LOCATION_TYPE_LABEL,
-  MOVEMENT_TYPE_LABEL,
   PURCHASE_RECEIPT_STATUS_LABEL,
   RECEIPT_KIND_LABEL,
 } from "@/lib/labels";
 import { cn } from "@/lib/utils";
-import Link from "next/link";
 
-type MainTab = "nfs" | "devolucao" | "movimentos";
+type MainTab = "nfs" | "devolucao";
 
 const ENTRY_STATUS_TABS: { value: string; label: string }[] = [
   { value: "", label: "Todos" },
@@ -51,7 +47,6 @@ const PUTAWAY_LABEL: Record<string, string> = {
 const MAIN_TABS: { key: MainTab; label: string }[] = [
   { key: "nfs", label: "Nota fiscal de entrada" },
   { key: "devolucao", label: "Devolução" },
-  { key: "movimentos", label: "Movimentações" },
 ];
 
 function formatDuration(ms: number | null) {
@@ -80,8 +75,14 @@ export default function RecebimentosPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const tabParam = searchParams.get("tab");
-  const mainTab: MainTab =
-    tabParam === "devolucao" || tabParam === "movimentos" ? tabParam : "nfs";
+
+  useEffect(() => {
+    if (tabParam === "movimentos") {
+      router.replace("/relatorios?report=movements");
+    }
+  }, [tabParam, router]);
+
+  const mainTab: MainTab = tabParam === "devolucao" ? "devolucao" : "nfs";
 
   const setMainTab = (tab: MainTab) => {
     const sp = new URLSearchParams(searchParams.toString());
@@ -99,52 +100,42 @@ export default function RecebimentosPage() {
   const [searchQ, setSearchQ] = useState("");
   const [dateFrom, setDateFrom] = useState(initialRange.from);
   const [dateTo, setDateTo] = useState(initialRange.to);
-  const [movements, setMovements] = useState<
-    Awaited<ReturnType<typeof fetchMovements>>["movements"]
-  >([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [syncMessage, setSyncMessage] = useState<string | null>(null);
   const [newModalOpen, setNewModalOpen] = useState(false);
   const [newModalMode, setNewModalMode] = useState<"entry" | "return">("entry");
 
-  const receiptKind =
-    mainTab === "devolucao" ? "RETURN" : mainTab === "nfs" ? "ENTRY" : undefined;
+  const receiptKind = mainTab === "devolucao" ? "RETURN" : "ENTRY";
 
   const load = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
-      if (mainTab === "movimentos") {
-        const data = await fetchMovements(page);
-        setMovements(data.movements);
-        setPagination(data.pagination);
-      } else {
-        if (mainTab === "nfs") {
-          try {
-            const sync = await syncPurchaseReceipts();
-            if (sync.warning) setSyncMessage(sync.warning);
-            else if (sync.created > 0) {
-              setSyncMessage(`${sync.created} nota(s) importada(s) do Tiny.`);
-            } else setSyncMessage(null);
-          } catch {
-            setSyncMessage(null);
-          }
+      if (mainTab === "nfs") {
+        try {
+          const sync = await syncPurchaseReceipts();
+          if (sync.warning) setSyncMessage(sync.warning);
+          else if (sync.created > 0) {
+            setSyncMessage(`${sync.created} nota(s) importada(s) do Tiny.`);
+          } else setSyncMessage(null);
+        } catch {
+          setSyncMessage(null);
         }
-
-        const data = await fetchPurchaseReceipts({
-          page,
-          status: statusFilter || undefined,
-          kind: receiptKind,
-          q: searchQ.trim() || undefined,
-          from: dateFrom || undefined,
-          to: dateTo || undefined,
-          sort: "desc",
-        });
-        setSessions(data.sessions);
-        setPagination(data.pagination);
-        setStatusCounts(data.statusCounts ?? {});
       }
+
+      const data = await fetchPurchaseReceipts({
+        page,
+        status: statusFilter || undefined,
+        kind: receiptKind,
+        q: searchQ.trim() || undefined,
+        from: dateFrom || undefined,
+        to: dateTo || undefined,
+        sort: "desc",
+      });
+      setSessions(data.sessions);
+      setPagination(data.pagination);
+      setStatusCounts(data.statusCounts ?? {});
     } catch (e) {
       setError(e instanceof Error ? e.message : "Erro ao carregar");
     } finally {
@@ -157,8 +148,9 @@ export default function RecebimentosPage() {
   }, [mainTab, statusFilter, searchQ, dateFrom, dateTo]);
 
   useEffect(() => {
+    if (tabParam === "movimentos") return;
     load();
-  }, [load]);
+  }, [load, tabParam]);
 
   const openSession = (id: string) => {
     const sp = new URLSearchParams();
@@ -167,6 +159,10 @@ export default function RecebimentosPage() {
     router.push(`/recebimentos/${id}${qs ? `?${qs}` : ""}`);
   };
 
+  if (tabParam === "movimentos") {
+    return null;
+  }
+
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-start justify-between gap-4">
@@ -174,18 +170,16 @@ export default function RecebimentosPage() {
           title="Conferência de compra"
           description="Recebimento e conferência de NF e devoluções pelo navegador. Notas de entrada são sincronizadas do Tiny ERP."
         />
-        {mainTab !== "movimentos" ? (
-          <button
-            type="button"
-            onClick={() => {
-              setNewModalMode(mainTab === "devolucao" ? "return" : "entry");
-              setNewModalOpen(true);
-            }}
-            className="rounded-lg bg-[#0d9488] px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-[#0f766e]"
-          >
-            Novo recebimento
-          </button>
-        ) : null}
+        <button
+          type="button"
+          onClick={() => {
+            setNewModalMode(mainTab === "devolucao" ? "return" : "entry");
+            setNewModalOpen(true);
+          }}
+          className="rounded-lg bg-[#0d9488] px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-[#0f766e]"
+        >
+          Novo recebimento
+        </button>
       </div>
 
       <NewReceiptModal
@@ -219,213 +213,151 @@ export default function RecebimentosPage() {
         ))}
       </div>
 
-      {mainTab !== "movimentos" ? (
-        <>
-          <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-end">
-            <div className="min-w-[200px] flex-1">
-              <label className="text-xs font-medium text-muted-foreground">
-                Pesquisar
-              </label>
-              <input
-                type="search"
-                placeholder="Fornecedor ou número…"
-                className="mt-1 w-full rounded-lg border px-3 py-2 text-sm"
-                value={searchQ}
-                onChange={(e) => setSearchQ(e.target.value)}
-              />
-            </div>
-            <div>
-              <label className="text-xs font-medium text-muted-foreground">
-                De
-              </label>
-              <input
-                type="date"
-                className="mt-1 block rounded-lg border px-3 py-2 text-sm"
-                value={dateFrom}
-                onChange={(e) => setDateFrom(e.target.value)}
-              />
-            </div>
-            <div>
-              <label className="text-xs font-medium text-muted-foreground">
-                Até
-              </label>
-              <input
-                type="date"
-                className="mt-1 block rounded-lg border px-3 py-2 text-sm"
-                value={dateTo}
-                onChange={(e) => setDateTo(e.target.value)}
-              />
-            </div>
-          </div>
+      <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-end">
+        <div className="min-w-[200px] flex-1">
+          <label className="text-xs font-medium text-muted-foreground">
+            Pesquisar
+          </label>
+          <input
+            type="search"
+            placeholder="Fornecedor ou número…"
+            className="mt-1 w-full rounded-lg border px-3 py-2 text-sm"
+            value={searchQ}
+            onChange={(e) => setSearchQ(e.target.value)}
+          />
+        </div>
+        <div>
+          <label className="text-xs font-medium text-muted-foreground">
+            De
+          </label>
+          <input
+            type="date"
+            className="mt-1 block rounded-lg border px-3 py-2 text-sm"
+            value={dateFrom}
+            onChange={(e) => setDateFrom(e.target.value)}
+          />
+        </div>
+        <div>
+          <label className="text-xs font-medium text-muted-foreground">
+            Até
+          </label>
+          <input
+            type="date"
+            className="mt-1 block rounded-lg border px-3 py-2 text-sm"
+            value={dateTo}
+            onChange={(e) => setDateTo(e.target.value)}
+          />
+        </div>
+      </div>
 
-          {mainTab !== "movimentos" ? (
-            <div className="flex flex-wrap gap-1 border-b">
-              {ENTRY_STATUS_TABS.map((tab) => {
-                const count =
-                  tab.value === ""
-                    ? Object.values(statusCounts).reduce((a, b) => a + b, 0)
-                    : (statusCounts[tab.value] ?? 0);
-                const active = statusFilter === tab.value;
-                return (
-                  <button
-                    key={tab.value || "all"}
-                    type="button"
-                    onClick={() => {
-                      setPage(1);
-                      setStatusFilter(tab.value);
-                    }}
-                    className={cn(
-                      "relative px-3 py-2 text-sm font-medium",
-                      active
-                        ? "text-[#0d9488] after:absolute after:inset-x-0 after:bottom-0 after:h-0.5 after:bg-[#0d9488]"
-                        : "text-slate-600 hover:text-slate-900",
-                    )}
-                  >
-                    <span className="flex items-center gap-2">
-                      {tab.value ? (
-                        <PurchaseReceiptStatusBadge
-                          status={tab.value}
-                          showDot
-                          className="!bg-transparent !px-0 !py-0 !text-inherit"
-                        />
-                      ) : (
-                        tab.label
-                      )}
-                      {count > 0 ? (
-                        <span className="text-xs text-muted-foreground">
-                          {String(count).padStart(2, "0")}
-                        </span>
-                      ) : null}
-                    </span>
-                  </button>
-                );
-              })}
-            </div>
-          ) : null}
-        </>
-      ) : null}
+      <div className="flex flex-wrap gap-1 border-b">
+        {ENTRY_STATUS_TABS.map((tab) => {
+          const count =
+            tab.value === ""
+              ? Object.values(statusCounts).reduce((a, b) => a + b, 0)
+              : (statusCounts[tab.value] ?? 0);
+          const active = statusFilter === tab.value;
+          return (
+            <button
+              key={tab.value || "all"}
+              type="button"
+              onClick={() => {
+                setPage(1);
+                setStatusFilter(tab.value);
+              }}
+              className={cn(
+                "relative px-3 py-2 text-sm font-medium",
+                active
+                  ? "text-[#0d9488] after:absolute after:inset-x-0 after:bottom-0 after:h-0.5 after:bg-[#0d9488]"
+                  : "text-slate-600 hover:text-slate-900",
+              )}
+            >
+              <span className="flex items-center gap-2">
+                {tab.value ? (
+                  <PurchaseReceiptStatusBadge
+                    status={tab.value}
+                    showDot
+                    className="!bg-transparent !px-0 !py-0 !text-inherit"
+                  />
+                ) : (
+                  tab.label
+                )}
+                {count > 0 ? (
+                  <span className="text-xs text-muted-foreground">
+                    {String(count).padStart(2, "0")}
+                  </span>
+                ) : null}
+              </span>
+            </button>
+          );
+        })}
+      </div>
 
       <DataState
         loading={loading}
         error={error}
-        empty={
-          !loading &&
-          (mainTab === "movimentos"
-            ? movements.length === 0
-            : sessions.length === 0)
-        }
+        empty={!loading && sessions.length === 0}
         emptyMessage="Nenhum registro nesta aba."
       >
-        {mainTab !== "movimentos" ? (
-          <div className="overflow-x-auto rounded-xl border bg-white shadow-sm">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Referência</TableHead>
-                  <TableHead>Tipo</TableHead>
-                  <TableHead>Fornecedor / Ref.</TableHead>
-                  <TableHead>Operador</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Itens</TableHead>
-                  <TableHead>Tempo receb.</TableHead>
-                  <TableHead>Tempo conf.</TableHead>
-                  <TableHead>Armazenagem</TableHead>
+        <div className="overflow-x-auto rounded-xl border bg-white shadow-sm">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Referência</TableHead>
+                <TableHead>Tipo</TableHead>
+                <TableHead>Fornecedor / Ref.</TableHead>
+                <TableHead>Operador</TableHead>
+                <TableHead>Status</TableHead>
+                <TableHead>Itens</TableHead>
+                <TableHead>Tempo receb.</TableHead>
+                <TableHead>Tempo conf.</TableHead>
+                <TableHead>Armazenagem</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {sessions.map((s) => (
+                <TableRow
+                  key={s.id}
+                  className="cursor-pointer hover:bg-slate-50"
+                  onClick={() => openSession(s.id)}
+                >
+                  <TableCell className="font-mono font-semibold">
+                    {s.invoiceNumber ?? s.reference ?? s.tinyNotaId ?? s.id.slice(0, 8)}
+                  </TableCell>
+                  <TableCell>
+                    {RECEIPT_KIND_LABEL[s.kind] ?? s.kind}
+                  </TableCell>
+                  <TableCell>{s.supplierName ?? s.reference ?? "—"}</TableCell>
+                  <TableCell>{s.operatorName}</TableCell>
+                  <TableCell>
+                    <PurchaseReceiptStatusBadge status={s.status} />
+                  </TableCell>
+                  <TableCell>
+                    {s.itemsChecked}/{s.itemCount}
+                  </TableCell>
+                  <TableCell>{formatDuration(s.receiptDurationMs)}</TableCell>
+                  <TableCell>{formatDuration(s.conferenceDurationMs)}</TableCell>
+                  <TableCell>
+                    {s.putaway ? (
+                      <div className="text-sm">
+                        <p>{PUTAWAY_LABEL[s.putaway.status] ?? s.putaway.status}</p>
+                        {s.putaway.operatorName ? (
+                          <p className="text-muted-foreground">
+                            {s.putaway.operatorName}
+                          </p>
+                        ) : null}
+                      </div>
+                    ) : s.status === "COMPLETED" && s.kind === "ENTRY" ? (
+                      <span className="text-sm text-amber-700">Pendente · app mobile</span>
+                    ) : (
+                      "—"
+                    )}
+                  </TableCell>
                 </TableRow>
-              </TableHeader>
-              <TableBody>
-                {sessions.map((s) => (
-                  <TableRow
-                    key={s.id}
-                    className="cursor-pointer hover:bg-slate-50"
-                    onClick={() => openSession(s.id)}
-                  >
-                    <TableCell className="font-mono font-semibold">
-                      {s.invoiceNumber ?? s.reference ?? s.tinyNotaId ?? s.id.slice(0, 8)}
-                    </TableCell>
-                    <TableCell>
-                      {RECEIPT_KIND_LABEL[s.kind] ?? s.kind}
-                    </TableCell>
-                    <TableCell>{s.supplierName ?? s.reference ?? "—"}</TableCell>
-                    <TableCell>{s.operatorName}</TableCell>
-                    <TableCell>
-                      <PurchaseReceiptStatusBadge status={s.status} />
-                    </TableCell>
-                    <TableCell>
-                      {s.itemsChecked}/{s.itemCount}
-                    </TableCell>
-                    <TableCell>{formatDuration(s.receiptDurationMs)}</TableCell>
-                    <TableCell>{formatDuration(s.conferenceDurationMs)}</TableCell>
-                    <TableCell>
-                      {s.putaway ? (
-                        <div className="text-sm">
-                          <p>{PUTAWAY_LABEL[s.putaway.status] ?? s.putaway.status}</p>
-                          {s.putaway.operatorName ? (
-                            <p className="text-muted-foreground">
-                              {s.putaway.operatorName}
-                            </p>
-                          ) : null}
-                        </div>
-                      ) : s.status === "COMPLETED" && s.kind === "ENTRY" ? (
-                        <span className="text-sm text-amber-700">Pendente</span>
-                      ) : (
-                        "—"
-                      )}
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </div>
-        ) : (
-          <div className="overflow-x-auto rounded-xl border bg-white shadow-sm">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Data</TableHead>
-                  <TableHead>Tipo</TableHead>
-                  <TableHead>Qtd</TableHead>
-                  <TableHead>Origem</TableHead>
-                  <TableHead>Destino</TableHead>
-                  <TableHead>Operador</TableHead>
-                  <TableHead>NF / Sessão</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {movements.map((m) => (
-                  <TableRow key={m.id}>
-                    <TableCell className="whitespace-nowrap text-xs">
-                      {new Date(m.createdAt).toLocaleString("pt-BR")}
-                    </TableCell>
-                    <TableCell>
-                      {MOVEMENT_TYPE_LABEL[m.type] ?? m.type}
-                    </TableCell>
-                    <TableCell>{m.quantity}</TableCell>
-                    <TableCell className="font-mono text-xs">
-                      {m.fromLocation?.barcode ?? "—"}
-                    </TableCell>
-                    <TableCell className="font-mono text-xs">
-                      {m.toLocation?.barcode ?? "—"}
-                    </TableCell>
-                    <TableCell>{m.userName}</TableCell>
-                    <TableCell className="font-mono text-xs">
-                      {m.purchaseReceiptSessionId ? (
-                        <Link
-                          href={`/recebimentos/${m.purchaseReceiptSessionId}?tab=movimentos`}
-                          className="text-[#0d9488] hover:underline"
-                          onClick={(e) => e.stopPropagation()}
-                        >
-                          {m.purchaseReceiptSessionId.slice(0, 8)}…
-                        </Link>
-                      ) : (
-                        "—"
-                      )}
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </div>
-        )}
+              ))}
+            </TableBody>
+          </Table>
+        </div>
 
         {pagination && pagination.total > 0 ? (
           <Pagination pagination={pagination} onPageChange={setPage} />

@@ -56,12 +56,6 @@ export const MAIN_NAV: NavItem[] = [
     permission: Permission.RECEIPTS_VIEW,
   },
   {
-    href: "/armazenagem",
-    label: "Armazenagem",
-    icon: Package,
-    permission: Permission.RECEIPTS_VIEW,
-  },
-  {
     href: "/estoque",
     label: "Estoque",
     icon: RotateCcw,

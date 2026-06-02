@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { FileSpreadsheet, FileText } from "lucide-react";
 import { MarketplaceBadge } from "@/components/ops/marketplace-badge";
 import { MarketplaceFilter } from "@/components/ops/marketplace-filter";
@@ -56,14 +57,19 @@ function ReportTypeButtons({
   );
 }
 
+const REPORT_ALIASES: Record<string, ReportId> = {
+  picking: "pickings",
+};
+
 export default function RelatoriosPage() {
   const { can } = useAuth();
+  const searchParams = useSearchParams();
   const defaults = useMemo(() => defaultReportPeriod(), []);
   const [periodFrom, setPeriodFrom] = useState(defaults.from);
   const [periodTo, setPeriodTo] = useState(defaults.to);
 
   const [types, setTypes] = useState<ReportTypeMeta[]>([]);
-  const [reportId, setReportId] = useState<ReportId>("dispatched");
+  const [reportId, setReportId] = useState<ReportId>("pickings");
   const [statusFilter, setStatusFilter] = useState("");
   const [movementFilter, setMovementFilter] = useState("");
   const [marketplaceFilter, setMarketplaceFilter] = useState("");
@@ -76,7 +82,14 @@ export default function RelatoriosPage() {
   const selectedType = types.find((t) => t.id === reportId);
   const needsPeriod = reportId !== "low_stock";
   const operationTypes = types.filter((t) => t.group === "operation_times");
-  const generalTypes = types.filter((t) => t.group !== "operation_times");
+  const operationalTypes = types.filter((t) => t.group === "operational");
+  const auditTypes = types.filter((t) => t.group === "audit");
+  const generalTypes = types.filter(
+    (t) =>
+      t.group !== "operation_times" &&
+      t.group !== "operational" &&
+      t.group !== "audit",
+  );
   const allowed = can(Permission.REPORTS_VIEW);
 
   useEffect(() => {
@@ -85,6 +98,15 @@ export default function RelatoriosPage() {
       .then((r) => setTypes(r.types))
       .catch(() => {});
   }, [allowed]);
+
+  useEffect(() => {
+    const raw = searchParams.get("report");
+    if (!raw) return;
+    const resolved = (REPORT_ALIASES[raw] ?? raw) as ReportId;
+    if (types.some((t) => t.id === resolved)) {
+      setReportId(resolved);
+    }
+  }, [searchParams, types]);
 
   const loadPreview = useCallback(async () => {
     setReportLoading(true);
@@ -182,6 +204,19 @@ export default function RelatoriosPage() {
       />
 
       <section className="rounded-xl border bg-white p-4 shadow-sm">
+        {operationalTypes.length > 0 ? (
+          <div className="mb-4">
+            <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+              Operação
+            </p>
+            <ReportTypeButtons
+              types={operationalTypes}
+              reportId={reportId}
+              onSelect={setReportId}
+            />
+          </div>
+        ) : null}
+
         {operationTypes.length > 0 ? (
           <div className="mb-4">
             <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
@@ -198,10 +233,23 @@ export default function RelatoriosPage() {
         {generalTypes.length > 0 ? (
           <div className="mb-4">
             <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-              Operação e estoque
+              Pedidos e volume
             </p>
             <ReportTypeButtons
               types={generalTypes}
+              reportId={reportId}
+              onSelect={setReportId}
+            />
+          </div>
+        ) : null}
+
+        {auditTypes.length > 0 ? (
+          <div className="mb-4">
+            <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+              Estoque e auditoria
+            </p>
+            <ReportTypeButtons
+              types={auditTypes}
               reportId={reportId}
               onSelect={setReportId}
             />

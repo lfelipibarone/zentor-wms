@@ -24,14 +24,17 @@ import {
 import {
   PickWaveError,
   acceptPickWave,
+  releasePickWave,
   releasePickWaveAccept,
   getCurrentReleasedWave,
+  getOpenWave,
   getReleasedWaveById,
   listReleasedWaves,
   getOrderIdsInActiveWave,
   getWaveLineDetail,
   mapWaveLineSummary,
 } from "../services/pick-wave.js";
+import { acceptOrdersBatch } from "../services/order-picking-batch.js";
 import { isWaveEnabled } from "../services/wave-settings.js";
 import { confirmConsolidatedPick } from "../services/pick-wave-pick.js";
 import { confirmSortAllocation } from "../services/pick-wave-sort.js";
@@ -253,6 +256,21 @@ export async function mobileRoutes(app: FastifyInstance) {
       }
       return { id: orderId, status: OrderStatus.PICKING };
     }
+  );
+
+  app.post<{ Body: { orderIds?: string[] } }>(
+    "/mobile/orders/accept-batch",
+    async (request, reply) => {
+      const tenantId = request.authUser!.tenantId!;
+      const userId = resolveUserId(request);
+      const orderIds = Array.isArray(request.body?.orderIds)
+        ? request.body.orderIds
+        : [];
+      if (orderIds.length === 0) {
+        return reply.status(400).send({ error: "orderIds obrigatório" });
+      }
+      return acceptOrdersBatch(tenantId, userId, orderIds);
+    },
   );
 
   app.post<{ Params: { orderId: string } }>(
@@ -1187,6 +1205,56 @@ export async function mobileRoutes(app: FastifyInstance) {
     });
     summaries.sort((a, b) => b.packingUrgency - a.packingUrgency);
     return { waves: summaries };
+  });
+
+  app.get("/mobile/waves/open", async (request) => {
+    const tenantId = request.authUser!.tenantId!;
+    const wave = await getOpenWave(tenantId);
+    if (!wave) return { wave: null };
+    return {
+      wave: {
+        id: wave.id,
+        name: wave.name,
+        orderCount: wave._count.orders,
+        lineCount: wave._count.lines,
+      },
+    };
+  });
+
+  app.post<{
+    Body: { orderIds?: string[]; appendToWaveId?: string };
+  }>("/mobile/waves/create-from-orders", async (request, reply) => {
+    const tenantId = request.authUser!.tenantId!;
+    const enabled = await isWaveEnabled(tenantId);
+    if (!enabled) {
+      return reply.status(404).send({ error: "Separação em onda desabilitada" });
+    }
+
+    const userId = resolveUserId(request);
+    const orderIds = Array.isArray(request.body?.orderIds)
+      ? request.body.orderIds
+      : [];
+    if (orderIds.length === 0) {
+      return reply.status(400).send({ error: "orderIds obrigatório" });
+    }
+    const appendToWaveId =
+      typeof request.body?.appendToWaveId === "string"
+        ? request.body.appendToWaveId.trim()
+        : undefined;
+
+    try {
+      const result = await releasePickWave(tenantId, userId, {
+        orderIds,
+        auto: false,
+        appendToWaveId: appendToWaveId || undefined,
+      });
+      return result;
+    } catch (e) {
+      if (e instanceof PickWaveError) {
+        return reply.status(e.statusCode).send({ error: e.message });
+      }
+      throw e;
+    }
   });
 
   app.get("/mobile/waves/current", async (request, reply) => {

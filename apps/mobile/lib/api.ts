@@ -242,6 +242,16 @@ export interface ReplenishmentNeed {
   canWork?: boolean;
 }
 
+export interface PickingIssueDetail {
+  source: "PACKING" | "PAUSE";
+  typeLabel: string;
+  sku: string;
+  productName: string | null;
+  quantity: number;
+  description: string | null;
+  summary: string;
+}
+
 export interface ProblemOrder {
   id: string;
   erpOrderId: string;
@@ -253,21 +263,29 @@ export interface ProblemOrder {
   returnedFromPacking: boolean;
   pausedIssue: boolean;
   issueSummary: string | null;
+  issueDetail: PickingIssueDetail | null;
   waveName: string | null;
   itemCount: number;
   totalUnits: number;
   qtyPicked: number;
 }
 
+export interface ProblemWaveOrder {
+  id: string;
+  erpOrderId: string;
+  status: string;
+  customerName: string | null;
+  marketplaceLabel?: string;
+  returnedFromPacking: boolean;
+  pausedIssue: boolean;
+  issueSummary: string | null;
+  issueDetail: PickingIssueDetail | null;
+}
+
 export interface ProblemWave {
   id: string;
   name: string;
-  problemOrders: Array<{
-    id: string;
-    erpOrderId: string;
-    status: string;
-    issueSummary: string | null;
-  }>;
+  problemOrders: ProblemWaveOrder[];
 }
 
 export interface ProductLocationOption {
@@ -314,6 +332,15 @@ export const api = {
       `/mobile/orders/${orderId}/accept`,
       { method: "POST" }
     ),
+
+  acceptOrdersBatch: (orderIds: string[]) =>
+    request<{
+      accepted: string[];
+      errors: Array<{ orderId: string; message: string }>;
+    }>("/mobile/orders/accept-batch", {
+      method: "POST",
+      body: JSON.stringify({ orderIds }),
+    }),
 
   releaseOrderAccept: (orderId: string) =>
     request<{ released: boolean; status: OrderStatus }>(
@@ -552,6 +579,27 @@ export const api = {
 
   getMobileConfig: () =>
     request<{ waveEnabled: boolean }>("/mobile/config"),
+
+  getOpenWave: () =>
+    request<{
+      wave: {
+        id: string;
+        name: string;
+        orderCount: number;
+        lineCount: number;
+      } | null;
+    }>("/mobile/waves/open"),
+
+  createWaveFromOrders: (orderIds: string[], appendToWaveId?: string) =>
+    request<{
+      waveId: string;
+      orderCount: number;
+      lineCount: number;
+      waveCount?: number;
+    }>("/mobile/waves/create-from-orders", {
+      method: "POST",
+      body: JSON.stringify({ orderIds, appendToWaveId }),
+    }),
 
   listReleasedWaves: () =>
     request<{
@@ -849,6 +897,7 @@ export interface PutawaySessionDto {
     productCode: string | null;
     description: string | null;
     barcode: string | null;
+    imageUrl?: string | null;
     remaining: number;
   } | null;
   allStored: boolean;

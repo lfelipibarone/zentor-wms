@@ -10,8 +10,9 @@ import {
 } from "react-native";
 import { BarcodeScanner } from "@/components/BarcodeScanner";
 import { FactoryButton } from "@/components/FactoryButton";
+import { PulmaoLocationPicker } from "@/components/PulmaoLocationPicker";
 import { ScreenShell } from "@/components/ScreenShell";
-import { api, ApiError } from "@/lib/api";
+import { api, ApiError, type LocationLookup } from "@/lib/api";
 import { theme, spacing, typography } from "@/lib/theme";
 
 export default function ReturnReceiptCheckScreen() {
@@ -21,7 +22,9 @@ export default function ReturnReceiptCheckScreen() {
   >(null);
   const [loading, setLoading] = useState(true);
   const [productScanner, setProductScanner] = useState(false);
-  const [pulmaoScanner, setPulmaoScanner] = useState(false);
+  const [selectedPulmao, setSelectedPulmao] = useState<LocationLookup | null>(
+    null,
+  );
   const [saving, setSaving] = useState(false);
   const [feedback, setFeedback] = useState<string | null>(null);
 
@@ -57,12 +60,11 @@ export default function ReturnReceiptCheckScreen() {
     }
   };
 
-  const handleComplete = async (pulmaoBarcode: string) => {
-    setPulmaoScanner(false);
-    if (!sessionId) return;
+  const handleFinalize = async () => {
+    if (!sessionId || !selectedPulmao) return;
     setSaving(true);
     try {
-      await api.completeReturnReceipt(sessionId, pulmaoBarcode);
+      await api.completeReturnReceipt(sessionId, selectedPulmao.barcode);
       Alert.alert("Devolução concluída", "Produtos armazenados no pulmão.", [
         { text: "OK", onPress: () => router.replace("/purchase-receipt") },
       ]);
@@ -80,6 +82,9 @@ export default function ReturnReceiptCheckScreen() {
       </View>
     );
   }
+
+  const defaultSku =
+    data.items.find((it) => it.productCode)?.productCode ?? "";
 
   return (
     <ScreenShell
@@ -100,6 +105,7 @@ export default function ReturnReceiptCheckScreen() {
         data={data.items}
         keyExtractor={(it) => it.id}
         style={styles.list}
+        scrollEnabled={false}
         ListEmptyComponent={
           <Text style={styles.empty}>Nenhum item — bipe um produto</Text>
         }
@@ -112,12 +118,41 @@ export default function ReturnReceiptCheckScreen() {
       />
 
       {data.hasItems ? (
-        <FactoryButton
-          label="Finalizar — bipar pulmão"
-          variant="success"
-          onPress={() => setPulmaoScanner(true)}
-          loading={saving}
-        />
+        <View style={styles.destinoSection}>
+          <Text style={styles.sectionTitle}>Destino no pulmão</Text>
+          {!selectedPulmao ? (
+            <PulmaoLocationPicker
+              defaultSku={defaultSku}
+              onSelect={(loc) => {
+                setSelectedPulmao(loc);
+                setFeedback(`Pulmão: ${loc.label}`);
+              }}
+              disabled={saving}
+            />
+          ) : (
+            <>
+              <View style={styles.locCard}>
+                <Text style={styles.locTitle}>{selectedPulmao.label}</Text>
+                <Text style={styles.locMeta}>
+                  {selectedPulmao.barcode} · saldo{" "}
+                  {selectedPulmao.currentQuantity}
+                </Text>
+              </View>
+              <FactoryButton
+                label="Finalizar devolução"
+                variant="success"
+                onPress={handleFinalize}
+                loading={saving}
+              />
+              <FactoryButton
+                label="Trocar pulmão"
+                variant="secondary"
+                onPress={() => setSelectedPulmao(null)}
+                disabled={saving}
+              />
+            </>
+          )}
+        </View>
       ) : null}
 
       <BarcodeScanner
@@ -126,13 +161,6 @@ export default function ReturnReceiptCheckScreen() {
         hint="Código de barras do produto"
         onScan={handleProductScan}
         onClose={() => setProductScanner(false)}
-      />
-      <BarcodeScanner
-        visible={pulmaoScanner}
-        title="Pulmão destino"
-        hint="Bipe o endereço de pulmão"
-        onScan={handleComplete}
-        onClose={() => setPulmaoScanner(false)}
       />
     </ScreenShell>
   );
@@ -157,4 +185,30 @@ const styles = StyleSheet.create({
   sku: { fontFamily: "monospace", fontWeight: "600" },
   qty: { fontWeight: "700" },
   empty: { color: theme.textMuted, textAlign: "center", padding: spacing.lg },
+  destinoSection: {
+    marginTop: spacing.md,
+    gap: spacing.sm,
+  },
+  sectionTitle: {
+    fontWeight: "900",
+    fontSize: typography.body,
+    color: theme.text,
+  },
+  locCard: {
+    backgroundColor: theme.surface,
+    borderRadius: 12,
+    padding: spacing.md,
+    borderWidth: 2,
+    borderColor: theme.primary,
+  },
+  locTitle: {
+    fontSize: typography.subtitle,
+    fontWeight: "900",
+    color: theme.primary,
+  },
+  locMeta: {
+    color: theme.textMuted,
+    fontSize: typography.caption,
+    marginTop: 4,
+  },
 });

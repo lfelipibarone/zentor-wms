@@ -14,6 +14,7 @@ import {
   getReportsSummary,
   reportToCsv,
   REPORT_IDS,
+  resolveReportId,
   runReport,
   type ReportId,
 } from "../services/reports.js";
@@ -1930,10 +1931,25 @@ export async function webRoutes(app: FastifyInstance) {
         acceptsMarketplaceFilter: true,
       },
       {
-        id: "picking",
-        label: "Separação (movimentações)",
+        id: "pickings",
+        label: "Pickings",
         description: "Itens separados (movimentações de pick) por operador",
         requiresPeriod: true,
+        group: "operational",
+      },
+      {
+        id: "packings",
+        label: "Packings",
+        description: "Itens conferidos no packing por operador e pedido",
+        requiresPeriod: true,
+        group: "operational",
+      },
+      {
+        id: "replenishments",
+        label: "Ressuprimentos",
+        description: "Movimentações de reabastecimento (pulmão → gôndola)",
+        requiresPeriod: true,
+        group: "operational",
       },
       {
         id: "picking_time_by_order",
@@ -1967,9 +1983,10 @@ export async function webRoutes(app: FastifyInstance) {
       },
       {
         id: "movements",
-        label: "Movimentações",
-        description: "Entradas, saídas, transferências e ajustes de estoque",
+        label: "Movimentações de estoque",
+        description: "Entradas, saídas, transferências e ajustes (auditoria)",
         requiresPeriod: true,
+        group: "audit",
       },
       {
         id: "packing_issues",
@@ -2009,8 +2026,9 @@ export async function webRoutes(app: FastifyInstance) {
     "/api/reports/data",
     { preHandler: guard(Permission.REPORTS_VIEW) },
     async (request, reply) => {
-      const report = request.query.report as ReportId | undefined;
-      if (!report || !REPORT_IDS.includes(report)) {
+      const reportRaw = request.query.report;
+      const report = reportRaw ? resolveReportId(reportRaw) : null;
+      if (!report) {
         return reply.status(400).send({
           error: `Informe report: ${REPORT_IDS.join(", ")}`,
         });

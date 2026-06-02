@@ -206,11 +206,11 @@ export default function PackingOrderDetailPage() {
             ) : null}
 
             <div className="flex flex-col gap-4 lg:flex-row lg:items-start">
-              <div className="grid min-w-0 flex-1 grid-cols-1 gap-3 sm:grid-cols-2 sm:justify-items-start">
+              <div className="flex min-w-0 flex-1 flex-wrap gap-3">
                 {pickedItems.map((item) => (
                   <div
                     key={item.id}
-                    className={`flex w-full max-w-xs gap-3 rounded-lg border bg-white p-3 shadow-sm ${
+                    className={`flex w-full gap-3 rounded-lg border bg-white p-3 shadow-sm sm:w-[min(100%,280px)] ${
                       item.remaining === 0
                         ? "border-emerald-300 bg-emerald-50"
                         : ""

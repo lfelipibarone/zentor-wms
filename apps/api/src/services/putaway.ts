@@ -109,7 +109,27 @@ async function ensurePutawaySession(purchaseReceiptId: string, userId: string) {
   return session;
 }
 
-function formatPutaway(session: NonNullable<Awaited<ReturnType<typeof ensurePutawaySession>>>) {
+async function resolveProductImageUrl(
+  tenantId: string,
+  productCode: string,
+  barcode: string | null,
+) {
+  const product = await prisma.product.findFirst({
+    where: {
+      tenantId,
+      OR: [
+        { sku: productCode },
+        ...(barcode ? [{ barcode }] : []),
+      ],
+    },
+    select: { imageUrl: true },
+  });
+  return product?.imageUrl ?? null;
+}
+
+async function formatPutaway(
+  session: NonNullable<Awaited<ReturnType<typeof ensurePutawaySession>>>,
+) {
   const isPending = (it: (typeof session.items)[0]) =>
     Number(it.quantityStored) < Number(it.quantityExpected);
 
@@ -134,6 +154,17 @@ function formatPutaway(session: NonNullable<Awaited<ReturnType<typeof ensurePuta
     isPending,
     lastStoredLoc,
   );
+
+  const tenantId = session.purchaseReceipt?.tenantId;
+  let nextImageUrl: string | null = null;
+  if (next && tenantId && next.productCode) {
+    nextImageUrl = await resolveProductImageUrl(
+      tenantId,
+      next.productCode,
+      next.barcode,
+    );
+  }
+
   return {
     session: {
       id: session.id,
@@ -157,6 +188,7 @@ function formatPutaway(session: NonNullable<Awaited<ReturnType<typeof ensurePuta
           productCode: next.productCode,
           description: next.description,
           barcode: next.barcode,
+          imageUrl: nextImageUrl,
           remaining:
             Number(next.quantityExpected) - Number(next.quantityStored),
         }
@@ -175,7 +207,7 @@ function formatPutaway(session: NonNullable<Awaited<ReturnType<typeof ensurePuta
 export async function startPutaway(purchaseReceiptId: string, userId: string) {
   const session = await ensurePutawaySession(purchaseReceiptId, userId);
   if (!session) throw new Error("Sessão de armazenagem não encontrada");
-  return formatPutaway(session);
+  return await formatPutaway(session);
 }
 
 export async function getPutawaySession(sessionId: string) {
@@ -187,7 +219,7 @@ export async function getPutawaySession(sessionId: string) {
     },
   });
   if (!session) throw new Error("Sessão não encontrada");
-  return formatPutaway(session);
+  return await formatPutaway(session);
 }
 
 export async function storePutawayItem(params: {

@@ -32,6 +32,39 @@ export function useAcceptOrder() {
   });
 }
 
+export function useAcceptOrdersBatch() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (orderIds: string[]) => api.acceptOrdersBatch(orderIds),
+    onSuccess: () => qc.invalidateQueries({ queryKey: pickingKeys.queue }),
+  });
+}
+
+export function useCreateWaveFromOrders() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({
+      orderIds,
+      appendToWaveId,
+    }: {
+      orderIds: string[];
+      appendToWaveId?: string;
+    }) => api.createWaveFromOrders(orderIds, appendToWaveId),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: pickingKeys.queue });
+      qc.invalidateQueries({ queryKey: ["wave", "current"] });
+    },
+  });
+}
+
+export function useMobileConfig() {
+  return useQuery({
+    queryKey: ["mobile-config"],
+    queryFn: api.getMobileConfig,
+    staleTime: 60_000,
+  });
+}
+
 export function useAttachBasket(orderId: string) {
   const qc = useQueryClient();
   return useMutation({

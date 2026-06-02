@@ -2,6 +2,7 @@ import { router } from "expo-router";
 import {
   ActivityIndicator,
   FlatList,
+  Pressable,
   StyleSheet,
   Text,
   View,
@@ -15,7 +16,10 @@ export default function PutawayListScreen() {
   const { data, isLoading, error, refetch, isRefetching } = usePutawayQueue();
   const start = useStartPutaway();
 
-  const openItem = async (purchaseReceiptId: string, putawaySessionId: string | null) => {
+  const openItem = async (
+    purchaseReceiptId: string,
+    putawaySessionId: string | null,
+  ) => {
     if (putawaySessionId) {
       router.push(`/putaway/${putawaySessionId}`);
       return;
@@ -27,9 +31,9 @@ export default function PutawayListScreen() {
   return (
     <ScreenShell
       backToHome
-      title="Armazenagem"
+      title="Armazenagem pulmão"
       style={styles.shell}
-      subtitle="NFs conferidas aguardando endereçamento no pulmão"
+      subtitle="NFs conferidas no recebimento — endereçamento no pulmão"
     >
       {isLoading ? (
         <View style={styles.centered}>
@@ -50,7 +54,27 @@ export default function PutawayListScreen() {
             onRefresh={refetch}
             contentContainerStyle={styles.list}
             ListEmptyComponent={
-              <Text style={styles.empty}>Nenhuma NF aguardando armazenagem</Text>
+              <Text style={styles.empty}>
+                Nenhuma NF aguardando armazenagem. Conferir notas no painel web.
+              </Text>
+            }
+            ListFooterComponent={
+              <View style={styles.footer}>
+                <FactoryButton
+                  label="Atualizar"
+                  variant="secondary"
+                  onPress={() => refetch()}
+                  loading={isRefetching}
+                />
+                <Pressable
+                  style={styles.avulsoLink}
+                  onPress={() => router.push("/armazenagem-pulmao")}
+                >
+                  <Text style={styles.avulsoLinkText}>
+                    Entrada avulsa no pulmão (sem NF)
+                  </Text>
+                </Pressable>
+              </View>
             }
             renderItem={({ item }) => (
               <View style={styles.card}>
@@ -65,12 +89,14 @@ export default function PutawayListScreen() {
                 </Text>
                 <FactoryButton
                   label={
-                    item.putawaySessionId ? "Continuar" : "Iniciar armazenagem"
+                    item.putawaySessionId
+                      ? "Continuar armazenagem"
+                      : "Iniciar armazenagem"
                   }
-                  variant="secondary"
                   onPress={() =>
                     openItem(item.purchaseReceiptId, item.putawaySessionId)
                   }
+                  loading={start.isPending}
                 />
               </View>
             )}
@@ -87,8 +113,9 @@ const styles = StyleSheet.create({
   centered: { padding: spacing.xl, alignItems: "center" },
   count: {
     marginBottom: spacing.sm,
-    color: theme.textMuted,
-    fontSize: typography.caption,
+    fontWeight: "800",
+    fontSize: typography.body,
+    color: theme.text,
   },
   list: { paddingBottom: spacing.xl },
   card: {
@@ -96,12 +123,20 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     padding: spacing.md,
     marginBottom: spacing.sm,
-    borderWidth: 1,
+    borderWidth: 2,
     borderColor: theme.border,
     gap: spacing.sm,
   },
-  numero: { fontWeight: "800", fontSize: typography.body, color: theme.text },
-  meta: { color: theme.textMuted, fontSize: typography.caption },
+  numero: { fontWeight: "900", fontSize: typography.subtitle, color: theme.text },
+  meta: { color: theme.textMuted, fontSize: typography.caption, fontWeight: "600" },
+  footer: { gap: spacing.md, marginTop: spacing.sm },
+  avulsoLink: { paddingVertical: spacing.sm, alignItems: "center" },
+  avulsoLinkText: {
+    color: theme.primary,
+    fontWeight: "800",
+    fontSize: typography.caption,
+    textDecorationLine: "underline",
+  },
   error: { color: theme.danger },
   empty: { textAlign: "center", color: theme.textMuted, marginTop: spacing.lg },
 });

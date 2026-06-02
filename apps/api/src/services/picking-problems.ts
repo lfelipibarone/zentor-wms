@@ -13,35 +13,77 @@ const PROBLEM_STATUSES: OrderStatus[] = [
   OrderStatus.PAUSED_ISSUE,
 ];
 
-function parseIssueLog(reason: string | null) {
+export type IssueDetail = {
+  source: "PACKING" | "PAUSE";
+  typeLabel: string;
+  sku: string;
+  productName: string | null;
+  quantity: number;
+  description: string | null;
+  summary: string;
+};
+
+function parsePackingIssueLog(reason: string | null): IssueDetail | null {
   if (!reason) return null;
   try {
     const parsed = JSON.parse(reason) as {
       sku?: string;
+      productName?: string;
       type?: PackingIssueType;
       quantity?: number;
+      description?: string;
     };
     const typeLabel =
       parsed.type && PACKING_ISSUE_TYPE_LABEL[parsed.type]
         ? PACKING_ISSUE_TYPE_LABEL[parsed.type]
         : "Problema";
-    return {
-      sku: parsed.sku ?? "",
-      type: parsed.type ?? null,
+    const sku = parsed.sku ?? "";
+    const quantity = parsed.quantity ?? 0;
+    const description = parsed.description?.trim() || null;
+    const productName = parsed.productName?.trim() || null;
+    const summaryParts = [
+      sku,
       typeLabel,
-      quantity: parsed.quantity ?? 0,
-      summary: `${parsed.sku ?? ""} · ${typeLabel} · ${parsed.quantity ?? 0} un.`,
+      `${quantity} un.`,
+      description,
+    ].filter(Boolean);
+    return {
+      source: "PACKING",
+      typeLabel,
+      sku,
+      productName,
+      quantity,
+      description,
+      summary: summaryParts.join(" · "),
     };
   } catch {
-    return { sku: "", type: null, typeLabel: "Problema", quantity: 0, summary: "Problema reportado" };
+    return {
+      source: "PACKING",
+      typeLabel: "Problema",
+      sku: "",
+      productName: null,
+      quantity: 0,
+      description: null,
+      summary: "Problema reportado no packing",
+    };
   }
 }
 
+function parsePauseIssueLog(reason: string | null): IssueDetail {
+  const description = reason?.trim().slice(0, 280) || null;
+  return {
+    source: "PAUSE",
+    typeLabel: "Pausado na separação",
+    sku: "",
+    productName: null,
+    quantity: 0,
+    description,
+    summary: description ?? "Pausado por problema",
+  };
+}
+
 async function loadLastIssues(orderIds: string[]) {
-  const lastIssueByOrder = new Map<
-    string,
-    ReturnType<typeof parseIssueLog> & { summary: string }
-  >();
+  const lastIssueByOrder = new Map<string, IssueDetail>();
   if (orderIds.length === 0) return lastIssueByOrder;
 
   const logs = await prisma.orderTimeLog.findMany({
@@ -57,19 +99,20 @@ async function loadLastIssues(orderIds: string[]) {
   for (const log of logs) {
     if (lastIssueByOrder.has(log.orderId)) continue;
     if (log.event === OrderTimeLogEvent.PACK_REPORT_ISSUE) {
-      const parsed = parseIssueLog(log.reason);
+      const parsed = parsePackingIssueLog(log.reason);
       if (parsed) lastIssueByOrder.set(log.orderId, parsed);
     } else {
-      lastIssueByOrder.set(log.orderId, {
-        sku: "",
-        type: null,
-        typeLabel: "Pausado",
-        quantity: 0,
-        summary: log.reason?.slice(0, 120) ?? "Pausado por problema",
-      });
+      lastIssueByOrder.set(log.orderId, parsePauseIssueLog(log.reason));
     }
   }
   return lastIssueByOrder;
+}
+
+function mapOrderIssueFields(issue: IssueDetail | undefined) {
+  return {
+    issueSummary: issue?.summary ?? null,
+    issueDetail: issue ?? null,
+  };
 }
 
 export async function listProblemOrders(tenantId: string) {
@@ -108,8 +151,7 @@ export async function listProblemOrders(tenantId: string) {
         returnedFromPacking:
           o.status === OrderStatus.PACKING_RETURNED_TO_PICKING,
         pausedIssue: o.status === OrderStatus.PAUSED_ISSUE,
-        issueSummary: issue?.summary ?? null,
-        issueType: issue?.type ?? null,
+        ...mapOrderIssueFields(issue),
         waveId: activeWave?.wave.id ?? null,
         waveName: activeWave?.wave.name ?? null,
         itemCount: o.items.length,
@@ -185,14 +227,20 @@ export async function listProblemWaves(tenantId: string) {
       lineCount: w.lines.length,
       problemOrders: w.orders
         .filter((wo) => PROBLEM_STATUSES.includes(wo.order.status))
-        .map((wo) => ({
-          id: wo.order.id,
-          erpOrderId: wo.order.erpOrderId,
-          status: wo.order.status,
-          customerName: wo.order.customerName,
-          marketplaceLabel: formatMarketplace(wo.order.marketplace),
-          issueSummary: issueMap.get(wo.order.id)?.summary ?? null,
-        })),
+        .map((wo) => {
+          const issue = issueMap.get(wo.order.id);
+          return {
+            id: wo.order.id,
+            erpOrderId: wo.order.erpOrderId,
+            status: wo.order.status,
+            customerName: wo.order.customerName,
+            marketplaceLabel: formatMarketplace(wo.order.marketplace),
+            returnedFromPacking:
+              wo.order.status === OrderStatus.PACKING_RETURNED_TO_PICKING,
+            pausedIssue: wo.order.status === OrderStatus.PAUSED_ISSUE,
+            ...mapOrderIssueFields(issue),
+          };
+        }),
       lines: w.lines.map((l) => ({
         id: l.id,
         sku: l.product.sku,
