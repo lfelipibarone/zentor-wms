@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { ChevronDown, ChevronRight } from "lucide-react";
+import { MarketplaceBadge } from "@/components/ops/marketplace-badge";
 import { OrderStatusBadge } from "@/components/ops/order-status-badge";
 import {
   Table,
@@ -24,6 +25,7 @@ const ACTIVE_STATUSES = new Set([
   "PICKING",
   "PAUSED_ISSUE",
   "PICKED_AWAITING_CONFERENCE",
+  "PACKING_RETURNED_TO_PICKING",
 ]);
 
 export function WorkboardEntryCard({
@@ -113,8 +115,9 @@ function OrderCardHeader({ order }: { order: BoardOrderEntry }) {
           {order.customerName ?? "—"} · Cesta {order.basketCode ?? "—"} ·{" "}
           {order.pickerName ?? "Sem separador"}
         </p>
-        <p className="text-xs text-muted-foreground">
-          {order.marketplace ?? "—"} · Prioridade {order.priority}
+        <p className="flex flex-wrap items-center gap-1.5 text-xs text-muted-foreground">
+          <MarketplaceBadge value={order.marketplace} />
+          <span>· Prioridade {order.priority}</span>
           {order.collectionDeadline
             ? ` · Coleta ${new Date(order.collectionDeadline).toLocaleString("pt-BR", {
                 dateStyle: "short",

@@ -13,6 +13,8 @@ interface QuantityInputProps {
   max: number;
   onConfirm: (qty: number) => void;
   loading?: boolean;
+  /** Permite confirmar 0 (ex.: gôndola vazia na solicitação de reabastecimento). */
+  allowZero?: boolean;
 }
 
 export function QuantityInput({
@@ -20,11 +22,15 @@ export function QuantityInput({
   max,
   onConfirm,
   loading,
+  allowZero = false,
 }: QuantityInputProps) {
   const [value, setValue] = useState("");
 
   const parsed = parseInt(value, 10);
-  const valid = !Number.isNaN(parsed) && parsed > 0 && parsed <= max;
+  const valid =
+    !Number.isNaN(parsed) &&
+    parsed <= max &&
+    (allowZero ? parsed >= 0 : parsed > 0);
 
   return (
     <View style={styles.wrap}>

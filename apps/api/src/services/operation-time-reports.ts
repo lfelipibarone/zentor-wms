@@ -8,6 +8,8 @@ import {
 } from "./operation-duration.js";
 import type { ReportColumn, ReportResult } from "./report-types.js";
 import { fmtDateBr } from "./report-types.js";
+import { marketplaceDisplayLabel } from "./marketplace-priority.js";
+import { marketplaceWhereClause } from "./marketplace-filter.js";
 
 export const OPERATION_TIME_REPORT_IDS = [
   "picking_time_by_order",
@@ -21,6 +23,7 @@ export type OperationTimeReportId =
 
 interface OrderTimeRow {
   pedidoErp: string;
+  marketplace: string;
   operador: string;
   origem: string;
   inicio: string | null;
@@ -91,7 +94,9 @@ async function fetchIndividualPickingRows(
     orderBy: { createdAt: "asc" },
     include: {
       user: { select: { name: true } },
-      order: { select: { id: true, erpOrderId: true } },
+      order: {
+        select: { id: true, erpOrderId: true, marketplace: true },
+      },
     },
   });
 
@@ -115,6 +120,7 @@ async function fetchIndividualPickingRows(
 
     rows.push({
       pedidoErp: endLog.order.erpOrderId,
+      marketplace: marketplaceDisplayLabel(endLog.order.marketplace),
       operador: startLog.user.name,
       origem: "INDIVIDUAL",
       inicio: fmtDateBr(startLog.createdAt),
@@ -146,7 +152,11 @@ async function fetchWavePickingRows(
       allocations: {
         include: {
           orderItem: {
-            include: { order: { select: { id: true, erpOrderId: true } } },
+            include: {
+              order: {
+                select: { id: true, erpOrderId: true, marketplace: true },
+              },
+            },
           },
         },
       },
@@ -157,6 +167,7 @@ async function fetchWavePickingRows(
     string,
     {
       pedidoErp: string;
+      marketplace: string;
       operador: string;
       onda: string;
       inicio: Date;
@@ -187,6 +198,9 @@ async function fetchWavePickingRows(
       } else {
         aggregated.set(key, {
           pedidoErp: alloc.orderItem.order.erpOrderId,
+          marketplace: marketplaceDisplayLabel(
+            alloc.orderItem.order.marketplace,
+          ),
           operador,
           onda: line.wave.name,
           inicio: start,
@@ -199,6 +213,7 @@ async function fetchWavePickingRows(
 
   return [...aggregated.values()].map((v) => ({
     pedidoErp: v.pedidoErp,
+    marketplace: v.marketplace,
     operador: v.operador,
     origem: "ONDA",
     inicio: fmtDateBr(v.inicio),
@@ -224,7 +239,7 @@ async function fetchIndividualPackingRows(
     orderBy: { createdAt: "asc" },
     include: {
       user: { select: { name: true } },
-      order: { select: { erpOrderId: true } },
+      order: { select: { erpOrderId: true, marketplace: true } },
     },
   });
 
@@ -252,6 +267,7 @@ async function fetchIndividualPackingRows(
 
     rows.push({
       pedidoErp: endLog.order.erpOrderId,
+      marketplace: marketplaceDisplayLabel(endLog.order.marketplace),
       operador: startLog.user.name,
       origem: "INDIVIDUAL",
       inicio: fmtDateBr(startLog.createdAt),
@@ -280,7 +296,9 @@ async function fetchWavePackingRows(
       sortedBy: { select: { name: true } },
       orderItem: {
         include: {
-          order: { select: { id: true, erpOrderId: true } },
+          order: {
+        select: { id: true, erpOrderId: true, marketplace: true },
+      },
         },
       },
       waveLine: {
@@ -293,6 +311,7 @@ async function fetchWavePackingRows(
     string,
     {
       pedidoErp: string;
+      marketplace: string;
       onda: string;
       starts: Date[];
       ends: Date[];
@@ -316,6 +335,9 @@ async function fetchWavePackingRows(
     } else {
       byOrderWave.set(key, {
         pedidoErp: alloc.orderItem.order.erpOrderId,
+        marketplace: marketplaceDisplayLabel(
+          alloc.orderItem.order.marketplace,
+        ),
         onda: alloc.waveLine.wave.name,
         starts: [alloc.sortStartedAt],
         ends: [alloc.sortCompletedAt],
@@ -330,6 +352,7 @@ async function fetchWavePackingRows(
     const duracaoSeg = msToSeconds(fim.getTime() - inicio.getTime());
     return {
       pedidoErp: v.pedidoErp,
+      marketplace: v.marketplace,
       operador: v.operador,
       origem: "ONDA",
       inicio: fmtDateBr(inicio),
@@ -341,8 +364,25 @@ async function fetchWavePackingRows(
   });
 }
 
+async function filterRowsByMarketplace(
+  tenantId: string,
+  rows: OrderTimeRow[],
+  marketplace?: string,
+): Promise<OrderTimeRow[]> {
+  if (!marketplace?.trim()) return rows;
+  const mp = marketplaceWhereClause(marketplace);
+  if (!mp) return rows;
+  const orders = await prisma.order.findMany({
+    where: { tenantId, ...mp },
+    select: { erpOrderId: true },
+  });
+  const allowed = new Set(orders.map((o) => o.erpOrderId));
+  return rows.filter((r) => allowed.has(r.pedidoErp));
+}
+
 const ORDER_COLUMNS: ReportColumn[] = [
   { key: "pedidoErp", header: "Pedido ERP" },
+  { key: "marketplace", header: "Marketplace" },
   { key: "operador", header: "Operador" },
   { key: "origem", header: "Origem" },
   { key: "inicio", header: "Início" },
@@ -402,13 +442,18 @@ export async function buildOperationTimeReport(
   report: OperationTimeReportId,
   from: Date,
   to: Date,
+  marketplace?: string,
 ): Promise<ReportResult> {
   switch (report) {
     case "picking_time_by_order": {
-      const rows = [
-        ...(await fetchIndividualPickingRows(tenantId, from, to)),
-        ...(await fetchWavePickingRows(tenantId, from, to)),
-      ].sort((a, b) => (a.pedidoErp ?? "").localeCompare(b.pedidoErp ?? ""));
+      const rows = await filterRowsByMarketplace(
+        tenantId,
+        [
+          ...(await fetchIndividualPickingRows(tenantId, from, to)),
+          ...(await fetchWavePickingRows(tenantId, from, to)),
+        ].sort((a, b) => (a.pedidoErp ?? "").localeCompare(b.pedidoErp ?? "")),
+        marketplace,
+      );
       return toOrderResult(
         report,
         "Tempo de picking por pedido",
@@ -418,10 +463,14 @@ export async function buildOperationTimeReport(
       );
     }
     case "picking_time_by_user": {
-      const orderRows = [
-        ...(await fetchIndividualPickingRows(tenantId, from, to)),
-        ...(await fetchWavePickingRows(tenantId, from, to)),
-      ];
+      const orderRows = await filterRowsByMarketplace(
+        tenantId,
+        [
+          ...(await fetchIndividualPickingRows(tenantId, from, to)),
+          ...(await fetchWavePickingRows(tenantId, from, to)),
+        ],
+        marketplace,
+      );
       return toUserResult(
         report,
         "Tempo de picking por operador",
@@ -431,10 +480,14 @@ export async function buildOperationTimeReport(
       );
     }
     case "packing_time_by_order": {
-      const rows = [
-        ...(await fetchIndividualPackingRows(tenantId, from, to)),
-        ...(await fetchWavePackingRows(tenantId, from, to)),
-      ].sort((a, b) => (a.pedidoErp ?? "").localeCompare(b.pedidoErp ?? ""));
+      const rows = await filterRowsByMarketplace(
+        tenantId,
+        [
+          ...(await fetchIndividualPackingRows(tenantId, from, to)),
+          ...(await fetchWavePackingRows(tenantId, from, to)),
+        ].sort((a, b) => (a.pedidoErp ?? "").localeCompare(b.pedidoErp ?? "")),
+        marketplace,
+      );
       return toOrderResult(
         report,
         "Tempo de packing por pedido",
@@ -444,10 +497,14 @@ export async function buildOperationTimeReport(
       );
     }
     case "packing_time_by_user": {
-      const orderRows = [
-        ...(await fetchIndividualPackingRows(tenantId, from, to)),
-        ...(await fetchWavePackingRows(tenantId, from, to)),
-      ];
+      const orderRows = await filterRowsByMarketplace(
+        tenantId,
+        [
+          ...(await fetchIndividualPackingRows(tenantId, from, to)),
+          ...(await fetchWavePackingRows(tenantId, from, to)),
+        ],
+        marketplace,
+      );
       return toUserResult(
         report,
         "Tempo de packing por operador",

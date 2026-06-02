@@ -4,7 +4,7 @@ import { appStackScreenOptions } from "@/lib/navigation";
 export default function PickingLayout() {
   return (
     <Stack screenOptions={appStackScreenOptions}>
-      <Stack.Screen name="index" options={{ title: "Separação" }} />
+      <Stack.Screen name="index" options={{ headerShown: false }} />
       <Stack.Screen
         name="[orderId]/basket"
         options={{ title: "Escanear cesta" }}

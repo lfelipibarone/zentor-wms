@@ -197,6 +197,10 @@ export class TinyApiV3Client {
     return this.request<Record<string, unknown>>("GET", `/notas/${id}`);
   }
 
+  async getPedido(id: number | string) {
+    return this.request<Record<string, unknown>>("GET", `/pedidos/${id}`);
+  }
+
   /**
    * Tenta mover a nota para "pronto para conferir" na extensão Conferência de Compra.
    * Endpoints não documentados publicamente — falha silenciosa é tratada pelo caller.

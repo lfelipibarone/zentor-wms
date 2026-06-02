@@ -20,3 +20,15 @@ export function useReplenish(locationId: string) {
     }) => api.replenishLocation(locationId, quantity, productBarcode),
   });
 }
+
+export function useRequestReplenishment(barcode: string | null) {
+  return useMutation({
+    mutationFn: ({
+      inputMode,
+      value,
+    }: {
+      inputMode: "UNITS" | "PERCENT";
+      value: number;
+    }) => api.requestReplenishment(barcode!, inputMode, value),
+  });
+}

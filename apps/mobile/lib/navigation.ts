@@ -19,4 +19,5 @@ export const appStackScreenOptions = {
   headerLeft: () => React.createElement(BackButton),
   contentStyle: { backgroundColor: theme.bg },
   animation: "slide_from_right" as const,
+  animationTypeForReplace: "pop" as const,
 };

@@ -22,8 +22,15 @@ export async function request<T>(
 ): Promise<T> {
   const url = `${getApiBaseUrl()}${path}`;
   const token = await getStoredToken();
+  const method = (options.method ?? "GET").toUpperCase();
+  const needsJsonBody = ["POST", "PUT", "PATCH"].includes(method);
+  const requestBody =
+    options.body ?? (needsJsonBody ? JSON.stringify({}) : undefined);
+
   const res = await fetch(url, {
     ...options,
+    method,
+    body: requestBody,
     headers: {
       "Content-Type": "application/json",
       Accept: "application/json",
@@ -55,9 +62,32 @@ export interface QueueOrder {
   erpOrderId: string;
   priority: number;
   customerName: string | null;
+  marketplace?: string | null;
+  marketplaceLabel?: string;
   collectionDeadline: string | null;
   itemCount: number;
   totalUnits: number;
+  returnedFromPacking?: boolean;
+  issueSummary?: string | null;
+  routeHint?: string | null;
+  proximityNeighborCount?: number;
+}
+
+export interface ProximityGroupDto {
+  id: string;
+  orderIds: string[];
+  routeHint: string;
+  proximityScore: number;
+  orders: Array<{
+    id: string;
+    erpOrderId: string;
+    marketplace: string | null;
+  }>;
+}
+
+export interface OrderQueueResponse {
+  orders: QueueOrder[];
+  proximityGroups: ProximityGroupDto[];
 }
 
 export interface PickLocationDto {
@@ -86,6 +116,8 @@ export interface PickingSession {
     id: string;
     erpOrderId: string;
     status: OrderStatus;
+    marketplace?: string | null;
+    marketplaceLabel?: string;
     basket: { id: string; code: string; barcode: string } | null;
     collectionDeadline: string | null;
   };
@@ -158,6 +190,30 @@ export interface LocationLookup {
   needsReplenishment: boolean;
 }
 
+export interface RequestReplenishmentResult {
+  location: {
+    id: string;
+    barcode: string;
+    label: string;
+    currentQuantity: number;
+    capacity: number;
+    minThreshold: number;
+    product: {
+      id: string;
+      sku: string;
+      name: string;
+      barcode: string | null;
+    } | null;
+  };
+  previousQuantity: number;
+  countedQuantity: number;
+  inputMode: "UNITS" | "PERCENT";
+  inputValue: number;
+  needsReplenishment: boolean;
+  deficit: number;
+  message: string;
+}
+
 export interface ReplenishmentNeed {
   id: string;
   pickFaceId: string;
@@ -166,6 +222,7 @@ export interface ReplenishmentNeed {
   productId: string;
   sku: string;
   productName: string;
+  imageUrl?: string | null;
   currentQuantity: number;
   minThreshold: number;
   capacity: number;
@@ -176,6 +233,50 @@ export interface ReplenishmentNeed {
     label: string;
     currentQuantity: number;
   } | null;
+  assignmentId?: string | null;
+  assignedToId?: string | null;
+  assignedToName?: string | null;
+  assignmentStatus?: string | null;
+  isMine?: boolean;
+  canAccept?: boolean;
+  canWork?: boolean;
+}
+
+export interface ProblemOrder {
+  id: string;
+  erpOrderId: string;
+  status: OrderStatus;
+  priority: number;
+  customerName: string | null;
+  marketplaceLabel?: string;
+  collectionDeadline: string | null;
+  returnedFromPacking: boolean;
+  pausedIssue: boolean;
+  issueSummary: string | null;
+  waveName: string | null;
+  itemCount: number;
+  totalUnits: number;
+  qtyPicked: number;
+}
+
+export interface ProblemWave {
+  id: string;
+  name: string;
+  problemOrders: Array<{
+    id: string;
+    erpOrderId: string;
+    status: string;
+    issueSummary: string | null;
+  }>;
+}
+
+export interface ProductLocationOption {
+  id: string;
+  barcode: string;
+  label: string;
+  currentQuantity: number;
+  capacity: number;
+  isSuggested: boolean;
 }
 
 export interface CargoTransferSummary {
@@ -191,6 +292,7 @@ export interface CargoTransferSummary {
     sku: string;
     name: string;
     barcode: string | null;
+    imageUrl?: string | null;
   };
   fromLocation: { id: string; barcode: string; label: string };
   toLocation: { id: string; barcode: string; label: string } | null;
@@ -199,12 +301,24 @@ export interface CargoTransferSummary {
 }
 
 export const api = {
-  getQueue: () => request<QueueOrder[]>("/mobile/orders/queue"),
+  getQueue: () => request<OrderQueueResponse>("/mobile/orders/queue"),
+
+  getProblemOrders: () =>
+    request<{ orders: ProblemOrder[] }>("/mobile/picking/problem-orders"),
+
+  getProblemWaves: () =>
+    request<{ waves: ProblemWave[] }>("/mobile/waves/problem-waves"),
 
   acceptOrder: (orderId: string) =>
     request<{ id: string; status: OrderStatus }>(
       `/mobile/orders/${orderId}/accept`,
       { method: "POST" }
+    ),
+
+  releaseOrderAccept: (orderId: string) =>
+    request<{ released: boolean; status: OrderStatus }>(
+      `/mobile/orders/${orderId}/release`,
+      { method: "POST" },
     ),
 
   attachBasket: (orderId: string, basketBarcode: string) =>
@@ -259,6 +373,19 @@ export const api = {
   getLocationByBarcode: (barcode: string) =>
     request<LocationLookup>(
       `/mobile/locations/barcode/${encodeURIComponent(barcode)}`
+    ),
+
+  requestReplenishment: (
+    barcode: string,
+    inputMode: "UNITS" | "PERCENT",
+    value: number,
+  ) =>
+    request<RequestReplenishmentResult>(
+      `/mobile/locations/barcode/${encodeURIComponent(barcode)}/request-replenishment`,
+      {
+        method: "POST",
+        body: JSON.stringify({ inputMode, value }),
+      },
     ),
 
   replenishLocation: (
@@ -339,7 +466,50 @@ export const api = {
     }),
 
   listReplenishmentNeeds: () =>
-    request<{ needs: ReplenishmentNeed[] }>("/mobile/replenishment/needs"),
+    request<{ needs: ReplenishmentNeed[]; myAssignmentCount: number }>(
+      "/mobile/replenishment/needs",
+    ),
+
+  acceptReplenishmentNeed: (pickFaceId: string) =>
+    request<{ assignmentId: string; pickFaceId: string; status: string }>(
+      `/mobile/replenishment/needs/${pickFaceId}/accept`,
+      { method: "POST" },
+    ),
+
+  releaseReplenishmentNeed: (pickFaceId: string) =>
+    request<{ released: boolean }>(
+      `/mobile/replenishment/needs/${pickFaceId}/release`,
+      { method: "POST" },
+    ),
+
+  listProductLocations: (code: string, type: "PULMAO" | "PICK_FACE") =>
+    request<{
+      product: {
+        id: string;
+        sku: string;
+        name: string;
+        barcode: string | null;
+        imageUrl?: string | null;
+      };
+      locations: ProductLocationOption[];
+    }>(
+      `/mobile/products/${encodeURIComponent(code)}/locations?type=${type}`,
+    ),
+
+  stockPulmao: (body: {
+    locationBarcode: string;
+    productBarcode: string;
+    quantity: number;
+  }) =>
+    request<{ location: { barcode: string; currentQuantity: number }; added: number }>(
+      "/mobile/locations/pulmao/stock",
+      { method: "POST", body: JSON.stringify(body) },
+    ),
+
+  cancelCargoTransfer: (id: string) =>
+    request<{ cancelled: boolean }>(`/mobile/cargo-transfers/${id}/cancel`, {
+      method: "POST",
+    }),
 
   withdrawCargoTransfer: (body: {
     fromLocationBarcode: string;
@@ -356,9 +526,10 @@ export const api = {
     }),
 
   listPendingCargoTransfers: () =>
-    request<{ transfers: CargoTransferSummary[] }>(
-      "/mobile/cargo-transfers/pending",
-    ),
+    request<{
+      transfers: CargoTransferSummary[];
+      allTransfers: CargoTransferSummary[];
+    }>("/mobile/cargo-transfers/pending"),
 
   getCargoTransfer: (id: string) =>
     request<CargoTransferSummary>(`/mobile/cargo-transfers/${id}`),
@@ -394,6 +565,7 @@ export const api = {
         acceptedByName: string | null;
         packingUrgency: number;
         collectionDeadline: string | null;
+        marketplaces?: string[];
       }>;
     }>("/mobile/waves/released"),
 
@@ -413,6 +585,7 @@ export const api = {
         canWork: boolean;
         isMine: boolean;
         collectionDeadline: string | null;
+        marketplaces?: string[];
       };
       lines: WaveLineSummary[];
     }>(`/mobile/waves/${waveId}`),
@@ -439,6 +612,7 @@ export const api = {
         canWork: boolean;
         isMine: boolean;
         collectionDeadline: string | null;
+        marketplaces?: string[];
       };
       lines: WaveLineSummary[];
     }>("/mobile/waves/current"),
@@ -448,6 +622,17 @@ export const api = {
       "/mobile/waves/current/accept",
       { method: "POST" },
     ),
+
+  releaseWaveAccept: (waveId: string) =>
+    request<{ released: boolean }>(
+      `/mobile/waves/${waveId}/release`,
+      { method: "POST" },
+    ),
+
+  releaseCurrentWaveAccept: () =>
+    request<{ released: boolean }>("/mobile/waves/current/release", {
+      method: "POST",
+    }),
 
   getWaveLine: (lineId: string) =>
     request<{ line: WaveLineDetail }>(`/mobile/waves/lines/${lineId}`),
@@ -732,6 +917,7 @@ export interface WaveLineSummary {
     sku: string;
     name: string;
     barcode: string | null;
+    imageUrl?: string | null;
   };
   pickLocation: {
     id: string;

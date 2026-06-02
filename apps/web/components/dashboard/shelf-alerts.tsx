@@ -41,7 +41,6 @@ export function ShelfAlerts({ alerts }: ShelfAlertsProps) {
           <TableHeader>
             <TableRow>
               <TableHead>Localização</TableHead>
-              <TableHead>Produto</TableHead>
               <TableHead className="text-right">Atual</TableHead>
               <TableHead className="text-right">Mínimo</TableHead>
               <TableHead className="text-right">Capacidade</TableHead>
@@ -51,7 +50,7 @@ export function ShelfAlerts({ alerts }: ShelfAlertsProps) {
           <TableBody>
             {alerts.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={6} className="text-center text-muted-foreground">
+                <TableCell colSpan={5} className="text-center text-muted-foreground">
                   Nenhum alerta no momento
                 </TableCell>
               </TableRow>
@@ -65,18 +64,6 @@ export function ShelfAlerts({ alerts }: ShelfAlertsProps) {
                       <span className="block text-xs font-normal text-muted-foreground">
                         {row.barcode}
                       </span>
-                    </TableCell>
-                    <TableCell>
-                      {row.productSku ? (
-                        <>
-                          <span className="font-medium">{row.productName}</span>
-                          <span className="block text-xs text-muted-foreground">
-                            {row.productSku}
-                          </span>
-                        </>
-                      ) : (
-                        <span className="text-muted-foreground">—</span>
-                      )}
                     </TableCell>
                     <TableCell className="text-right font-bold tabular-nums">
                       {row.currentQuantity}

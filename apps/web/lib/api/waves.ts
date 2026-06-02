@@ -13,11 +13,26 @@ export interface WaveRow {
   createdAt: string;
 }
 
+export type WavePartitionStrategy = "SINGLE_ITEM" | "PROXIMITY" | "BY_PRODUCT";
+
 export interface WavePreview {
   orderCount: number;
   lineCount: number;
   gondolaPasses: number;
   waveCount?: number;
+  partitionStrategy?: WavePartitionStrategy;
+  marketplace?: string | null;
+  excludedOrderIds?: string[];
+  excludedOrderDetails?: Array<{
+    orderId: string;
+    reason: "too_many_skus" | "no_link" | "below_min_wave" | "not_single_item";
+  }>;
+  proximityGroups?: Array<{
+    id: string;
+    orderIds: string[];
+    routeHint: string;
+    proximityScore: number;
+  }>;
   waves?: Array<{
     index: number;
     orderCount: number;
@@ -68,18 +83,106 @@ export interface WaveDetail {
     erpOrderId: string;
     customerName: string | null;
     status: string;
+    marketplace: string | null;
   }>;
+}
+
+export interface OpenWaveSummary {
+  id: string;
+  name: string;
+  releasedAt: string | null;
+  orderCount: number;
+  lineCount: number;
 }
 
 export function fetchWaveDetail(id: string) {
   return apiFetch<WaveDetail>(`/api/waves/${id}`);
 }
 
-export function fetchWavePreview() {
-  return apiFetch<WavePreview>("/api/waves/preview");
+export function fetchWavePreview(opts?: {
+  orderIds?: string[];
+  marketplace?: string;
+  partitionStrategy?: WavePartitionStrategy;
+}) {
+  return apiFetch<WavePreview>("/api/waves/preview", {
+    method: "POST",
+    body: JSON.stringify({
+      orderIds: opts?.orderIds,
+      marketplace: opts?.marketplace,
+      partitionStrategy: opts?.partitionStrategy,
+    }),
+  });
 }
 
-export function releaseWave(body?: { orderIds?: string[]; auto?: boolean }) {
+export interface WaveSchedule {
+  dayOfWeek: number;
+  time: string;
+}
+
+export interface WaveSettings {
+  enabled: boolean;
+  autoReleaseEnabled: boolean;
+  autoReleaseTime: string;
+  autoReleaseSchedules: WaveSchedule[];
+  autoReleaseMaxOrders: number;
+  onlyDeadlineToday: boolean;
+  partitionEnabled: boolean;
+  minOrdersPerWave: number;
+  maxWavesPerBatch: number;
+  defaultPartitionStrategy: WavePartitionStrategy;
+  proximityMaxDistance: number;
+  autoReleaseMarketplace: string | null;
+}
+
+export interface WaveSettingMetaItem {
+  key: string;
+  label: string;
+  description: string;
+}
+
+export interface WaveSettingsResponse {
+  settings: WaveSettings;
+  meta: WaveSettingMetaItem[];
+}
+
+export function fetchWaveSettings() {
+  return apiFetch<WaveSettingsResponse>("/api/waves/settings");
+}
+
+export function updateWaveSettings(payload: Partial<WaveSettings>) {
+  return apiFetch<WaveSettingsResponse>("/api/waves/settings", {
+    method: "PUT",
+    body: JSON.stringify(payload),
+  });
+}
+
+export function fetchOpenWave() {
+  return apiFetch<{ wave: OpenWaveSummary | null }>("/api/waves/open");
+}
+
+export function addOrdersToWave(waveId: string, orderIds: string[]) {
+  return apiFetch<{ ok: boolean; added: number; lineCount: number }>(
+    `/api/waves/${waveId}/orders`,
+    {
+      method: "POST",
+      body: JSON.stringify({ orderIds }),
+    },
+  );
+}
+
+export function removeOrderFromWave(waveId: string, orderId: string) {
+  return apiFetch<{ ok: boolean }>(`/api/waves/${waveId}/orders/${orderId}`, {
+    method: "DELETE",
+  });
+}
+
+export function releaseWave(body?: {
+  orderIds?: string[];
+  auto?: boolean;
+  appendToWaveId?: string;
+  marketplace?: string;
+  partitionStrategy?: WavePartitionStrategy;
+}) {
   return apiFetch<{
     waveId: string;
     orderCount: number;

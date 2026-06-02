@@ -2,8 +2,13 @@ import {
   InventoryMovementType,
   LocationType,
   OrderStatus,
+  OrderTimeLogEvent,
+  type Prisma,
 } from "@prisma/client";
 import { prisma } from "../lib/prisma.js";
+import { PACKING_ISSUE_TYPE_LABEL, type PackingIssueType } from "./order-packing.js";
+import { marketplaceWhereClause } from "./marketplace-filter.js";
+import { marketplaceDisplayLabel } from "./marketplace-priority.js";
 
 import {
   buildOperationTimeReport,
@@ -23,10 +28,29 @@ export const REPORT_IDS = [
   "picking",
   "movements",
   "low_stock",
+  "packing_issues",
+  "volume_by_marketplace",
   ...OPERATION_TIME_REPORT_IDS,
 ] as const;
 
 export type ReportId = (typeof REPORT_IDS)[number];
+
+export const REPORTS_WITH_MARKETPLACE_FILTER = new Set<ReportId>([
+  "dispatched",
+  "orders",
+  "packing_issues",
+  "picking_time_by_order",
+  "packing_time_by_order",
+]);
+
+function withMarketplaceFilter(
+  base: Prisma.OrderWhereInput,
+  marketplace?: string,
+): Prisma.OrderWhereInput {
+  const mp = marketplaceWhereClause(marketplace);
+  if (!mp) return base;
+  return { AND: [base, mp] };
+}
 
 export interface ReportResult extends Omit<BaseReportResult, "report"> {
   report: ReportId;
@@ -70,6 +94,7 @@ const STATUS_LABEL: Record<OrderStatus, string> = {
   PICKING: "Em separação",
   PAUSED_ISSUE: "Pausado (problema)",
   PICKED_AWAITING_CONFERENCE: "Aguardando conferência",
+  PACKING_RETURNED_TO_PICKING: "Retorno do packing",
   DISPATCHING: "Pronto para expedir",
   DISPATCHED: "Expedido",
 };
@@ -90,6 +115,8 @@ export function reportTitle(id: ReportId): string {
     picking: "Separação (movimentações)",
     movements: "Movimentações de estoque",
     low_stock: "Gôndolas abaixo do mínimo",
+    packing_issues: "Incidentes no packing",
+    volume_by_marketplace: "Volume por marketplace",
     picking_time_by_order: "Tempo de picking por pedido",
     picking_time_by_user: "Tempo de picking por operador",
     packing_time_by_order: "Tempo de packing por pedido",
@@ -105,9 +132,17 @@ export async function runReport(params: {
   to?: string;
   status?: string;
   movementType?: string;
+  marketplace?: string;
 }): Promise<ReportResult> {
-  const { tenantId, report, from: fromStr, to: toStr, status, movementType } =
-    params;
+  const {
+    tenantId,
+    report,
+    from: fromStr,
+    to: toStr,
+    status,
+    movementType,
+    marketplace,
+  } = params;
 
   if (report === "low_stock") {
     return buildLowStockReport(tenantId);
@@ -117,13 +152,17 @@ export async function runReport(params: {
 
   switch (report) {
     case "dispatched":
-      return buildDispatchedReport(tenantId, from, to);
+      return buildDispatchedReport(tenantId, from, to, marketplace);
     case "orders":
-      return buildOrdersReport(tenantId, from, to, status);
+      return buildOrdersReport(tenantId, from, to, status, marketplace);
     case "picking":
       return buildPickingReport(tenantId, from, to);
     case "movements":
       return buildMovementsReport(tenantId, from, to, movementType);
+    case "packing_issues":
+      return buildPackingIssuesReport(tenantId, from, to, marketplace);
+    case "volume_by_marketplace":
+      return buildVolumeByMarketplaceReport(tenantId, from, to);
     case "picking_time_by_order":
     case "picking_time_by_user":
     case "packing_time_by_order":
@@ -133,6 +172,7 @@ export async function runReport(params: {
         report,
         from,
         to,
+        marketplace,
       )) as ReportResult;
     default:
       throw new Error("Relatório desconhecido");
@@ -143,19 +183,23 @@ async function buildDispatchedReport(
   tenantId: string,
   from: Date,
   to: Date,
+  marketplace?: string,
 ): Promise<ReportResult> {
   const orders = await prisma.order.findMany({
-    where: {
-      tenantId,
-      status: OrderStatus.DISPATCHED,
-      OR: [
-        { dispatchedAt: { gte: from, lte: to } },
-        {
-          dispatchedAt: null,
-          updatedAt: { gte: from, lte: to },
-        },
-      ],
-    },
+    where: withMarketplaceFilter(
+      {
+        tenantId,
+        status: OrderStatus.DISPATCHED,
+        OR: [
+          { dispatchedAt: { gte: from, lte: to } },
+          {
+            dispatchedAt: null,
+            updatedAt: { gte: from, lte: to },
+          },
+        ],
+      },
+      marketplace,
+    ),
     orderBy: [{ dispatchedAt: "desc" }, { updatedAt: "desc" }],
     include: {
       basket: { select: { code: true } },
@@ -172,6 +216,7 @@ async function buildDispatchedReport(
     return {
       erpOrderId: o.erpOrderId,
       customerName: o.customerName,
+      marketplace: marketplaceDisplayLabel(o.marketplace),
       shippingLabel: o.shippingLabel,
       pickerName: o.assignedPicker?.name ?? null,
       basketCode: o.basket?.code ?? null,
@@ -191,6 +236,7 @@ async function buildDispatchedReport(
     columns: [
       { key: "erpOrderId", header: "Pedido ERP" },
       { key: "customerName", header: "Cliente" },
+      { key: "marketplace", header: "Marketplace" },
       { key: "shippingLabel", header: "Etiqueta envio" },
       { key: "pickerName", header: "Separador" },
       { key: "basketCode", header: "Cesta" },
@@ -209,6 +255,7 @@ async function buildOrdersReport(
   from: Date,
   to: Date,
   statusFilter?: string,
+  marketplace?: string,
 ): Promise<ReportResult> {
   const status =
     statusFilter && statusFilter in OrderStatus
@@ -216,14 +263,17 @@ async function buildOrdersReport(
       : undefined;
 
   const orders = await prisma.order.findMany({
-    where: {
-      tenantId,
-      ...(status ? { status } : {}),
-      OR: [
-        { createdAt: { gte: from, lte: to } },
-        { updatedAt: { gte: from, lte: to } },
-      ],
-    },
+    where: withMarketplaceFilter(
+      {
+        tenantId,
+        ...(status ? { status } : {}),
+        OR: [
+          { createdAt: { gte: from, lte: to } },
+          { updatedAt: { gte: from, lte: to } },
+        ],
+      },
+      marketplace,
+    ),
     orderBy: { updatedAt: "desc" },
     include: {
       basket: { select: { code: true } },
@@ -238,6 +288,7 @@ async function buildOrdersReport(
     return {
       erpOrderId: o.erpOrderId,
       customerName: o.customerName,
+      marketplace: marketplaceDisplayLabel(o.marketplace),
       status: STATUS_LABEL[o.status],
       statusCode: o.status,
       pickerName: o.assignedPicker?.name ?? null,
@@ -260,6 +311,7 @@ async function buildOrdersReport(
     columns: [
       { key: "erpOrderId", header: "Pedido ERP" },
       { key: "customerName", header: "Cliente" },
+      { key: "marketplace", header: "Marketplace" },
       { key: "status", header: "Status" },
       { key: "pickerName", header: "Separador" },
       { key: "basketCode", header: "Cesta" },
@@ -321,6 +373,182 @@ async function buildPickingReport(
       { key: "quantidade", header: "Quantidade" },
       { key: "localOrigem", header: "Local origem" },
       { key: "referencia", header: "Referência" },
+    ],
+    rows,
+    totalRows: rows.length,
+  };
+}
+
+async function buildPackingIssuesReport(
+  tenantId: string,
+  from: Date,
+  to: Date,
+  marketplace?: string,
+): Promise<ReportResult> {
+  const mp = marketplaceWhereClause(marketplace);
+  const logs = await prisma.orderTimeLog.findMany({
+    where: {
+      event: OrderTimeLogEvent.PACK_REPORT_ISSUE,
+      createdAt: { gte: from, lte: to },
+      order: { tenantId, ...(mp ?? {}) },
+    },
+    orderBy: { createdAt: "desc" },
+    include: {
+      user: { select: { name: true } },
+      order: {
+        select: { erpOrderId: true, customerName: true, marketplace: true },
+      },
+    },
+  });
+
+  const rows = logs.map((log) => {
+    let parsed: {
+      sku?: string;
+      productName?: string;
+      type?: PackingIssueType;
+      quantity?: number;
+      description?: string;
+    } = {};
+    if (log.reason) {
+      try {
+        parsed = JSON.parse(log.reason);
+      } catch {
+        parsed = {};
+      }
+    }
+    const typeLabel = parsed.type
+      ? PACKING_ISSUE_TYPE_LABEL[parsed.type] ?? parsed.type
+      : null;
+    return {
+      dataHora: fmtDateBr(log.createdAt),
+      pedidoErp: log.order?.erpOrderId ?? null,
+      cliente: log.order?.customerName ?? null,
+      marketplace: marketplaceDisplayLabel(log.order?.marketplace),
+      sku: parsed.sku ?? null,
+      produto: parsed.productName ?? null,
+      tipo: typeLabel,
+      quantidade: parsed.quantity ?? null,
+      descricao: parsed.description || null,
+      reportadoPor: log.user.name,
+    };
+  });
+
+  return {
+    report: "packing_issues",
+    title: reportTitle("packing_issues"),
+    from: from.toISOString().slice(0, 10),
+    to: to.toISOString().slice(0, 10),
+    columns: [
+      { key: "dataHora", header: "Data/hora" },
+      { key: "pedidoErp", header: "Pedido ERP" },
+      { key: "cliente", header: "Cliente" },
+      { key: "marketplace", header: "Marketplace" },
+      { key: "sku", header: "SKU" },
+      { key: "produto", header: "Produto" },
+      { key: "tipo", header: "Tipo" },
+      { key: "quantidade", header: "Qtd" },
+      { key: "descricao", header: "Descrição" },
+      { key: "reportadoPor", header: "Reportado por" },
+    ],
+    rows,
+    totalRows: rows.length,
+  };
+}
+
+async function buildVolumeByMarketplaceReport(
+  tenantId: string,
+  from: Date,
+  to: Date,
+): Promise<ReportResult> {
+  const periodWhere: Prisma.OrderWhereInput = {
+    tenantId,
+    OR: [
+      { createdAt: { gte: from, lte: to } },
+      { updatedAt: { gte: from, lte: to } },
+    ],
+  };
+
+  const orders = await prisma.order.findMany({
+    where: periodWhere,
+    select: {
+      id: true,
+      marketplace: true,
+      status: true,
+      dispatchedAt: true,
+      updatedAt: true,
+    },
+  });
+
+  const issueLogs = await prisma.orderTimeLog.findMany({
+    where: {
+      event: OrderTimeLogEvent.PACK_REPORT_ISSUE,
+      createdAt: { gte: from, lte: to },
+      order: { tenantId },
+    },
+    select: { order: { select: { marketplace: true } } },
+  });
+
+  const agg = new Map<
+    string,
+    { label: string; orders: number; dispatched: number; issues: number }
+  >();
+
+  const keyOf = (raw: string | null) =>
+    raw?.trim() ? raw.trim() : "__SEM__";
+
+  for (const o of orders) {
+    const key = keyOf(o.marketplace);
+    const cur = agg.get(key) ?? {
+      label: marketplaceDisplayLabel(o.marketplace),
+      orders: 0,
+      dispatched: 0,
+      issues: 0,
+    };
+    cur.orders += 1;
+    if (o.status === OrderStatus.DISPATCHED) {
+      const exp = o.dispatchedAt ?? o.updatedAt;
+      if (exp >= from && exp <= to) cur.dispatched += 1;
+    }
+    agg.set(key, cur);
+  }
+
+  for (const log of issueLogs) {
+    const key = keyOf(log.order.marketplace);
+    const cur = agg.get(key) ?? {
+      label: marketplaceDisplayLabel(log.order.marketplace),
+      orders: 0,
+      dispatched: 0,
+      issues: 0,
+    };
+    cur.issues += 1;
+    agg.set(key, cur);
+  }
+
+  const totalOrders = orders.length;
+  const rows = [...agg.values()]
+    .sort((a, b) => b.orders - a.orders)
+    .map((r) => ({
+      marketplace: r.label,
+      pedidosNoPeriodo: r.orders,
+      expedidos: r.dispatched,
+      pctDoTotal:
+        totalOrders > 0
+          ? `${Math.round((r.orders / totalOrders) * 1000) / 10}%`
+          : "0%",
+      incidentesPacking: r.issues,
+    }));
+
+  return {
+    report: "volume_by_marketplace",
+    title: reportTitle("volume_by_marketplace"),
+    from: from.toISOString().slice(0, 10),
+    to: to.toISOString().slice(0, 10),
+    columns: [
+      { key: "marketplace", header: "Marketplace" },
+      { key: "pedidosNoPeriodo", header: "Pedidos no período" },
+      { key: "expedidos", header: "Expedidos" },
+      { key: "pctDoTotal", header: "% do total" },
+      { key: "incidentesPacking", header: "Incidentes packing" },
     ],
     rows,
     totalRows: rows.length,
@@ -528,11 +756,28 @@ export async function getReportsSummary(
   });
   const nameMap = new Map(pickers.map((u) => [u.id, u.name]));
 
+  const dispatchedByMarketplace = await prisma.order.groupBy({
+    by: ["marketplace"],
+    where: {
+      tenantId,
+      status: OrderStatus.DISPATCHED,
+      OR: [
+        { dispatchedAt: { gte: from, lte: to } },
+        { dispatchedAt: null, updatedAt: { gte: from, lte: to } },
+      ],
+    },
+    _count: { id: true },
+  });
+
   return {
     periodFrom: from.toISOString().slice(0, 10),
     periodTo: to.toISOString().slice(0, 10),
     ordersByStatus: ordersByStatus.map((r) => ({
       status: r.status,
+      count: r._count.id,
+    })),
+    dispatchedByMarketplace: dispatchedByMarketplace.map((r) => ({
+      marketplace: marketplaceDisplayLabel(r.marketplace),
       count: r._count.id,
     })),
     productsCount,

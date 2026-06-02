@@ -2,6 +2,8 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { FileSpreadsheet, FileText } from "lucide-react";
+import { MarketplaceBadge } from "@/components/ops/marketplace-badge";
+import { MarketplaceFilter } from "@/components/ops/marketplace-filter";
 import { PageHeader } from "@/components/ops/page-header";
 import { DataState } from "@/components/ops/data-state";
 import { MOVEMENT_TYPE_LABEL, ORDER_STATUS_LABEL } from "@/lib/labels";
@@ -64,6 +66,7 @@ export default function RelatoriosPage() {
   const [reportId, setReportId] = useState<ReportId>("dispatched");
   const [statusFilter, setStatusFilter] = useState("");
   const [movementFilter, setMovementFilter] = useState("");
+  const [marketplaceFilter, setMarketplaceFilter] = useState("");
 
   const [report, setReport] = useState<ReportResult | null>(null);
   const [reportLoading, setReportLoading] = useState(false);
@@ -96,6 +99,10 @@ export default function RelatoriosPage() {
           reportId === "movements" && movementFilter
             ? movementFilter
             : undefined,
+        marketplace:
+          selectedType?.acceptsMarketplaceFilter && marketplaceFilter
+            ? marketplaceFilter
+            : undefined,
       });
       setReport(data);
     } catch (e) {
@@ -110,8 +117,14 @@ export default function RelatoriosPage() {
     periodTo,
     statusFilter,
     movementFilter,
+    marketplaceFilter,
+    selectedType?.acceptsMarketplaceFilter,
     needsPeriod,
   ]);
+
+  useEffect(() => {
+    setMarketplaceFilter("");
+  }, [reportId]);
 
   useEffect(() => {
     if (!allowed) return;
@@ -242,6 +255,13 @@ export default function RelatoriosPage() {
               ))}
             </select>
           ) : null}
+
+          {selectedType?.acceptsMarketplaceFilter ? (
+            <MarketplaceFilter
+              value={marketplaceFilter}
+              onChange={setMarketplaceFilter}
+            />
+          ) : null}
         </div>
 
         <div className="border-t pt-4">
@@ -310,7 +330,15 @@ export default function RelatoriosPage() {
                       <TableRow key={i}>
                         {report.columns.map((c) => (
                           <TableCell key={c.key} className="whitespace-nowrap">
-                            {formatCell(row[c.key])}
+                            {c.key === "marketplace" ? (
+                              <MarketplaceBadge
+                                value={
+                                  row[c.key] != null ? String(row[c.key]) : null
+                                }
+                              />
+                            ) : (
+                              formatCell(row[c.key])
+                            )}
                           </TableCell>
                         ))}
                       </TableRow>

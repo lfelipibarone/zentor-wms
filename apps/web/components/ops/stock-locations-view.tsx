@@ -136,7 +136,6 @@ export function StockLocationsView({
               <TableHeader>
                 <TableRow>
                   <TableHead>Local</TableHead>
-                  <TableHead>SKU</TableHead>
                   <TableHead>Tipo</TableHead>
                   <TableHead>Quantidade</TableHead>
                   <TableHead>Mínimo</TableHead>
@@ -149,14 +148,6 @@ export function StockLocationsView({
                   return (
                     <TableRow key={l.id} className={alert ? "bg-amber-50" : ""}>
                       <TableCell className="font-mono">{l.barcode}</TableCell>
-                      <TableCell>
-                        {l.product?.sku ?? "—"}
-                        {l.product?.name ? (
-                          <span className="block text-xs text-muted-foreground">
-                            {l.product.name}
-                          </span>
-                        ) : null}
-                      </TableCell>
                       <TableCell>
                         {LOCATION_TYPE_LABEL[l.type] ?? l.type}
                       </TableCell>
@@ -181,7 +172,6 @@ export function StockLocationsView({
                 <TableRow>
                   <TableHead>Data</TableHead>
                   <TableHead>Tipo</TableHead>
-                  <TableHead>SKU</TableHead>
                   <TableHead>Qtd</TableHead>
                   <TableHead>Origem</TableHead>
                   <TableHead>Destino</TableHead>
@@ -199,7 +189,6 @@ export function StockLocationsView({
                     <TableCell>
                       {MOVEMENT_TYPE_LABEL[m.type] ?? m.type}
                     </TableCell>
-                    <TableCell className="font-mono">{m.product.sku}</TableCell>
                     <TableCell>{m.quantity}</TableCell>
                     <TableCell>{m.fromLocation?.barcode ?? "—"}</TableCell>
                     <TableCell>{m.toLocation?.barcode ?? "—"}</TableCell>

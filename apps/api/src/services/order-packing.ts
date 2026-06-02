@@ -3,6 +3,7 @@ import {
   OrderTimeLogEvent,
   PickWaveLineSortStatus,
   PickWaveStatus,
+  Prisma,
 } from "@prisma/client";
 import { prisma } from "../lib/prisma.js";
 import { notifyUsersWithPermission } from "./notifications.js";
@@ -469,6 +470,140 @@ export async function completePacking(orderId: string, userId: string) {
   }
 
   return { orderId, status: OrderStatus.DISPATCHING, completed: true };
+}
+
+export type PackingIssueType =
+  | "MISSING"
+  | "DAMAGED"
+  | "WRONG_ITEM"
+  | "WRONG_QUANTITY";
+
+export const PACKING_ISSUE_TYPE_LABEL: Record<PackingIssueType, string> = {
+  MISSING: "Item faltando",
+  DAMAGED: "Avaria no produto",
+  WRONG_ITEM: "Item separado errado",
+  WRONG_QUANTITY: "Quantidade divergente",
+};
+
+export interface PackingIssuePayload {
+  itemId: string;
+  quantity: number;
+  type: PackingIssueType;
+  description?: string;
+}
+
+export async function reportPackingIssue(
+  orderId: string,
+  userId: string,
+  input: PackingIssuePayload,
+) {
+  const order = await prisma.order.findUnique({
+    where: { id: orderId },
+    include: {
+      items: { include: { product: { select: { sku: true, name: true } } } },
+    },
+  });
+  if (!order) throw new PackingSessionError("Pedido não encontrado", 404);
+  if (order.status !== OrderStatus.PICKED_AWAITING_CONFERENCE) {
+    throw new PackingSessionError("Pedido não está em conferência de packing");
+  }
+
+  const item = order.items.find((i) => i.id === input.itemId);
+  if (!item) {
+    throw new PackingSessionError("Item não pertence ao pedido", 404);
+  }
+
+  if (!PACKING_ISSUE_TYPE_LABEL[input.type]) {
+    throw new PackingSessionError("Tipo de problema inválido");
+  }
+
+  const qty = Math.floor(input.quantity);
+  if (!Number.isFinite(qty) || qty <= 0) {
+    throw new PackingSessionError("Quantidade inválida");
+  }
+  if (qty > item.quantityPicked) {
+    throw new PackingSessionError(
+      "Quantidade reportada maior que a quantidade separada",
+    );
+  }
+
+  const description = input.description?.trim().slice(0, 280) ?? "";
+
+  const reasonPayload = {
+    itemId: item.id,
+    productId: item.productId,
+    sku: item.product.sku,
+    productName: item.product.name,
+    type: input.type,
+    quantity: qty,
+    description,
+  };
+
+  const newPicked = Math.max(0, item.quantityPicked - qty);
+  const newPacked = Math.min(item.quantityPacked, newPicked);
+
+  const packingState = await getPackingOperationalState(orderId);
+
+  await prisma.$transaction(async (tx) => {
+    const { detachOrderFromWaveForPackingReturn } = await import(
+      "./pick-wave.js"
+    );
+    await detachOrderFromWaveForPackingReturn(
+      tx,
+      order.tenantId,
+      orderId,
+      item.id,
+      qty,
+    );
+
+    await tx.orderItem.update({
+      where: { id: item.id },
+      data: {
+        quantityPicked: newPicked,
+        quantityPacked: newPacked,
+      },
+    });
+    await tx.order.update({
+      where: { id: orderId },
+      data: {
+        status: OrderStatus.PACKING_RETURNED_TO_PICKING,
+        assignedPickerId: null,
+      },
+    });
+    await tx.orderTimeLog.create({
+      data: {
+        orderId,
+        userId,
+        event: OrderTimeLogEvent.PACK_REPORT_ISSUE,
+        reason: JSON.stringify(reasonPayload),
+      },
+    });
+    if (packingState.packingInProgress) {
+      await tx.orderTimeLog.create({
+        data: { orderId, userId, event: OrderTimeLogEvent.PACK_CANCEL },
+      });
+    }
+  });
+
+  const summary = `${item.product.sku} · ${PACKING_ISSUE_TYPE_LABEL[input.type]} · ${qty} un.`;
+  await notifyUsersWithPermission(Permission.MOBILE_ACCESS, {
+    title: "Pedido retornou do packing",
+    body: `${order.erpOrderId} — ${summary}`,
+    category: "PICKING",
+    data: {
+      orderId: order.id,
+      erpOrderId: order.erpOrderId,
+      issueType: input.type,
+      sku: item.product.sku,
+    },
+  });
+
+  return {
+    orderId,
+    status: OrderStatus.PACKING_RETURNED_TO_PICKING,
+    reported: true,
+    summary,
+  };
 }
 
 async function listWavePackingLinesInternal(tenantId: string) {

@@ -5,6 +5,7 @@ import {
 } from "@prisma/client";
 import { prisma } from "../lib/prisma.js";
 import { buildPaginationMeta } from "../lib/pagination.js";
+import { marketplaceWhereClause } from "./marketplace-filter.js";
 
 export type BoardKind = "all" | "order" | "wave";
 
@@ -79,14 +80,18 @@ function buildOrderWhere(
   opts: {
     status?: OrderStatus;
     q?: string;
+    marketplace?: string;
   },
 ): Prisma.OrderWhereInput {
   const where: Prisma.OrderWhereInput = { tenantId };
   if (opts.status) where.status = opts.status;
+  const mp = marketplaceWhereClause(opts.marketplace);
+  if (mp) Object.assign(where, mp);
   if (opts.q) {
     where.OR = [
       { erpOrderId: { contains: opts.q, mode: "insensitive" } },
       { customerName: { contains: opts.q, mode: "insensitive" } },
+      { marketplace: { contains: opts.q, mode: "insensitive" } },
     ];
   }
   return where;
@@ -175,6 +180,7 @@ export async function getWaveDetail(tenantId: string, waveId: string) {
               erpOrderId: true,
               customerName: true,
               status: true,
+              marketplace: true,
             },
           },
         },
@@ -203,6 +209,7 @@ export async function getWaveDetail(tenantId: string, waveId: string) {
       erpOrderId: wo.order.erpOrderId,
       customerName: wo.order.customerName,
       status: wo.order.status,
+      marketplace: wo.order.marketplace,
     })),
   };
 }
@@ -213,6 +220,7 @@ export async function getOrdersBoard(
     kind?: BoardKind;
     status?: OrderStatus;
     q?: string;
+    marketplace?: string;
     page: number;
     pageSize: number;
   },

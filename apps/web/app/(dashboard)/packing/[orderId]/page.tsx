@@ -1,12 +1,14 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import Image from "next/image";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { PageHeader } from "@/components/ops/page-header";
 import { CollectionDeadlineIndicator } from "@/components/ops/collection-deadline-indicator";
+import { MarketplaceBadge } from "@/components/ops/marketplace-badge";
 import { DataState } from "@/components/ops/data-state";
+import { PackingIssueModal } from "@/components/ops/packing-issue-modal";
+import { ProductImageZoom } from "@/components/ops/product-image-zoom";
 import {
   Table,
   TableBody,
@@ -29,13 +31,14 @@ export default function PackingOrderDetailPage() {
 
   const [order, setOrder] = useState<PackingOrder | null>(null);
   const [scanCode, setScanCode] = useState("");
-  const [scanQty, setScanQty] = useState("1");
   const [lineQty, setLineQty] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const [issueModalOpen, setIssueModalOpen] = useState(false);
   const packedProgressRef = useRef(false);
+  const reportedRef = useRef(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -61,7 +64,7 @@ export default function PackingOrderDetailPage() {
 
   useEffect(() => {
     return () => {
-      if (!packedProgressRef.current) {
+      if (!packedProgressRef.current && !reportedRef.current) {
         void apiFetch(`/api/packing/orders/${orderId}/cancel`, {
           method: "POST",
           body: "{}",
@@ -71,7 +74,7 @@ export default function PackingOrderDetailPage() {
   }, [orderId]);
 
   const handleBack = async () => {
-    if (!packedProgressRef.current) {
+    if (!packedProgressRef.current && !reportedRef.current) {
       try {
         await apiFetch(`/api/packing/orders/${orderId}/cancel`, {
           method: "POST",
@@ -96,14 +99,13 @@ export default function PackingOrderDetailPage() {
           method: "POST",
           body: JSON.stringify({
             barcode: scanCode.trim(),
-            quantity: Number(scanQty) || 1,
+            quantity: 1,
           }),
         },
       );
       setOrder(updated);
       packedProgressRef.current = updated.items.some((i) => i.quantityPacked > 0);
       setScanCode("");
-      setScanQty("1");
       setMessage("Produto conferido");
     } catch (e) {
       setMessage(e instanceof Error ? e.message : "Erro no bip — use o código de barras do produto");
@@ -163,152 +165,176 @@ export default function PackingOrderDetailPage() {
           title={order?.erpOrderId ?? "Packing"}
           description="Conferência por código de barras do produto."
         />
-        <button
-          type="button"
-          onClick={() => void handleBack()}
-          className="rounded-lg border px-3 py-2 text-sm font-medium"
-        >
-          Voltar
-        </button>
+        <div className="flex gap-2">
+          {order ? (
+            <button
+              type="button"
+              onClick={() => setIssueModalOpen(true)}
+              disabled={saving}
+              className="rounded-lg border border-red-300 bg-white px-3 py-2 text-sm font-medium text-red-700 hover:bg-red-50 disabled:opacity-50"
+            >
+              Relatar problema
+            </button>
+          ) : null}
+          <button
+            type="button"
+            onClick={() => void handleBack()}
+            className="rounded-lg border px-3 py-2 text-sm font-medium"
+          >
+            Voltar
+          </button>
+        </div>
       </div>
+
+      {order && issueModalOpen ? (
+        <PackingIssueModal
+          order={order}
+          onClose={() => setIssueModalOpen(false)}
+          onSubmitted={() => {
+            reportedRef.current = true;
+            setIssueModalOpen(false);
+            router.push("/packing");
+          }}
+        />
+      ) : null}
 
       <DataState loading={loading} error={error} empty={false}>
         {order ? (
           <>
-            <div className="rounded-xl border bg-white p-4 shadow-sm">
-              <div className="flex flex-wrap items-start justify-between gap-4">
-                <div className="min-w-0 flex-1">
-                  <p className="font-mono text-2xl font-bold">{order.erpOrderId}</p>
-                  <p className="text-sm text-muted-foreground">
-                    Cesta {order.basket?.code ?? "—"}
-                    {order.assignedPicker?.name
-                      ? ` · Separador ${order.assignedPicker.name}`
-                      : ""}
-                    {order.routeLabel ? ` · ${order.routeLabel}` : ""}
-                  </p>
-                  {order.customerName ? (
-                    <p className="text-sm">{order.customerName}</p>
-                  ) : null}
-                </div>
-                <div className="flex flex-col items-end gap-2">
-                  {order.packingInProgress ? (
-                    <span className="rounded-md bg-blue-100 px-2 py-1 text-xs font-bold text-blue-900">
-                      Em conferência
-                      {order.packingOperatorName
-                        ? ` · ${order.packingOperatorName}`
-                        : ""}
-                    </span>
-                  ) : null}
-                  <CollectionDeadlineIndicator
-                    deadline={order.collectionDeadline}
-                    variant="detail"
-                  />
-                </div>
-                {order.allPacked ? (
-                  <button
-                    type="button"
-                    disabled={saving}
-                    onClick={handleComplete}
-                    className="rounded-lg bg-[#0d9488] px-4 py-2 text-sm font-semibold text-white"
-                  >
-                    Finalizar packing
-                  </button>
-                ) : null}
-              </div>
-            </div>
-
             {message ? (
               <p className="rounded-lg bg-slate-100 px-3 py-2 text-sm">{message}</p>
             ) : null}
 
-            <form
-              onSubmit={handleScan}
-              className="flex flex-wrap gap-2 rounded-xl border bg-white p-4 shadow-sm"
-            >
-              <input
-                autoFocus
-                className="min-w-[200px] flex-1 rounded-lg border px-3 py-2 text-sm font-mono"
-                placeholder="Bipar código de barras do produto"
-                value={scanCode}
-                onChange={(e) => setScanCode(e.target.value)}
-              />
-              <input
-                type="number"
-                min={1}
-                className="w-20 rounded-lg border px-2 py-2 text-sm"
-                value={scanQty}
-                onChange={(e) => setScanQty(e.target.value)}
-                title="Quantidade"
-              />
-              <button
-                type="submit"
-                disabled={saving || !scanCode.trim()}
-                className="rounded-lg bg-[#0d9488] px-4 py-2 text-sm font-semibold text-white disabled:opacity-50"
-              >
-                Bipar produto
-              </button>
-            </form>
-
-            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-              {pickedItems.map((item) => (
-                <div
-                  key={item.id}
-                  className={`rounded-xl border bg-white p-3 shadow-sm ${
-                    item.remaining === 0 ? "border-emerald-300 bg-emerald-50" : ""
-                  }`}
-                >
-                  <div className="relative mb-2 aspect-square w-full overflow-hidden rounded-lg bg-slate-100">
-                    {item.product.imageUrl ? (
-                      <Image
-                        src={item.product.imageUrl}
-                        alt={item.product.name}
-                        fill
-                        className="object-contain"
-                        unoptimized
-                      />
-                    ) : (
-                      <div className="flex h-full items-center justify-center text-xs text-muted-foreground">
+            <div className="flex flex-col gap-4 lg:flex-row lg:items-start">
+              <div className="grid min-w-0 flex-1 grid-cols-1 gap-3 sm:grid-cols-2 sm:justify-items-start">
+                {pickedItems.map((item) => (
+                  <div
+                    key={item.id}
+                    className={`flex w-full max-w-xs gap-3 rounded-lg border bg-white p-3 shadow-sm ${
+                      item.remaining === 0
+                        ? "border-emerald-300 bg-emerald-50"
+                        : ""
+                    }`}
+                  >
+                    <ProductImageZoom
+                      src={item.product.imageUrl}
+                      alt={item.product.name}
+                      placeholder={item.product.sku}
+                      className="relative aspect-square w-40 shrink-0 overflow-visible"
+                    />
+                    <div className="flex min-w-0 flex-1 flex-col">
+                      <p
+                        className="truncate font-mono text-sm font-bold"
+                        title={item.product.sku}
+                      >
                         {item.product.sku}
-                      </div>
-                    )}
+                      </p>
+                      <p
+                        className="line-clamp-2 text-sm leading-tight"
+                        title={item.product.name}
+                      >
+                        {item.product.name}
+                      </p>
+                      {item.multiGondolaHint ? (
+                        <p
+                          className="mt-1 truncate rounded-md bg-amber-50 px-2 py-0.5 text-xs text-amber-900"
+                          title={item.multiGondolaHint}
+                        >
+                          {item.multiGondolaHint}
+                        </p>
+                      ) : null}
+                      <p className="mt-1 text-sm font-semibold">
+                        Conferido {item.quantityPacked}/{item.quantityPicked}
+                      </p>
+                      {item.remaining > 0 ? (
+                        <div className="mt-auto pt-2">
+                          <button
+                            type="button"
+                            disabled={saving}
+                            onClick={() =>
+                              handleConfirmLine(item.id, item.remaining)
+                            }
+                            className="rounded-lg bg-[#0d9488] px-3 py-1 text-sm font-semibold text-white"
+                          >
+                            OK
+                          </button>
+                        </div>
+                      ) : null}
+                    </div>
                   </div>
-                  <p className="font-mono text-sm font-bold">{item.product.sku}</p>
-                  <p className="text-sm">{item.product.name}</p>
-                  {item.multiGondolaHint ? (
-                    <p className="mt-1 rounded-md bg-amber-50 px-2 py-1 text-xs text-amber-900">
-                      {item.multiGondolaHint}
+                ))}
+              </div>
+
+              <div className="flex w-full flex-col gap-3 lg:sticky lg:top-4 lg:w-80 lg:shrink-0">
+                <div className="rounded-xl border bg-white p-4 shadow-sm">
+                  <p className="font-mono text-2xl font-bold">
+                    {order.erpOrderId}
+                  </p>
+                  <p className="mt-1 text-sm text-muted-foreground">
+                    Cesta {order.basket?.code ?? "—"}
+                  </p>
+                  {order.assignedPicker?.name ? (
+                    <p className="text-sm text-muted-foreground">
+                      Separador {order.assignedPicker.name}
                     </p>
                   ) : null}
-                  <p className="mt-1 text-sm">
-                    Conferido {item.quantityPacked}/{item.quantityPicked}
-                  </p>
-                  {item.remaining > 0 ? (
-                    <div className="mt-2 flex gap-2">
-                      <input
-                        type="number"
-                        min={1}
-                        max={item.remaining}
-                        className="w-16 rounded border px-2 py-1 text-sm"
-                        value={lineQty[item.id] ?? String(item.remaining)}
-                        onChange={(e) =>
-                          setLineQty((prev) => ({
-                            ...prev,
-                            [item.id]: e.target.value,
-                          }))
-                        }
-                      />
+                  {order.routeLabel ? (
+                    <p className="text-sm text-muted-foreground">
+                      {order.routeLabel}
+                    </p>
+                  ) : null}
+                  <div className="mt-1 flex flex-wrap items-center gap-2">
+                    {order.customerName ? (
+                      <p className="text-sm">{order.customerName}</p>
+                    ) : null}
+                    <MarketplaceBadge value={order.marketplace} />
+                  </div>
+                  <div className="mt-3 flex flex-col gap-2">
+                    {order.packingInProgress ? (
+                      <span className="self-start rounded-md bg-blue-100 px-2 py-1 text-xs font-bold text-blue-900">
+                        Em conferência
+                        {order.packingOperatorName
+                          ? ` · ${order.packingOperatorName}`
+                          : ""}
+                      </span>
+                    ) : null}
+                    <CollectionDeadlineIndicator
+                      deadline={order.collectionDeadline}
+                      variant="detail"
+                    />
+                    {order.allPacked ? (
                       <button
                         type="button"
                         disabled={saving}
-                        onClick={() => handleConfirmLine(item.id, item.remaining)}
-                        className="rounded-lg bg-[#0d9488] px-2 py-1 text-xs font-semibold text-white"
+                        onClick={handleComplete}
+                        className="mt-1 rounded-lg bg-[#0d9488] px-4 py-2 text-sm font-semibold text-white"
                       >
-                        OK
+                        Finalizar packing
                       </button>
-                    </div>
-                  ) : null}
+                    ) : null}
+                  </div>
                 </div>
-              ))}
+
+                <form
+                  onSubmit={handleScan}
+                  className="flex flex-col gap-2 rounded-xl border bg-white p-3 shadow-sm"
+                >
+                  <input
+                    autoFocus
+                    className="rounded-lg border px-2 py-1.5 text-sm font-mono"
+                    placeholder="Bipar código de barras"
+                    value={scanCode}
+                    onChange={(e) => setScanCode(e.target.value)}
+                  />
+                  <button
+                    type="submit"
+                    disabled={saving || !scanCode.trim()}
+                    className="w-full rounded-lg bg-[#0d9488] px-2 py-1.5 text-sm font-semibold text-white disabled:opacity-50"
+                  >
+                    Bipar
+                  </button>
+                </form>
+              </div>
             </div>
 
             <div className="overflow-hidden rounded-xl border bg-white shadow-sm">

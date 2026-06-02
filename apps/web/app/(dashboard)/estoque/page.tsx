@@ -62,7 +62,7 @@ export default function EstoquePage() {
     <div>
       <PageHeader
         title="Estoque"
-        description="Gôndolas de pulmão e estoque de giro — saldos, capacidade e produto alocado."
+        description="Gôndolas de pulmão e estoque de giro — saldos e capacidade."
       />
 
       <div className="mb-4 flex flex-wrap gap-2">
@@ -109,12 +109,9 @@ export default function EstoquePage() {
               <TableRow>
                 <TableHead>Tipo</TableHead>
                 <TableHead>Endereço</TableHead>
-                <TableHead>SKU</TableHead>
                 <TableHead>Ocupado</TableHead>
                 <TableHead>Disponível</TableHead>
                 <TableHead>Capacidade</TableHead>
-                <TableHead>Unidade</TableHead>
-                <TableHead>Peso (un.)</TableHead>
                 <TableHead>Alerta</TableHead>
               </TableRow>
             </TableHeader>
@@ -122,12 +119,6 @@ export default function EstoquePage() {
               {locations.map((l) => {
                 const available = l.capacity - l.currentQuantity;
                 const alert = l.currentQuantity <= l.minThreshold;
-                const product = l.product as {
-                  sku?: string;
-                  name?: string;
-                  unit?: string | null;
-                  weight?: string | number | null;
-                } | null;
                 return (
                   <TableRow key={l.id} className={alert ? "bg-amber-50" : ""}>
                     <TableCell>
@@ -139,21 +130,9 @@ export default function EstoquePage() {
                         {l.barcode}
                       </span>
                     </TableCell>
-                    <TableCell>
-                      {product?.sku ?? "—"}
-                      {product?.name ? (
-                        <span className="block text-xs text-muted-foreground">
-                          {product.name}
-                        </span>
-                      ) : null}
-                    </TableCell>
                     <TableCell>{l.currentQuantity}</TableCell>
                     <TableCell>{available}</TableCell>
                     <TableCell>{l.capacity}</TableCell>
-                    <TableCell>{product?.unit ?? "—"}</TableCell>
-                    <TableCell>
-                      {product?.weight != null ? String(product.weight) : "—"}
-                    </TableCell>
                     <TableCell>{alert ? "Repor" : "OK"}</TableCell>
                   </TableRow>
                 );

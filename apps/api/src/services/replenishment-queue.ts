@@ -11,6 +11,7 @@ export type ReplenishmentNeed = {
   productId: string;
   sku: string;
   productName: string;
+  imageUrl: string | null;
   currentQuantity: number;
   minThreshold: number;
   capacity: number;
@@ -35,7 +36,9 @@ export async function listReplenishmentNeeds(
         productId: { not: null },
       },
       include: {
-        product: { select: { id: true, sku: true, name: true } },
+        product: {
+          select: { id: true, sku: true, name: true, imageUrl: true },
+        },
       },
     }),
     prisma.cargoTransfer.findMany({
@@ -88,6 +91,7 @@ export async function listReplenishmentNeeds(
         productId: product.id,
         sku: product.sku,
         productName: product.name,
+        imageUrl: product.imageUrl,
         currentQuantity: face.currentQuantity,
         minThreshold: face.minThreshold,
         capacity: face.capacity,

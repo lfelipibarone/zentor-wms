@@ -24,7 +24,11 @@ export function BackButton({
       return;
     }
     if (toHome) {
-      router.replace("/");
+      if (router.canGoBack()) {
+        router.back();
+      } else {
+        router.replace("/");
+      }
       return;
     }
     router.back();

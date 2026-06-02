@@ -11,6 +11,7 @@ export function useOrderQueue() {
     queryKey: pickingKeys.queue,
     queryFn: api.getQueue,
     refetchInterval: 15_000,
+    select: (data) => data,
   });
 }
 
@@ -78,6 +79,17 @@ export function useCompletePicking(orderId: string) {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: () => api.completePicking(orderId),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: pickingKeys.session(orderId) });
+      qc.invalidateQueries({ queryKey: pickingKeys.queue });
+    },
+  });
+}
+
+export function useReleaseOrderAccept(orderId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: () => api.releaseOrderAccept(orderId),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: pickingKeys.session(orderId) });
       qc.invalidateQueries({ queryKey: pickingKeys.queue });

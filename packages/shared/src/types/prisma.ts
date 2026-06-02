@@ -27,6 +27,7 @@ export const OrderStatus = {
   PICKING: "PICKING",
   PAUSED_ISSUE: "PAUSED_ISSUE",
   PICKED_AWAITING_CONFERENCE: "PICKED_AWAITING_CONFERENCE",
+  PACKING_RETURNED_TO_PICKING: "PACKING_RETURNED_TO_PICKING",
   DISPATCHING: "DISPATCHING",
   DISPATCHED: "DISPATCHED",
 } as const;
@@ -40,6 +41,7 @@ export const OrderTimeLogEvent = {
   PACK_START: "PACK_START",
   PACK_END: "PACK_END",
   PACK_CANCEL: "PACK_CANCEL",
+  PACK_REPORT_ISSUE: "PACK_REPORT_ISSUE",
 } as const;
 export type OrderTimeLogEvent =
   (typeof OrderTimeLogEvent)[keyof typeof OrderTimeLogEvent];
@@ -74,6 +76,7 @@ export interface Product {
   id: string;
   sku: string;
   name: string;
+  imageUrl?: string | null;
   requiresItemScan: boolean;
   barcode: string | null;
   active: boolean;
@@ -115,6 +118,10 @@ export interface Order {
   customerName: string | null;
   shippingLabel: string | null;
   notes: string | null;
+  collectionDeadline: Date | null;
+  marketplace: string | null;
+  erpSource: string | null;
+  dispatchedAt: Date | null;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -253,6 +260,7 @@ export const OrderStatusLabel: Record<OrderStatus, string> = {
   PICKING: "Em separação",
   PAUSED_ISSUE: "Pausado (problema)",
   PICKED_AWAITING_CONFERENCE: "Separado — aguardando conferência",
+  PACKING_RETURNED_TO_PICKING: "Retorno do packing",
   DISPATCHING: "Em expedição",
   DISPATCHED: "Expedido",
 };

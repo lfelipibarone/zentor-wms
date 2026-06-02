@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { PageHeader } from "@/components/ops/page-header";
 import { DataState } from "@/components/ops/data-state";
+import { MarketplaceFilter } from "@/components/ops/marketplace-filter";
 import { WorkboardEntryCard } from "@/components/ops/workboard-entry-card";
 import { Pagination } from "@/components/ui/pagination";
 import { cn } from "@/lib/utils";
@@ -82,6 +83,7 @@ export default function PedidosPage() {
   const [pagination, setPagination] = useState<PaginationMeta | null>(null);
   const [page, setPage] = useState(1);
   const [q, setQ] = useState("");
+  const [marketplace, setMarketplace] = useState("");
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -89,7 +91,7 @@ export default function PedidosPage() {
   useEffect(() => {
     setPage(1);
     setExpandedIds(new Set());
-  }, [tab, q]);
+  }, [tab, q, marketplace]);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -100,6 +102,7 @@ export default function PedidosPage() {
         kind,
         status,
         q: q || undefined,
+        marketplace: marketplace || undefined,
         page,
       });
       setEntries(data.entries);
@@ -110,7 +113,7 @@ export default function PedidosPage() {
     } finally {
       setLoading(false);
     }
-  }, [tab, q, page]);
+  }, [tab, q, marketplace, page]);
 
   useEffect(() => {
     const t = setTimeout(load, 300);
@@ -155,13 +158,14 @@ export default function PedidosPage() {
         })}
       </div>
 
-      <div className="mb-2">
+      <div className="mb-2 flex flex-wrap items-center gap-2">
         <input
           value={q}
           onChange={(e) => setQ(e.target.value)}
           placeholder="Pedido ERP, cliente ou nome da onda…"
-          className="min-w-[240px] w-full max-w-md rounded-lg border bg-white px-3 py-2 text-sm"
+          className="min-w-[240px] flex-1 max-w-md rounded-lg border bg-white px-3 py-2 text-sm"
         />
+        <MarketplaceFilter value={marketplace} onChange={setMarketplace} />
       </div>
 
       <DataState

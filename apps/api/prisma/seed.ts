@@ -32,6 +32,11 @@ function yesterdayAt(hour: number): Date {
   return d;
 }
 
+/** URLs estáveis (picsum por SKU) para validar zoom no packing. */
+function demoProductImageUrl(sku: string): string {
+  return `https://picsum.photos/seed/wms-${encodeURIComponent(sku)}/400/400`;
+}
+
 async function main() {
   const defaultTenant = await prisma.tenant.upsert({
     where: { slug: "default" },
@@ -224,8 +229,9 @@ async function main() {
         name: "Parafuso 6x40 (caixa)",
         requiresItemScan: false,
         barcode: "7891000000001",
+        imageUrl: demoProductImageUrl("PAR-6X40"),
       },
-      update: {},
+      update: { imageUrl: demoProductImageUrl("PAR-6X40") },
     }),
     prisma.product.upsert({
       where: { tenantId_sku: { tenantId: TENANT_ID, sku: "MOT-220V" } },
@@ -235,8 +241,9 @@ async function main() {
         name: "Motor 220V",
         requiresItemScan: true,
         barcode: "7891000000002",
+        imageUrl: demoProductImageUrl("MOT-220V"),
       },
-      update: {},
+      update: { imageUrl: demoProductImageUrl("MOT-220V") },
     }),
     prisma.product.upsert({
       where: { tenantId_sku: { tenantId: TENANT_ID, sku: "CAB-2M" } },
@@ -246,8 +253,9 @@ async function main() {
         name: "Cabo elétrico 2m",
         requiresItemScan: false,
         barcode: "7891000000003",
+        imageUrl: demoProductImageUrl("CAB-2M"),
       },
-      update: {},
+      update: { imageUrl: demoProductImageUrl("CAB-2M") },
     }),
     prisma.product.upsert({
       where: { tenantId_sku: { tenantId: TENANT_ID, sku: "VAL-1/2" } },
@@ -257,8 +265,9 @@ async function main() {
         name: "Válvula 1/2 pol",
         requiresItemScan: true,
         barcode: "7891000000004",
+        imageUrl: demoProductImageUrl("VAL-1/2"),
       },
-      update: {},
+      update: { imageUrl: demoProductImageUrl("VAL-1/2") },
     }),
     prisma.product.upsert({
       where: { tenantId_sku: { tenantId: TENANT_ID, sku: "FUN-150" } },
@@ -268,8 +277,9 @@ async function main() {
         name: "Filtro UV 150W",
         requiresItemScan: false,
         barcode: "7891000000005",
+        imageUrl: demoProductImageUrl("FUN-150"),
       },
-      update: {},
+      update: { imageUrl: demoProductImageUrl("FUN-150") },
     }),
   ]);
 
@@ -456,7 +466,19 @@ async function main() {
   await prisma.pickWaveOrder.deleteMany({});
   await prisma.pickWave.deleteMany({});
   await prisma.order.deleteMany({
-    where: { tenantId: TENANT_ID, erpOrderId: { startsWith: "ERP-DEMO-" } },
+    where: {
+      tenantId: TENANT_ID,
+      erpOrderId: { startsWith: "ERP-DEMO-" },
+    },
+  });
+  await prisma.order.deleteMany({
+    where: {
+      tenantId: TENANT_ID,
+      OR: [
+        { erpOrderId: { startsWith: "ERP-MOB-" } },
+        { erpOrderId: { startsWith: "ERP-MOB-WAVE-" } },
+      ],
+    },
   });
 
   const locCycle = [locA, locB, locC, locD, locE, locA];
@@ -466,6 +488,7 @@ async function main() {
     index: number,
     status: OrderStatus,
     opts?: {
+      erpOrderId?: string;
       updatedAt?: Date;
       createdAt?: Date;
       dispatchedAt?: Date;
@@ -481,11 +504,18 @@ async function main() {
     const prod = prodCycle[index % prodCycle.length]!;
     const qty = 5 + (index % 12);
     const picked = opts?.quantityPicked ?? (status === "PENDING" ? 0 : qty);
+    const line2Picked =
+      opts?.quantityPicked !== undefined
+        ? opts.quantityPicked
+        : status === "PENDING"
+          ? 0
+          : 2 + (index % 4);
 
     return prisma.order.create({
       data: {
         tenantId: TENANT_ID,
-        erpOrderId: `ERP-DEMO-${String(index).padStart(4, "0")}`,
+        erpOrderId:
+          opts?.erpOrderId ?? `ERP-DEMO-${String(index).padStart(4, "0")}`,
         customerName: `Cliente Demo ${index + 1}`,
         status,
         priority: opts?.priority ?? index % 3,
@@ -512,7 +542,7 @@ async function main() {
               lineNumber: 2,
               productId: prodCycle[(index + 1) % prodCycle.length]!.id,
               quantityOrdered: 2 + (index % 4),
-              quantityPicked: status === "PENDING" ? 0 : 2 + (index % 4),
+              quantityPicked: line2Picked,
               pickLocationId: locCycle[(index + 1) % locCycle.length]!.id,
             },
           ],
@@ -745,6 +775,135 @@ async function main() {
     }
   } catch (e) {
     console.warn("Onda demo:", e);
+  }
+
+  // Pedidos PENDING fora da onda (criados após liberação da onda demo)
+  const mobMarketplaces = [
+    "MERCADO_LIVRE",
+    "SHOPEE",
+    "AMAZON",
+    "MAGALU",
+  ] as const;
+  for (let i = 0; i < 10; i++) {
+    const loc = locCycle[i % locCycle.length]!;
+    const prod = prodCycle[i % prodCycle.length]!;
+    const prod2 = prodCycle[(i + 1) % prodCycle.length]!;
+    await prisma.order.create({
+      data: {
+        tenantId: TENANT_ID,
+        erpOrderId: `ERP-MOB-${String(i).padStart(4, "0")}`,
+        customerName: `Cliente Mobile Teste ${i + 1}`,
+        status: OrderStatus.PENDING,
+        priority: i < 3 ? 3 : i < 6 ? 2 : 1,
+        marketplace: mobMarketplaces[i % mobMarketplaces.length]!,
+        collectionDeadline: atToday(14 + (i % 4), (i * 7) % 60),
+        items: {
+          create: [
+            {
+              lineNumber: 1,
+              productId: prod.id,
+              quantityOrdered: 3 + (i % 5),
+              quantityPicked: 0,
+              pickLocationId: loc.id,
+            },
+            {
+              lineNumber: 2,
+              productId: prod2.id,
+              quantityOrdered: 2 + (i % 3),
+              quantityPicked: 0,
+              pickLocationId: locCycle[(i + 2) % locCycle.length]!.id,
+            },
+          ],
+        },
+      },
+    });
+  }
+
+  // Pedidos com problema (aba Problemas no mobile)
+  for (let i = 0; i < 4; i++) {
+    const returned = await createDemoOrder(80 + i, OrderStatus.PACKING_RETURNED_TO_PICKING, {
+      erpOrderId: `ERP-MOB-RET-${String(i).padStart(2, "0")}`,
+      marketplace: mobMarketplaces[i % mobMarketplaces.length]!,
+      priority: 2,
+    });
+    await prisma.orderTimeLog.create({
+      data: {
+        orderId: returned.id,
+        userId: operador.id,
+        event: OrderTimeLogEvent.PACK_REPORT_ISSUE,
+        reason: JSON.stringify({
+          sku: screw.sku,
+          type: i % 2 === 0 ? "MISSING" : "DAMAGED",
+          quantity: 1 + i,
+        }),
+      },
+    });
+  }
+
+  for (let i = 0; i < 3; i++) {
+    const paused = await createDemoOrder(90 + i, OrderStatus.PAUSED_ISSUE, {
+      erpOrderId: `ERP-MOB-PAU-${String(i).padStart(2, "0")}`,
+      assignedPickerId: operador.id,
+      marketplace: "SHOPEE",
+    });
+    await prisma.orderTimeLog.create({
+      data: {
+        orderId: paused.id,
+        userId: operador.id,
+        event: OrderTimeLogEvent.PAUSE,
+        reason: `Problema na separação — item ${i + 1}`,
+      },
+    });
+  }
+
+  // Aceite sem cesta (testar cancelar aceite / retomar)
+  for (let i = 0; i < 2; i++) {
+    await createDemoOrder(95 + i, OrderStatus.PICKING, {
+      erpOrderId: `ERP-MOB-PICK-${String(i).padStart(2, "0")}`,
+      assignedPickerId: operador.id,
+      quantityPicked: 0,
+      priority: 1,
+    });
+  }
+
+  // Segunda onda pequena (mesmo marketplace) para testes de aceite de onda
+  try {
+    const waveOrderIds: string[] = [];
+    for (let i = 0; i < 4; i++) {
+      const loc = locCycle[i % locCycle.length]!;
+      const prod = prodCycle[i % prodCycle.length]!;
+      const o = await prisma.order.create({
+        data: {
+          tenantId: TENANT_ID,
+          erpOrderId: `ERP-MOB-WAVE-${String(i).padStart(2, "0")}`,
+          customerName: `Cliente Onda Mobile ${i + 1}`,
+          status: OrderStatus.PENDING,
+          priority: 2,
+          marketplace: "MERCADO_LIVRE",
+          collectionDeadline: atToday(15, i * 15),
+          items: {
+            create: [
+              {
+                lineNumber: 1,
+                productId: prod.id,
+                quantityOrdered: 4 + i,
+                quantityPicked: 0,
+                pickLocationId: loc.id,
+              },
+            ],
+          },
+        },
+      });
+      waveOrderIds.push(o.id);
+    }
+    const wave2 = await releasePickWave(TENANT_ID, operador.id, {
+      orderIds: waveOrderIds,
+    });
+    console.log(
+      `Onda mobile extra: ${wave2.orderCount} pedidos, ${wave2.lineCount} linhas`,
+    );
+  } catch (e) {
+    console.warn("Onda mobile extra:", e);
   }
 
   for (const config of DEMO_TENANT_CONFIGS) {

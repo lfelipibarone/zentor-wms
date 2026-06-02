@@ -9,7 +9,14 @@ import {
 } from "react-native";
 import { FactoryButton } from "@/components/FactoryButton";
 import { CollectionDeadlineRow } from "@/components/CollectionDeadlineRow";
-import { useAcceptWave, useCurrentWave } from "@/hooks/useWavePicking";
+import { ProductThumbnail } from "@/components/ProductThumbnail";
+import {
+  useAcceptWave,
+  useCurrentWave,
+  useReleaseWaveAccept,
+} from "@/hooks/useWavePicking";
+import { showErrorAlert } from "@/lib/app-alert";
+import { ApiError } from "@/lib/api";
 import type { WaveLineSummary } from "@/lib/api";
 import { theme, spacing, typography } from "@/lib/theme";
 
@@ -23,6 +30,7 @@ function statusLabel(line: WaveLineSummary) {
 export function WavePickingPanel() {
   const { data, isLoading, error, refetch, isRefetching } = useCurrentWave();
   const acceptWave = useAcceptWave(data?.wave.id);
+  const releaseWave = useReleaseWaveAccept(data?.wave.id);
 
   if (isLoading) {
     return (
@@ -52,6 +60,19 @@ export function WavePickingPanel() {
 
   const { wave, lines } = data;
   const pending = lines.filter((l) => l.sortStatus !== "SORTED");
+  const canReleaseWave =
+    wave.canWork && lines.every((l) => l.quantityPicked === 0);
+
+  const handleReleaseWave = async () => {
+    try {
+      await releaseWave.mutateAsync();
+      await refetch();
+    } catch (e) {
+      showErrorAlert(
+        e instanceof ApiError ? e.message : "Erro ao cancelar aceite",
+      );
+    }
+  };
 
   if (wave.canAccept) {
     return (
@@ -61,6 +82,11 @@ export function WavePickingPanel() {
         <Text style={styles.waveMeta}>
           {wave.orderCount} pedidos · {wave.gondolaPasses} passagens na gôndola
         </Text>
+        {wave.marketplaces && wave.marketplaces.length > 0 ? (
+          <Text style={styles.marketplaces}>
+            {wave.marketplaces.join(" · ")}
+          </Text>
+        ) : null}
         <Text style={styles.acceptHint}>
           Mesmo SKU agrupado — pick consolidado no mobile; packing no painel
           web.
@@ -95,80 +121,102 @@ export function WavePickingPanel() {
     );
   }
 
-  return (
-    <View style={styles.container}>
-      <View style={styles.header}>
-        <Text style={styles.waveName}>{wave.name}</Text>
-        <CollectionDeadlineRow deadline={wave.collectionDeadline} />
-        <Text style={styles.waveMeta}>
-          {wave.orderCount} pedidos · {pending.length} linhas pendentes
+  const listHeader = (
+    <View style={styles.listHeader}>
+      <Text style={styles.waveName}>{wave.name}</Text>
+      <CollectionDeadlineRow deadline={wave.collectionDeadline} />
+      <Text style={styles.waveMeta}>
+        {wave.orderCount} pedidos · {pending.length} linhas pendentes
+      </Text>
+      {wave.marketplaces && wave.marketplaces.length > 0 ? (
+        <Text style={styles.marketplaces}>
+          {wave.marketplaces.join(" · ")}
         </Text>
-      </View>
+      ) : null}
+      {canReleaseWave ? (
+        <FactoryButton
+          label="Cancelar aceite"
+          variant="secondary"
+          onPress={handleReleaseWave}
+          loading={releaseWave.isPending}
+        />
+      ) : null}
+    </View>
+  );
 
-      <FlatList
-        data={lines}
-        keyExtractor={(item) => item.id}
-        contentContainerStyle={styles.list}
-        refreshing={isRefetching}
-        onRefresh={refetch}
-        renderItem={({ item }) => (
-          <Pressable
-            style={[
-              styles.card,
-              item.sortStatus === "SORTED" && styles.cardDone,
-            ]}
-            onPress={() => {
-              if (item.sortStatus === "PICKED" || item.sortStatus === "SORTED") {
-                return;
-              }
-              router.push({
-                pathname: "/wave-picking/[lineId]/pick",
-                params: { lineId: item.id },
-              });
-            }}
-          >
-            <View style={styles.cardTop}>
+  return (
+    <FlatList
+      style={styles.listFlex}
+      data={lines}
+      keyExtractor={(item) => item.id}
+      contentContainerStyle={styles.list}
+      refreshing={isRefetching}
+      onRefresh={refetch}
+      ListHeaderComponent={listHeader}
+      ListFooterComponent={
+        <FactoryButton
+          label="Atualizar onda"
+          variant="secondary"
+          onPress={() => refetch()}
+          loading={isRefetching}
+        />
+      }
+      renderItem={({ item }) => (
+        <Pressable
+          style={[
+            styles.card,
+            item.sortStatus === "SORTED" && styles.cardDone,
+          ]}
+          onPress={() => {
+            if (item.sortStatus === "PICKED" || item.sortStatus === "SORTED") {
+              return;
+            }
+            router.push({
+              pathname: "/wave-picking/[lineId]/pick",
+              params: { lineId: item.id },
+            });
+          }}
+        >
+          <View style={styles.cardTop}>
+            <ProductThumbnail
+              imageUrl={item.product.imageUrl}
+              alt={item.product.name}
+              size={48}
+            />
+            <View style={styles.cardTopText}>
               <Text style={styles.sku}>{item.product.sku}</Text>
               <Text style={styles.badge}>{statusLabel(item)}</Text>
             </View>
-            <CollectionDeadlineRow
-              deadline={item.collectionDeadline}
-              compact
-            />
-            <Text style={styles.productName} numberOfLines={2}>
-              {item.product.name}
+          </View>
+          <CollectionDeadlineRow deadline={item.collectionDeadline} compact />
+          <Text style={styles.productName} numberOfLines={2}>
+            {item.product.name}
+          </Text>
+          <Text style={styles.location}>{item.pickLocation.label}</Text>
+          <View style={styles.qtyRow}>
+            <Text style={styles.qtyMain}>
+              {item.quantityPicked} / {item.quantityTotal} un.
             </Text>
-            <Text style={styles.location}>{item.pickLocation.label}</Text>
-            <View style={styles.qtyRow}>
-              <Text style={styles.qtyMain}>
-                {item.quantityPicked} / {item.quantityTotal} un.
-              </Text>
-            </View>
-            {item.remaining > 0 ? (
-              <Text style={styles.remaining}>
-                Faltam {item.remaining} un. na gôndola
-              </Text>
-            ) : item.sortStatus === "PICKED" ? (
-              <Text style={styles.hint}>
-                Pick concluído — packing no painel web
-              </Text>
-            ) : null}
-          </Pressable>
-        )}
-      />
-
-      <FactoryButton
-        label="Atualizar onda"
-        variant="secondary"
-        onPress={() => refetch()}
-        loading={isRefetching}
-      />
-    </View>
+          </View>
+          {item.remaining > 0 ? (
+            <Text style={styles.remaining}>
+              Faltam {item.remaining} un. na gôndola
+            </Text>
+          ) : item.sortStatus === "PICKED" ? (
+            <Text style={styles.hint}>
+              Pick concluído — packing no painel web
+            </Text>
+          ) : (
+            <Text style={styles.tapLine}>TOQUE PARA SEPARAR</Text>
+          )}
+        </Pressable>
+      )}
+    />
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1 },
+  listFlex: { flex: 1 },
   centered: {
     flex: 1,
     justifyContent: "center",
@@ -182,7 +230,12 @@ const styles = StyleSheet.create({
     fontWeight: "700",
     marginBottom: spacing.lg,
   },
-  header: { marginBottom: spacing.md },
+  listHeader: {
+    paddingHorizontal: spacing.md,
+    paddingTop: spacing.sm,
+    marginBottom: spacing.md,
+    gap: spacing.sm,
+  },
   waveName: {
     fontSize: typography.title,
     fontWeight: "900",
@@ -194,13 +247,24 @@ const styles = StyleSheet.create({
     marginTop: spacing.xs,
     textAlign: "center",
   },
+  marketplaces: {
+    color: theme.textMuted,
+    marginTop: spacing.xs,
+    textAlign: "center",
+    fontSize: typography.caption,
+    fontWeight: "600",
+  },
   acceptHint: {
     color: theme.textMuted,
     textAlign: "center",
     marginVertical: spacing.lg,
     paddingHorizontal: spacing.md,
   },
-  list: { paddingBottom: spacing.md },
+  list: {
+    paddingHorizontal: spacing.md,
+    paddingBottom: spacing.xl,
+    flexGrow: 1,
+  },
   card: {
     backgroundColor: theme.surface,
     borderRadius: 16,
@@ -211,6 +275,12 @@ const styles = StyleSheet.create({
   },
   cardDone: { borderColor: theme.border, opacity: 0.85 },
   cardTop: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.md,
+  },
+  cardTopText: {
+    flex: 1,
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
@@ -245,4 +315,11 @@ const styles = StyleSheet.create({
   qtyMain: { fontSize: 28, fontWeight: "900", color: theme.text },
   remaining: { color: theme.warning, fontWeight: "700", marginTop: spacing.sm },
   hint: { color: theme.success, fontWeight: "600", marginTop: spacing.sm },
+  tapLine: {
+    marginTop: spacing.sm,
+    textAlign: "center",
+    fontWeight: "800",
+    color: theme.primary,
+    fontSize: typography.caption,
+  },
 });

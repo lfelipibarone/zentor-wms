@@ -37,6 +37,19 @@ export function useAcceptWave(waveId?: string | null) {
   });
 }
 
+export function useReleaseWaveAccept(waveId?: string | null) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: () =>
+      waveId
+        ? api.releaseWaveAccept(waveId)
+        : api.releaseCurrentWaveAccept(),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["wave"] });
+    },
+  });
+}
+
 /** @deprecated use useAcceptWave */
 export function useAcceptCurrentWave() {
   return useAcceptWave(null);

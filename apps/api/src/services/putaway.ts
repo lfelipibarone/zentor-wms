@@ -11,9 +11,10 @@ import {
   sortPendingItemsByRoute,
 } from "./location-route.js";
 
-export async function listPutawayQueue() {
+export async function listPutawayQueue(tenantId?: string) {
   const sessions = await prisma.purchaseReceiptSession.findMany({
     where: {
+      ...(tenantId ? { tenantId } : {}),
       status: PurchaseReceiptSessionStatus.COMPLETED,
       OR: [
         { putaway: null },

@@ -4,6 +4,9 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { PageHeader } from "@/components/ops/page-header";
 import { CollectionDeadlineIndicator } from "@/components/ops/collection-deadline-indicator";
+import { MarketplaceBadge } from "@/components/ops/marketplace-badge";
+import { MarketplaceFilter } from "@/components/ops/marketplace-filter";
+import { matchesMarketplaceFilter } from "@/lib/marketplace-filter-client";
 import { DataState } from "@/components/ops/data-state";
 import { apiFetch } from "@/lib/api/client";
 import { cn } from "@/lib/utils";
@@ -50,6 +53,7 @@ export default function PackingPage() {
   const router = useRouter();
   const [items, setItems] = useState<PackingQueueItem[]>([]);
   const [filter, setFilter] = useState<QueueFilter>("all");
+  const [marketplace, setMarketplace] = useState("");
   const [basketScan, setBasketScan] = useState("");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -129,7 +133,11 @@ export default function PackingPage() {
     if (code) void openOrderByBasketCode(code);
   };
 
-  const visible = filterItems(items, filter);
+  const visible = filterItems(items, filter).filter((entry) => {
+    if (!marketplace) return true;
+    if (entry.kind !== "order") return true;
+    return matchesMarketplaceFilter(entry.order.marketplace, marketplace);
+  });
   const isEmpty = !loading && visible.length === 0;
 
   const filters: { id: QueueFilter; label: string }[] = [
@@ -181,6 +189,10 @@ export default function PackingPage() {
           {saving ? "Abrindo…" : "Abrir pedido"}
         </button>
       </form>
+
+      <div className="flex flex-wrap items-center gap-2">
+        <MarketplaceFilter value={marketplace} onChange={setMarketplace} />
+      </div>
 
       <div className="flex flex-wrap gap-2">
         {filters.map((f) => (
@@ -240,7 +252,6 @@ export default function PackingPage() {
                   Reposição · mobile
                 </span>
                 <p className="mt-2 font-mono font-bold">{entry.need.sku}</p>
-                <p className="text-sm">{entry.need.productName}</p>
                 <p className="text-sm text-muted-foreground">
                   {entry.need.routeLabel} · {entry.need.currentQuantity}/
                   {entry.need.minThreshold} un. · repor ~{entry.need.deficit} un.
@@ -280,6 +291,9 @@ export default function PackingPage() {
                   </p>
                 ) : null}
                 <p className="mt-2 font-mono font-bold">{entry.order.erpOrderId}</p>
+                <div className="mt-1">
+                  <MarketplaceBadge value={entry.order.marketplace} />
+                </div>
                 <p className="text-sm text-muted-foreground">
                   {entry.order.routeLabel ? `${entry.order.routeLabel} · ` : ""}
                   Cesta {entry.order.basket?.code ?? "—"} · {entry.order.items.length}{" "}

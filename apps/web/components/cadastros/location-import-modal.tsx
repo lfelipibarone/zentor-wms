@@ -172,7 +172,6 @@ export function LocationImportModal({
                   <th className="px-2 py-1 text-left">Corredor</th>
                   <th className="px-2 py-1 text-left">Fileira</th>
                   <th className="px-2 py-1 text-left">Tipo</th>
-                  <th className="px-2 py-1 text-left">SKU</th>
                 </tr>
               </thead>
               <tbody>
@@ -182,7 +181,6 @@ export function LocationImportModal({
                     <td className="px-2 py-1">{r.corridor}</td>
                     <td className="px-2 py-1">{r.row}</td>
                     <td className="px-2 py-1">{r.type}</td>
-                    <td className="px-2 py-1">{r.productSku ?? "—"}</td>
                   </tr>
                 ))}
               </tbody>

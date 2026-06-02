@@ -25,6 +25,22 @@ export default function RootLayout() {
               options={{ headerShown: false }}
             />
             <Stack.Screen
+              name="wave-picking"
+              options={{ headerShown: false }}
+            />
+            <Stack.Screen
+              name="correcao/index"
+              options={{ headerShown: false }}
+            />
+            <Stack.Screen
+              name="ressuprimento/index"
+              options={{ headerShown: false }}
+            />
+            <Stack.Screen
+              name="armazenagem-pulmao/index"
+              options={{ headerShown: false }}
+            />
+            <Stack.Screen
               name="cargo-transport/index"
               options={{ title: "Transporte de carga" }}
             />
@@ -34,7 +50,7 @@ export default function RootLayout() {
             />
             <Stack.Screen
               name="replenishment/index"
-              options={{ title: "Reposição" }}
+              options={{ title: "Solicitar reabastecimento" }}
             />
             <Stack.Screen
               name="purchase-receipt"

@@ -9,10 +9,12 @@ export type ReportId =
   | "picking"
   | "movements"
   | "low_stock"
+  | "packing_issues"
   | "picking_time_by_order"
   | "picking_time_by_user"
   | "packing_time_by_order"
-  | "packing_time_by_user";
+  | "packing_time_by_user"
+  | "volume_by_marketplace";
 
 export interface ReportColumn {
   key: string;
@@ -35,6 +37,7 @@ export interface ReportTypeMeta {
   description: string;
   requiresPeriod: boolean;
   group?: string;
+  acceptsMarketplaceFilter?: boolean;
 }
 
 export function defaultReportPeriod(): { from: string; to: string } {
@@ -81,12 +84,14 @@ export function fetchReportData(params: {
   to?: string;
   status?: string;
   movementType?: string;
+  marketplace?: string;
 }) {
   const qs = new URLSearchParams({ report: params.report });
   if (params.from) qs.set("from", params.from);
   if (params.to) qs.set("to", params.to);
   if (params.status) qs.set("status", params.status);
   if (params.movementType) qs.set("movementType", params.movementType);
+  if (params.marketplace) qs.set("marketplace", params.marketplace);
   return apiFetch<ReportResult>(`/api/reports/data?${qs}`);
 }
 
@@ -96,6 +101,7 @@ export async function downloadReportCsv(params: {
   to?: string;
   status?: string;
   movementType?: string;
+  marketplace?: string;
 }): Promise<void> {
   const qs = new URLSearchParams({
     report: params.report,
@@ -105,6 +111,7 @@ export async function downloadReportCsv(params: {
   if (params.to) qs.set("to", params.to);
   if (params.status) qs.set("status", params.status);
   if (params.movementType) qs.set("movementType", params.movementType);
+  if (params.marketplace) qs.set("marketplace", params.marketplace);
 
   const res = await fetch(`${API_BASE}/api/reports/data?${qs}`, {
     headers: authHeaders(),

@@ -29,24 +29,52 @@ import {
 } from "../services/location-rules.js";
 import {
   PickWaveError,
+  addOrdersToWave,
+  getOpenWave,
   listPickWaves,
   previewWaveRelease,
   releasePickWave,
+  removeOrderFromWave,
   closePickWave,
 } from "../services/pick-wave.js";
-import { getWaveSettings, WAVE_SETTING_META } from "../services/wave-settings.js";
+import {
+  getWaveSettings,
+  setWaveSettings,
+  WAVE_SETTING_META,
+  type WaveSettings,
+} from "../services/wave-settings.js";
 import { enrichOrderPriority } from "../services/marketplace-priority.js";
+import { marketplaceWhereClause } from "../services/marketplace-filter.js";
+import { marketplaceDisplayLabel } from "../services/marketplace-priority.js";
 import {
   getPurchaseReceiptDetailForWeb,
   listPurchaseReceiptsForWeb,
 } from "../services/purchase-receipt-web.js";
+import { syncPurchaseReceiptsFromTiny } from "../services/sync-purchase-receipts-from-tiny.js";
+import {
+  completePurchaseReceipt,
+  confirmReceiptItem,
+  isTinyConnectedError,
+  markConferenceStarted,
+  scanPurchaseReceiptItem,
+  startPurchaseReceiptByBarcode,
+} from "../services/tiny-purchase-receipt.js";
+import {
+  completeReturnReceipt,
+  scanReturnReceiptProduct,
+  startReturnReceiptSession,
+} from "../services/purchase-receipt-return.js";
 import {
   getOrderDetail,
   getOrdersBoard,
   getWaveDetail,
   type BoardKind,
 } from "../services/orders-board.js";
-import { tenantWhere } from "../lib/tenant-context.js";
+import {
+  assertResourceTenant,
+  tenantWhere,
+  TenantContextError,
+} from "../lib/tenant-context.js";
 import {
   completePacking,
   confirmPackingItem,
@@ -56,12 +84,22 @@ import {
   listPackingQueue,
   listUnifiedPackingQueue,
   listWavePackingLines,
+  reportPackingIssue,
   scanPackingItem,
   sortWaveAllocationWeb,
   startPacking,
+  type PackingIssuePayload,
+  type PackingIssueType,
   cancelPacking,
   PackingSessionError,
 } from "../services/order-packing.js";
+import {
+  completePutaway,
+  getPutawaySession,
+  listPutawayQueue,
+  startPutaway,
+  storePutawayItem,
+} from "../services/putaway.js";
 
 const guard = (p: string) => createPermissionGuard(p);
 
@@ -251,22 +289,37 @@ export async function webRoutes(app: FastifyInstance) {
 
   // --- Pedidos (Vendas) ---
   app.get<{
-    Querystring: { status?: string; q?: string; page?: string; pageSize?: string };
+    Querystring: {
+      status?: string;
+      q?: string;
+      page?: string;
+      pageSize?: string;
+      notInWave?: string;
+      marketplace?: string;
+    };
   }>(
     "/api/orders",
     { preHandler: guard(Permission.SALES_VIEW) },
     async (request) => {
       const q = request.query.q?.trim();
       const status = request.query.status as OrderStatus | undefined;
+      const notInWave = request.query.notInWave === "true";
+      const marketplace = request.query.marketplace?.trim();
       const { page, pageSize, skip, take } = parsePagination(request.query);
       const where: Prisma.OrderWhereInput = { ...tenantWhere(request) };
       if (status && Object.values(OrderStatus).includes(status)) {
         where.status = status;
       }
+      if (notInWave) {
+        where.waveOrders = { none: {} };
+      }
+      const mpWhere = marketplaceWhereClause(marketplace);
+      if (mpWhere) Object.assign(where, mpWhere);
       if (q) {
         where.OR = [
           { erpOrderId: { contains: q, mode: "insensitive" } },
           { customerName: { contains: q, mode: "insensitive" } },
+          { marketplace: { contains: q, mode: "insensitive" } },
         ];
       }
       const [orders, total] = await Promise.all([
@@ -313,6 +366,7 @@ export async function webRoutes(app: FastifyInstance) {
       page?: string;
       pageSize?: string;
       kind?: string;
+      marketplace?: string;
     };
   }>(
     "/api/orders/board",
@@ -321,6 +375,7 @@ export async function webRoutes(app: FastifyInstance) {
       const kind = (request.query.kind as BoardKind | undefined) ?? "all";
       const status = request.query.status as OrderStatus | undefined;
       const q = request.query.q?.trim();
+      const marketplace = request.query.marketplace?.trim();
       const { page, pageSize } = parsePagination(request.query);
       const validKind = ["all", "order", "wave"].includes(kind) ? kind : "all";
       return getOrdersBoard(tenantWhere(request).tenantId, {
@@ -330,9 +385,32 @@ export async function webRoutes(app: FastifyInstance) {
             ? status
             : undefined,
         q: q || undefined,
+        marketplace: marketplace || undefined,
         page,
         pageSize,
       });
+    },
+  );
+
+  app.get(
+    "/api/orders/marketplaces",
+    { preHandler: guard(Permission.SALES_VIEW) },
+    async (request) => {
+      const rows = await prisma.order.findMany({
+        where: tenantWhere(request),
+        select: { marketplace: true },
+        distinct: ["marketplace"],
+      });
+      const values = rows
+        .map((r) => r.marketplace)
+        .filter((m): m is string => m != null && m !== "")
+        .sort((a, b) => a.localeCompare(b));
+      return {
+        marketplaces: values.map((value) => ({
+          value,
+          label: marketplaceDisplayLabel(value),
+        })),
+      };
     },
   );
 
@@ -415,18 +493,65 @@ export async function webRoutes(app: FastifyInstance) {
     },
   );
 
-  app.get(
+  app.post<{
+    Body: {
+      orderIds?: string[];
+      marketplace?: string;
+      partitionStrategy?: string;
+    };
+  }>(
     "/api/waves/preview",
     { preHandler: guard(Permission.SALES_VIEW) },
     async (request) => {
+      const body = request.body ?? {};
+      const orderIds = Array.isArray(body.orderIds)
+        ? body.orderIds.filter((x) => typeof x === "string")
+        : undefined;
+      const marketplace =
+        typeof body.marketplace === "string" ? body.marketplace : undefined;
+      const partitionStrategy =
+        typeof body.partitionStrategy === "string"
+          ? body.partitionStrategy
+          : undefined;
       try {
-        return await previewWaveRelease(tenantWhere(request).tenantId);
+        return await previewWaveRelease(tenantWhere(request).tenantId, {
+          orderIds,
+          marketplace,
+          partitionStrategy: partitionStrategy as
+            | "SINGLE_ITEM"
+            | "PROXIMITY"
+            | "BY_PRODUCT"
+            | undefined,
+        });
       } catch (e) {
         if (e instanceof PickWaveError) {
-          return { orderCount: 0, lineCount: 0, gondolaPasses: 0, orders: [], lines: [], error: e.message };
+          return {
+            orderCount: 0,
+            lineCount: 0,
+            gondolaPasses: 0,
+            orders: [],
+            lines: [],
+            waves: [],
+            error: e.message,
+          };
         }
         throw e;
       }
+    },
+  );
+
+  app.get<{ Querystring: { marketplace?: string; limit?: string } }>(
+    "/api/orders/pick-proximity-groups",
+    { preHandler: guard(Permission.SALES_VIEW) },
+    async (request) => {
+      const limit = Number(request.query.limit);
+      const { getPickProximityGroups } = await import(
+        "../services/pick-proximity-recommendations.js"
+      );
+      return getPickProximityGroups(tenantWhere(request).tenantId, {
+        marketplace: request.query.marketplace,
+        limit: Number.isFinite(limit) && limit > 0 ? limit : 10,
+      });
     },
   );
 
@@ -436,6 +561,24 @@ export async function webRoutes(app: FastifyInstance) {
     async (request) => {
       const settings = await getWaveSettings(tenantWhere(request).tenantId);
       return { settings, meta: WAVE_SETTING_META };
+    },
+  );
+
+  app.put<{ Body: Partial<WaveSettings> }>(
+    "/api/waves/settings",
+    { preHandler: guard(Permission.SETTINGS_MANAGE) },
+    async (request, reply) => {
+      try {
+        const settings = await setWaveSettings(
+          tenantWhere(request).tenantId,
+          request.body ?? {},
+          request.authUser!.id,
+        );
+        return { settings, meta: WAVE_SETTING_META };
+      } catch (e) {
+        const message = e instanceof Error ? e.message : "Erro ao salvar configurações";
+        return reply.status(400).send({ error: message });
+      }
     },
   );
 
@@ -453,19 +596,36 @@ export async function webRoutes(app: FastifyInstance) {
   );
 
   app.post<{
-    Body: { orderIds?: string[]; auto?: boolean };
+    Body: {
+      orderIds?: string[];
+      auto?: boolean;
+      appendToWaveId?: string;
+      marketplace?: string;
+      partitionStrategy?: string;
+    };
   }>(
     "/api/waves/release",
     { preHandler: guard(Permission.SALES_VIEW) },
     async (request, reply) => {
       const userId = request.authUser!.id;
+      const body = request.body ?? {};
       try {
         const result = await releasePickWave(
           tenantWhere(request).tenantId,
           userId,
           {
-            orderIds: request.body?.orderIds,
-            auto: request.body?.auto ?? true,
+            orderIds: body.orderIds,
+            auto: body.auto ?? true,
+            appendToWaveId: body.appendToWaveId,
+            marketplace:
+              typeof body.marketplace === "string" ? body.marketplace : undefined,
+            partitionStrategy:
+              typeof body.partitionStrategy === "string"
+                ? (body.partitionStrategy as
+                    | "SINGLE_ITEM"
+                    | "PROXIMITY"
+                    | "BY_PRODUCT")
+                : undefined,
           },
         );
         return result;
@@ -475,6 +635,24 @@ export async function webRoutes(app: FastifyInstance) {
         }
         throw e;
       }
+    },
+  );
+
+  app.get(
+    "/api/waves/open",
+    { preHandler: guard(Permission.SALES_VIEW) },
+    async (request) => {
+      const wave = await getOpenWave(tenantWhere(request).tenantId);
+      if (!wave) return { wave: null };
+      return {
+        wave: {
+          id: wave.id,
+          name: wave.name,
+          releasedAt: wave.releasedAt?.toISOString() ?? null,
+          orderCount: wave._count.orders,
+          lineCount: wave._count.lines,
+        },
+      };
     },
   );
 
@@ -497,6 +675,49 @@ export async function webRoutes(app: FastifyInstance) {
     async (request, reply) => {
       try {
         await closePickWave(request.params.id);
+        return { ok: true };
+      } catch (e) {
+        if (e instanceof PickWaveError) {
+          return reply.status(e.statusCode).send({ error: e.message });
+        }
+        throw e;
+      }
+    },
+  );
+
+  app.post<{ Params: { id: string }; Body: { orderIds?: string[] } }>(
+    "/api/waves/:id/orders",
+    { preHandler: guard(Permission.SALES_VIEW) },
+    async (request, reply) => {
+      const orderIds = Array.isArray(request.body?.orderIds)
+        ? request.body!.orderIds.filter((x) => typeof x === "string")
+        : [];
+      try {
+        const result = await addOrdersToWave(
+          tenantWhere(request).tenantId,
+          request.params.id,
+          orderIds,
+        );
+        return { ok: true, ...result };
+      } catch (e) {
+        if (e instanceof PickWaveError) {
+          return reply.status(e.statusCode).send({ error: e.message });
+        }
+        throw e;
+      }
+    },
+  );
+
+  app.delete<{ Params: { id: string; orderId: string } }>(
+    "/api/waves/:id/orders/:orderId",
+    { preHandler: guard(Permission.SALES_VIEW) },
+    async (request, reply) => {
+      try {
+        await removeOrderFromWave(
+          tenantWhere(request).tenantId,
+          request.params.id,
+          request.params.orderId,
+        );
         return { ok: true };
       } catch (e) {
         if (e instanceof PickWaveError) {
@@ -978,6 +1199,22 @@ export async function webRoutes(app: FastifyInstance) {
     },
   );
 
+  app.post(
+    "/api/purchase-receipts/sync",
+    { preHandler: guard(Permission.RECEIPTS_VIEW) },
+    async (request, reply) => {
+      try {
+        return await syncPurchaseReceiptsFromTiny({
+          tenantId: tenantWhere(request).tenantId,
+          userId: request.authUser!.id,
+        });
+      } catch (e) {
+        const message = e instanceof Error ? e.message : "Erro ao sincronizar";
+        return reply.status(422).send({ error: message });
+      }
+    },
+  );
+
   app.get<{
     Querystring: {
       page?: string;
@@ -985,6 +1222,10 @@ export async function webRoutes(app: FastifyInstance) {
       status?: string;
       userId?: string;
       kind?: string;
+      q?: string;
+      from?: string;
+      to?: string;
+      sort?: string;
     };
   }>(
     "/api/purchase-receipts",
@@ -995,6 +1236,10 @@ export async function webRoutes(app: FastifyInstance) {
         request.query.kind === "ENTRY" || request.query.kind === "RETURN"
           ? request.query.kind
           : undefined;
+      const sort =
+        request.query.sort === "asc" || request.query.sort === "desc"
+          ? request.query.sort
+          : "desc";
       return listPurchaseReceiptsForWeb({
         tenantId: tenantWhere(request).tenantId,
         page,
@@ -1002,7 +1247,53 @@ export async function webRoutes(app: FastifyInstance) {
         status: request.query.status,
         kind,
         userId: request.query.userId,
+        q: request.query.q,
+        from: request.query.from,
+        to: request.query.to,
+        sort,
       });
+    },
+  );
+
+  app.post<{ Body: { barcode?: string } }>(
+    "/api/purchase-receipts/start",
+    { preHandler: guard(Permission.RECEIPTS_VIEW) },
+    async (request, reply) => {
+      const barcode = request.body?.barcode?.trim();
+      if (!barcode) {
+        return reply.status(400).send({ error: "Código DANFE obrigatório" });
+      }
+      try {
+        return await startPurchaseReceiptByBarcode({
+          tenantId: tenantWhere(request).tenantId,
+          barcode,
+          userId: request.authUser!.id,
+        });
+      } catch (e) {
+        if (isTinyConnectedError(e)) {
+          return reply.status(503).send({ error: "Tiny ERP não conectado." });
+        }
+        const message =
+          e instanceof Error ? e.message : "Erro ao iniciar recebimento";
+        return reply.status(422).send({ error: message });
+      }
+    },
+  );
+
+  app.post<{ Body: { reference?: string } }>(
+    "/api/purchase-receipts/return/start",
+    { preHandler: guard(Permission.RECEIPTS_VIEW) },
+    async (request, reply) => {
+      try {
+        return await startReturnReceiptSession({
+          tenantId: tenantWhere(request).tenantId,
+          userId: request.authUser!.id,
+          reference: request.body?.reference,
+        });
+      } catch (e) {
+        const message = e instanceof Error ? e.message : "Erro ao iniciar devolução";
+        return reply.status(422).send({ error: message });
+      }
     },
   );
 
@@ -1010,9 +1301,252 @@ export async function webRoutes(app: FastifyInstance) {
     "/api/purchase-receipts/:id",
     { preHandler: guard(Permission.RECEIPTS_VIEW) },
     async (request, reply) => {
-      const detail = await getPurchaseReceiptDetailForWeb(request.params.id);
-      if (!detail) return reply.status(404).send({ error: "Sessão não encontrada" });
-      return detail;
+      try {
+        const detail = await getPurchaseReceiptDetailForWeb(
+          request.params.id,
+          tenantWhere(request).tenantId,
+        );
+        if (!detail) {
+          return reply.status(404).send({ error: "Sessão não encontrada" });
+        }
+        return detail;
+      } catch (e) {
+        if (e instanceof TenantContextError) {
+          return reply.status(403).send({ error: e.message });
+        }
+        throw e;
+      }
+    },
+  );
+
+  app.post<{ Params: { id: string } }>(
+    "/api/purchase-receipts/:id/conference-start",
+    { preHandler: guard(Permission.RECEIPTS_VIEW) },
+    async (request, reply) => {
+      try {
+        const session = await prisma.purchaseReceiptSession.findUnique({
+          where: { id: request.params.id },
+          select: { tenantId: true, status: true },
+        });
+        if (!session) {
+          return reply.status(404).send({ error: "Sessão não encontrada" });
+        }
+        await assertResourceTenant(
+          session.tenantId,
+          tenantWhere(request).tenantId,
+        );
+        if (
+          session.status === "READY_TO_CHECK" ||
+          session.status === "WAITING_ENTRY"
+        ) {
+          await prisma.purchaseReceiptSession.update({
+            where: { id: request.params.id },
+            data: { status: "IN_CHECK" },
+          });
+        }
+        await markConferenceStarted(request.params.id, request.authUser!.id);
+        return { ok: true };
+      } catch (e) {
+        const message =
+          e instanceof Error ? e.message : "Erro ao iniciar conferência";
+        return reply.status(422).send({ error: message });
+      }
+    },
+  );
+
+  app.post<{
+    Params: { id: string };
+    Body: { barcode?: string; quantity?: number };
+  }>(
+    "/api/purchase-receipts/:id/scan",
+    { preHandler: guard(Permission.RECEIPTS_VIEW) },
+    async (request, reply) => {
+      const barcode = request.body?.barcode?.trim();
+      if (!barcode) {
+        return reply.status(400).send({ error: "Código do produto obrigatório" });
+      }
+      try {
+        const session = await prisma.purchaseReceiptSession.findUnique({
+          where: { id: request.params.id },
+          select: { tenantId: true },
+        });
+        if (!session) {
+          return reply.status(404).send({ error: "Sessão não encontrada" });
+        }
+        await assertResourceTenant(
+          session.tenantId,
+          tenantWhere(request).tenantId,
+        );
+        await scanPurchaseReceiptItem({
+          sessionId: request.params.id,
+          barcode,
+          quantity: request.body?.quantity,
+        });
+        const detail = await getPurchaseReceiptDetailForWeb(
+          request.params.id,
+          tenantWhere(request).tenantId,
+        );
+        return { detail };
+      } catch (e) {
+        const message = e instanceof Error ? e.message : "Erro ao registrar bip";
+        return reply.status(422).send({ error: message });
+      }
+    },
+  );
+
+  app.post<{
+    Params: { id: string };
+    Body: { itemId?: string; quantity?: number };
+  }>(
+    "/api/purchase-receipts/:id/confirm-item",
+    { preHandler: guard(Permission.RECEIPTS_VIEW) },
+    async (request, reply) => {
+      const { itemId, quantity } = request.body ?? {};
+      if (!itemId) {
+        return reply.status(400).send({ error: "itemId obrigatório" });
+      }
+      try {
+        const session = await prisma.purchaseReceiptSession.findUnique({
+          where: { id: request.params.id },
+          select: { tenantId: true },
+        });
+        if (!session) {
+          return reply.status(404).send({ error: "Sessão não encontrada" });
+        }
+        await assertResourceTenant(
+          session.tenantId,
+          tenantWhere(request).tenantId,
+        );
+        await confirmReceiptItem(
+          request.params.id,
+          itemId,
+          Number(quantity ?? 1),
+        );
+        const detail = await getPurchaseReceiptDetailForWeb(
+          request.params.id,
+          tenantWhere(request).tenantId,
+        );
+        return { detail };
+      } catch (e) {
+        const message = e instanceof Error ? e.message : "Erro ao confirmar item";
+        return reply.status(422).send({ error: message });
+      }
+    },
+  );
+
+  app.post<{ Params: { id: string } }>(
+    "/api/purchase-receipts/:id/complete",
+    { preHandler: guard(Permission.RECEIPTS_VIEW) },
+    async (request, reply) => {
+      try {
+        const session = await prisma.purchaseReceiptSession.findUnique({
+          where: { id: request.params.id },
+          select: { tenantId: true },
+        });
+        if (!session) {
+          return reply.status(404).send({ error: "Sessão não encontrada" });
+        }
+        await assertResourceTenant(
+          session.tenantId,
+          tenantWhere(request).tenantId,
+        );
+        await completePurchaseReceipt(
+          request.params.id,
+          request.authUser!.id,
+        );
+        const detail = await getPurchaseReceiptDetailForWeb(
+          request.params.id,
+          tenantWhere(request).tenantId,
+        );
+        return { detail };
+      } catch (e) {
+        const message =
+          e instanceof Error ? e.message : "Erro ao finalizar conferência";
+        return reply.status(422).send({ error: message });
+      }
+    },
+  );
+
+  app.post<{
+    Params: { id: string };
+    Body: { barcode?: string; quantity?: number };
+  }>(
+    "/api/purchase-receipts/return/:id/scan",
+    { preHandler: guard(Permission.RECEIPTS_VIEW) },
+    async (request, reply) => {
+      const barcode = request.body?.barcode?.trim();
+      if (!barcode) {
+        return reply.status(400).send({ error: "Código do produto obrigatório" });
+      }
+      try {
+        const session = await prisma.purchaseReceiptSession.findUnique({
+          where: { id: request.params.id },
+          select: { tenantId: true },
+        });
+        if (!session) {
+          return reply.status(404).send({ error: "Sessão não encontrada" });
+        }
+        await assertResourceTenant(
+          session.tenantId,
+          tenantWhere(request).tenantId,
+        );
+        await scanReturnReceiptProduct({
+          sessionId: request.params.id,
+          barcode,
+          quantity: request.body?.quantity,
+        });
+        const detail = await getPurchaseReceiptDetailForWeb(
+          request.params.id,
+          tenantWhere(request).tenantId,
+        );
+        return { detail };
+      } catch (e) {
+        const message = e instanceof Error ? e.message : "Erro ao registrar bip";
+        return reply.status(422).send({ error: message });
+      }
+    },
+  );
+
+  app.post<{
+    Params: { id: string };
+    Body: { pulmaoLocationBarcode?: string };
+  }>(
+    "/api/purchase-receipts/return/:id/complete",
+    { preHandler: guard(Permission.RECEIPTS_VIEW) },
+    async (request, reply) => {
+      const pulmao = request.body?.pulmaoLocationBarcode?.trim();
+      if (!pulmao) {
+        return reply
+          .status(400)
+          .send({ error: "Local de pulmão (código) obrigatório" });
+      }
+      try {
+        const session = await prisma.purchaseReceiptSession.findUnique({
+          where: { id: request.params.id },
+          select: { tenantId: true },
+        });
+        if (!session) {
+          return reply.status(404).send({ error: "Sessão não encontrada" });
+        }
+        await assertResourceTenant(
+          session.tenantId,
+          tenantWhere(request).tenantId,
+        );
+        await completeReturnReceipt({
+          sessionId: request.params.id,
+          userId: request.authUser!.id,
+          pulmaoLocationBarcode: pulmao,
+        });
+        const detail = await getPurchaseReceiptDetailForWeb(
+          request.params.id,
+          tenantWhere(request).tenantId,
+        );
+        return { detail };
+      } catch (e) {
+        const message =
+          e instanceof Error ? e.message : "Erro ao finalizar devolução";
+        return reply.status(422).send({ error: message });
+      }
     },
   );
 
@@ -1163,6 +1697,51 @@ export async function webRoutes(app: FastifyInstance) {
       try {
         return await completePacking(request.params.id, request.authUser!.id);
       } catch (e) {
+        const message = e instanceof Error ? e.message : "Erro";
+        return reply.status(422).send({ error: message });
+      }
+    },
+  );
+
+  app.post<{
+    Params: { id: string };
+    Body: {
+      itemId?: string;
+      quantity?: number;
+      type?: PackingIssueType;
+      description?: string;
+    };
+  }>(
+    "/api/packing/orders/:id/report-issue",
+    { preHandler: guard(Permission.SHIPPING_VIEW) },
+    async (request, reply) => {
+      const { itemId, quantity, type, description } = request.body ?? {};
+      if (!itemId) {
+        return reply.status(400).send({ error: "itemId obrigatório" });
+      }
+      if (!type) {
+        return reply.status(400).send({ error: "type obrigatório" });
+      }
+      const qty = Number(quantity);
+      if (!Number.isFinite(qty) || qty <= 0) {
+        return reply.status(400).send({ error: "Quantidade inválida" });
+      }
+      const payload: PackingIssuePayload = {
+        itemId,
+        quantity: Math.floor(qty),
+        type,
+        description: description?.trim() || undefined,
+      };
+      try {
+        return await reportPackingIssue(
+          request.params.id,
+          request.authUser!.id,
+          payload,
+        );
+      } catch (e) {
+        if (e instanceof PackingSessionError) {
+          return reply.status(e.statusCode).send({ error: e.message });
+        }
         const message = e instanceof Error ? e.message : "Erro";
         return reply.status(422).send({ error: message });
       }
@@ -1341,12 +1920,14 @@ export async function webRoutes(app: FastifyInstance) {
         label: "Expedidos",
         description: "Pedidos despachados no período selecionado",
         requiresPeriod: true,
+        acceptsMarketplaceFilter: true,
       },
       {
         id: "orders",
         label: "Pedidos",
         description: "Pedidos criados ou atualizados no período",
         requiresPeriod: true,
+        acceptsMarketplaceFilter: true,
       },
       {
         id: "picking",
@@ -1360,6 +1941,7 @@ export async function webRoutes(app: FastifyInstance) {
         description: "Duração de separação por pedido (onda e individual)",
         requiresPeriod: true,
         group: "operation_times",
+        acceptsMarketplaceFilter: true,
       },
       {
         id: "picking_time_by_user",
@@ -1374,6 +1956,7 @@ export async function webRoutes(app: FastifyInstance) {
         description: "Duração de packing/sort por pedido (onda e individual)",
         requiresPeriod: true,
         group: "operation_times",
+        acceptsMarketplaceFilter: true,
       },
       {
         id: "packing_time_by_user",
@@ -1386,6 +1969,21 @@ export async function webRoutes(app: FastifyInstance) {
         id: "movements",
         label: "Movimentações",
         description: "Entradas, saídas, transferências e ajustes de estoque",
+        requiresPeriod: true,
+      },
+      {
+        id: "packing_issues",
+        label: "Incidentes no packing",
+        description:
+          "Itens com avaria, faltantes ou separados errado detectados no packing",
+        requiresPeriod: true,
+        acceptsMarketplaceFilter: true,
+      },
+      {
+        id: "volume_by_marketplace",
+        label: "Volume por marketplace",
+        description:
+          "Pedidos, expedidos e incidentes de packing agrupados por marketplace",
         requiresPeriod: true,
       },
       {
@@ -1404,6 +2002,7 @@ export async function webRoutes(app: FastifyInstance) {
       to?: string;
       status?: string;
       movementType?: string;
+      marketplace?: string;
       format?: string;
     };
   }>(
@@ -1425,6 +2024,7 @@ export async function webRoutes(app: FastifyInstance) {
           to: request.query.to,
           status: request.query.status,
           movementType: request.query.movementType,
+          marketplace: request.query.marketplace,
         });
 
         if (request.query.format === "csv") {
@@ -1445,6 +2045,91 @@ export async function webRoutes(app: FastifyInstance) {
       } catch (e) {
         const msg = e instanceof Error ? e.message : "Erro ao gerar relatório";
         return reply.status(400).send({ error: msg });
+      }
+    },
+  );
+
+  // --- Armazenagem (putaway NF → pulmão) ---
+  app.get(
+    "/api/putaway/queue",
+    { preHandler: guard(Permission.RECEIPTS_VIEW) },
+    async (request) => listPutawayQueue(tenantWhere(request).tenantId),
+  );
+
+  app.post<{ Body: { purchaseReceiptId?: string } }>(
+    "/api/putaway/start",
+    { preHandler: guard(Permission.RECEIPTS_VIEW) },
+    async (request, reply) => {
+      const purchaseReceiptId = request.body?.purchaseReceiptId?.trim();
+      if (!purchaseReceiptId) {
+        return reply.status(400).send({ error: "purchaseReceiptId obrigatório" });
+      }
+      try {
+        return await startPutaway(
+          purchaseReceiptId,
+          request.authUser!.id,
+        );
+      } catch (e) {
+        const message = e instanceof Error ? e.message : "Erro ao iniciar";
+        return reply.status(422).send({ error: message });
+      }
+    },
+  );
+
+  app.get<{ Params: { sessionId: string } }>(
+    "/api/putaway/:sessionId",
+    { preHandler: guard(Permission.RECEIPTS_VIEW) },
+    async (request, reply) => {
+      try {
+        return await getPutawaySession(request.params.sessionId);
+      } catch (e) {
+        const message = e instanceof Error ? e.message : "Sessão não encontrada";
+        return reply.status(404).send({ error: message });
+      }
+    },
+  );
+
+  app.post<{
+    Params: { sessionId: string };
+    Body: {
+      itemId?: string;
+      locationBarcode?: string;
+      productBarcode?: string;
+      quantity?: number;
+    };
+  }>(
+    "/api/putaway/:sessionId/store",
+    { preHandler: guard(Permission.RECEIPTS_VIEW) },
+    async (request, reply) => {
+      const { itemId, locationBarcode, productBarcode } = request.body ?? {};
+      if (!itemId || !locationBarcode) {
+        return reply.status(400).send({ error: "itemId e local são obrigatórios" });
+      }
+      try {
+        return await storePutawayItem({
+          sessionId: request.params.sessionId,
+          itemId,
+          locationBarcode,
+          productBarcode: productBarcode?.trim() || undefined,
+          quantity: Number(request.body?.quantity ?? 1),
+          userId: request.authUser!.id,
+        });
+      } catch (e) {
+        const message = e instanceof Error ? e.message : "Erro ao armazenar";
+        return reply.status(422).send({ error: message });
+      }
+    },
+  );
+
+  app.post<{ Params: { sessionId: string } }>(
+    "/api/putaway/:sessionId/complete",
+    { preHandler: guard(Permission.RECEIPTS_VIEW) },
+    async (request, reply) => {
+      try {
+        return await completePutaway(request.params.sessionId);
+      } catch (e) {
+        const message = e instanceof Error ? e.message : "Erro ao finalizar";
+        return reply.status(422).send({ error: message });
       }
     },
   );

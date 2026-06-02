@@ -31,7 +31,13 @@ type TransferRow = {
   withdrawnAt: Date;
   depositedAt: Date | null;
   targetPickFaceId: string | null;
-  product: { id: string; sku: string; name: string; barcode: string | null };
+  product: {
+    id: string;
+    sku: string;
+    name: string;
+    barcode: string | null;
+    imageUrl: string | null;
+  };
   fromLocation: { id: string; barcode: string; corridor: string; row: string };
   toLocation: {
     id: string;
@@ -70,6 +76,7 @@ export function mapCargoTransferSummary(transfer: TransferRow) {
       sku: transfer.product.sku,
       name: transfer.product.name,
       barcode: transfer.product.barcode,
+      imageUrl: transfer.product.imageUrl,
     },
     fromLocation: {
       id: transfer.fromLocation.id,
@@ -95,7 +102,15 @@ export function mapCargoTransferSummary(transfer: TransferRow) {
 }
 
 const transferInclude = {
-  product: { select: { id: true, sku: true, name: true, barcode: true } },
+  product: {
+    select: {
+      id: true,
+      sku: true,
+      name: true,
+      barcode: true,
+      imageUrl: true,
+    },
+  },
   fromLocation: {
     select: { id: true, barcode: true, corridor: true, row: true },
   },
@@ -245,7 +260,98 @@ export async function withdrawCargoTransfer(input: {
     };
   });
 
+  if (targetPickFaceId) {
+    const { markAssignmentWithdrawn } = await import(
+      "./replenishment-assignment.js"
+    );
+    await markAssignmentWithdrawn(
+      input.tenantId,
+      targetPickFaceId,
+      input.userId,
+      result.transfer.id,
+    );
+  }
+
   return result;
+}
+
+export async function cancelCargoTransfer(
+  tenantId: string,
+  transferId: string,
+  userId: string,
+) {
+  const transfer = await prisma.cargoTransfer.findFirst({
+    where: {
+      id: transferId,
+      tenantId,
+      status: CargoTransferStatus.IN_TRANSIT,
+    },
+    include: { fromLocation: true, product: true },
+  });
+
+  if (!transfer) {
+    throw new CargoTransferError("Transporte não encontrado ou já concluído", 404);
+  }
+  if (transfer.withdrawnById !== userId) {
+    throw new CargoTransferError(
+      "Somente quem retirou pode cancelar o transporte",
+      403,
+    );
+  }
+
+  await prisma.$transaction(async (tx) => {
+    await tx.location.update({
+      where: { id: transfer.fromLocationId },
+      data: {
+        currentQuantity: transfer.fromLocation.currentQuantity + transfer.quantity,
+      },
+    });
+
+    await tx.inventoryMovement.create({
+      data: {
+        tenantId,
+        type: InventoryMovementType.TRANSFER,
+        quantity: transfer.quantity,
+        userId,
+        productId: transfer.productId,
+        toLocationId: transfer.fromLocationId,
+        cargoTransferId: transfer.id,
+        notes: "Cancelamento de transporte — devolução ao pulmão",
+      },
+    });
+
+    await tx.cargoTransfer.update({
+      where: { id: transfer.id },
+      data: { status: CargoTransferStatus.CANCELLED },
+    });
+
+    if (transfer.targetPickFaceId) {
+      await tx.replenishmentAssignment.updateMany({
+        where: {
+          cargoTransferId: transfer.id,
+          status: "WITHDRAWN",
+        },
+        data: {
+          status: "CANCELLED",
+          completedAt: new Date(),
+          cargoTransferId: null,
+        },
+      });
+      await tx.replenishmentAssignment.updateMany({
+        where: {
+          pickFaceId: transfer.targetPickFaceId,
+          assignedToId: userId,
+          status: "OPEN",
+        },
+        data: {
+          status: "CANCELLED",
+          completedAt: new Date(),
+        },
+      });
+    }
+  });
+
+  return { cancelled: true, transferId };
 }
 
 export async function listPendingCargoTransfers(
@@ -403,6 +509,11 @@ export async function depositCargoTransfer(input: {
       },
     };
   });
+
+  const { completeReplenishmentAssignment } = await import(
+    "./replenishment-assignment.js"
+  );
+  await completeReplenishmentAssignment(input.tenantId, input.transferId);
 
   return result;
 }

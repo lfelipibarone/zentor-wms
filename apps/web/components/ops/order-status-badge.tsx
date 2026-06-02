@@ -10,6 +10,7 @@ const VARIANT: Record<
   PICKING: "default",
   PAUSED_ISSUE: "destructive",
   PICKED_AWAITING_CONFERENCE: "secondary",
+  PACKING_RETURNED_TO_PICKING: "warning",
   DISPATCHING: "default",
   DISPATCHED: "outline",
 };

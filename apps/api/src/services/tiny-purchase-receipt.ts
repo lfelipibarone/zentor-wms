@@ -239,7 +239,7 @@ export async function startPurchaseReceiptByBarcode(params: {
         data: { status: PurchaseReceiptSessionStatus.IN_CHECK },
       });
     }
-    return formatSession(existing.id);
+    return formatPurchaseReceiptSession(existing.id);
   }
 
   let listRow = await findEntryInvoiceByAccessKey(params.tenantId, accessKey);
@@ -299,10 +299,10 @@ export async function startPurchaseReceiptByBarcode(params: {
     payload: { notaId, sessionId: session.id },
   });
 
-  return formatSession(session.id);
+  return formatPurchaseReceiptSession(session.id);
 }
 
-async function formatSession(sessionId: string) {
+export async function formatPurchaseReceiptSession(sessionId: string) {
   const session = await prisma.purchaseReceiptSession.findUnique({
     where: { id: sessionId },
     include: { items: { orderBy: { lineNumber: "asc" } } },
@@ -357,7 +357,7 @@ async function formatSession(sessionId: string) {
 }
 
 export async function getPurchaseReceiptSession(sessionId: string) {
-  return formatSession(sessionId);
+  return formatPurchaseReceiptSession(sessionId);
 }
 
 export async function confirmReceiptItem(

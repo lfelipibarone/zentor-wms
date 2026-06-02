@@ -83,6 +83,11 @@ export default function WavePickingListScreen() {
               <Text style={styles.location}>
                 {item.orderCount} pedidos · {item.lineCount} linhas
               </Text>
+              {item.marketplaces && item.marketplaces.length > 0 ? (
+                <Text style={styles.marketplaces}>
+                  {item.marketplaces.join(" · ")}
+                </Text>
+              ) : null}
               {item.acceptedByName ? (
                 <Text style={styles.hint}>Aceita por {item.acceptedByName}</Text>
               ) : (
@@ -142,6 +147,11 @@ export default function WavePickingListScreen() {
         <Text style={styles.waveMeta}>
           {wave.orderCount} pedidos · {wave.gondolaPasses} passagens na gôndola
         </Text>
+        {wave.marketplaces && wave.marketplaces.length > 0 ? (
+          <Text style={styles.marketplaces}>
+            {wave.marketplaces.join(" · ")}
+          </Text>
+        ) : null}
         <Text style={styles.acceptHint}>
           Mesmo SKU agrupado — pick consolidado; packing nas cestas no web.
         </Text>
@@ -191,6 +201,11 @@ export default function WavePickingListScreen() {
           {wave.orderCount} pedidos · {wave.gondolaPasses} gôndolas ·{" "}
           {pending.length} linhas pendentes
         </Text>
+        {wave.marketplaces && wave.marketplaces.length > 0 ? (
+          <Text style={styles.marketplaces}>
+            {wave.marketplaces.join(" · ")}
+          </Text>
+        ) : null}
         <Text style={styles.acceptHint}>Você está executando esta onda</Text>
       </View>
 
@@ -287,6 +302,13 @@ const styles = StyleSheet.create({
     color: theme.textMuted,
     marginTop: spacing.xs,
     textAlign: "center",
+  },
+  marketplaces: {
+    color: theme.textMuted,
+    marginTop: spacing.xs,
+    textAlign: "center",
+    fontSize: typography.caption,
+    fontWeight: "600",
   },
   acceptHint: {
     color: theme.textMuted,

@@ -9,22 +9,27 @@ import {
 } from "@prisma/client";
 import { prisma } from "../lib/prisma.js";
 import { allocateQuantityAcrossPickFaces } from "./pick-allocation.js";
+import { PickWaveError } from "./pick-wave-error.js";
+
+export { PickWaveError } from "./pick-wave-error.js";
+import { marketplaceWhereClause } from "./marketplace-filter.js";
+import { sortOrdersByPickProximity } from "./order-proximity.js";
+import { buildOrderPickProfiles } from "./pick-wave-order-profile.js";
 import {
-  partitionOrdersIntoWaves,
+  getExcludedOrderDetails,
+  getExcludedOrderIds,
+  isEligibleForByProductWave,
+  orderLinksToAnyInGroup,
+  partitionOrders,
   waveSettingsToPartition,
   type OrderWithItems,
+  type WavePartitionStrategy,
 } from "./pick-wave-partition.js";
+import {
+  assertOrdersMatchWaveMarketplace,
+  assertUniformMarketplace,
+} from "./wave-marketplace.js";
 import { getWaveSettings } from "./wave-settings.js";
-
-export class PickWaveError extends Error {
-  constructor(
-    message: string,
-    public statusCode: number = 400,
-  ) {
-    super(message);
-    this.name = "PickWaveError";
-  }
-}
 
 function formatLocation(loc: { corridor: string; row: string; barcode: string }) {
   return `${loc.corridor}-${loc.row} · ${loc.barcode}`;
@@ -64,14 +69,18 @@ export async function buildWaveCandidateOrders(
     orderIds?: string[];
     maxOrders?: number;
     onlyDeadlineToday?: boolean;
+    marketplace?: string;
   },
 ): Promise<OrderWithItems[]> {
+  const marketplaceFilter = marketplaceWhereClause(opts?.marketplace);
+
   if (opts?.orderIds?.length) {
     const orders = await prisma.order.findMany({
       where: {
         tenantId,
         id: { in: opts.orderIds },
         status: OrderStatus.PENDING,
+        ...(marketplaceFilter ?? {}),
       },
       include: { items: true, waveOrders: true },
     });
@@ -97,6 +106,7 @@ export async function buildWaveCandidateOrders(
     tenantId,
     status: OrderStatus.PENDING,
     waveOrders: { none: {} },
+    ...(marketplaceFilter ?? {}),
   };
 
   if (onlyToday) {
@@ -239,13 +249,47 @@ export async function previewWaveRelease(
   opts?: {
     orderIds?: string[];
     maxOrders?: number;
+    marketplace?: string;
+    partitionStrategy?: WavePartitionStrategy;
   },
 ) {
   const settings = await getWaveSettings(tenantId);
+  const strategy =
+    opts?.partitionStrategy ?? settings.defaultPartitionStrategy;
   const orders = await buildWaveCandidateOrders(tenantId, opts);
-  const groups = partitionOrdersIntoWaves(
-    orders,
-    waveSettingsToPartition(settings),
+  if (orders.length === 0) {
+    return {
+      orderCount: 0,
+      lineCount: 0,
+      gondolaPasses: 0,
+      waveCount: 0,
+      waves: [],
+      orders: [],
+      lines: [],
+      partitionStrategy: strategy,
+      marketplace: opts?.marketplace ?? null,
+      excludedOrderIds: [],
+      proximityGroups: [],
+    };
+  }
+
+  const waveMarketplace = assertUniformMarketplace(orders);
+  const profiles = await buildOrderPickProfiles(tenantId, orders);
+  const sorted = sortOrdersByPickProximity(orders, profiles);
+  const partitionSettings = waveSettingsToPartition(settings, strategy);
+  const groups = partitionOrders(sorted, strategy, partitionSettings, profiles);
+  const excludedOrderIds = getExcludedOrderIds(orders, groups, strategy);
+  const excludedOrderDetails = getExcludedOrderDetails(orders, groups, strategy);
+
+  const { buildPickProximityGroups } = await import("./order-proximity.js");
+  const remaining = orders.filter((o) => excludedOrderIds.includes(o.id));
+  const proximityGroups = await buildPickProximityGroups(
+    tenantId,
+    remaining.length > 0 ? remaining : orders,
+    {
+      maxDistance: partitionSettings.proximityMaxDistance,
+      maxGroups: 5,
+    },
   );
 
   const waves = await Promise.all(
@@ -282,6 +326,16 @@ export async function previewWaveRelease(
     gondolaPasses: lineCount,
     waveCount: waves.length,
     waves,
+    partitionStrategy: strategy,
+    marketplace: waveMarketplace,
+    excludedOrderIds,
+    excludedOrderDetails,
+    proximityGroups: proximityGroups.map((g) => ({
+      id: g.id,
+      orderIds: g.orderIds,
+      routeHint: g.routeHint,
+      proximityScore: g.proximityScore,
+    })),
     orders: orders.map((o) => ({
       id: o.id,
       erpOrderId: o.erpOrderId,
@@ -298,6 +352,7 @@ async function createReleasedWave(
   releasedById: string,
   orders: OrderWithItems[],
   waveLabel: string,
+  meta?: { marketplace?: string | null; partitionStrategy?: string | null },
 ) {
   const lineBuilds = await buildWaveLinesFromOrders(orders, tenantId);
   if (lineBuilds.length === 0) {
@@ -310,6 +365,8 @@ async function createReleasedWave(
         tenantId,
         name: waveLabel,
         status: PickWaveStatus.RELEASED,
+        marketplace: meta?.marketplace ?? null,
+        partitionStrategy: meta?.partitionStrategy ?? null,
         releasedAt: new Date(),
         releasedById,
         orders: {
@@ -343,7 +400,12 @@ async function createReleasedWave(
 export async function releasePickWaves(
   tenantId: string,
   releasedById: string,
-  opts?: { orderIds?: string[]; auto?: boolean },
+  opts?: {
+    orderIds?: string[];
+    auto?: boolean;
+    marketplace?: string;
+    partitionStrategy?: WavePartitionStrategy;
+  },
 ): Promise<{
   waves: Array<{ waveId: string; orderCount: number; lineCount: number; name: string }>;
   orderCount: number;
@@ -356,19 +418,34 @@ export async function releasePickWaves(
     throw new PickWaveError("Separação em onda está desabilitada nas configurações");
   }
 
+  const settings = await getWaveSettings(tenantId);
+  const marketplace =
+    opts?.marketplace?.trim() || settings.autoReleaseMarketplace || undefined;
+  const strategy =
+    opts?.partitionStrategy ?? settings.defaultPartitionStrategy;
+
   const orders = await buildWaveCandidateOrders(tenantId, {
     orderIds: opts?.orderIds,
+    marketplace,
   });
 
   if (orders.length === 0) {
     throw new PickWaveError("Nenhum pedido pendente disponível para a onda");
   }
 
-  const settings = await getWaveSettings(tenantId);
-  const groups = partitionOrdersIntoWaves(
-    orders,
-    waveSettingsToPartition(settings),
-  );
+  const waveMarketplace = assertUniformMarketplace(orders);
+  const profiles = await buildOrderPickProfiles(tenantId, orders);
+  const sorted = sortOrdersByPickProximity(orders, profiles);
+  const partitionSettings = waveSettingsToPartition(settings, strategy);
+  const groups = partitionOrders(sorted, strategy, partitionSettings, profiles);
+
+  if (groups.length === 0) {
+    throw new PickWaveError(
+      strategy === "SINGLE_ITEM"
+        ? "Nenhum pedido mono-SKU elegível para onda neste modo"
+        : "Nenhum grupo de onda formado com os critérios atuais",
+    );
+  }
 
   const baseTime = new Date().toLocaleTimeString("pt-BR", {
     hour: "2-digit",
@@ -392,6 +469,10 @@ export async function releasePickWaves(
       releasedById,
       group,
       waveLabel,
+      {
+        marketplace: waveMarketplace,
+        partitionStrategy: strategy,
+      },
     );
     created.push({
       waveId: wave.id,
@@ -412,8 +493,24 @@ export async function releasePickWaves(
 export async function releasePickWave(
   tenantId: string,
   releasedById: string,
-  opts?: { orderIds?: string[]; auto?: boolean },
+  opts?: {
+    orderIds?: string[];
+    auto?: boolean;
+    appendToWaveId?: string;
+    marketplace?: string;
+    partitionStrategy?: WavePartitionStrategy;
+  },
 ): Promise<{ waveId: string; orderCount: number; lineCount: number; waveCount?: number }> {
+  if (opts?.appendToWaveId) {
+    const orderIds = opts.orderIds ?? [];
+    const result = await addOrdersToWave(tenantId, opts.appendToWaveId, orderIds);
+    return {
+      waveId: opts.appendToWaveId,
+      orderCount: result.added,
+      lineCount: result.lineCount,
+    };
+  }
+
   const result = await releasePickWaves(tenantId, releasedById, opts);
   const first = result.waves[0];
   if (!first) {
@@ -425,6 +522,320 @@ export async function releasePickWave(
     lineCount: result.lineCount,
     waveCount: result.waves.length,
   };
+}
+
+export async function getOpenWave(tenantId: string) {
+  return prisma.pickWave.findFirst({
+    where: {
+      tenantId,
+      status: PickWaveStatus.RELEASED,
+      acceptedById: null,
+    },
+    orderBy: { releasedAt: "desc" },
+    include: { _count: { select: { orders: true, lines: true } } },
+  });
+}
+
+export async function addOrdersToWave(
+  tenantId: string,
+  waveId: string,
+  orderIds: string[],
+): Promise<{ added: number; lineCount: number }> {
+  if (orderIds.length === 0) {
+    throw new PickWaveError("Nenhum pedido selecionado");
+  }
+
+  const wave = await prisma.pickWave.findFirst({
+    where: { id: waveId, tenantId },
+    include: {
+      orders: {
+        include: { order: { include: { items: true } } },
+      },
+    },
+  });
+  if (!wave) throw new PickWaveError("Onda não encontrada", 404);
+  if (wave.status === PickWaveStatus.CLOSED) {
+    throw new PickWaveError("Onda encerrada — não é possível editar", 409);
+  }
+  if (wave.status !== PickWaveStatus.RELEASED) {
+    throw new PickWaveError("Onda não está disponível para edição");
+  }
+
+  const orders = await buildWaveCandidateOrders(tenantId, { orderIds });
+  if (orders.length === 0) {
+    throw new PickWaveError("Nenhum pedido elegível para adicionar");
+  }
+
+  assertOrdersMatchWaveMarketplace(wave.marketplace, orders);
+
+  if (wave.partitionStrategy === "BY_PRODUCT") {
+    for (const o of orders) {
+      if (!isEligibleForByProductWave(o)) {
+        throw new PickWaveError(
+          "Pedido com mais de 5 SKUs pendentes — não pode entrar em onda SKU compartilhado",
+        );
+      }
+    }
+  }
+
+  const existingInWave: OrderWithItems[] = wave.orders.map((wo) => ({
+    ...wo.order,
+    items: wo.order.items,
+  }));
+
+  if (existingInWave.length > 0) {
+    const settings = await getWaveSettings(tenantId);
+    const profiles = await buildOrderPickProfiles(tenantId, [
+      ...existingInWave,
+      ...orders,
+    ]);
+    for (const newOrder of orders) {
+      if (
+        !orderLinksToAnyInGroup(
+          newOrder,
+          existingInWave,
+          profiles,
+          settings.proximityMaxDistance,
+        )
+      ) {
+        throw new PickWaveError(
+          "Pedido sem SKU em comum nem proximidade com a onda",
+        );
+      }
+    }
+  }
+
+  const lineBuilds = await buildWaveLinesFromOrders(orders, tenantId);
+  if (lineBuilds.length === 0) {
+    throw new PickWaveError("Pedidos sem itens pendentes para separar");
+  }
+
+  const lineCount = await prisma.$transaction(async (tx) => {
+    for (const line of lineBuilds) {
+      const existing = await tx.pickWaveLine.findUnique({
+        where: {
+          waveId_productId_pickLocationId: {
+            waveId,
+            productId: line.productId,
+            pickLocationId: line.pickLocationId,
+          },
+        },
+      });
+
+      if (existing) {
+        if (
+          existing.sortStatus !== PickWaveLineSortStatus.PENDING ||
+          existing.quantityPicked > 0
+        ) {
+          throw new PickWaveError(
+            `Linha já iniciada para SKU ${line.productSku} — não é possível adicionar pedidos`,
+            409,
+          );
+        }
+        await tx.pickWaveLine.update({
+          where: { id: existing.id },
+          data: { quantityTotal: { increment: line.quantityTotal } },
+        });
+        await tx.pickWaveAllocation.createMany({
+          data: line.allocations.map((a) => ({
+            waveLineId: existing.id,
+            orderItemId: a.orderItemId,
+            quantity: a.quantity,
+          })),
+        });
+      } else {
+        const waveLine = await tx.pickWaveLine.create({
+          data: {
+            waveId,
+            productId: line.productId,
+            pickLocationId: line.pickLocationId,
+            quantityTotal: line.quantityTotal,
+          },
+        });
+        await tx.pickWaveAllocation.createMany({
+          data: line.allocations.map((a) => ({
+            waveLineId: waveLine.id,
+            orderItemId: a.orderItemId,
+            quantity: a.quantity,
+          })),
+        });
+      }
+    }
+
+    await tx.pickWaveOrder.createMany({
+      data: orders.map((o) => ({ waveId, orderId: o.id })),
+      skipDuplicates: true,
+    });
+
+    return tx.pickWaveLine.count({ where: { waveId } });
+  });
+
+  return { added: orders.length, lineCount };
+}
+
+type PrismaTx = Parameters<Parameters<typeof prisma.$transaction>[0]>[0];
+
+/** Remove pedido da onda após retorno do packing (reverte sort parcial e alocações). */
+export async function detachOrderFromWaveForPackingReturn(
+  tx: PrismaTx,
+  tenantId: string,
+  orderId: string,
+  orderItemId: string,
+  reportedQty: number,
+): Promise<{ waveId?: string; waveName?: string }> {
+  const waveOrder = await tx.pickWaveOrder.findFirst({
+    where: {
+      orderId,
+      wave: { tenantId, status: PickWaveStatus.RELEASED },
+    },
+    include: { wave: { select: { id: true, name: true } } },
+  });
+  if (!waveOrder) return {};
+
+  const waveId = waveOrder.waveId;
+
+  const reportedAllocations = await tx.pickWaveAllocation.findMany({
+    where: { orderItemId, waveLine: { waveId } },
+  });
+  let remaining = reportedQty;
+  for (const alloc of reportedAllocations) {
+    if (remaining <= 0) break;
+    const revert = Math.min(remaining, alloc.quantitySorted);
+    if (revert > 0) {
+      await tx.pickWaveAllocation.update({
+        where: { id: alloc.id },
+        data: { quantitySorted: alloc.quantitySorted - revert },
+      });
+      remaining -= revert;
+    }
+  }
+
+  const orderItems = await tx.orderItem.findMany({
+    where: { orderId },
+    select: { id: true },
+  });
+  const itemIds = orderItems.map((i) => i.id);
+
+  const allocations = await tx.pickWaveAllocation.findMany({
+    where: { orderItemId: { in: itemIds }, waveLine: { waveId } },
+  });
+
+  const lineAdjustments = new Map<string, number>();
+  for (const alloc of allocations) {
+    lineAdjustments.set(
+      alloc.waveLineId,
+      (lineAdjustments.get(alloc.waveLineId) ?? 0) + alloc.quantity,
+    );
+    await tx.pickWaveAllocation.delete({ where: { id: alloc.id } });
+  }
+
+  for (const [lineId, decrement] of lineAdjustments) {
+    const line = await tx.pickWaveLine.findUnique({ where: { id: lineId } });
+    if (!line) continue;
+    const newTotal = line.quantityTotal - decrement;
+    if (newTotal <= 0) {
+      await tx.pickWaveLine.delete({ where: { id: lineId } });
+    } else {
+      await tx.pickWaveLine.update({
+        where: { id: lineId },
+        data: { quantityTotal: newTotal },
+      });
+    }
+  }
+
+  await tx.pickWaveOrder.delete({ where: { id: waveOrder.id } });
+
+  return { waveId, waveName: waveOrder.wave.name };
+}
+
+export async function removeOrderFromWave(
+  tenantId: string,
+  waveId: string,
+  orderId: string,
+): Promise<void> {
+  const wave = await prisma.pickWave.findFirst({
+    where: { id: waveId, tenantId },
+  });
+  if (!wave) throw new PickWaveError("Onda não encontrada", 404);
+  if (wave.status === PickWaveStatus.CLOSED) {
+    throw new PickWaveError("Onda encerrada — não é possível editar", 409);
+  }
+  if (wave.status !== PickWaveStatus.RELEASED) {
+    throw new PickWaveError("Onda não está disponível para edição");
+  }
+
+  const waveOrder = await prisma.pickWaveOrder.findFirst({
+    where: { waveId, orderId },
+  });
+  if (!waveOrder) {
+    throw new PickWaveError("Pedido não pertence a esta onda", 404);
+  }
+
+  const orderItems = await prisma.orderItem.findMany({
+    where: { orderId },
+    select: { id: true },
+  });
+  const itemIds = orderItems.map((i) => i.id);
+  if (itemIds.length === 0) {
+    await prisma.pickWaveOrder.delete({ where: { id: waveOrder.id } });
+    return;
+  }
+
+  const allocations = await prisma.pickWaveAllocation.findMany({
+    where: {
+      orderItemId: { in: itemIds },
+      waveLine: { waveId },
+    },
+    include: { waveLine: true, orderItem: true },
+  });
+
+  for (const alloc of allocations) {
+    if (alloc.quantitySorted > 0) {
+      throw new PickWaveError("Pedido já teve itens separados no packing", 409);
+    }
+    if (alloc.orderItem.quantityPicked > 0) {
+      throw new PickWaveError("Pedido já teve itens separados", 409);
+    }
+    if (
+      alloc.waveLine.sortStatus !== PickWaveLineSortStatus.PENDING ||
+      alloc.waveLine.quantityPicked > 0
+    ) {
+      throw new PickWaveError(
+        "Pedido já teve itens separados na linha da onda",
+        409,
+      );
+    }
+  }
+
+  await prisma.$transaction(async (tx) => {
+    const lineAdjustments = new Map<string, number>();
+    for (const alloc of allocations) {
+      lineAdjustments.set(
+        alloc.waveLineId,
+        (lineAdjustments.get(alloc.waveLineId) ?? 0) + alloc.quantity,
+      );
+    }
+
+    for (const alloc of allocations) {
+      await tx.pickWaveAllocation.delete({ where: { id: alloc.id } });
+    }
+
+    for (const [lineId, decrement] of lineAdjustments) {
+      const line = await tx.pickWaveLine.findUnique({ where: { id: lineId } });
+      if (!line) continue;
+      const newTotal = line.quantityTotal - decrement;
+      if (newTotal <= 0) {
+        await tx.pickWaveLine.delete({ where: { id: lineId } });
+      } else {
+        await tx.pickWaveLine.update({
+          where: { id: lineId },
+          data: { quantityTotal: newTotal },
+        });
+      }
+    }
+
+    await tx.pickWaveOrder.delete({ where: { id: waveOrder.id } });
+  });
 }
 
 export async function acceptPickWave(
@@ -458,6 +869,43 @@ export async function acceptPickWave(
     waveId: updated.id,
     acceptedAt: updated.acceptedAt!.toISOString(),
   };
+}
+
+export async function releasePickWaveAccept(
+  waveId: string,
+  userId: string,
+): Promise<{ released: boolean }> {
+  const wave = await prisma.pickWave.findUnique({
+    where: { id: waveId },
+    include: { lines: { select: { quantityPicked: true } } },
+  });
+  if (!wave) throw new PickWaveError("Onda não encontrada", 404);
+  if (wave.status !== PickWaveStatus.RELEASED) {
+    throw new PickWaveError("Onda não está disponível", 409);
+  }
+  if (!wave.acceptedById) {
+    throw new PickWaveError("Onda não foi aceita", 409);
+  }
+  if (wave.acceptedById !== userId) {
+    throw new PickWaveError(
+      "Esta onda foi aceita por outro operador",
+      403,
+    );
+  }
+  const hasPicked = wave.lines.some((l) => l.quantityPicked > 0);
+  if (hasPicked) {
+    throw new PickWaveError(
+      "Separação já iniciada — não é possível cancelar o aceite",
+      409,
+    );
+  }
+
+  await prisma.pickWave.update({
+    where: { id: waveId },
+    data: { acceptedById: null, acceptedAt: null },
+  });
+
+  return { released: true };
 }
 
 export async function assertWaveOperatorForMutation(
@@ -661,6 +1109,7 @@ export function mapWaveLineSummary(
       sku: line.product.sku,
       name: line.product.name,
       barcode: line.product.barcode,
+      imageUrl: line.product.imageUrl,
     },
     pickLocation: {
       id: line.pickLocation.id,

@@ -15,6 +15,7 @@ import {
 } from "../services/tiny-oauth.js";
 import { prisma } from "../lib/prisma.js";
 import { TinyConnectionStatus } from "@prisma/client";
+import { syncPendingOrderPrioritiesFromTiny } from "../services/tiny-integration.js";
 
 export async function tinyRoutes(app: FastifyInstance) {
   app.get<{
@@ -102,6 +103,23 @@ export async function tinyRoutes(app: FastifyInstance) {
             .send({ error: "clientSecret é obrigatório na primeira configuração" });
         }
         return getTinyConnectionStatus(tenantId);
+      },
+    );
+
+    secured.post(
+      "/api/integrations/tiny/sync-order-priorities",
+      { preHandler: requireSettingsManage },
+      async (request, reply) => {
+        try {
+          const result = await syncPendingOrderPrioritiesFromTiny(
+            tenantWhere(request).tenantId,
+          );
+          return result;
+        } catch (e) {
+          const message =
+            e instanceof Error ? e.message : "Erro ao sincronizar prioridades";
+          return reply.status(400).send({ error: message });
+        }
       },
     );
 

@@ -9,6 +9,9 @@ import {
 import { BackButton } from "@/components/BackButton";
 import { theme, spacing, typography } from "@/lib/theme";
 
+/** Padding horizontal padrão das telas com ScreenShell */
+export const screenPadding = spacing.md;
+
 interface ScreenShellProps extends ViewProps {
   title?: string;
   subtitle?: string;
@@ -69,18 +72,18 @@ const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: theme.bg },
   container: {
     flex: 1,
-    padding: spacing.md,
+    padding: screenPadding,
     gap: spacing.md,
   },
   scrollContent: {
     flexGrow: 1,
-    padding: spacing.md,
+    padding: screenPadding,
     gap: spacing.md,
     paddingBottom: spacing.xl,
   },
   backRow: {
     alignSelf: "flex-start",
-    marginBottom: spacing.xs,
+    marginBottom: spacing.md,
   },
   header: { gap: spacing.xs, marginBottom: spacing.sm },
   title: {

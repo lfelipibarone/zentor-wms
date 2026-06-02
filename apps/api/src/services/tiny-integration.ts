@@ -4,6 +4,11 @@ import {
   detectMarketplaceFromTiny,
   enrichOrderPriority,
 } from "./marketplace-priority.js";
+import {
+  extractTinyPriorityFromRecord,
+  fetchTinyOrderPriority,
+  normalizeTinyPriority,
+} from "./tiny-order-priority.js";
 
 export interface TinyLineItem {
   sku: string;
@@ -16,6 +21,8 @@ export interface TinyOrderPayload {
   customerName?: string;
   marketplace?: string | null;
   collectionDeadline?: Date | null;
+  /** Prioridade bruta do Tiny (antes de normalizar para erpPriority). */
+  tinyPriorityRaw?: number | null;
   items: TinyLineItem[];
 }
 
@@ -98,6 +105,15 @@ export function parseTinyWebhookPayload(body: unknown): TinyOrderPayload | null 
     str(pedido.nome_ecommerce) ??
     str(pedido.loja) ??
     str(dados.ecommerce);
+  const canalExtra = [
+    str(pedido.tipo),
+    str(pedido.naturezaOperacao),
+    str(pedido.natureza_operacao),
+    str(pedido.canalVenda),
+    str(pedido.canal_venda),
+  ]
+    .filter(Boolean)
+    .join(" ");
 
   const deadlineRaw =
     str(pedido.data_coleta) ??
@@ -109,16 +125,33 @@ export function parseTinyWebhookPayload(body: unknown): TinyOrderPayload | null 
     if (!Number.isNaN(d.getTime())) collectionDeadline = d;
   }
 
+  const tinyPriorityRaw = extractTinyPriorityFromRecord(dados);
+
   return {
     erpOrderId: `TINY-${erpOrderId}`,
     customerName:
       str(pedido.nome_cliente) ??
       str(pedido.cliente) ??
       str(pedido.nome),
-    marketplace: detectMarketplaceFromTiny(ecommerce, str(pedido.loja)),
+    marketplace: detectMarketplaceFromTiny(
+      ecommerce,
+      str(pedido.loja),
+      canalExtra || null,
+    ),
     collectionDeadline,
+    tinyPriorityRaw,
     items,
   };
+}
+
+async function resolveErpPriorityForPayload(
+  tenantId: string,
+  payload: TinyOrderPayload,
+): Promise<number | null> {
+  if (payload.tinyPriorityRaw !== null && payload.tinyPriorityRaw !== undefined) {
+    return normalizeTinyPriority(payload.tinyPriorityRaw);
+  }
+  return fetchTinyOrderPriority(tenantId, payload.erpOrderId);
 }
 
 export async function upsertOrderFromTiny(
@@ -160,6 +193,8 @@ export async function upsertOrderFromTiny(
     );
   }
 
+  const erpPriority = await resolveErpPriorityForPayload(tenantId, payload);
+
   if (existing) {
     await prisma.orderItem.deleteMany({ where: { orderId: existing.id } });
     await prisma.order.update({
@@ -170,6 +205,7 @@ export async function upsertOrderFromTiny(
         collectionDeadline:
           payload.collectionDeadline ?? existing.collectionDeadline,
         erpSource: "TINY",
+        ...(erpPriority !== null ? { erpPriority } : {}),
         items: {
           create: productIds.map((p) => ({
             lineNumber: p.lineNumber,
@@ -192,6 +228,7 @@ export async function upsertOrderFromTiny(
       collectionDeadline: payload.collectionDeadline,
       erpSource: "TINY",
       status: OrderStatus.PENDING,
+      ...(erpPriority !== null ? { erpPriority } : {}),
       items: {
         create: productIds.map((p) => ({
           lineNumber: p.lineNumber,
@@ -204,6 +241,40 @@ export async function upsertOrderFromTiny(
 
   await enrichOrderPriority(order.id);
   return { orderId: order.id, created: true };
+}
+
+/** Reaplica prioridade Tiny + WMS em pedidos PENDING do tenant. */
+export async function syncPendingOrderPrioritiesFromTiny(
+  tenantId: string,
+): Promise<{ updated: number; skipped: number }> {
+  const orders = await prisma.order.findMany({
+    where: {
+      tenantId,
+      status: OrderStatus.PENDING,
+      erpSource: "TINY",
+    },
+    select: { id: true, erpOrderId: true },
+    take: 200,
+  });
+
+  let updated = 0;
+  let skipped = 0;
+
+  for (const o of orders) {
+    const erpPriority = await fetchTinyOrderPriority(tenantId, o.erpOrderId);
+    if (erpPriority === null) {
+      skipped += 1;
+      continue;
+    }
+    await prisma.order.update({
+      where: { id: o.id },
+      data: { erpPriority },
+    });
+    await enrichOrderPriority(o.id);
+    updated += 1;
+  }
+
+  return { updated, skipped };
 }
 
 export async function logIntegrationEvent(params: {

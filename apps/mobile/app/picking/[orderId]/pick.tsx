@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { router, useLocalSearchParams } from "expo-router";
 import {
   ActivityIndicator,
@@ -16,14 +16,17 @@ import { FactoryButton } from "@/components/FactoryButton";
 import { QuantityInput } from "@/components/QuantityInput";
 import { ProblemReportModal } from "@/components/ProblemReportModal";
 import { CollectionDeadlineRow } from "@/components/CollectionDeadlineRow";
+import { ProductThumbnail } from "@/components/ProductThumbnail";
 import { ScreenShell } from "@/components/ScreenShell";
 import { useAdjustLocationStock } from "@/hooks/useAdjustLocationStock";
 import {
   useCompletePicking,
   usePickItem,
   usePickingSession,
+  useReleaseOrderAccept,
   useReportIssue,
 } from "@/hooks/usePicking";
+import { showErrorAlert } from "@/lib/app-alert";
 import { api, ApiError } from "@/lib/api";
 import { theme, spacing, typography } from "@/lib/theme";
 import { OrderStatus } from "@wms/shared";
@@ -40,7 +43,9 @@ export default function PickScreen() {
   const pickItem = usePickItem(orderId);
   const reportIssue = useReportIssue(orderId);
   const completePicking = useCompletePicking(orderId);
+  const releaseAccept = useReleaseOrderAccept(orderId);
   const adjustStock = useAdjustLocationStock();
+  const [itemsExpanded, setItemsExpanded] = useState(false);
 
   const [step, setStep] = useState<PickStep>("location");
   const [locationValidated, setLocationValidated] = useState(false);
@@ -55,6 +60,12 @@ export default function PickScreen() {
 
   const next = session?.nextItem;
   const itemId = next?.id ?? "";
+
+  const canReleaseAccept = useMemo(() => {
+    if (!session) return false;
+    if (session.order.basket) return false;
+    return session.items.every((i) => i.quantityPicked === 0);
+  }, [session]);
 
   const resetItemFlow = useCallback(() => {
     setStep("location");
@@ -267,7 +278,13 @@ export default function PickScreen() {
     <ScreenShell
       scroll
       title={session.order.erpOrderId}
-      subtitle={`Cesta ${basketCode ?? session.order.basket?.code ?? "—"} · rota otimizada`}
+      subtitle={[
+        session.order.marketplaceLabel ?? session.order.marketplace,
+        `Cesta ${basketCode ?? session.order.basket?.code ?? "—"}`,
+        "rota otimizada",
+      ]
+        .filter(Boolean)
+        .join(" · ")}
     >
       <CollectionDeadlineRow deadline={session.order.collectionDeadline} />
       {session.routeQueue && session.routeQueue.length > 1 ? (
@@ -307,11 +324,20 @@ export default function PickScreen() {
       ) : null}
 
       <View style={styles.productCard}>
-        <Text style={styles.sku}>{next.product.sku}</Text>
-        <Text style={styles.productName}>{next.product.name}</Text>
-        <Text style={styles.qty}>
-          Separar: {next.remaining} de {next.quantityOrdered}
-        </Text>
+        <View style={styles.productRow}>
+          <ProductThumbnail
+            imageUrl={next.product.imageUrl}
+            alt={next.product.name}
+            size={88}
+          />
+          <View style={styles.productInfo}>
+            <Text style={styles.sku}>{next.product.sku}</Text>
+            <Text style={styles.productName}>{next.product.name}</Text>
+            <Text style={styles.qty}>
+              Separar: {next.remaining} de {next.quantityOrdered}
+            </Text>
+          </View>
+        </View>
         <Text style={styles.scanHint}>
           Informe a quantidade coletada
           {requiresScan ? " ou bipe o produto (opcional)" : ""}
@@ -368,6 +394,59 @@ export default function PickScreen() {
         variant="danger"
         onPress={() => setProblemOpen(true)}
       />
+
+      {session.items.length > 1 ? (
+        <>
+          <FactoryButton
+            label={
+              itemsExpanded
+                ? "Ocultar todos os itens"
+                : `Ver todos os itens (${session.items.length})`
+            }
+            variant="secondary"
+            onPress={() => setItemsExpanded((v) => !v)}
+          />
+          {itemsExpanded ? (
+            <View style={styles.itemsPreview}>
+              {session.items.map((item) => (
+                <View key={item.id} style={styles.itemsPreviewRow}>
+                  <ProductThumbnail
+                    imageUrl={item.product.imageUrl}
+                    alt={item.product.name}
+                    size={40}
+                  />
+                  <View style={styles.itemsPreviewInfo}>
+                    <Text style={styles.itemsPreviewSku}>
+                      {item.product.sku}
+                    </Text>
+                    <Text style={styles.itemsPreviewQty}>
+                      {item.quantityPicked}/{item.quantityOrdered} un.
+                    </Text>
+                  </View>
+                </View>
+              ))}
+            </View>
+          ) : null}
+        </>
+      ) : null}
+
+      {canReleaseAccept ? (
+        <FactoryButton
+          label="Cancelar aceite"
+          variant="secondary"
+          onPress={async () => {
+            try {
+              await releaseAccept.mutateAsync();
+              router.replace("/picking");
+            } catch (e) {
+              showErrorAlert(
+                e instanceof ApiError ? e.message : "Erro ao cancelar aceite",
+              );
+            }
+          }}
+          loading={releaseAccept.isPending}
+        />
+      ) : null}
 
       <BarcodeScanner
         visible={scannerOpen}
@@ -455,6 +534,12 @@ const styles = StyleSheet.create({
     borderWidth: 2,
     borderColor: theme.border,
   },
+  productRow: {
+    flexDirection: "row",
+    gap: spacing.md,
+    alignItems: "flex-start",
+  },
+  productInfo: { flex: 1, gap: spacing.xs },
   sku: {
     fontSize: typography.caption,
     color: theme.info,
@@ -489,4 +574,19 @@ const styles = StyleSheet.create({
     lineHeight: 26,
   },
   paused: { color: theme.warning, fontSize: typography.body },
+  itemsPreview: {
+    gap: spacing.sm,
+    marginBottom: spacing.sm,
+  },
+  itemsPreviewRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.sm,
+    padding: spacing.sm,
+    backgroundColor: theme.surface,
+    borderRadius: 8,
+  },
+  itemsPreviewInfo: { flex: 1 },
+  itemsPreviewSku: { fontWeight: "700", color: theme.text },
+  itemsPreviewQty: { color: theme.textMuted, fontSize: typography.caption },
 });

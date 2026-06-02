@@ -110,26 +110,33 @@ export async function seedDemoTenant(
     update: { value: config.name },
   });
 
+  const sku1 = `${config.prefix}-SKU-01`;
+  const sku2 = `${config.prefix}-SKU-02`;
+  const imageUrl1 = `https://picsum.photos/seed/wms-${encodeURIComponent(sku1)}/400/400`;
+  const imageUrl2 = `https://picsum.photos/seed/wms-${encodeURIComponent(sku2)}/400/400`;
+
   const product = await prisma.product.upsert({
-    where: { tenantId_sku: { tenantId, sku: `${config.prefix}-SKU-01` } },
+    where: { tenantId_sku: { tenantId, sku: sku1 } },
     create: {
       tenantId,
-      sku: `${config.prefix}-SKU-01`,
+      sku: sku1,
       name: `Produto 01 — ${config.name}`,
       barcode: `${config.prefix}0001`,
+      imageUrl: imageUrl1,
     },
-    update: {},
+    update: { imageUrl: imageUrl1 },
   });
 
   const product2 = await prisma.product.upsert({
-    where: { tenantId_sku: { tenantId, sku: `${config.prefix}-SKU-02` } },
+    where: { tenantId_sku: { tenantId, sku: sku2 } },
     create: {
       tenantId,
-      sku: `${config.prefix}-SKU-02`,
+      sku: sku2,
       name: `Produto 02 — ${config.name}`,
       barcode: `${config.prefix}0002`,
+      imageUrl: imageUrl2,
     },
-    update: {},
+    update: { imageUrl: imageUrl2 },
   });
 
   const loc = await prisma.location.upsert({

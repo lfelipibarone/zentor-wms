@@ -20,11 +20,10 @@ import type { PaginationMeta } from "@/lib/pagination";
 import {
   fetchBaskets,
   fetchLocations,
-  fetchProducts,
   type LocationRow,
 } from "@/lib/api/operations";
 
-type Tab = "locations" | "products" | "baskets";
+type Tab = "locations" | "baskets";
 type LocTypeFilter = "" | "PULMAO" | "PICK_FACE";
 
 export default function CadastrosPage() {
@@ -34,9 +33,6 @@ export default function CadastrosPage() {
   const [baskets, setBaskets] = useState<
     Awaited<ReturnType<typeof fetchBaskets>>["baskets"]
   >([]);
-  const [products, setProducts] = useState<
-    Awaited<ReturnType<typeof fetchProducts>>["products"]
-  >([]);
   const [page, setPage] = useState(1);
   const [pagination, setPagination] = useState<PaginationMeta | null>(null);
   const [loading, setLoading] = useState(true);
@@ -44,7 +40,6 @@ export default function CadastrosPage() {
   const [locForm, setLocForm] = useState(false);
   const [locImport, setLocImport] = useState(false);
   const [basketForm, setBasketForm] = useState(false);
-  const [productForm, setProductForm] = useState(false);
 
   useEffect(() => {
     setPage(1);
@@ -54,8 +49,6 @@ export default function CadastrosPage() {
     setLoading(true);
     setError(null);
     try {
-      const prod = await fetchProducts(undefined, 1, 100);
-      setProducts(prod.products);
       if (tab === "locations") {
         const loc = await fetchLocations(
           undefined,
@@ -65,10 +58,6 @@ export default function CadastrosPage() {
         );
         setLocations(loc.locations);
         setPagination(loc.pagination);
-      } else if (tab === "products") {
-        const prodPage = await fetchProducts(undefined, page);
-        setProducts(prodPage.products);
-        setPagination(prodPage.pagination);
       } else {
         const bas = await fetchBaskets(page);
         setBaskets(bas.baskets);
@@ -89,15 +78,12 @@ export default function CadastrosPage() {
     <div>
       <PageHeader
         title="Cadastros"
-        description="Gôndolas (pulmão e estoque de giro), produtos e cestas."
+        description="Gôndolas (pulmão e estoque de giro) e cestas de separação."
       />
 
       <div className="mb-4 flex flex-wrap gap-2">
         <TabBtn active={tab === "locations"} onClick={() => setTab("locations")}>
           Gôndolas / Localizações
-        </TabBtn>
-        <TabBtn active={tab === "products"} onClick={() => setTab("products")}>
-          Produtos
         </TabBtn>
         <TabBtn active={tab === "baskets"} onClick={() => setTab("baskets")}>
           Cestas
@@ -119,14 +105,6 @@ export default function CadastrosPage() {
               <Plus className="h-4 w-4" /> Nova localização
             </button>
           </>
-        ) : tab === "products" ? (
-          <button
-            type="button"
-            onClick={() => setProductForm(true)}
-            className="ml-auto inline-flex items-center gap-1 rounded-lg bg-[#0d9488] px-3 py-2 text-sm font-semibold text-white"
-          >
-            <Plus className="h-4 w-4" /> Novo produto
-          </button>
         ) : (
           <button
             type="button"
@@ -173,7 +151,6 @@ export default function CadastrosPage() {
                   <TableHead>Corredor</TableHead>
                   <TableHead>Fileira</TableHead>
                   <TableHead>Tipo</TableHead>
-                  <TableHead>SKU</TableHead>
                   <TableHead>Tamanho (cap.)</TableHead>
                   <TableHead>Qtd atual</TableHead>
                   <TableHead>Mín.</TableHead>
@@ -188,42 +165,9 @@ export default function CadastrosPage() {
                     <TableCell>
                       {LOCATION_TYPE_LABEL[l.type] ?? l.type}
                     </TableCell>
-                    <TableCell>
-                      {l.product?.sku ?? "—"}
-                      {l.product?.name ? (
-                        <span className="block text-xs text-muted-foreground">
-                          {l.product.name}
-                        </span>
-                      ) : null}
-                    </TableCell>
                     <TableCell>{l.capacity}</TableCell>
                     <TableCell>{l.currentQuantity}</TableCell>
                     <TableCell>{l.minThreshold}</TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </div>
-        ) : tab === "products" ? (
-          <div className="overflow-hidden rounded-xl border bg-white shadow-sm">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>SKU</TableHead>
-                  <TableHead>Nome</TableHead>
-                  <TableHead>Barcode</TableHead>
-                  <TableHead>Unidade</TableHead>
-                  <TableHead>Peso</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {products.map((p) => (
-                  <TableRow key={p.id}>
-                    <TableCell className="font-mono">{p.sku}</TableCell>
-                    <TableCell>{p.name}</TableCell>
-                    <TableCell className="font-mono">{p.barcode ?? "—"}</TableCell>
-                    <TableCell>{p.unit ?? "—"}</TableCell>
-                    <TableCell>{p.weight != null ? String(p.weight) : "—"}</TableCell>
                   </TableRow>
                 ))}
               </TableBody>
@@ -269,7 +213,6 @@ export default function CadastrosPage() {
       ) : null}
       {locForm ? (
         <LocationFormModal
-          products={products}
           onClose={() => setLocForm(false)}
           onSaved={() => {
             setLocForm(false);
@@ -282,15 +225,6 @@ export default function CadastrosPage() {
           onClose={() => setBasketForm(false)}
           onSaved={() => {
             setBasketForm(false);
-            load();
-          }}
-        />
-      ) : null}
-      {productForm ? (
-        <ProductFormModal
-          onClose={() => setProductForm(false)}
-          onSaved={() => {
-            setProductForm(false);
             load();
           }}
         />
@@ -322,11 +256,9 @@ function TabBtn({
 }
 
 function LocationFormModal({
-  products,
   onClose,
   onSaved,
 }: {
-  products: { id: string; sku: string; name: string }[];
   onClose: () => void;
   onSaved: () => void;
 }) {
@@ -334,7 +266,6 @@ function LocationFormModal({
   const [row, setRow] = useState("01");
   const [barcode, setBarcode] = useState("");
   const [type, setType] = useState("PICK_FACE");
-  const [productId, setProductId] = useState("");
   const [capacity, setCapacity] = useState("100");
   const [minThreshold, setMinThreshold] = useState("10");
 
@@ -346,7 +277,6 @@ function LocationFormModal({
         row,
         barcode,
         type,
-        productId: productId || undefined,
         capacity: Number(capacity),
         minThreshold: Number(minThreshold),
       }),
@@ -371,65 +301,9 @@ function LocationFormModal({
             <option value="PULMAO">Pulmão</option>
           </select>
         </label>
-        <label className="text-sm sm:col-span-2">
-          SKU
-          <select
-            className="mt-1 w-full rounded-lg border px-3 py-2"
-            value={productId}
-            onChange={(e) => setProductId(e.target.value)}
-          >
-            <option value="">— Sem produto —</option>
-            {products.map((p) => (
-              <option key={p.id} value={p.id}>
-                {p.sku} — {p.name}
-              </option>
-            ))}
-          </select>
-        </label>
         <Field label="Tamanho (capacidade)" value={capacity} onChange={setCapacity} />
         <Field label="Mínimo" value={minThreshold} onChange={setMinThreshold} />
       </div>
-    </Modal>
-  );
-}
-
-function ProductFormModal({
-  onClose,
-  onSaved,
-}: {
-  onClose: () => void;
-  onSaved: () => void;
-}) {
-  const [sku, setSku] = useState("");
-  const [name, setName] = useState("");
-  const [barcode, setBarcode] = useState("");
-  const [imageUrl, setImageUrl] = useState("");
-  const [unit, setUnit] = useState("UN");
-  const [weight, setWeight] = useState("");
-
-  const save = async () => {
-    await apiFetch("/api/products", {
-      method: "POST",
-      body: JSON.stringify({
-        sku,
-        name,
-        barcode: barcode || undefined,
-        imageUrl: imageUrl || null,
-        unit: unit || null,
-        weight: weight ? Number(weight) : null,
-      }),
-    });
-    onSaved();
-  };
-
-  return (
-    <Modal title="Novo produto" onClose={onClose} onSave={save}>
-      <Field label="SKU" value={sku} onChange={setSku} />
-      <Field label="Nome" value={name} onChange={setName} />
-      <Field label="Código de barras" value={barcode} onChange={setBarcode} />
-      <Field label="URL da imagem" value={imageUrl} onChange={setImageUrl} />
-      <Field label="Unidade" value={unit} onChange={setUnit} />
-      <Field label="Peso (kg)" value={weight} onChange={setWeight} />
     </Modal>
   );
 }
