@@ -1,10 +1,14 @@
 import { decrypt, encrypt } from "../lib/encryption.js";
 import { prisma } from "../lib/prisma.js";
 import { TinyConnectionStatus } from "@prisma/client";
+import { formatOAuthErrorMessage } from "./tiny-oauth-errors.js";
 
 const BASE_URL = "https://api.tiny.com.br/public-api/v3";
 const TOKEN_URL =
   "https://accounts.tiny.com.br/realms/tiny/protocol/openid-connect/token";
+const REQUEST_TIMEOUT_MS = 30_000;
+const MIN_REQUEST_INTERVAL_MS = 1_200;
+const MAX_429_RETRIES = 3;
 
 export class TinyApiError extends Error {
   constructor(
@@ -17,6 +21,8 @@ export class TinyApiError extends Error {
   }
 }
 
+const lastRequestAtByConnection = new Map<string, number>();
+
 function asRecord(v: unknown): Record<string, unknown> | null {
   return v && typeof v === "object" && !Array.isArray(v)
     ? (v as Record<string, unknown>)
@@ -25,6 +31,30 @@ function asRecord(v: unknown): Record<string, unknown> | null {
 
 function asArray(v: unknown): unknown[] {
   return Array.isArray(v) ? v : [];
+}
+
+function str(v: unknown): string | undefined {
+  if (v === null || v === undefined) return undefined;
+  const s = String(v).trim();
+  return s || undefined;
+}
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+async function throttleConnection(connectionId: string) {
+  const last = lastRequestAtByConnection.get(connectionId) ?? 0;
+  const elapsed = Date.now() - last;
+  if (elapsed < MIN_REQUEST_INTERVAL_MS) {
+    await sleep(MIN_REQUEST_INTERVAL_MS - elapsed);
+  }
+  lastRequestAtByConnection.set(connectionId, Date.now());
+}
+
+function parseRateLimitReset(headers: Headers): number {
+  const reset = Number(headers.get("X-RateLimit-Reset") ?? 0);
+  return Number.isFinite(reset) && reset > 0 ? reset * 1000 : 60_000;
 }
 
 export class TinyApiV3Client {
@@ -64,6 +94,7 @@ export class TinyApiV3Client {
         client_secret: clientSecret,
         refresh_token: refreshToken,
       }),
+      signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
     });
 
     if (!res.ok) {
@@ -71,23 +102,30 @@ export class TinyApiV3Client {
         error_description?: string;
         error?: string;
       };
+      const message = formatOAuthErrorMessage(err);
+      const isInvalidGrant = err.error?.toLowerCase() === "invalid_grant";
       await prisma.tinyConnection.update({
         where: { id: this.connectionId },
         data: {
           status: TinyConnectionStatus.ERROR,
-          lastError: err.error_description ?? err.error ?? "Refresh falhou",
+          lastError: message,
+          ...(isInvalidGrant
+            ? {
+                accessToken: null,
+                refreshToken: null,
+                oauthIdToken: null,
+                tokenExpiresAt: null,
+              }
+            : {}),
         },
       });
-      throw new TinyApiError(
-        "Token Tiny expirado. Reconecte em Integrações → Tiny.",
-        401,
-        "TOKEN_EXPIRED",
-      );
+      throw new TinyApiError(message, 401, isInvalidGrant ? "INVALID_GRANT" : "TOKEN_EXPIRED");
     }
 
     const data = (await res.json()) as {
       access_token?: string;
       refresh_token?: string;
+      id_token?: string;
       expires_in?: number;
     };
     if (!data.access_token) {
@@ -105,6 +143,7 @@ export class TinyApiV3Client {
         refreshToken: data.refresh_token
           ? encrypt(data.refresh_token)
           : conn.refreshToken,
+        oauthIdToken: data.id_token ? encrypt(data.id_token) : conn.oauthIdToken,
         tokenExpiresAt: expiresAt,
         status: TinyConnectionStatus.CONNECTED,
         lastError: null,
@@ -120,7 +159,12 @@ export class TinyApiV3Client {
     path: string,
     options?: { query?: Record<string, string | number | undefined>; body?: unknown },
   ): Promise<T> {
-    const run = async (retry: boolean): Promise<T> => {
+    const run = async (
+      retry401: boolean,
+      retry429Count: number,
+    ): Promise<T> => {
+      await throttleConnection(this.connectionId);
+
       const url = new URL(
         path.startsWith("http") ? path : `${BASE_URL}${path.startsWith("/") ? path : `/${path}`}`,
       );
@@ -138,11 +182,18 @@ export class TinyApiV3Client {
           ...(options?.body ? { "Content-Type": "application/json" } : {}),
         },
         body: options?.body ? JSON.stringify(options.body) : undefined,
+        signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
       });
 
-      if (res.status === 401 && !retry) {
+      if (res.status === 401 && !retry401) {
         await this.refreshAccessToken();
-        return run(true);
+        return run(true, retry429Count);
+      }
+
+      if (res.status === 429 && retry429Count < MAX_429_RETRIES) {
+        const waitMs = parseRateLimitReset(res.headers);
+        await sleep(waitMs);
+        return run(retry401, retry429Count + 1);
       }
 
       const text = await res.text();
@@ -154,18 +205,31 @@ export class TinyApiV3Client {
       }
 
       if (!res.ok) {
+        if (res.status === 429) {
+          await prisma.tinyConnection.update({
+            where: { id: this.connectionId },
+            data: {
+              status: TinyConnectionStatus.BLOCKED,
+              lastError: "Rate limit Olist ERP excedido. Aguarde e tente novamente.",
+            },
+          });
+        }
         const rec = asRecord(data);
         const msg =
           str(rec?.mensagem) ??
           str(asRecord(rec?.error)?.message) ??
           `Erro Tiny HTTP ${res.status}`;
-        throw new TinyApiError(msg, res.status);
+        throw new TinyApiError(msg, res.status, res.status === 429 ? "RATE_LIMIT" : undefined);
       }
 
       return data as T;
     };
 
-    return run(false);
+    return run(false, 0);
+  }
+
+  async getInfo() {
+    return this.request<Record<string, unknown>>("GET", "/info");
   }
 
   async listEntryInvoices(params: {
@@ -201,10 +265,6 @@ export class TinyApiV3Client {
     return this.request<Record<string, unknown>>("GET", `/pedidos/${id}`);
   }
 
-  /**
-   * Tenta mover a nota para "pronto para conferir" na extensão Conferência de Compra.
-   * Endpoints não documentados publicamente — falha silenciosa é tratada pelo caller.
-   */
   async tryMarkReadyForConference(notaId: number | string): Promise<{
     ok: boolean;
     endpoint?: string;
@@ -234,12 +294,6 @@ export class TinyApiV3Client {
   }
 }
 
-function str(v: unknown): string | undefined {
-  if (v === null || v === undefined) return undefined;
-  const s = String(v).trim();
-  return s || undefined;
-}
-
 export async function refreshTinyAccessToken(connectionId: string): Promise<string> {
   const conn = await prisma.tinyConnection.findUnique({ where: { id: connectionId } });
   if (!conn?.accessToken) {
@@ -253,7 +307,12 @@ export async function getTinyApiClient(tenantId: string): Promise<TinyApiV3Clien
   const conn = await prisma.tinyConnection.findUnique({
     where: { tenantId },
   });
-  if (!conn?.accessToken || conn.status !== TinyConnectionStatus.CONNECTED) {
+  if (
+    !conn?.accessToken ||
+    conn.status !== TinyConnectionStatus.CONNECTED ||
+    !conn.isActive ||
+    conn.deletedAt
+  ) {
     throw new TinyApiError(
       "Tiny ERP não conectado. Configure OAuth em Integrações → Tiny.",
       503,
@@ -273,7 +332,6 @@ export async function getTinyApiClient(tenantId: string): Promise<TinyApiV3Clien
     conn.tokenExpiresAt.getTime() < Date.now() + 60_000;
 
   if (expiresSoon && conn.refreshToken) {
-    const client = new TinyApiV3Client(token, conn.id);
     const fresh = await refreshTinyAccessToken(conn.id);
     return new TinyApiV3Client(fresh, conn.id);
   }

@@ -82,6 +82,7 @@ enum TinyConnectionStatus {
   PENDING
   CONNECTED
   ERROR
+  BLOCKED
 }
 
 /// Tipo de sessão no recebimento do caminhão
@@ -615,20 +616,27 @@ model TinyConnection {
   id                String               @id @default(cuid())
   tenantId          String               @unique
   name              String               @default("Tiny ERP")
+  apiVersion        String               @default("v3")
   status            TinyConnectionStatus @default(PENDING)
   oauthClientId     String?
   oauthClientSecret String?
   oauthRedirectUri  String?
   accessToken       String?
   refreshToken      String?
+  oauthIdToken      String?
   tokenExpiresAt    DateTime?
   companyName       String?
+  metadata          Json?
+  lastValidatedAt   DateTime?
   lastError         String?
+  isActive          Boolean              @default(true)
+  deletedAt         DateTime?
   createdAt         DateTime             @default(now())
   updatedAt         DateTime             @updatedAt
 
   tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
+  @@index([status])
   @@map("tiny_connections")
 }
 

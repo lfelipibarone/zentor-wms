@@ -130,3 +130,6 @@ export const requireUsersManage = createPermissionGuard(Permission.USERS_MANAGE)
 export const requireSettingsManage = createPermissionGuard(
   Permission.SETTINGS_MANAGE,
 );
+export const requireOlistConfigure = createPermissionGuard(
+  Permission.OLIST_CONFIGURE,
+);

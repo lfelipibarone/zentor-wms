@@ -14,14 +14,49 @@ interface IntegrationEvent {
   createdAt: string;
 }
 
+interface TinyConnectionMetadata {
+  razaoSocial?: string;
+  cnpj?: string;
+  nome?: string;
+}
+
 interface TinyConnectionStatus {
   connected: boolean;
   status: string;
+  uiStatus?: "NONE" | "VALID" | "PENDING" | "INVALID" | "BLOCKED";
   companyName?: string | null;
+  metadata?: TinyConnectionMetadata | null;
   hasCredentials?: boolean;
+  oauthClientId?: string | null;
   redirectUri?: string;
+  expectedRedirectUri?: string;
+  redirectUriMismatch?: boolean;
   lastError?: string | null;
   tokenExpiresAt?: string | null;
+  lastValidatedAt?: string | null;
+  isActive?: boolean;
+  isDraft?: boolean;
+}
+
+const STATUS_LABELS: Record<string, string> = {
+  VALID: "Conectado",
+  PENDING: "Pendente",
+  INVALID: "Erro",
+  BLOCKED: "Bloqueado (rate limit)",
+  NONE: "Não configurado",
+};
+
+const STATUS_COLORS: Record<string, string> = {
+  VALID: "bg-emerald-100 text-emerald-800",
+  PENDING: "bg-amber-100 text-amber-800",
+  INVALID: "bg-red-100 text-red-800",
+  BLOCKED: "bg-orange-100 text-orange-800",
+  NONE: "bg-slate-100 text-slate-700",
+};
+
+function formatDateTime(iso: string | null | undefined) {
+  if (!iso) return "—";
+  return new Date(iso).toLocaleString("pt-BR");
 }
 
 export default function TinyIntegracaoPage() {
@@ -30,21 +65,43 @@ export default function TinyIntegracaoPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [connecting, setConnecting] = useState(false);
+  const [testing, setTesting] = useState(false);
+  const [disconnecting, setDisconnecting] = useState(false);
+  const [cancellingDraft, setCancellingDraft] = useState(false);
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const [clientId, setClientId] = useState("");
   const [clientSecret, setClientSecret] = useState("");
-  const [redirectUri, setRedirectUri] = useState("");
 
   const apiBase =
     typeof window !== "undefined"
       ? (process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3333")
       : "";
 
+  const callbackUri =
+    connection?.redirectUri ??
+    connection?.expectedRedirectUri ??
+    `${apiBase}/integrations/tiny/oauth/callback`;
+
   const webhookUrl =
     typeof window !== "undefined"
       ? `${apiBase}/integrations/tiny/webhook`
       : "";
+
+  const uiStatus = connection?.uiStatus ?? "NONE";
+
+  const canSaveCredentials =
+    Boolean(clientId.trim()) &&
+    (Boolean(clientSecret.trim()) || Boolean(connection?.hasCredentials));
+
+  /** Habilita conectar quando há credenciais no formulário ou já salvas no servidor. */
+  const canConnectOAuth = canSaveCredentials;
+
+  const credentialsDirty =
+    Boolean(clientSecret.trim()) ||
+    (Boolean(clientId.trim()) &&
+      clientId.trim() !== (connection?.oauthClientId ?? ""));
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -58,7 +115,7 @@ export default function TinyIntegracaoPage() {
       ]);
       setEvents(evData.events);
       setConnection(conn);
-      if (conn.redirectUri) setRedirectUri(conn.redirectUri);
+      if (conn.oauthClientId) setClientId(conn.oauthClientId);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Erro ao carregar");
     } finally {
@@ -72,21 +129,24 @@ export default function TinyIntegracaoPage() {
 
   useEffect(() => {
     const onMessage = (event: MessageEvent) => {
-      if (event.data?.type !== "tiny-oauth-callback") return;
+      const type = event.data?.type;
+      if (type !== "tiny-oauth-callback" && type !== "erp-oauth-callback") return;
       setConnecting(false);
       if (event.data.success) {
+        setSuccessMessage("Conta Olist conectada com sucesso.");
         load();
       } else {
-        setError(event.data.error ?? "Falha na autenticação Tiny");
+        setError(event.data.error ?? "Falha na autenticação Olist");
       }
     };
     window.addEventListener("message", onMessage);
     return () => window.removeEventListener("message", onMessage);
   }, [load]);
 
-  const saveCredentials = async () => {
+  const saveCredentials = async (): Promise<TinyConnectionStatus> => {
     setSaving(true);
     setError(null);
+    setSuccessMessage(null);
     try {
       const conn = await apiFetch<TinyConnectionStatus>(
         "/api/integrations/tiny/credentials",
@@ -94,15 +154,17 @@ export default function TinyIntegracaoPage() {
           method: "PUT",
           body: JSON.stringify({
             clientId,
-            clientSecret,
-            redirectUri: redirectUri || undefined,
+            clientSecret: clientSecret || undefined,
           }),
         },
       );
       setConnection(conn);
-      setClientSecret("");
+      if (clientSecret) setClientSecret("");
+      setSuccessMessage("Credenciais salvas.");
+      return conn;
     } catch (e) {
       setError(e instanceof Error ? e.message : "Erro ao salvar credenciais");
+      throw e;
     } finally {
       setSaving(false);
     }
@@ -111,11 +173,24 @@ export default function TinyIntegracaoPage() {
   const connectOAuth = async () => {
     setConnecting(true);
     setError(null);
+    setSuccessMessage(null);
     try {
+      if (!connection?.hasCredentials || credentialsDirty) {
+        if (!clientSecret.trim() && !connection?.hasCredentials) {
+          setError("Informe o Client Secret antes de conectar.");
+          setConnecting(false);
+          return;
+        }
+        await saveCredentials();
+      }
+
       const { authUrl } = await apiFetch<{ authUrl: string }>(
         "/api/integrations/tiny/oauth/authorize",
-        { method: "POST" },
+        { method: "POST", body: "{}" },
       );
+      if (!authUrl.includes("accounts.tiny.com.br")) {
+        throw new Error("URL de autenticação Olist inválida. Tente salvar as credenciais novamente.");
+      }
       const w = 600;
       const h = 700;
       const left = window.screenX + (window.outerWidth - w) / 2;
@@ -131,19 +206,78 @@ export default function TinyIntegracaoPage() {
     }
   };
 
+  const testConnection = async () => {
+    setTesting(true);
+    setError(null);
+    setSuccessMessage(null);
+    try {
+      const result = await apiFetch<{
+        ok: boolean;
+        companyName?: string;
+        message?: string;
+      }>("/api/integrations/tiny/test-connection", { method: "POST", body: "{}" });
+      if (result.ok) {
+        setSuccessMessage(
+          result.companyName
+            ? `Conexão OK — ${result.companyName}`
+            : "Conexão com API v3 OK.",
+        );
+        await load();
+      } else {
+        setError(result.message ?? "Falha ao testar conexão");
+      }
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Erro ao testar conexão");
+    } finally {
+      setTesting(false);
+    }
+  };
+
+  const disconnect = async () => {
+    setDisconnecting(true);
+    setError(null);
+    setSuccessMessage(null);
+    try {
+      await apiFetch("/api/integrations/tiny/disconnect", { method: "POST", body: "{}" });
+      setSuccessMessage("Conta desvinculada. Tokens removidos.");
+      await load();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Erro ao desvincular");
+    } finally {
+      setDisconnecting(false);
+    }
+  };
+
+  const cancelDraft = async () => {
+    setCancellingDraft(true);
+    setError(null);
+    setSuccessMessage(null);
+    try {
+      await apiFetch("/api/integrations/tiny/draft", { method: "DELETE" });
+      setSuccessMessage("Rascunho cancelado.");
+      setClientId("");
+      setClientSecret("");
+      await load();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Erro ao cancelar rascunho");
+    } finally {
+      setCancellingDraft(false);
+    }
+  };
+
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Integração Tiny ERP"
-        description="OAuth v3 para recebimento de NF de compra no mobile e webhook de vendas."
+        title="Integração Olist ERP (Tiny)"
+        description="OAuth API v3 — conexão segura, refresh automático e teste de conexão."
       />
 
       <section className="rounded-xl border bg-white p-4 shadow-sm">
         <h2 className="text-sm font-semibold">Conexão OAuth (API v3)</h2>
         <p className="mt-2 text-sm text-muted-foreground">
-          Crie um aplicativo em Configurações → Aplicativos no Tiny e use o
-          redirect URI abaixo. Permissões: notas fiscais (entrada) e, se
-          disponível, conferência de compra.
+          Crie um aplicativo em Configurações → Aplicativos no Olist/Tiny. O
+          redirect URI abaixo deve ser <strong>idêntico</strong> ao registrado no
+          painel (http/https, porta e path).
         </p>
 
         {loading ? (
@@ -152,23 +286,47 @@ export default function TinyIntegracaoPage() {
           </div>
         ) : (
           <>
-            <div className="mt-4 rounded-lg bg-slate-50 p-3 text-sm">
-              <p>
-                Status:{" "}
-                <span className="font-medium">
-                  {connection?.connected
-                    ? `Conectado${connection.companyName ? ` — ${connection.companyName}` : ""}`
-                    : connection?.status ?? "Não configurado"}
-                </span>
-              </p>
-              {connection?.lastError ? (
-                <p className="mt-1 text-red-600">{connection.lastError}</p>
+            <div className="mt-4 flex flex-wrap items-center gap-2">
+              <span
+                className={`rounded-full px-2.5 py-0.5 text-xs font-medium ${STATUS_COLORS[uiStatus] ?? STATUS_COLORS.NONE}`}
+              >
+                {STATUS_LABELS[uiStatus] ?? uiStatus}
+              </span>
+              {connection?.companyName ? (
+                <span className="text-sm font-medium">{connection.companyName}</span>
               ) : null}
             </div>
 
-            <label className="mt-4 block text-sm font-medium">Redirect URI</label>
+            {connection?.metadata?.cnpj ? (
+              <p className="mt-2 text-sm text-muted-foreground">
+                CNPJ: {connection.metadata.cnpj}
+              </p>
+            ) : null}
+
+            <div className="mt-3 grid gap-1 text-sm text-muted-foreground sm:grid-cols-2">
+              <p>Token expira: {formatDateTime(connection?.tokenExpiresAt)}</p>
+              <p>Última validação: {formatDateTime(connection?.lastValidatedAt)}</p>
+            </div>
+
+            {connection?.lastError ? (
+              <p className="mt-2 text-sm text-red-600">{connection.lastError}</p>
+            ) : null}
+            {successMessage ? (
+              <p className="mt-2 text-sm text-emerald-700">{successMessage}</p>
+            ) : null}
+
+            <label className="mt-4 block text-sm font-medium">
+              Redirect URI (cadastre no aplicativo Olist)
+            </label>
             <p className="mt-1 break-all rounded-lg bg-slate-50 p-2 font-mono text-xs">
-              {redirectUri || `${apiBase}/integrations/tiny/oauth/callback`}
+              {callbackUri}
+            </p>
+            <p className="mt-2 text-xs text-muted-foreground">
+              No painel Olist → Configurações → Aplicativos, o redirect URI deve ser{" "}
+              <strong>idêntico</strong> ao endereço acima (incluindo http, porta e path).
+              O popup abre primeiro o login em{" "}
+              <span className="font-mono">accounts.tiny.com.br</span> e só depois retorna
+              aqui para capturar o token.
             </p>
 
             <div className="mt-4 grid gap-3 sm:grid-cols-2">
@@ -178,7 +336,7 @@ export default function TinyIntegracaoPage() {
                   className="mt-1 w-full rounded-lg border px-3 py-2 text-sm"
                   value={clientId}
                   onChange={(e) => setClientId(e.target.value)}
-                  placeholder="Do aplicativo Tiny"
+                  placeholder="Do aplicativo Olist"
                 />
               </div>
               <div>
@@ -197,37 +355,55 @@ export default function TinyIntegracaoPage() {
               </div>
             </div>
 
-            <div className="mt-3">
-              <label className="text-sm font-medium">
-                Redirect URI (opcional)
-              </label>
-              <input
-                className="mt-1 w-full rounded-lg border px-3 py-2 text-sm font-mono"
-                value={redirectUri}
-                onChange={(e) => setRedirectUri(e.target.value)}
-                placeholder={`${apiBase}/integrations/tiny/oauth/callback`}
-              />
-            </div>
-
             <div className="mt-4 flex flex-wrap gap-2">
               <button
                 type="button"
-                disabled={
-                  saving || !clientId || (!clientSecret && !connection?.hasCredentials)
-                }
-                onClick={saveCredentials}
+                disabled={saving || !canSaveCredentials}
+                onClick={() => {
+                  void saveCredentials().catch(() => undefined);
+                }}
                 className="rounded-lg bg-slate-800 px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
               >
                 {saving ? "Salvando…" : "Salvar credenciais"}
               </button>
               <button
                 type="button"
-                disabled={connecting || !connection?.hasCredentials}
+                disabled={connecting || saving || !canConnectOAuth}
                 onClick={connectOAuth}
                 className="rounded-lg bg-[#0d9488] px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
               >
-                {connecting ? "Aguardando Tiny…" : "Conectar com Tiny"}
+                {connecting ? "Aguardando Olist…" : "Conectar com Olist"}
               </button>
+              {connection?.connected ? (
+                <button
+                  type="button"
+                  disabled={testing}
+                  onClick={testConnection}
+                  className="rounded-lg border border-[#0d9488] px-4 py-2 text-sm font-medium text-[#0d9488] disabled:opacity-50"
+                >
+                  {testing ? "Testando…" : "Testar conexão"}
+                </button>
+              ) : null}
+              {connection?.connected || connection?.status === "ERROR" ? (
+                <button
+                  type="button"
+                  disabled={disconnecting}
+                  onClick={disconnect}
+                  className="rounded-lg border border-red-300 px-4 py-2 text-sm font-medium text-red-700 disabled:opacity-50"
+                >
+                  {disconnecting ? "Desvinculando…" : "Desvincular"}
+                </button>
+              ) : null}
+              {connection?.isDraft ? (
+                <button
+                  type="button"
+                  disabled={cancellingDraft}
+                  onClick={cancelDraft}
+                  className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 disabled:opacity-50"
+                >
+                  {cancellingDraft ? "Cancelando…" : "Cancelar rascunho"}
+                </button>
+              ) : null}
             </div>
           </>
         )}
@@ -236,7 +412,7 @@ export default function TinyIntegracaoPage() {
       <section className="rounded-xl border bg-white p-4 shadow-sm">
         <h2 className="text-sm font-semibold">Webhook (vendas)</h2>
         <p className="mt-2 text-sm text-muted-foreground">
-          Configure no Tiny (Configurações → Webhooks → notificações de vendas) a
+          Configure no Olist (Configurações → Webhooks → notificações de vendas) a
           URL abaixo. Token em Admin → Configurações (
           <code className="text-xs">tiny.webhook.secret</code>).
         </p>

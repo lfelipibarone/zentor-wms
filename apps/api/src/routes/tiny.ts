@@ -1,51 +1,67 @@
 import type { FastifyInstance } from "fastify";
 import {
-  requireSettingsManage,
+  requireOlistConfigure,
   requireWebAccess,
 } from "../lib/auth-guard.js";
 import { tenantWhere } from "../lib/tenant-context.js";
 import {
+  cancelTinyDraft,
   defaultOAuthRedirectUri,
+  disconnectTinyConnection,
   getOrCreateTinyConnection,
   getTinyConnectionStatus,
   handleTinyOAuthCallback,
   oauthCallbackHtml,
+  oauthCallbackJson,
+  resolveOAuthRedirectUri,
   saveTinyOAuthCredentials,
   startTinyOAuth,
+  testTinyConnection,
 } from "../services/tiny-oauth.js";
 import { prisma } from "../lib/prisma.js";
 import { TinyConnectionStatus } from "@prisma/client";
 import { syncPendingOrderPrioritiesFromTiny } from "../services/tiny-integration.js";
 
+function wantsJson(request: {
+  headers: Record<string, unknown>;
+  query: Record<string, unknown>;
+}): boolean {
+  const accept = String(request.headers.accept ?? "");
+  if (accept.includes("application/json")) return true;
+  return request.query.format === "json";
+}
+
 export async function tinyRoutes(app: FastifyInstance) {
   app.get<{
-    Querystring: { code?: string; state?: string; error?: string };
+    Querystring: { code?: string; state?: string; error?: string; format?: string };
   }>("/integrations/tiny/oauth/callback", async (request, reply) => {
+    const asJson = wantsJson({
+      headers: request.headers as Record<string, unknown>,
+      query: request.query as Record<string, unknown>,
+    });
+
+    const fail = (message: string) => {
+      const result = { success: false, message };
+      if (asJson) {
+        return reply.send(oauthCallbackJson(result));
+      }
+      return reply.type("text/html").send(oauthCallbackHtml(result));
+    };
+
     if (request.query.error) {
-      return reply
-        .type("text/html")
-        .send(
-          oauthCallbackHtml({
-            success: false,
-            message: String(request.query.error),
-          }),
-        );
+      return fail(String(request.query.error));
     }
 
     const code = request.query.code;
     const state = request.query.state;
     if (!code || !state) {
-      return reply
-        .type("text/html")
-        .send(
-          oauthCallbackHtml({
-            success: false,
-            message: "Código ou state OAuth ausente",
-          }),
-        );
+      return fail("Código ou state OAuth ausente");
     }
 
     const result = await handleTinyOAuthCallback({ code, state });
+    if (asJson) {
+      return reply.send(oauthCallbackJson(result));
+    }
     return reply.type("text/html").send(oauthCallbackHtml(result));
   });
 
@@ -68,7 +84,7 @@ export async function tinyRoutes(app: FastifyInstance) {
       };
     }>(
       "/api/integrations/tiny/credentials",
-      { preHandler: requireSettingsManage },
+      { preHandler: requireOlistConfigure },
       async (request, reply) => {
         const tenantId = tenantWhere(request).tenantId;
         const clientId = request.body?.clientId?.trim();
@@ -83,17 +99,16 @@ export async function tinyRoutes(app: FastifyInstance) {
           await saveTinyOAuthCredentials(tenantId, {
             clientId,
             clientSecret,
-            redirectUri: request.body?.redirectUri,
+            redirectUri: resolveOAuthRedirectUri(request.body?.redirectUri),
           });
         } else if (conn.oauthClientSecret) {
           await prisma.tinyConnection.update({
             where: { id: conn.id },
             data: {
               oauthClientId: clientId,
-              oauthRedirectUri:
-                request.body?.redirectUri?.trim() ||
-                conn.oauthRedirectUri ||
-                defaultOAuthRedirectUri(),
+              oauthRedirectUri: resolveOAuthRedirectUri(
+                request.body?.redirectUri ?? conn.oauthRedirectUri,
+              ),
               status: TinyConnectionStatus.PENDING,
             },
           });
@@ -107,8 +122,41 @@ export async function tinyRoutes(app: FastifyInstance) {
     );
 
     secured.post(
+      "/api/integrations/tiny/test-connection",
+      { preHandler: requireOlistConfigure },
+      async (request, reply) => {
+        const result = await testTinyConnection(tenantWhere(request).tenantId);
+        if (!result.ok) {
+          return reply.status(400).send(result);
+        }
+        return result;
+      },
+    );
+
+    secured.post(
+      "/api/integrations/tiny/disconnect",
+      { preHandler: requireOlistConfigure },
+      async (request) => {
+        return disconnectTinyConnection(tenantWhere(request).tenantId);
+      },
+    );
+
+    secured.delete(
+      "/api/integrations/tiny/draft",
+      { preHandler: requireOlistConfigure },
+      async (request, reply) => {
+        try {
+          return await cancelTinyDraft(tenantWhere(request).tenantId);
+        } catch (e) {
+          const message = e instanceof Error ? e.message : "Erro ao cancelar rascunho";
+          return reply.status(400).send({ error: message });
+        }
+      },
+    );
+
+    secured.post(
       "/api/integrations/tiny/sync-order-priorities",
-      { preHandler: requireSettingsManage },
+      { preHandler: requireOlistConfigure },
       async (request, reply) => {
         try {
           const result = await syncPendingOrderPrioritiesFromTiny(
@@ -125,17 +173,17 @@ export async function tinyRoutes(app: FastifyInstance) {
 
     secured.post(
       "/api/integrations/tiny/oauth/authorize",
-      { preHandler: requireSettingsManage },
+      { preHandler: requireOlistConfigure },
       async (request, reply) => {
         if (!request.authUser) {
           return reply.status(401).send({ error: "Não autenticado" });
         }
         try {
-          const { authUrl, connectionId } = await startTinyOAuth(
+          const { authUrl, state, connectionId } = await startTinyOAuth(
             tenantWhere(request).tenantId,
             request.authUser.id,
           );
-          return { authUrl, connectionId };
+          return { authUrl, state, connectionId };
         } catch (e) {
           const message = e instanceof Error ? e.message : "Erro ao iniciar OAuth";
           return reply.status(400).send({ error: message });

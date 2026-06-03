@@ -11,9 +11,10 @@
     "db:migrate": "prisma migrate dev",
     "db:push": "prisma db push",
     "db:studio": "prisma studio",
+    "preseed": "pnpm --filter @wms/shared build",
     "db:seed": "tsx prisma/seed.ts",
     "typecheck": "tsc --noEmit",
-    "test": "node --import tsx --test src/services/order-proximity.test.ts src/services/pick-wave-partition.test.ts src/services/tiny-order-priority.test.ts"
+    "test": "node --import tsx --test src/services/order-proximity.test.ts src/services/pick-wave-partition.test.ts src/services/tiny-order-priority.test.ts src/services/tiny-oauth.test.ts"
   },
   "dependencies": {
     "@fastify/cors": "^11.0.1",

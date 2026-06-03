@@ -1,134 +1,125 @@
-# Lógica de ondas e fila de packing
+# 🌊 Lógica de Ondas e Fila de Packing
 
-Documento de referência para explicar ao cliente e ajustar regras por tenant. Implementação principal em `apps/api/src/services/`.
+Este documento serve como referência técnica e operacional para a liberação consolidada de pedidos (ondas de separação) e gerenciamento da fila de packing no WMS.
 
-## Glossário
+---
+
+## 📖 Glossário
 
 | Termo | Significado |
-|-------|-------------|
+| :--- | :--- |
 | **Onda** | Lote de pedidos `PENDING` liberados juntos para separação consolidada (`PickWave` status `RELEASED`). |
-| **Linha de onda** | Uma passagem na gôndola: combinação **produto + localização** (`PickWaveLine`). |
-| **Alocação** | Quantidade de um item de pedido atribuída à linha (`PickWaveAllocation`). |
-| **Packing de onda** | No web, distribuir quantidades coletadas nas cestas de cada pedido (sort). |
-| **Packing de pedido** | Conferir itens bipando produto após separação individual. |
+| **Linha de onda** | Uma tarefa de coleta física na gôndola: combinação **produto + localização** (`PickWaveLine`). |
+| **Alocação** | Quantidade de um item de pedido específica atribuída a uma linha de onda (`PickWaveAllocation`). |
+| **Packing de onda** | Distribuição e triagem dos produtos coletados consolidados em cestas individuais no web dashboard. |
+| **Packing de pedido** | Conferência unitária de itens bipando o código de barras do produto após separação dedicada. |
 
-## Quem entra na onda
+---
 
-- Pedidos com status `PENDING` e **sem** vínculo em outra onda ativa.
-- Filtros em `buildWaveCandidateOrders` (`pick-wave.ts`):
-  - `wave.onlyDeadlineToday`: só coleta no dia corrente.
-  - `wave.autoRelease.maxOrders`: limite de pedidos por liberação automática.
-- Ordem de candidatos: `priority` desc, `collectionDeadline` asc, `createdAt` asc.
+## 🎯 Candidatos à Onda
 
-## Várias ondas na mesma liberação
+A seleção de pedidos candidatos a entrar na onda ocorre na função `buildWaveCandidateOrders` dentro de `pick-wave.ts`:
+1.  **Filtros Básicos**:
+    *   Pedidos com status `PENDING`.
+    *   Pedidos que **não** possuem vínculo em nenhuma onda ativa.
+    *   Se a configuração `wave.onlyDeadlineToday` estiver ativa: apenas pedidos com deadline no dia atual.
+2.  **Ordenação de Prioridade**:
+    *   O WMS prioriza os candidatos pela ordem: `priority` (decrescente), `collectionDeadline` (crescente) e `createdAt` (crescente).
 
-Configuração (`wave-settings.ts`):
+---
 
-| Chave | Padrão | Efeito |
-|-------|--------|--------|
-| `wave.partition.enabled` | `true` | Ativa partição greedy por produto |
-| `wave.partition.minOrdersPerWave` | `3` | Grupo menor é ignorado ou fundido |
-| `wave.partition.maxWavesPerBatch` | `10` | Teto de ondas por release |
+## 🔀 Algoritmos de Particionamento (Várias Ondas por Release)
 
-Algoritmo (`pick-wave-partition.ts`):
+A partição de ondas divide um lote grande de pedidos candidatos em grupos menores e focados para separação unificada. O comportamento é parametrizado em `wave-settings.ts`.
 
-1. Para cada produto P, conjunto O(P) = pedidos com item pendente de P.
-2. Produtos ordenados por |O(P)| decrescente (maior consolidação primeiro).
-3. Para cada P, forma onda com pedidos de O(P) ainda não atribuídos (se |grupo| ≥ mínimo).
-4. Pedido com vários SKUs entra na **primeira** onda que o incluir (produto âncora).
+O WMS oferece três estratégias de particionamento em `pick-wave-partition.ts`:
 
-**Exemplo:** 5 pedidos só com SKU-A → onda 1; 10 pedidos só com SKU-B → onda 2. Pedido com A+B segue a onda do SKU cujo grupo foi formado primeiro.
+### 1. Greedy por Agrupamento de Produto (`BY_PRODUCT`) - *Padrão*
+*   **Foco**: Consolidar coletas de SKUs idênticos no galpão.
+*   **Funcionamento**:
+    1.  Filtra apenas pedidos com no máximo 5 SKUs distintos.
+    2.  Calcula a frequência de cada produto em aberto.
+    3.  Seleciona o produto de maior frequência e cria um grupo.
+    4.  Associa pedidos que compartilham deste produto (e produtos vizinhos por rota física) até atingir o limite mínimo (`wave.partition.minOrdersPerWave`) e teto máximo da onda.
+    5.  Pedidos multifuncionais seguem o produto cuja onda foi agrupada primeiro (produto âncora).
 
-Várias ondas podem ficar `RELEASED` ao mesmo tempo. O mobile lista em `/mobile/waves/released` e o operador escolhe qual aceitar.
+### 2. Agrupamento por Rota Física (`PROXIMITY`)
+*   **Foco**: Minimizar a distância percorrida pelo operador entre as gôndolas.
+*   **Funcionamento**:
+    1.  Gera um perfil de locais de gôndola (`OrderPickProfile`) para cada pedido pendente.
+    2.  Agrupa os pedidos em clusters físicos onde as localizações de coleta estão próximas na serpentine de rota do armazém.
+    3.  Usa o limite de distância configurado em `wave.proximityMaxDistance` para delimitar até onde um separador pode andar em uma única onda.
 
-## Passagens na gôndola e multi-gôndola
+### 3. Pedidos Monocanal / Item Único (`SINGLE_ITEM`)
+*   **Foco**: Separação expressa de pedidos de e-commerce que possuem exatamente **uma unidade de um único SKU**.
+*   **Funcionamento**:
+    1.  Filtra apenas pedidos mono-item e monocantidade.
+    2.  Agrupa por proximidade física de rota e forma ondas de picking consolidadas de alta velocidade. O separador vai a poucas gôndolas e resolve dezenas de pedidos de uma vez.
 
-- Chave da linha: `productId` + `pickLocationId`.
-- Alocação de quantidade (`pick-allocation.ts`):
-  1. Lista gôndolas `PICK_FACE` do SKU, ordenadas por rota.
-  2. Em cada face, usa até `min(saldo, restante)`.
-  3. Se saldo total < necessário, completa na face de menor saldo (shortfall).
+---
 
-**Exemplo:** pedido precisa de 100 un.; duas gôndolas com 50 cada → duas linhas de onda (ou hint no packing: "50 un. em A-01 · 50 un. em B-02").
+## 🛣️ Rota de Coleta e Multi-Gôndolas (`pick-allocation.ts`)
 
-## Prioridade e coleta
+A linha de onda (`PickWaveLine`) consolida as quantidades agregadas dos produtos. A alocação física de qual gôndola o separador retirará o item é calculada no arquivo `pick-allocation.ts`:
 
-`computeOrderPriority` (`marketplace-priority.ts`) gera score 0–100:
+1.  Lista as gôndolas cadastradas como `PICK_FACE` do SKU, ordenadas pela sequência lógica de rota (serpentine do galpão).
+2.  Aloca as quantidades em cada endereço usando o menor número de paradas, aplicando `min(saldo, restante)`.
+3.  Caso a soma das frentes de pick ativa seja menor que a necessária (ruptura de gôndola), o WMS sugere a gôndola de menor saldo e dispara um alerta de reabastecimento.
 
-| Situação | Score aproximado |
-|----------|------------------|
-| Coleta já passou | 100 |
-| ≤ 2 h para coleta | 95 |
-| ≤ 4 h | 85 |
-| ≤ 8 h | 70 |
-| ≤ 24 h | 55 |
-| Marketplace Mercado Livre | +5 base |
+---
 
-Na fila de packing, `scorePackingUrgency` aplica bônus extra se a coleta é **hoje**.
+## ⏱️ Prioridade de Coleta e Urgência do Packing
 
-## Ordenação no packing (web)
+A prioridade do pedido é calculada em `marketplace-priority.ts` gerando um score de `0` a `100`:
 
-Endpoint unificado: `GET /api/packing/queue/unified`
+| Janela para Coleta / Marketplace | Score WMS |
+| :--- | :--- |
+| Prazo de coleta expirado | `100` |
+| $\le$ 2 horas para coleta | `95` |
+| $\le$ 4 horas para coleta | `85` |
+| $\le$ 8 horas para coleta | `70` |
+| $\le$ 24 horas para coleta | `55` |
+| Integração Mercado Livre | `+5` (bônus na base do score) |
 
-1. **Linhas de onda** sempre antes dos pedidos.
-2. Dentro de ondas: urgência agregada (max dos pedidos) desc, depois rota da gôndola (`packing-queue-sort.ts`).
-3. Pedidos: urgência desc, proximidade em rota (serpentine), deadline asc.
+Na mesa de packing (fila de expedição), o algoritmo aplica bônus extra de urgência caso a coleta ocorra no dia corrente.
 
-## Fluxo operacional
+---
+
+## 📦 Fila Unificada e Ordenação no Packing (`packing-queue-sort.ts`)
+
+O painel web busca o endpoint unificado `GET /api/packing/queue/unified` para exibir as cestas prontas para expedição. A ordenação respeita as seguintes prioridades:
+
+1.  **Ondas de Separação Coletadas (`PICKED`)**: Aparecem sempre no topo da fila, pois seus itens já foram retirados do armazém e estão ocupando cestas físicas físicas que precisam ser liberadas.
+2.  **Pedidos Dedicados**: Ordenados por urgência da coleta (score decrescente), proximidade em rota e deadline.
+
+---
+
+## 🔁 Fluxo Operacional de Ondas
 
 ```mermaid
 sequenceDiagram
-  participant Web
-  participant API
-  participant Mobile
-  participant Operador
+    participant Web as Painel Web (Expedidor)
+    participant API as Backend (WMS API)
+    participant Mobile as App Mobile (Separador)
 
-  Web->>API: POST /api/waves/release
-  API->>API: partitionOrdersIntoWaves
-  API->>API: N PickWave RELEASED
-  Mobile->>API: GET /mobile/waves/released
-  Operador->>Mobile: Aceita onda
-  Mobile->>API: POST /mobile/waves/:id/accept
-  Operador->>Mobile: Pick por linha/gôndola
-  Web->>API: Packing sort nas cestas
-  API->>API: Fechar onda CLOSED
+    Web->{API}: POST /api/waves/release (Libera Lote)
+    API->>API: partitionOrdersIntoWaves (BY_PRODUCT / PROXIMITY)
+    API->>API: N PickWave geradas com status RELEASED
+    Mobile->>API: GET /mobile/waves/released
+    Note over Mobile: Exibe ondas disponíveis para separação
+    Mobile->>API: Aceita Onda (status aceito pelo Picker)
+    Note over Mobile: Rota orientada para coleta
+    Mobile->>API: POST /mobile/waves/:id/pick-complete (Coleta Finalizada)
+    Web->>API: Faz a bipagem das cestas no packing (Sort)
+    API->>API: Atualiza status da onda para CLOSED
 ```
 
-## Ajuste de contagem no mobile
+---
 
-Quando o operador vê saldo divergente na gôndola ou no pulmão durante a separação:
+## 🔧 Correção de Estoque no Mobile e Reconciliação
+Quando o operador identifica uma divergência física de estoque na gôndola durante a separação:
+1.  Ele clica em **Corrigir estoque na gôndola** na tela de coleta do app.
+2.  Informa a quantidade real física contada (ex: `0`).
+3.  A API processa o ajuste (`adjustLocationQuantity`) e dispara a reconciliação automática de rotas (`reconcilePickTargetsAfterStockChange`).
 
-1. Botão **Corrigir estoque na gôndola** em `pick.tsx` e na pick de onda.
-2. Informa a **quantidade contada** (valor absoluto, 0 até capacidade).
-3. API `POST /mobile/locations/:id/adjust-quantity` grava `currentQuantity` e movimento `ADJUSTMENT`.
-
-**Reconciliação automática** (`pick-location-reconcile.ts`), escopo **todo SKU ativo**:
-
-| Alvo | Comportamento |
-|------|----------------|
-| Pedidos `PENDING` / `PICKING` | Recalcula `orderItem.pickLocationId` via `allocateQuantityAcrossPickFaces` / `resolvePickFaceForProduct` |
-| Linhas de onda `RELEASED` sem pick | Pode mover linha para outra gôndola (mesmo produto) |
-| Linha de onda já iniciada | Apenas aviso se saldo < pendente |
-| Ajuste em **pulmão** | Atualiza saldo do pulmão; **não** altera faces de pick dos pedidos |
-
-Após o ajuste, a sessão de picking do pedido é recarregada (`routeQueue`, `nextItem`) para refletir nova gôndola.
-
-## Arquivos de código
-
-| Regra | Arquivo |
-|-------|---------|
-| Partição de ondas | `pick-wave-partition.ts` |
-| Liberação / linhas | `pick-wave.ts` |
-| Multi-gôndola | `pick-allocation.ts` |
-| Ordenação packing | `packing-queue-sort.ts`, `order-packing.ts` |
-| Ajuste de estoque | `location-adjust.ts`, `pick-location-reconcile.ts` |
-| Configurações | `wave-settings.ts` |
-| UI packing | `apps/web/app/(dashboard)/packing/page.tsx` |
-| Mobile ondas / pick | `apps/mobile/app/wave-picking/`, `apps/mobile/app/picking/[orderId]/pick.tsx` |
-
-## Como alterar para o cliente
-
-1. Ajustar chaves `wave.*` em Configurações do tenant (ou `system_settings`).
-2. Para mudar algoritmo de partição, editar `partitionOrdersIntoWaves`.
-3. Para mudar prioridade de coleta, editar `computeOrderPriority` / `scorePackingUrgency`.
-4. Reexecutar seed ou liberar onda de teste e validar preview em `/api/waves/preview` (campo `waves[]`).
+Para ver em detalhes como esse processo repara os pedidos e as ondas afetadas sem parar a operação, acesse o documento [[reabastecimento-estoque|Reabastecimento e Reconciliação]].

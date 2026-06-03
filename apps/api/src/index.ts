@@ -9,6 +9,7 @@ import { notificationRoutes } from "./routes/notifications.js";
 import { integrationRoutes } from "./routes/integrations.js";
 import { tinyRoutes } from "./routes/tiny.js";
 import { startWaveScheduler } from "./services/wave-scheduler.js";
+import { startTinyOAuthRefreshWorker } from "./services/tiny-oauth-refresh-worker.js";
 
 const PORT = Number(process.env.PORT ?? 3333);
 const HOST = process.env.HOST ?? "0.0.0.0";
@@ -16,7 +17,11 @@ const HOST = process.env.HOST ?? "0.0.0.0";
 async function main() {
   const app = Fastify({ logger: true });
 
-  await app.register(cors, { origin: true });
+  await app.register(cors, {
+    origin: true,
+    methods: ["GET", "HEAD", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "Authorization", "x-tenant-slug", "Accept"],
+  });
 
   app.get("/health", async () => ({ ok: true }));
 
@@ -32,6 +37,7 @@ async function main() {
   await app.register(tinyRoutes);
 
   startWaveScheduler();
+  startTinyOAuthRefreshWorker();
 
   await app.listen({ port: PORT, host: HOST });
   console.log(`@wms/api rodando em http://${HOST}:${PORT}`);
