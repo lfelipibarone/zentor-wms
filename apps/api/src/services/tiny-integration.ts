@@ -27,7 +27,7 @@ export interface TinyOrderPayload {
 }
 
 /** Situações Tiny elegíveis para ingestão no WMS (API v3). */
-export const TINY_ORDER_SITUACOES_SYNC = new Set([1, 3, 4, 7]);
+export const TINY_ORDER_SITUACOES_SYNC = new Set([0, 1, 3, 4, 7]);
 
 /** Situação cancelada no Tiny. */
 export const TINY_ORDER_SITUACAO_CANCELADA = 2;

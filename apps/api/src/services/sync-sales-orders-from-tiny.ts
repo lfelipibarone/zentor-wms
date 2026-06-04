@@ -37,6 +37,8 @@ export type SyncSalesOrdersResult = {
   created: number;
   updated: number;
   skipped: number;
+  /** Pedidos retornados pelo GET /pedidos no período (antes dos filtros WMS). */
+  listedFromTiny: number;
   ordersRemoved: number;
   wavesRemoved: number;
   demoRemoved: number;
@@ -128,6 +130,7 @@ export async function syncSalesOrdersFromTiny(params: {
     created: 0,
     updated: 0,
     skipped: 0,
+    listedFromTiny: 0,
     ordersRemoved: 0,
     wavesRemoved: 0,
     demoRemoved: 0,
@@ -173,10 +176,11 @@ export async function syncSalesOrdersFromTiny(params: {
     const page = await client.listPedidos({
       dataInicial: formatDate(start),
       dataFinal: formatDate(end),
-      origemPedido: 0,
       limit,
       offset,
     });
+
+    result.listedFromTiny += page.items.length;
 
     for (const raw of page.items) {
       const row = asRecord(raw);
@@ -259,6 +263,15 @@ export async function syncSalesOrdersFromTiny(params: {
 
   await setLastSyncAt(params.tenantId);
 
+  if (result.listedFromTiny === 0) {
+    result.warning =
+      "A API Tiny não retornou pedidos de venda no período. Confira se existem pedidos no ERP (últimos " +
+      `${days} dias), se o aplicativo OAuth tem permissão de Pedidos de Venda e se a conta conectada é a correta.`;
+  } else if (result.created === 0 && result.updated === 0 && result.errors.length === 0) {
+    result.warning =
+      `${result.listedFromTiny} pedido(s) listado(s), mas nenhum foi importado. Situações aceitas: Aberta (0), Faturada (1), Aprovada (3), Preparando envio (4), Pronto envio (7). Cancelados (2) removem pedido PENDING existente. SKUs precisam existir no cadastro WMS.`;
+  }
+
   await logIntegrationEvent({
     tenantId: params.tenantId,
     source: "TINY",
@@ -269,6 +282,7 @@ export async function syncSalesOrdersFromTiny(params: {
       created: result.created,
       updated: result.updated,
       skipped: result.skipped,
+      listedFromTiny: result.listedFromTiny,
       ordersRemoved: result.ordersRemoved,
       wavesRemoved: result.wavesRemoved,
       demoRemoved: result.demoRemoved,

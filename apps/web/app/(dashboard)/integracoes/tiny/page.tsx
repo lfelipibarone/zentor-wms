@@ -267,7 +267,11 @@ export default function TinyIntegracaoPage() {
         setError(result.warning ?? "Tiny ERP não conectado.");
         return;
       }
+      if (result.warning) {
+        setError(result.warning);
+      }
       const parts = [
+        `${result.listedFromTiny ?? 0} listado(s) no Tiny`,
         `${result.created} criado(s)`,
         `${result.updated} atualizado(s)`,
         `${result.skipped} ignorado(s)`,

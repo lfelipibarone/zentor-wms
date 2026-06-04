@@ -276,7 +276,9 @@ export class TinyApiV3Client {
       query: {
         dataInicial: params.dataInicial,
         dataFinal: params.dataFinal,
-        origemPedido: params.origemPedido ?? 0,
+        ...(params.origemPedido !== undefined
+          ? { origemPedido: params.origemPedido }
+          : {}),
         situacao: params.situacao,
         limit: params.limit ?? 100,
         offset: params.offset ?? 0,

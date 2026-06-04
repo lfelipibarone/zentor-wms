@@ -66,3 +66,5 @@ Todos os eventos importantes de troca de dados (notificações de venda do Tiny 
 Para entender os dados mapeados nesta integração, consulte a [[modelagem-dados|Modelagem de Dados]].
 
 Para o histórico de problemas e correções ao conectar a conta em desenvolvimento, consulte [[tiny-conexao-conta-ajustes|Conexão Tiny — histórico e ajustes]].
+
+Para pedidos de venda (webhook, API v3 e mapeamento no WMS), consulte [[integracao-tiny-pedidos|Integração Tiny — Pedidos de venda]].

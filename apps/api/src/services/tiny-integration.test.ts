@@ -23,6 +23,7 @@ describe("tiny-integration pedidos", () => {
     assert.equal(isTinyOrderSituacaoSyncable(4), true);
     assert.equal(isTinyOrderSituacaoSyncable(7), true);
     assert.equal(isTinyOrderSituacaoSyncable(1), true);
+    assert.equal(isTinyOrderSituacaoSyncable(0), true);
     assert.equal(isTinyOrderSituacaoSyncable(TINY_ORDER_SITUACAO_CANCELADA), false);
     assert.equal(isTinyOrderSituacaoSyncable(5), false);
     assert.equal(isTinyOrderSituacaoSyncable(null), false);

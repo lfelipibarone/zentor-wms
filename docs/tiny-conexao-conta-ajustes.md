@@ -1,111 +1,89 @@
-# Conexão da conta Tiny/Olist — histórico e ajustes
+# 🔌 Conexão da Conta Tiny/Olist — Histórico e Ajustes
 
-Este documento registra **como estava a integração OAuth antes dos ajustes**, **quais problemas apareceram ao conectar a conta** e **o que foi corrigido** para o fluxo funcionar em desenvolvimento local.
+Este documento registra o histórico da integração OAuth com a **Olist ERP API v3** (Tiny). Ele descreve como estava o comportamento da API e do frontend antes das correções, os problemas encontrados e o que foi ajustado para que o fluxo funcione perfeitamente em ambiente de desenvolvimento local.
 
-Para a referência técnica contínua (rate limit, refresh de tokens, criptografia), consulte [[integracao-tiny-oauth|Integração Tiny ERP (v3)]].
-
----
-
-## Contexto
-
-A integração usa **OAuth 2.0 / OpenID Connect** da **Olist ERP API v3** (Tiny), conforme documentação oficial:
-
-- Autenticação: https://api-docs.erp.olist.com/documentacao/comecando/autenticacao
-- URL de login: `https://accounts.tiny.com.br/realms/tiny/protocol/openid-connect/auth`
-- Callback do WMS: `{API_PUBLIC_URL}/integrations/tiny/oauth/callback`
-
-Tela no painel web: `/integracoes/tiny`.
+> [!NOTE]
+> Para a referência técnica contínua (rate limits, refresh de tokens e criptografia), consulte o guia principal: [[integracao-tiny-oauth|Integração Tiny ERP (v3)]].
 
 ---
 
-## Como estava antes (problemas encontrados)
+## 🗺️ Contexto do Protocolo
 
-Durante os testes locais na branch `integracaotiny`, a conexão da conta falhava em etapas diferentes. Abaixo, o comportamento observado e a causa raiz de cada um.
-
-### 1. Erro ao salvar credenciais — CORS / Failed to fetch
-
-| Sintoma | `PUT /api/integrations/tiny/credentials` bloqueado no navegador |
-| Causa | A API não permitia métodos `PUT`, `PATCH` e `DELETE` na configuração CORS |
-| Estado anterior | Apenas `GET` e `POST` estavam liberados em `apps/api/src/index.ts` |
-
-### 2. Erro ao salvar credenciais — Permissão negada (403)
-
-| Sintoma | Resposta `{ "error": "Permissão negada" }` e crash na UI |
-| Causa | Rotas de mutação da integração Tiny usavam `requireSettingsManage` (`settings.manage`) |
-| Estado anterior | A tela exige `olist.configure`, mas o usuário de teste `operador@wms.local` (role `EXPEDITER`) **não** possui `settings.manage` |
-| Impacto | Quem tinha acesso ao menu Tiny não conseguia salvar credenciais nem iniciar OAuth |
-
-### 3. Botão “Conectar com Olist” desabilitado
-
-| Sintoma | Botão permanecia cinza mesmo com Client ID e Secret preenchidos |
-| Causa | A UI só habilitava conectar quando `connection.connected === true` |
-| Estado anterior | Era necessário salvar credenciais antes, sem fluxo claro de “salvar e conectar” |
-
-### 4. Erro ao iniciar OAuth — Body JSON vazio (400)
-
-| Sintoma | `POST /api/integrations/tiny/oauth/authorize` retornava 400 |
-| Mensagem Fastify | `Body cannot be empty when content-type is set to 'application/json'` |
-| Causa | `apiFetch` sempre envia `Content-Type: application/json`, mas a chamada de authorize não enviava corpo |
-| Estado anterior | Fastify 5 rejeita POST JSON sem body |
-
-### 5. Popup abria na página errada (redirect URI de produção)
-
-| Sintoma | Popup não mostrava login do Tiny; ia direto para URL externa ou callback sem capturar token |
-| Causa | No banco estava salvo `redirect_uri=https://app.visoratech.com.br` (produção), copiado do aplicativo Olist de produção |
-| Estado anterior | Campo “Redirect URI (opcional)” na UI permitia gravar URI incorreto; o OAuth redirecionava para o domínio errado após login |
-| Fluxo esperado | Login em `accounts.tiny.com.br` → retorno em `http://localhost:3333/integrations/tiny/oauth/callback?code=...&state=...` → WMS troca code por token e salva |
-
-### 6. Worker OAuth — Prisma desatualizado (log)
-
-| Sintoma | `[tiny-oauth-worker] Unknown argument isActive` |
-| Causa | Schema Prisma estendido (`isActive`, `deletedAt`, etc.) sem `pnpm db:generate` após `db:push` |
-| Observação | No Windows, `db:generate` pode falhar com EPERM enquanto `pnpm dev` está rodando (DLL do Prisma bloqueada) |
+A integração utiliza o fluxo **OAuth 2.0 / OpenID Connect** do Tiny ERP:
+*   **Documentação Oficial**: [Autenticação Tiny API v3](https://api-docs.erp.olist.com/documentacao/comecando/autenticacao)
+*   **Endpoint de Login/Autorização**: `https://accounts.tiny.com.br/realms/tiny/protocol/openid-connect/auth`
+*   **Redirect URI do WMS (Callback)**: `{API_PUBLIC_URL}/integrations/tiny/oauth/callback`
+*   **Interface no Dashboard**: Acessível em `/integracoes/tiny`.
 
 ---
 
-## O que foi feito e ajustado
+## ❌ Problemas Encontrados (Antes dos Ajustes)
 
-### Infraestrutura e ambiente
+Durante os testes locais de integração, o fluxo falhava em múltiplas etapas. Abaixo estão detalhadas as causas raiz e os comportamentos observados.
 
-| Ajuste | Arquivo / comando |
-|--------|-------------------|
-| Script `pnpm dev` corrigido para subir API + Web em paralelo | `package.json` (raiz) |
-| Seed com build prévio de `@wms/shared` | `apps/api/package.json` (`preseed`) |
-| Variáveis documentadas: `ENCRYPTION_KEY`, `API_PUBLIC_URL`, `WEB_URL`, `START_OAUTH_REFRESH_WORKER` | `apps/api/.env.example` |
+### 1. Bloqueio de CORS no Salvamento de Credenciais
+> [!BUG] **Sintoma: Falha na requisição**
+> A chamada `PUT /api/integrations/tiny/credentials` falhava no navegador com erro de rede ou política de CORS (*Failed to fetch*).
+> 
+> *   **Causa**: O CORS do backend (`apps/api/src/index.ts`) estava configurado para aceitar apenas os métodos `GET` e `POST`. Os verbos `PUT`, `PATCH` e `DELETE` eram bloqueados.
 
-### Backend — OAuth e permissões
+### 2. Permissão Negada (Erro 403) para Expedidores
+> [!WARNING] **Sintoma: Tela de erro ou crash na UI**
+> Ao tentar salvar as credenciais ou testar a conexão, o sistema retornava `{ "error": "Permissão negada" }`.
+> 
+> *   **Causa**: As rotas da API do Tiny exigiam a permissão `settings.manage`. No entanto, a tela no frontend exige apenas `olist.configure`. O usuário de teste padrão (`operador@wms.local`, papel `EXPEDITER`) tem permissão para configurar integrações, mas não para gerenciar configurações globais do sistema.
 
-| Ajuste | Detalhe |
-|--------|---------|
-| Guard `requireOlistConfigure` | Criado em `apps/api/src/lib/auth-guard.ts` usando `Permission.OLIST_CONFIGURE` |
-| Rotas Tiny sensíveis | `apps/api/src/routes/tiny.ts` passou de `requireSettingsManage` para `requireOlistConfigure` (credentials, authorize, test-connection, disconnect, draft, sync-order-priorities) |
-| CORS | Métodos `PUT`, `PATCH`, `DELETE` habilitados em `apps/api/src/index.ts` |
-| `resolveOAuthRedirectUri()` | Nova função em `apps/api/src/services/tiny-oauth.ts` — força callback válido `{API_PUBLIC_URL}/integrations/tiny/oauth/callback`; rejeita URIs sem o path correto (ex.: domínio de produção sem `/integrations/tiny/oauth/callback`) |
-| Início do OAuth | `startTinyOAuth` corrige URI no banco se inválido; adiciona `prompt=login` para exibir tela de login |
-| Callback / token | `handleTinyOAuthCallback` usa o redirect URI resolvido na troca do `authorization_code` |
-| State OAuth | Formato `{nonce}:{userId}:{tenantId}:{connectionId}:{hmac}` com validação HMAC (`AUTH_SECRET`) |
+### 3. Botão "Conectar com Olist" Desabilitado
+> [!BUG] **Sintoma: Impossibilidade de iniciar o OAuth**
+> O botão para conectar permanecia cinza (desabilitado) mesmo com o Client ID e Client Secret preenchidos no formulário.
+> 
+> *   **Causa**: O estado do frontend condicionava a ativação do botão apenas quando a conexão já estivesse ativa (`connection.connected === true`), impossibilitando o primeiro login.
 
-### Frontend — tela `/integracoes/tiny`
+### 4. Falha de Body Vazio no Fastify 5 (Erro 400)
+> [!BUG] **Sintoma: POST /oauth/authorize retornava Bad Request**
+> A API do Fastify respondia com status 400: `Body cannot be empty when content-type is set to 'application/json'`.
+> 
+> *   **Causa**: O cliente de requisição do frontend (`apiFetch`) insere automaticamente o cabeçalho `Content-Type: application/json`. No entanto, a chamada de autorização não possuía dados no corpo (body nulo). O Fastify 5 rejeita requisições JSON vazias por padrão.
 
-| Ajuste | Detalhe |
-|--------|---------|
-| Botão Conectar | Habilitado quando há Client ID + Secret (formulário ou já salvos) |
-| Salvar + Conectar | Ao conectar, salva credenciais automaticamente se ainda não persistidas ou se o formulário mudou |
-| POST authorize | Envia `body: "{}"` para evitar erro 400 do Fastify |
-| Redirect URI | Campo editável removido; exibição somente leitura com URL correta do backend |
-| Instruções | Texto explicando cadastro idêntico no painel Olist e fluxo login → callback → captura do token |
-| Erros na UI | Tratamento de promise rejeitada ao salvar credenciais (evita crash do Next.js) |
-| Validação | Verifica se `authUrl` contém `accounts.tiny.com.br` antes de abrir o popup |
+### 5. Redirecionamento Incorreto do Popup OAuth
+> [!WARNING] **Sintoma: Mismatch ou login em tela errada**
+> O popup de autorização redirecionava para a URL de produção (`app.visoratech.com.br`) ao invés do localhost em desenvolvimento.
+> 
+> *   **Causa**: O aplicativo configurado na Olist continha o Redirect URI de produção. No WMS, a tabela `tiny_connections` aceitava qualquer string inserida manualmente, gerando incompatibilidade de domínios (*mismatch*).
 
-### Testes
-
-| Arquivo | Cobertura adicionada |
-|---------|----------------------|
-| `apps/api/src/services/tiny-oauth.test.ts` | State HMAC, metadata, correção de redirect URI inválido |
+### 6. Crash no Worker de Refresh de Tokens (Prisma EPERM)
+> [!BUG] **Sintoma: Crash na inicialização da API**
+> O log exibia `[tiny-oauth-worker] Unknown argument isActive`.
+> 
+> *   **Causa**: Novas colunas foram inseridas no banco de dados, mas o Prisma Client não foi gerado novamente (`pnpm db:generate`). No Windows, o processo do dev server bloqueia as DLLs do Prisma, gerando erros de permissão (`EPERM`) se tentado gerar com o servidor rodando.
 
 ---
 
-## Fluxo correto após os ajustes
+## 🛠️ Correções Aplicadas
+
+### 💻 Infraestrutura e Scripts
+
+*   **Monorepo (`package.json`)**: Ajustado o script `pnpm dev` para subir em paralelo a API e o painel Web de forma sincronizada.
+*   **Seed Automático (`apps/api/package.json`)**: Adicionado o gatilho `preseed` para compilar o pacote `@wms/shared` antes de rodar os seeds, evitando erros de importação de tipos.
+*   **Variáveis de Ambiente**: Mapeadas as variáveis críticas no arquivo `.env.example`.
+
+### 🖧 Backend (Fastify & Prisma)
+
+*   **Nova Permissão**: Criada a validação `requireOlistConfigure` usando a chave de permissão `olist.configure` para isolar rotas do Tiny.
+*   **CORS**: Habilitada a aceitação dos métodos `PUT`, `PATCH` e `DELETE` no entrypoint da API.
+*   **Normalização de Redirecionamento (`resolveOAuthRedirectUri`)**: Função que força a URI de redirect para o endereço público da API WMS atual, impedindo domínios incorretos salvos de produção.
+*   **Parâmetro `prompt=login`**: Adicionado à URL de autorização para forçar a tela de seleção de conta do Tiny ERP.
+*   **State Seguro**: O parâmetro `state` do OAuth passou a ser gerado de forma estruturada: `{nonce}:{userId}:{tenantId}:{connectionId}:{hmac}` e assinado via HMAC SHA-256 (`AUTH_SECRET`).
+
+### 🖥️ Frontend (Next.js Dashboard)
+
+*   **Fluxo de Salvamento**: A UI agora salva as credenciais de forma transparente antes de abrir o popup de autorização.
+*   **Fastify Bypass**: Adicionado `{}` no corpo do POST de autorização para satisfazer a validação de JSON do Fastify 5.
+*   **Somente Leitura**: O campo de Redirect URI no painel web foi alterado para apenas leitura, exibindo a URL exata gerada pela API para evitar erros de digitação.
+
+---
+
+## 🔄 Fluxo de Comunicação Corrigido
 
 ```mermaid
 sequenceDiagram
@@ -114,84 +92,71 @@ sequenceDiagram
   participant T as accounts.tiny.com.br
   participant C as Callback WMS
 
-  U->>W: PUT /api/integrations/tiny/credentials
-  W-->>U: 200 (credenciais criptografadas)
+  U->>W: PUT /api/integrations/tiny/credentials (Salva ID/Secret)
+  W-->>U: 200 (Salvo com Criptografia)
   U->>W: POST /api/integrations/tiny/oauth/authorize
-  W-->>U: authUrl (redirect_uri = localhost:3333/.../callback)
-  U->>T: Popup — login e autorização Olist
-  T->>C: Redirect com code + state
-  C->>W: handleTinyOAuthCallback (troca code por tokens)
-  C-->>U: postMessage + fecha popup
+  W-->>U: authUrl (Redirect resolvida para localhost:3333)
+  U->>T: Abre Popup (Login e Autorização no Tiny)
+  T->>C: Redireciona com code e state assinado
+  C->>W: handleTinyOAuthCallback (Troca code por Access/Refresh Token)
+  C-->>U: Envia postMessage & Fecha Popup
   U->>W: GET /api/integrations/tiny/connection
-  W-->>U: status CONNECTED
+  W-->>U: Conexão bem-sucedida (CONNECTED)
 ```
 
-### Passo a passo operacional (dev local)
+---
 
-1. **Configurar `.env` da API** (`apps/api/.env`):
-   - `DATABASE_URL`, `AUTH_SECRET`, `ENCRYPTION_KEY` (64 hex fixo)
-   - `API_PUBLIC_URL=http://localhost:3333`
-   - `WEB_URL=http://localhost:3000`
+## 📋 Passo a Passo para Teste Local
 
-2. **Subir o projeto:**
-   ```bash
-   pnpm db:push
-   pnpm db:generate   # parar pnpm dev antes, se EPERM no Windows
-   pnpm --filter @wms/api db:seed
-   pnpm dev
-   ```
+Siga este roteiro para testar e validar o fluxo de ponta a ponta em sua máquina:
 
-3. **No painel Olist** (Configurações → Aplicativos), cadastrar **exatamente**:
-   ```
-   http://localhost:3333/integrations/tiny/oauth/callback
-   ```
-   O URI de produção (`https://app.exemplo.com.br`) **não** serve para testes locais, a menos que esteja registrado **junto** com o localhost no mesmo aplicativo.
+### 1. Preparar o Ambiente
+Verifique as variáveis no arquivo `apps/api/.env`:
+```env
+API_PUBLIC_URL="http://localhost:3333"
+WEB_URL="http://localhost:3000"
+ENCRYPTION_KEY="sua_chave_hexadecimal_de_64_caracteres"
+AUTH_SECRET="sua_chave_secreta_de_assinatura"
+```
 
-4. **No WMS** (`/integracoes/tiny`):
-   - Informar Client ID e Client Secret do aplicativo Olist
-   - Clicar em **Salvar credenciais**
-   - Clicar em **Conectar com Olist**
-   - Fazer login no popup do Tiny e autorizar
-   - Popup fecha; status deve mudar para **Conectado**
+### 2. Inicializar o Banco
+Pare o dev server e rode as atualizações de modelo:
+```bash
+pnpm db:push
+pnpm db:generate
+pnpm db:seed
+pnpm dev
+```
 
-5. **Usuário recomendado para teste:**
-   - `operador@wms.local` / `operador123` — possui `olist.configure`
-   - `admin@loja-a.local` / `admin123` — admin do tenant (todas as permissões exceto platform)
+### 3. Cadastro no Tiny ERP
+No painel do Tiny do cliente (em ambiente de teste ou sandbox), insira o Redirect URI exatamente como:
+```
+http://localhost:3333/integrations/tiny/oauth/callback
+```
+
+### 4. Conectar
+1.  Faça login no painel web com o usuário `operador@wms.local` (senha `operador123`).
+2.  Navegue até **Integrações → Tiny ERP**.
+3.  Preencha as credenciais, clique em **Salvar** e depois em **Conectar com Olist**.
+4.  Efetue o login no popup e conceda acesso. O status na tela deverá mudar para **Conectado**.
 
 ---
 
-## Arquivos principais alterados
+## 🔍 Resolução de Problemas Rápidos (Troubleshooting)
 
-| Área | Caminhos |
-|------|----------|
-| Permissões | `apps/api/src/lib/auth-guard.ts` |
-| Rotas OAuth | `apps/api/src/routes/tiny.ts` |
-| Lógica OAuth | `apps/api/src/services/tiny-oauth.ts`, `tiny-oauth-errors.ts`, `tiny-api-v3-client.ts` |
-| Worker refresh | `apps/api/src/services/tiny-oauth-refresh-worker.ts`, `apps/api/src/index.ts` |
-| CORS | `apps/api/src/index.ts` |
-| UI | `apps/web/app/(dashboard)/integracoes/tiny/page.tsx` |
-| Schema | `apps/api/prisma/schema.prisma` (`TinyConnection`) |
-| Testes | `apps/api/src/services/tiny-oauth.test.ts` |
+> [!TIP] **Erro 403 (Forbidden) ao acessar a página**
+> Garanta que o usuário logado possui a permissão `olist.configure` vinculada ao seu papel.
+
+> [!WARNING] **Erro de Mismatch no Redirect URI**
+> Certifique-se de que a URI cadastrada no painel de aplicativos do Tiny ERP é idêntica à exibida como somente leitura na tela do WMS.
+
+> [!CAUTION] **Perda de conexão após reiniciar a API**
+> Ocorre se a variável `ENCRYPTION_KEY` estiver ausente ou mudar de valor entre reinicializações. O WMS não conseguirá decriptografar os tokens salvos anteriormente. Garanta uma chave fixa no arquivo `.env`.
 
 ---
 
-## Troubleshooting rápido
-
-| Erro | Verificar |
-|------|-----------|
-| Permissão negada (403) | Usuário precisa de `olist.configure`; rotas não devem exigir só `settings.manage` |
-| Failed to fetch no PUT | CORS da API inclui PUT; API rodando em `:3333` |
-| 400 body vazio no authorize | Frontend deve enviar `body: "{}"` no POST |
-| Popup vai para site errado | Redirect URI no Olist e no WMS deve ser `http://localhost:3333/integrations/tiny/oauth/callback`; salvar credenciais de novo |
-| redirect_uri mismatch (Olist) | URI no aplicativo Olist **idêntico** ao exibido na tela (http, porta, path) |
-| Código ou state ausente no callback | Popup abriu callback direto sem passar pelo login — conferir redirect URI |
-| Tokens inválidos após restart | `ENCRYPTION_KEY` fixa no `.env`; não alterar após conectar |
-| Worker `isActive` unknown | Rodar `pnpm db:push` + `pnpm db:generate` com API parada |
-
----
-
-## Referências
-
-- [[integracao-tiny-oauth|Integração Tiny ERP (v3)]] — arquitetura OAuth, rate limit e refresh
-- [[setup-desenvolvimento|Guia de Setup Local]] — ambiente e banco
-- [[usuarios-teste|Credenciais e Testes]] — usuários do seed
+## 🔗 Referências Úteis
+*   [[integracao-tiny-oauth|Integração Tiny ERP (v3)]] — Detalhes da API v3 e controle de rate limits.
+*   [[integracao-tiny-pedidos|Integração Tiny — Pedidos de venda]] — Sync pull, situação Aberta (0), filtro `origemPedido`, SKU (jun/2026).
+*   [[setup-desenvolvimento|Guia de Setup Local]] — Variáveis de ambiente e Docker.
+*   [[usuarios-teste|Credenciais e Testes]] — Contas e e-mails criados por padrão.

@@ -361,6 +361,7 @@ export type SyncTinySalesOrdersResult = {
   created: number;
   updated: number;
   skipped: number;
+  listedFromTiny: number;
   ordersRemoved: number;
   wavesRemoved: number;
   demoRemoved: number;
