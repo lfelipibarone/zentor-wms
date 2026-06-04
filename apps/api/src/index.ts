@@ -8,8 +8,10 @@ import { webRoutes } from "./routes/web.js";
 import { notificationRoutes } from "./routes/notifications.js";
 import { integrationRoutes } from "./routes/integrations.js";
 import { tinyRoutes } from "./routes/tiny.js";
+import { cleanupSeedDemoTenantData } from "./services/demo-tenant-cleanup.js";
 import { startWaveScheduler } from "./services/wave-scheduler.js";
 import { startTinyOAuthRefreshWorker } from "./services/tiny-oauth-refresh-worker.js";
+import { startTinyOrderSyncScheduler } from "./services/tiny-order-sync-scheduler.js";
 
 const PORT = Number(process.env.PORT ?? 3333);
 const HOST = process.env.HOST ?? "0.0.0.0";
@@ -36,8 +38,10 @@ async function main() {
   await app.register(integrationRoutes);
   await app.register(tinyRoutes);
 
+  await cleanupSeedDemoTenantData();
   startWaveScheduler();
   startTinyOAuthRefreshWorker();
+  startTinyOrderSyncScheduler();
 
   await app.listen({ port: PORT, host: HOST });
   console.log(`@wms/api rodando em http://${HOST}:${PORT}`);

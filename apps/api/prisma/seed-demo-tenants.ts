@@ -1,4 +1,4 @@
-import { OrderStatus, PrismaClient } from "@prisma/client";
+import { PrismaClient } from "@prisma/client";
 import { defaultPermissionsForRole } from "@wms/shared";
 import { hashPassword } from "../src/lib/password.js";
 
@@ -202,44 +202,6 @@ export async function seedDemoTenant(
     },
     update: {},
   });
-
-  const statuses: OrderStatus[] = [
-    OrderStatus.PENDING,
-    OrderStatus.PENDING,
-    OrderStatus.PICKED_AWAITING_CONFERENCE,
-    OrderStatus.DISPATCHING,
-    OrderStatus.DISPATCHED,
-    OrderStatus.PENDING,
-    OrderStatus.PENDING,
-  ];
-
-  for (let i = 1; i <= statuses.length; i++) {
-    const erpOrderId = `${config.prefix}-${String(i).padStart(3, "0")}`;
-    const status = statuses[i - 1]!;
-    await prisma.order.upsert({
-      where: { tenantId_erpOrderId: { tenantId, erpOrderId } },
-      create: {
-        tenantId,
-        erpOrderId,
-        customerName: `Cliente ${config.prefix} ${i}`,
-        status,
-        priority: i % 3,
-        items: {
-          create: [
-            {
-              lineNumber: 1,
-              productId: product.id,
-              quantityOrdered: 5 + i,
-              quantityPicked:
-                status === OrderStatus.PENDING ? 0 : 5 + i,
-              pickLocationId: loc.id,
-            },
-          ],
-        },
-      },
-      update: { status, customerName: `Cliente ${config.prefix} ${i}` },
-    });
-  }
 
   return { tenant, admin, picker };
 }

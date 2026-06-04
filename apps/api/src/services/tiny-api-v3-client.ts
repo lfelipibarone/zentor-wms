@@ -261,6 +261,34 @@ export class TinyApiV3Client {
     return this.request<Record<string, unknown>>("GET", `/notas/${id}`);
   }
 
+  async listPedidos(params: {
+    dataInicial?: string;
+    dataFinal?: string;
+    origemPedido?: number;
+    situacao?: number;
+    limit?: number;
+    offset?: number;
+  }) {
+    const body = await this.request<{
+      itens?: unknown[];
+      paginacao?: { total?: number; limit?: number; offset?: number };
+    }>("GET", "/pedidos", {
+      query: {
+        dataInicial: params.dataInicial,
+        dataFinal: params.dataFinal,
+        origemPedido: params.origemPedido ?? 0,
+        situacao: params.situacao,
+        limit: params.limit ?? 100,
+        offset: params.offset ?? 0,
+        orderBy: "desc",
+      },
+    });
+    return {
+      items: asArray(body.itens),
+      pagination: body.paginacao ?? {},
+    };
+  }
+
   async getPedido(id: number | string) {
     return this.request<Record<string, unknown>>("GET", `/pedidos/${id}`);
   }

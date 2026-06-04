@@ -357,6 +357,29 @@ export function syncPurchaseReceipts() {
   }>("/api/purchase-receipts/sync", { method: "POST", body: "{}" });
 }
 
+export type SyncTinySalesOrdersResult = {
+  created: number;
+  updated: number;
+  skipped: number;
+  ordersRemoved: number;
+  wavesRemoved: number;
+  demoRemoved: number;
+  cancelledRemoved: number;
+  errors: Array<{ erpOrderId: string; message: string }>;
+  tinyConnected: boolean;
+  warning?: string;
+};
+
+export function syncTinySalesOrders(params?: { days?: number }) {
+  return apiFetch<SyncTinySalesOrdersResult>(
+    "/api/integrations/tiny/sync-orders",
+    {
+      method: "POST",
+      body: JSON.stringify(params ?? {}),
+    },
+  );
+}
+
 export function fetchPurchaseReceipts(params?: {
   page?: number;
   pageSize?: number;

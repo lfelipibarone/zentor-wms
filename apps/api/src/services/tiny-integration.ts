@@ -26,6 +26,88 @@ export interface TinyOrderPayload {
   items: TinyLineItem[];
 }
 
+/** Situações Tiny elegíveis para ingestão no WMS (API v3). */
+export const TINY_ORDER_SITUACOES_SYNC = new Set([1, 3, 4, 7]);
+
+/** Situação cancelada no Tiny. */
+export const TINY_ORDER_SITUACAO_CANCELADA = 2;
+
+const DEMO_ERP_PREFIXES = ["ERP-DEMO-", "ERP-MOB-"] as const;
+
+export function isDemoErpOrderId(erpOrderId: string): boolean {
+  if (erpOrderId === "ERP-10042") return true;
+  return DEMO_ERP_PREFIXES.some((p) => erpOrderId.startsWith(p));
+}
+
+export function parseTinyPedidoSituacao(pedido: Record<string, unknown>): number | null {
+  if (pedido.situacao === null || pedido.situacao === undefined) {
+    return null;
+  }
+  const n = num(pedido.situacao);
+  return Number.isFinite(n) ? Math.floor(n) : null;
+}
+
+export function isTinyOrderSituacaoSyncable(situacao: number | null): boolean {
+  if (situacao === null) return false;
+  return TINY_ORDER_SITUACOES_SYNC.has(situacao);
+}
+
+function parseDateField(raw: string | undefined): Date | null {
+  if (!raw) return null;
+  const d = new Date(raw);
+  return Number.isNaN(d.getTime()) ? null : d;
+}
+
+/** Mapeia resposta GET /pedidos/{id} (API v3) para payload de upsert. */
+export function parseTinyApiPedido(
+  pedido: Record<string, unknown>,
+): TinyOrderPayload | null {
+  const id = num(pedido.id);
+  if (!id) return null;
+
+  const situacao = parseTinyPedidoSituacao(pedido);
+  if (!isTinyOrderSituacaoSyncable(situacao)) return null;
+
+  const rawItems = asArray(pedido.itens);
+  const items: TinyLineItem[] = [];
+  for (const raw of rawItems) {
+    const row = asRecord(raw);
+    if (!row) continue;
+    const prod = asRecord(row.produto);
+    const sku = str(prod?.sku) ?? str(row.sku) ?? str(row.codigo);
+    const quantity = num(row.quantidade) || 1;
+    if (!sku) continue;
+    items.push({
+      sku,
+      quantity: Math.max(1, Math.floor(quantity)),
+      description: str(prod?.descricao) ?? str(row.descricao),
+    });
+  }
+
+  if (items.length === 0) return null;
+
+  const cliente = asRecord(pedido.cliente);
+  const ecommerce = asRecord(pedido.ecommerce);
+  const natureza = asRecord(pedido.naturezaOperacao);
+
+  const collectionDeadline =
+    parseDateField(str(pedido.dataPrevista)) ??
+    parseDateField(str(pedido.dataEntrega));
+
+  return {
+    erpOrderId: `TINY-${id}`,
+    customerName: str(cliente?.nome) ?? str(cliente?.fantasia),
+    marketplace: detectMarketplaceFromTiny(
+      str(ecommerce?.nome),
+      str(ecommerce?.canalVenda),
+      str(natureza?.nome) ?? null,
+    ),
+    collectionDeadline,
+    tinyPriorityRaw: extractTinyPriorityFromRecord(pedido),
+    items,
+  };
+}
+
 function asRecord(v: unknown): Record<string, unknown> | null {
   return v && typeof v === "object" && !Array.isArray(v)
     ? (v as Record<string, unknown>)

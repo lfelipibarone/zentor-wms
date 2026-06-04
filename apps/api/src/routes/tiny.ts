@@ -21,6 +21,7 @@ import {
 import { prisma } from "../lib/prisma.js";
 import { TinyConnectionStatus } from "@prisma/client";
 import { syncPendingOrderPrioritiesFromTiny } from "../services/tiny-integration.js";
+import { syncSalesOrdersFromTiny } from "../services/sync-sales-orders-from-tiny.js";
 
 function wantsJson(request: {
   headers: Record<string, unknown>;
@@ -166,6 +167,25 @@ export async function tinyRoutes(app: FastifyInstance) {
         } catch (e) {
           const message =
             e instanceof Error ? e.message : "Erro ao sincronizar prioridades";
+          return reply.status(400).send({ error: message });
+        }
+      },
+    );
+
+    secured.post<{ Body: { days?: number } }>(
+      "/api/integrations/tiny/sync-orders",
+      { preHandler: requireOlistConfigure },
+      async (request, reply) => {
+        try {
+          const days = request.body?.days;
+          const result = await syncSalesOrdersFromTiny({
+            tenantId: tenantWhere(request).tenantId,
+            ...(days !== undefined ? { days } : {}),
+          });
+          return result;
+        } catch (e) {
+          const message =
+            e instanceof Error ? e.message : "Erro ao sincronizar pedidos";
           return reply.status(400).send({ error: message });
         }
       },

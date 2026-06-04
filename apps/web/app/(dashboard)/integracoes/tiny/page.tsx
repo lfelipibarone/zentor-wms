@@ -4,6 +4,10 @@ import { useCallback, useEffect, useState } from "react";
 import { Loader2 } from "lucide-react";
 import { PageHeader } from "@/components/ops/page-header";
 import { apiFetch } from "@/lib/api/client";
+import {
+  syncTinySalesOrders,
+  type SyncTinySalesOrdersResult,
+} from "@/lib/api/operations";
 
 interface IntegrationEvent {
   id: string;
@@ -68,6 +72,9 @@ export default function TinyIntegracaoPage() {
   const [testing, setTesting] = useState(false);
   const [disconnecting, setDisconnecting] = useState(false);
   const [cancellingDraft, setCancellingDraft] = useState(false);
+  const [syncingOrders, setSyncingOrders] = useState(false);
+  const [syncOrdersResult, setSyncOrdersResult] =
+    useState<SyncTinySalesOrdersResult | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -248,6 +255,44 @@ export default function TinyIntegracaoPage() {
     }
   };
 
+  const syncOrders = async () => {
+    setSyncingOrders(true);
+    setError(null);
+    setSuccessMessage(null);
+    setSyncOrdersResult(null);
+    try {
+      const result = await syncTinySalesOrders({ days: 30 });
+      setSyncOrdersResult(result);
+      if (!result.tinyConnected) {
+        setError(result.warning ?? "Tiny ERP não conectado.");
+        return;
+      }
+      const parts = [
+        `${result.created} criado(s)`,
+        `${result.updated} atualizado(s)`,
+        `${result.skipped} ignorado(s)`,
+      ];
+      if (result.ordersRemoved > 0 || result.wavesRemoved > 0) {
+        parts.push(
+          `${result.ordersRemoved} pedido(s) removido(s)`,
+          `${result.wavesRemoved} onda(s) removida(s)`,
+        );
+      }
+      if (result.demoRemoved > 0) {
+        parts.push(`${result.demoRemoved} demo removido(s)`);
+      }
+      if (result.cancelledRemoved > 0) {
+        parts.push(`${result.cancelledRemoved} cancelado(s) removido(s)`);
+      }
+      setSuccessMessage(`Pedidos sincronizados: ${parts.join(", ")}.`);
+      await load();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Erro ao sincronizar pedidos");
+    } finally {
+      setSyncingOrders(false);
+    }
+  };
+
   const cancelDraft = async () => {
     setCancellingDraft(true);
     setError(null);
@@ -406,6 +451,48 @@ export default function TinyIntegracaoPage() {
               ) : null}
             </div>
           </>
+        )}
+      </section>
+
+      <section className="rounded-xl border bg-white p-4 shadow-sm">
+        <h2 className="text-sm font-semibold">Pedidos de venda</h2>
+        <p className="mt-2 text-sm text-muted-foreground">
+          A sincronização é automática: roda todos os dias às 7h e o webhook
+          atualiza novos pedidos em tempo real. Os SKUs precisam existir no
+          cadastro de produtos.
+        </p>
+        <p className="mt-2 text-xs text-muted-foreground">
+          O botão abaixo fica apenas como fallback administrativo.
+        </p>
+        {connection?.connected ? (
+          <div className="mt-4 space-y-3">
+            <button
+              type="button"
+              disabled={syncingOrders}
+              onClick={syncOrders}
+              className="rounded-lg bg-[#0d9488] px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
+            >
+              {syncingOrders ? "Sincronizando…" : "Reexecutar sync manual"}
+            </button>
+            {syncOrdersResult && syncOrdersResult.errors.length > 0 ? (
+              <div className="max-h-40 overflow-auto rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm">
+                <p className="font-medium text-amber-900">
+                  {syncOrdersResult.errors.length} pedido(s) com erro:
+                </p>
+                <ul className="mt-1 list-inside list-disc text-amber-800">
+                  {syncOrdersResult.errors.slice(0, 10).map((err) => (
+                    <li key={err.erpOrderId}>
+                      {err.erpOrderId}: {err.message}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ) : null}
+          </div>
+        ) : (
+          <p className="mt-3 text-sm text-muted-foreground">
+            Conecte o OAuth acima para habilitar a sincronização.
+          </p>
         )}
       </section>
 
