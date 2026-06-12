@@ -86,12 +86,13 @@ export function parseTinyPedidoIdFromErpOrderId(
 export async function fetchTinyOrderPriority(
   tenantId: string,
   erpOrderId: string,
+  userId?: string,
 ): Promise<number | null> {
   const pedidoId = parseTinyPedidoIdFromErpOrderId(erpOrderId);
   if (pedidoId === null) return null;
 
   try {
-    const client = await getTinyApiClient(tenantId);
+    const client = await getTinyApiClient({ tenantId, userId });
     const body = await client.getPedido(pedidoId);
     const raw = extractTinyPriorityFromRecord(body);
     return raw !== null ? normalizeTinyPriority(raw) : null;

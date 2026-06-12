@@ -4,6 +4,7 @@ import {
   BarChart3,
   Box,
   Building2,
+  Warehouse,
   ClipboardList,
   LayoutDashboard,
   Layers,
@@ -35,6 +36,12 @@ export const MAIN_NAV: NavItem[] = [
     href: "/cadastros",
     label: "Cadastros",
     icon: ClipboardList,
+    permission: Permission.REGISTERS_VIEW,
+  },
+  {
+    href: "/gestao-barracao",
+    label: "Layout do galpão",
+    icon: Warehouse,
     permission: Permission.REGISTERS_VIEW,
   },
   {

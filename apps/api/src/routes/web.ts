@@ -29,6 +29,11 @@ import {
   LocationRuleError,
 } from "../services/location-rules.js";
 import {
+  layoutInclude,
+  resolveLocationLayout,
+} from "../services/warehouse-layout.js";
+import { registerWarehouseRoutes } from "./warehouse.js";
+import {
   PickWaveError,
   addOrdersToWave,
   getOpenWave,
@@ -105,6 +110,8 @@ import {
 const guard = (p: string) => createPermissionGuard(p);
 
 export async function webRoutes(app: FastifyInstance) {
+  registerWarehouseRoutes(app, guard);
+
   // --- Pesquisa rápida ---
   app.get<{ Querystring: { q?: string } }>(
     "/api/search",
@@ -585,7 +592,7 @@ export async function webRoutes(app: FastifyInstance) {
 
   app.get(
     "/api/integrations/tiny/events",
-    { preHandler: guard(Permission.SALES_VIEW) },
+    { preHandler: guard(Permission.OLIST_CONFIGURE) },
     async (request) => {
       const events = await prisma.integrationEventLog.findMany({
         where: { ...tenantWhere(request), source: "TINY" },
@@ -731,12 +738,19 @@ export async function webRoutes(app: FastifyInstance) {
 
   // --- Localizações (Cadastros) ---
   app.get<{
-    Querystring: { q?: string; page?: string; pageSize?: string; type?: string };
+    Querystring: {
+      q?: string;
+      sku?: string;
+      page?: string;
+      pageSize?: string;
+      type?: string;
+    };
   }>(
     "/api/locations",
     { preHandler: guard(Permission.REGISTERS_VIEW) },
     async (request) => {
       const q = request.query.q?.trim();
+      const sku = request.query.sku?.trim();
       const typeFilter =
         request.query.type === LocationType.PULMAO ||
         request.query.type === LocationType.PICK_FACE
@@ -746,6 +760,13 @@ export async function webRoutes(app: FastifyInstance) {
       const where: Prisma.LocationWhereInput = {
         ...tenantWhere(request),
         ...(typeFilter ? { type: typeFilter } : {}),
+        ...(sku
+          ? {
+              product: {
+                sku: { contains: sku, mode: "insensitive" },
+              },
+            }
+          : {}),
         ...(q
           ? {
               OR: [
@@ -761,7 +782,10 @@ export async function webRoutes(app: FastifyInstance) {
           orderBy: [{ corridor: "asc" }, { row: "asc" }],
           skip,
           take,
-          include: { product: { select: { sku: true, name: true } } },
+          include: {
+            product: { select: { sku: true, name: true } },
+            ...layoutInclude,
+          },
         }),
         prisma.location.count({ where }),
       ]);
@@ -777,6 +801,13 @@ export async function webRoutes(app: FastifyInstance) {
       corridor?: string;
       row?: string;
       barcode?: string;
+      barracaoId?: string | null;
+      setorId?: string | null;
+      corredorId?: string | null;
+      fileiraId?: string | null;
+      estanteId?: string | null;
+      prateleiraId?: string | null;
+      colunaId?: string | null;
       type?: LocationType;
       productId?: string;
       capacity?: number;
@@ -787,7 +818,7 @@ export async function webRoutes(app: FastifyInstance) {
     { preHandler: guard(Permission.REGISTERS_VIEW) },
     async (request, reply) => {
       const b = request.body ?? {};
-      if (!b.corridor || !b.row || !b.barcode || !b.type) {
+      if (!b.barcode || !b.type) {
         return reply.status(400).send({ error: "Campos obrigatórios faltando" });
       }
       try {
@@ -797,23 +828,49 @@ export async function webRoutes(app: FastifyInstance) {
           b.productId,
           b.type,
         );
+        const layout = await resolveLocationLayout(
+          tenantId,
+          {
+            barracaoId: b.barracaoId,
+            setorId: b.setorId,
+            corredorId: b.corredorId,
+            fileiraId: b.fileiraId,
+            estanteId: b.estanteId,
+            prateleiraId: b.prateleiraId,
+            colunaId: b.colunaId,
+          },
+          { corridor: b.corridor, row: b.row },
+        );
         const location = await prisma.location.create({
           data: {
             tenantId,
-            corridor: b.corridor,
-            row: b.row,
+            corridor: layout.corridor,
+            row: layout.row,
             barcode: b.barcode.trim().toUpperCase(),
+            barracaoId: layout.barracaoId,
+            setorId: layout.setorId,
+            corredorId: layout.corredorId,
+            fileiraId: layout.fileiraId,
+            estanteId: layout.estanteId,
+            prateleiraId: layout.prateleiraId,
+            colunaId: layout.colunaId,
             type: b.type,
             productId: b.productId || null,
             capacity: b.capacity ?? 100,
             minThreshold: b.minThreshold ?? 0,
             currentQuantity: 0,
           },
-          include: { product: { select: { sku: true, name: true } } },
+          include: {
+            product: { select: { sku: true, name: true } },
+            ...layoutInclude,
+          },
         });
         return reply.status(201).send({ location });
       } catch (e) {
         if (e instanceof LocationRuleError) {
+          return reply.status(400).send({ error: e.message });
+        }
+        if (e instanceof Error && e.message) {
           return reply.status(400).send({ error: e.message });
         }
         return reply.status(409).send({ error: "Código de barras já existe" });
@@ -825,6 +882,13 @@ export async function webRoutes(app: FastifyInstance) {
     Params: { id: string };
     Body: {
       productId?: string | null;
+      barracaoId?: string | null;
+      setorId?: string | null;
+      corredorId?: string | null;
+      fileiraId?: string | null;
+      estanteId?: string | null;
+      prateleiraId?: string | null;
+      colunaId?: string | null;
       capacity?: number;
       minThreshold?: number;
       active?: boolean;
@@ -851,14 +915,86 @@ export async function webRoutes(app: FastifyInstance) {
           type,
           existing.id,
         );
+        const layoutFields = [
+          "barracaoId",
+          "setorId",
+          "corredorId",
+          "fileiraId",
+          "estanteId",
+          "prateleiraId",
+          "colunaId",
+        ] as const;
+        const hasLayoutChange = layoutFields.some(
+          (f) => request.body[f] !== undefined,
+        );
+        let updateData: Prisma.LocationUncheckedUpdateInput = {
+          productId: request.body.productId,
+          capacity: request.body.capacity,
+          minThreshold: request.body.minThreshold,
+          active: request.body.active,
+        };
+        if (hasLayoutChange) {
+          const layout = await resolveLocationLayout(
+            existing.tenantId,
+            {
+              barracaoId:
+                request.body.barracaoId !== undefined
+                  ? request.body.barracaoId
+                  : existing.barracaoId,
+              setorId:
+                request.body.setorId !== undefined
+                  ? request.body.setorId
+                  : existing.setorId,
+              corredorId:
+                request.body.corredorId !== undefined
+                  ? request.body.corredorId
+                  : existing.corredorId,
+              fileiraId:
+                request.body.fileiraId !== undefined
+                  ? request.body.fileiraId
+                  : existing.fileiraId,
+              estanteId:
+                request.body.estanteId !== undefined
+                  ? request.body.estanteId
+                  : existing.estanteId,
+              prateleiraId:
+                request.body.prateleiraId !== undefined
+                  ? request.body.prateleiraId
+                  : existing.prateleiraId,
+              colunaId:
+                request.body.colunaId !== undefined
+                  ? request.body.colunaId
+                  : existing.colunaId,
+            },
+            { corridor: existing.corridor, row: existing.row },
+          );
+          updateData = {
+            ...updateData,
+            corridor: layout.corridor,
+            row: layout.row,
+            barracaoId: layout.barracaoId,
+            setorId: layout.setorId,
+            corredorId: layout.corredorId,
+            fileiraId: layout.fileiraId,
+            estanteId: layout.estanteId,
+            prateleiraId: layout.prateleiraId,
+            colunaId: layout.colunaId,
+          };
+        }
         const location = await prisma.location.update({
           where: { id: request.params.id },
-          data: request.body,
-          include: { product: { select: { sku: true, name: true } } },
+          data: updateData,
+          include: {
+            product: { select: { sku: true, name: true } },
+            ...layoutInclude,
+          },
         });
         return { location };
       } catch (e) {
         if (e instanceof LocationRuleError) {
+          return reply.status(400).send({ error: e.message });
+        }
+        if (e instanceof Error && e.message) {
           return reply.status(400).send({ error: e.message });
         }
         throw e;

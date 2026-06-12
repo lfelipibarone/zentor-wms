@@ -36,12 +36,6 @@ async function main() {
   });
   const TENANT_ID = defaultTenant.id;
 
-  await prisma.tinyConnection.upsert({
-    where: { tenantId: TENANT_ID },
-    create: { tenantId: TENANT_ID, name: "Tiny ERP" },
-    update: {},
-  });
-
   // --- Usuários ---
   const admin = await prisma.user.upsert({
     where: { email: "admin@wms.local" },
@@ -87,6 +81,41 @@ async function main() {
     update: {
       password: hashPassword("operador123"),
       name: "Felipe Figueiredo",
+      active: true,
+      tenantId: TENANT_ID,
+      isPlatformAdmin: false,
+      permissions: felipePermissions,
+    },
+  });
+
+  const existingTiny = await prisma.tinyConnection.findFirst({
+    where: { tenantId: TENANT_ID, userId: operador.id, deletedAt: null },
+  });
+  if (!existingTiny) {
+    await prisma.tinyConnection.create({
+      data: {
+        tenantId: TENANT_ID,
+        userId: operador.id,
+        name: "Tiny ERP",
+        isDefault: true,
+      },
+    });
+  }
+
+  const operador2 = await prisma.user.upsert({
+    where: { email: "operador2@wms.local" },
+    create: {
+      email: "operador2@wms.local",
+      name: "Ana Operadora",
+      password: hashPassword("operador123"),
+      role: "EXPEDITER",
+      tenantId: TENANT_ID,
+      isPlatformAdmin: false,
+      permissions: felipePermissions,
+    },
+    update: {
+      password: hashPassword("operador123"),
+      name: "Ana Operadora",
       active: true,
       tenantId: TENANT_ID,
       isPlatformAdmin: false,
@@ -371,6 +400,8 @@ async function main() {
   ]);
 
   const [locA, locB, locC, locD, locE] = locations;
+  const prodCycle = [screw, motor, cable];
+  const locCycle = [locA, locB, locC, locD, locE];
 
   const pulmaoLocations = await Promise.all([
     prisma.location.upsert({
@@ -500,7 +531,7 @@ async function main() {
     await seedDemoTenant(prisma, config);
   }
 
-  const notifyUsers = [admin, operador, ...pickers];
+  const notifyUsers = [admin, operador, operador2, ...pickers];
   for (const u of notifyUsers) {
     await prisma.notification.createMany({
       data: [

@@ -3,7 +3,18 @@ import { Prisma, TinyConnectionStatus } from "@prisma/client";
 import { prisma } from "../lib/prisma.js";
 import { decrypt, encrypt } from "../lib/encryption.js";
 import { getTinyApiClient, TinyApiError } from "./tiny-api-v3-client.js";
-import { formatOAuthErrorMessage } from "./tiny-oauth-errors.js";
+import {
+  formatOAuthErrorMessage,
+  formatTinyApiValidationMessage,
+} from "./tiny-oauth-errors.js";
+import {
+  clientIdSuffix,
+  extractAuthorizedUserFromIdToken,
+  logTinyOAuthAudit,
+  TINY_OAUTH_REQUIRED_APP_PERMISSIONS,
+} from "./tiny-oauth-log.js";
+
+export { TINY_OAUTH_REQUIRED_APP_PERMISSIONS };
 
 const AUTHORIZE_URL =
   "https://accounts.tiny.com.br/realms/tiny/protocol/openid-connect/auth";
@@ -167,55 +178,161 @@ async function clearOAuthTokens(connectionId: string) {
   });
 }
 
-export async function getOrCreateTinyConnection(tenantId: string) {
-  let conn = await prisma.tinyConnection.findUnique({ where: { tenantId } });
-  if (!conn) {
-    conn = await prisma.tinyConnection.create({
-      data: {
-        tenantId,
-        name: "Tiny ERP",
-        apiVersion: "v3",
-        status: TinyConnectionStatus.PENDING,
-        isActive: true,
+export type TinyConnectionScope = {
+  tenantId: string;
+  userId: string;
+};
+
+async function getSharedOAuthCredentials(tenantId: string) {
+  return prisma.tinyConnection.findFirst({
+    where: {
+      tenantId,
+      deletedAt: null,
+      oauthClientId: { not: null },
+      oauthClientSecret: { not: null },
+    },
+    orderBy: { updatedAt: "desc" },
+    select: {
+      oauthClientId: true,
+      oauthClientSecret: true,
+      oauthRedirectUri: true,
+    },
+  });
+}
+
+async function countUserConnections(scope: TinyConnectionScope) {
+  return prisma.tinyConnection.count({
+    where: { tenantId: scope.tenantId, userId: scope.userId, deletedAt: null },
+  });
+}
+
+export async function findUserTinyConnection(
+  scope: TinyConnectionScope,
+  connectionId?: string,
+) {
+  if (connectionId) {
+    return prisma.tinyConnection.findFirst({
+      where: {
+        id: connectionId,
+        tenantId: scope.tenantId,
+        userId: scope.userId,
+        deletedAt: null,
       },
     });
   }
-  return conn;
+
+  return prisma.tinyConnection.findFirst({
+    where: {
+      tenantId: scope.tenantId,
+      userId: scope.userId,
+      deletedAt: null,
+      isActive: true,
+    },
+    orderBy: [{ isDefault: "desc" }, { updatedAt: "desc" }],
+  });
+}
+
+export async function getOrCreateTinyConnection(
+  scope: TinyConnectionScope,
+  options?: { connectionId?: string; forceNew?: boolean },
+) {
+  if (options?.connectionId) {
+    const existing = await findUserTinyConnection(scope, options.connectionId);
+    if (!existing) {
+      throw new Error("Conexão Tiny não encontrada para este usuário");
+    }
+    return existing;
+  }
+
+  if (!options?.forceNew) {
+    const draft = await prisma.tinyConnection.findFirst({
+      where: {
+        tenantId: scope.tenantId,
+        userId: scope.userId,
+        deletedAt: null,
+        status: TinyConnectionStatus.PENDING,
+        accessToken: null,
+      },
+      orderBy: { createdAt: "desc" },
+    });
+    if (draft) return draft;
+  }
+
+  const shared = await getSharedOAuthCredentials(scope.tenantId);
+  const total = await countUserConnections(scope);
+  return prisma.tinyConnection.create({
+    data: {
+      tenantId: scope.tenantId,
+      userId: scope.userId,
+      name: total === 0 ? "Tiny ERP" : `Tiny ERP ${total + 1}`,
+      apiVersion: "v3",
+      status: TinyConnectionStatus.PENDING,
+      isActive: true,
+      isDefault: total === 0,
+      oauthClientId: shared?.oauthClientId ?? null,
+      oauthClientSecret: shared?.oauthClientSecret ?? null,
+      oauthRedirectUri: shared?.oauthRedirectUri ?? null,
+    },
+  });
+}
+
+export async function createAdditionalTinyConnection(scope: TinyConnectionScope) {
+  return getOrCreateTinyConnection(scope, { forceNew: true });
 }
 
 export async function saveTinyOAuthCredentials(
-  tenantId: string,
+  scope: TinyConnectionScope,
   params: {
     clientId: string;
     clientSecret: string;
     redirectUri?: string;
   },
 ) {
-  const conn = await getOrCreateTinyConnection(tenantId);
+  const conn = await getOrCreateTinyConnection(scope);
   const redirectUri = resolveOAuthRedirectUri(params.redirectUri);
-  return prisma.tinyConnection.update({
-    where: { id: conn.id },
-    data: {
-      oauthClientId: params.clientId.trim(),
-      oauthClientSecret: encrypt(params.clientSecret.trim()),
-      oauthRedirectUri: redirectUri,
-      status: TinyConnectionStatus.PENDING,
-      lastError: null,
-      isActive: true,
-      deletedAt: null,
-    },
-  });
+  const credentialData = {
+    oauthClientId: params.clientId.trim(),
+    oauthClientSecret: encrypt(params.clientSecret.trim()),
+    oauthRedirectUri: redirectUri,
+    status: TinyConnectionStatus.PENDING,
+    lastError: null,
+    isActive: true,
+    deletedAt: null,
+  };
+
+  await prisma.$transaction([
+    prisma.tinyConnection.update({
+      where: { id: conn.id },
+      data: credentialData,
+    }),
+    prisma.tinyConnection.updateMany({
+      where: {
+        tenantId: scope.tenantId,
+        userId: scope.userId,
+        deletedAt: null,
+        id: { not: conn.id },
+        accessToken: null,
+      },
+      data: {
+        oauthClientId: credentialData.oauthClientId,
+        oauthClientSecret: credentialData.oauthClientSecret,
+        oauthRedirectUri: credentialData.oauthRedirectUri,
+      },
+    }),
+  ]);
+
+  return prisma.tinyConnection.findUniqueOrThrow({ where: { id: conn.id } });
 }
 
 export async function startTinyOAuth(
-  tenantId: string,
-  userId: string,
+  scope: TinyConnectionScope,
+  options?: { connectionId?: string; forceNew?: boolean },
 ): Promise<{
   authUrl: string;
   state: string;
   connectionId: string;
 }> {
-  const conn = await getOrCreateTinyConnection(tenantId);
+  const conn = await getOrCreateTinyConnection(scope, options);
   if (!conn.oauthClientId || !conn.oauthClientSecret) {
     throw new Error(
       "Configure Client ID, Client Secret e Redirect URI antes de conectar.",
@@ -231,8 +348,8 @@ export async function startTinyOAuth(
   }
 
   const state = buildOAuthState({
-    userId,
-    tenantId,
+    userId: scope.userId,
+    tenantId: scope.tenantId,
     connectionId: conn.id,
   });
 
@@ -242,15 +359,23 @@ export async function startTinyOAuth(
   authUrl.searchParams.set("scope", "openid");
   authUrl.searchParams.set("response_type", "code");
   authUrl.searchParams.set("state", state);
-  authUrl.searchParams.set("prompt", "login");
+  authUrl.searchParams.set("prompt", "login consent");
 
   return { authUrl: authUrl.toString(), state, connectionId: conn.id };
 }
+
+type OAuthLogger = {
+  info: (obj: Record<string, unknown>, msg?: string) => void;
+  warn: (obj: Record<string, unknown>, msg?: string) => void;
+};
 
 async function smokeTestWithAccessToken(accessToken: string): Promise<{
   ok: boolean;
   metadata?: TinyConnectionMetadata;
   message?: string;
+  httpStatus?: number;
+  apiMessage?: string;
+  endpoint?: string;
 }> {
   try {
     const res = await fetch(INFO_URL, {
@@ -258,9 +383,14 @@ async function smokeTestWithAccessToken(accessToken: string): Promise<{
       signal: AbortSignal.timeout(30_000),
     });
     if (!res.ok) {
+      const errBody = (await res.json().catch(() => ({}))) as Record<string, unknown>;
+      const apiMessage = str(errBody.mensagem);
       return {
         ok: false,
-        message: `Validação API v3 falhou (HTTP ${res.status})`,
+        message: formatTinyApiValidationMessage(res.status, errBody),
+        httpStatus: res.status,
+        apiMessage,
+        endpoint: "GET /info",
       };
     }
     const infoJson = (await res.json()) as Record<string, unknown>;
@@ -276,20 +406,45 @@ async function smokeTestWithAccessToken(accessToken: string): Promise<{
 export async function handleTinyOAuthCallback(params: {
   code: string;
   state: string;
+  logger?: OAuthLogger;
 }): Promise<{ success: boolean; message: string; connectionId?: string }> {
   const parsed = parseAndVerifyOAuthState(params.state);
   if (!parsed) {
     return { success: false, message: "State OAuth inválido ou adulterado" };
   }
 
-  const { connectionId, tenantId } = parsed;
+  const { connectionId, tenantId, userId } = parsed;
   const conn = await prisma.tinyConnection.findUnique({ where: { id: connectionId } });
-  if (!conn || conn.tenantId !== tenantId) {
+  if (!conn || conn.tenantId !== tenantId || conn.userId !== userId) {
+    await logTinyOAuthAudit({
+      step: "OAUTH_CONNECTION_NOT_FOUND",
+      tenantId,
+      connectionId,
+      userId,
+      logger: params.logger,
+    });
     return { success: false, message: "Conexão OAuth não encontrada" };
   }
   if (!conn.oauthClientId || !conn.oauthClientSecret) {
+    await logTinyOAuthAudit({
+      step: "OAUTH_CREDENTIALS_MISSING",
+      tenantId,
+      connectionId,
+      userId,
+      clientIdSuffix: clientIdSuffix(conn.oauthClientId),
+      logger: params.logger,
+    });
     return { success: false, message: "Credenciais OAuth não encontradas" };
   }
+
+  await logTinyOAuthAudit({
+    step: "OAUTH_CALLBACK_STARTED",
+    tenantId,
+    connectionId,
+    userId,
+    clientIdSuffix: clientIdSuffix(conn.oauthClientId),
+    logger: params.logger,
+  });
 
   const redirectUri = resolveOAuthRedirectUri(conn.oauthRedirectUri);
   const clientSecret = decrypt(conn.oauthClientSecret);
@@ -313,6 +468,16 @@ export async function handleTinyOAuthCallback(params: {
       error_description?: string;
     };
     const message = formatOAuthErrorMessage(err);
+    await logTinyOAuthAudit({
+      step: "OAUTH_TOKEN_EXCHANGE_FAILED",
+      tenantId,
+      connectionId,
+      userId,
+      httpStatus: tokenRes.status,
+      oauthError: err.error ?? err.error_description ?? message,
+      clientIdSuffix: clientIdSuffix(conn.oauthClientId),
+      logger: params.logger,
+    });
     await prisma.tinyConnection.update({
       where: { id: connectionId },
       data: {
@@ -331,6 +496,14 @@ export async function handleTinyOAuthCallback(params: {
   };
 
   if (!tokenData.access_token) {
+    await logTinyOAuthAudit({
+      step: "OAUTH_TOKEN_MISSING",
+      tenantId,
+      connectionId,
+      userId,
+      clientIdSuffix: clientIdSuffix(conn.oauthClientId),
+      logger: params.logger,
+    });
     await clearOAuthTokens(connectionId);
     await prisma.tinyConnection.update({
       where: { id: connectionId },
@@ -342,8 +515,21 @@ export async function handleTinyOAuthCallback(params: {
     return { success: false, message: "access_token não retornado pelo Olist", connectionId };
   }
 
+  const authorizedUser = extractAuthorizedUserFromIdToken(tokenData.id_token);
   const smoke = await smokeTestWithAccessToken(tokenData.access_token);
   if (!smoke.ok) {
+    await logTinyOAuthAudit({
+      step: "OAUTH_API_VALIDATION_FAILED",
+      tenantId,
+      connectionId,
+      userId,
+      httpStatus: smoke.httpStatus,
+      endpoint: smoke.endpoint,
+      apiMessage: smoke.apiMessage,
+      authorizedUser,
+      clientIdSuffix: clientIdSuffix(conn.oauthClientId),
+      logger: params.logger,
+    });
     await clearOAuthTokens(connectionId);
     await prisma.tinyConnection.update({
       where: { id: connectionId },
@@ -366,6 +552,17 @@ export async function handleTinyOAuthCallback(params: {
   const companyName = metadata?.razaoSocial ?? metadata?.nome ?? null;
   const now = new Date();
 
+  const hasDefault = await prisma.tinyConnection.count({
+    where: {
+      tenantId,
+      userId,
+      deletedAt: null,
+      isDefault: true,
+      id: { not: connectionId },
+      status: TinyConnectionStatus.CONNECTED,
+    },
+  });
+
   await prisma.tinyConnection.update({
     where: { id: connectionId },
     data: {
@@ -382,7 +579,18 @@ export async function handleTinyOAuthCallback(params: {
       lastError: null,
       isActive: true,
       deletedAt: null,
+      isDefault: hasDefault === 0 ? true : conn.isDefault,
     },
+  });
+
+  await logTinyOAuthAudit({
+    step: "OAUTH_CONNECTED",
+    tenantId,
+    connectionId,
+    userId,
+    authorizedUser,
+    clientIdSuffix: clientIdSuffix(conn.oauthClientId),
+    logger: params.logger,
   });
 
   return {
@@ -442,21 +650,23 @@ export function oauthCallbackJson(result: {
   };
 }
 
-export async function getTinyConnectionStatus(tenantId: string) {
-  const conn = await prisma.tinyConnection.findUnique({
-    where: { tenantId },
-  });
-  if (!conn || conn.deletedAt) {
-    return {
-      connected: false,
-      status: "NONE" as const,
-      uiStatus: "NONE" as TinyUiStatus,
-      redirectUri: defaultOAuthRedirectUri(),
-    };
-  }
-
+function formatTinyConnectionStatus(conn: {
+  id: string;
+  name: string;
+  status: TinyConnectionStatus;
+  isActive: boolean;
+  isDefault: boolean;
+  accessToken: string | null;
+  oauthClientId: string | null;
+  oauthClientSecret: string | null;
+  oauthRedirectUri: string | null;
+  companyName: string | null;
+  metadata: unknown;
+  lastError: string | null;
+  tokenExpiresAt: Date | null;
+  lastValidatedAt: Date | null;
+}) {
   const metadata = conn.metadata as TinyConnectionMetadata | null;
-
   const redirectUri = resolveOAuthRedirectUri(conn.oauthRedirectUri);
 
   return {
@@ -466,6 +676,7 @@ export async function getTinyConnectionStatus(tenantId: string) {
       Boolean(conn.accessToken),
     status: conn.status,
     uiStatus: mapTinyStatusToUi(conn.status, conn.isActive),
+    name: conn.name,
     companyName: conn.companyName,
     metadata,
     hasCredentials: Boolean(conn.oauthClientId && conn.oauthClientSecret),
@@ -479,41 +690,111 @@ export async function getTinyConnectionStatus(tenantId: string) {
     tokenExpiresAt: conn.tokenExpiresAt?.toISOString() ?? null,
     lastValidatedAt: conn.lastValidatedAt?.toISOString() ?? null,
     isActive: conn.isActive,
+    isDefault: conn.isDefault,
     connectionId: conn.id,
-    isDraft:
-      conn.status === TinyConnectionStatus.PENDING && !conn.accessToken,
+    isDraft: conn.status === TinyConnectionStatus.PENDING && !conn.accessToken,
   };
 }
 
-export async function testTinyConnection(tenantId: string): Promise<{
+export async function listUserTinyConnections(scope: TinyConnectionScope) {
+  const connections = await prisma.tinyConnection.findMany({
+    where: {
+      tenantId: scope.tenantId,
+      userId: scope.userId,
+      deletedAt: null,
+    },
+    orderBy: [{ isDefault: "desc" }, { updatedAt: "desc" }],
+  });
+
+  return connections.map(formatTinyConnectionStatus);
+}
+
+export async function getTinyConnectionStatus(
+  scope: TinyConnectionScope,
+  connectionId?: string,
+) {
+  const conn = await findUserTinyConnection(scope, connectionId);
+  if (!conn) {
+    return {
+      connected: false,
+      status: "NONE" as const,
+      uiStatus: "NONE" as TinyUiStatus,
+      redirectUri: defaultOAuthRedirectUri(),
+      connections: await listUserTinyConnections(scope),
+    };
+  }
+
+  return {
+    ...formatTinyConnectionStatus(conn),
+    connections: await listUserTinyConnections(scope),
+  };
+}
+
+export async function setDefaultTinyConnection(
+  scope: TinyConnectionScope,
+  connectionId: string,
+) {
+  const conn = await findUserTinyConnection(scope, connectionId);
+  if (!conn) {
+    throw new Error("Conexão Tiny não encontrada para este usuário");
+  }
+
+  await prisma.$transaction([
+    prisma.tinyConnection.updateMany({
+      where: {
+        tenantId: scope.tenantId,
+        userId: scope.userId,
+        deletedAt: null,
+      },
+      data: { isDefault: false },
+    }),
+    prisma.tinyConnection.update({
+      where: { id: connectionId },
+      data: { isDefault: true },
+    }),
+  ]);
+
+  return getTinyConnectionStatus(scope, connectionId);
+}
+
+export async function testTinyConnection(
+  scope: TinyConnectionScope,
+  connectionId?: string,
+): Promise<{
   ok: boolean;
   companyName?: string | null;
   metadata?: TinyConnectionMetadata | null;
   tokenExpiresAt?: string | null;
   message?: string;
 }> {
+  const conn = await findUserTinyConnection(scope, connectionId);
+  if (!conn) {
+    return { ok: false, message: "Nenhuma conta Tiny configurada para este usuário" };
+  }
+
   try {
-    const client = await getTinyApiClient(tenantId);
+    const client = await getTinyApiClient({
+      tenantId: scope.tenantId,
+      userId: scope.userId,
+      connectionId: conn.id,
+    });
     const info = await client.getInfo();
     const metadata = extractCompanyMetadata(info);
     const companyName = metadata.razaoSocial ?? metadata.nome ?? null;
     const now = new Date();
 
-    const conn = await prisma.tinyConnection.findUnique({ where: { tenantId } });
-    if (conn) {
-      await prisma.tinyConnection.update({
-        where: { id: conn.id },
-        data: {
-          companyName,
-          metadata: metadata as unknown as Prisma.InputJsonValue,
-          lastValidatedAt: now,
-          lastError: null,
-          status: TinyConnectionStatus.CONNECTED,
-        },
-      });
-    }
+    await prisma.tinyConnection.update({
+      where: { id: conn.id },
+      data: {
+        companyName,
+        metadata: metadata as unknown as Prisma.InputJsonValue,
+        lastValidatedAt: now,
+        lastError: null,
+        status: TinyConnectionStatus.CONNECTED,
+      },
+    });
 
-    const updated = await prisma.tinyConnection.findUnique({ where: { tenantId } });
+    const updated = await prisma.tinyConnection.findUnique({ where: { id: conn.id } });
     return {
       ok: true,
       companyName,
@@ -528,24 +809,24 @@ export async function testTinyConnection(tenantId: string): Promise<{
           ? e.message
           : "Falha ao testar conexão";
 
-    const conn = await prisma.tinyConnection.findUnique({ where: { tenantId } });
-    if (conn) {
-      const status =
-        e instanceof TinyApiError && e.statusCode === 429
-          ? TinyConnectionStatus.BLOCKED
-          : TinyConnectionStatus.ERROR;
-      await prisma.tinyConnection.update({
-        where: { id: conn.id },
-        data: { lastError: message, status },
-      });
-    }
+    const status =
+      e instanceof TinyApiError && e.statusCode === 429
+        ? TinyConnectionStatus.BLOCKED
+        : TinyConnectionStatus.ERROR;
+    await prisma.tinyConnection.update({
+      where: { id: conn.id },
+      data: { lastError: message, status },
+    });
 
     return { ok: false, message };
   }
 }
 
-export async function disconnectTinyConnection(tenantId: string) {
-  const conn = await prisma.tinyConnection.findUnique({ where: { tenantId } });
+export async function disconnectTinyConnection(
+  scope: TinyConnectionScope,
+  connectionId?: string,
+) {
+  const conn = await findUserTinyConnection(scope, connectionId);
   if (!conn) {
     return { ok: true };
   }
@@ -561,14 +842,38 @@ export async function disconnectTinyConnection(tenantId: string) {
       status: TinyConnectionStatus.PENDING,
       lastError: null,
       isActive: false,
+      isDefault: false,
     },
   });
+
+  if (conn.isDefault) {
+    const next = await prisma.tinyConnection.findFirst({
+      where: {
+        tenantId: scope.tenantId,
+        userId: scope.userId,
+        deletedAt: null,
+        isActive: true,
+        status: TinyConnectionStatus.CONNECTED,
+        id: { not: conn.id },
+      },
+      orderBy: { updatedAt: "desc" },
+    });
+    if (next) {
+      await prisma.tinyConnection.update({
+        where: { id: next.id },
+        data: { isDefault: true },
+      });
+    }
+  }
 
   return { ok: true };
 }
 
-export async function cancelTinyDraft(tenantId: string) {
-  const conn = await prisma.tinyConnection.findUnique({ where: { tenantId } });
+export async function cancelTinyDraft(
+  scope: TinyConnectionScope,
+  connectionId?: string,
+) {
+  const conn = await findUserTinyConnection(scope, connectionId);
   if (!conn) {
     return { ok: true };
   }

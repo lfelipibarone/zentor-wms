@@ -1,0 +1,85 @@
+{
+  "fetchedAt": "2026-06-12T18:40:31.297Z",
+  "total": 6,
+  "comEtiqueta": 0,
+  "resultados": [
+    {
+      "erpOrderId": "TINY-860197915",
+      "pedidoId": 860197915,
+      "numeroPedido": 206009,
+      "situacao": 7,
+      "formaEnvioNome": "Mercado Envios",
+      "numeroPedidoEcommerce": "2000013374793209",
+      "idNotaFiscal": 860237536,
+      "agrupamentosVerificados": 20,
+      "expedicao": null,
+      "etiquetas": null,
+      "temEtiqueta": false
+    },
+    {
+      "erpOrderId": "TINY-860199959",
+      "pedidoId": 860199959,
+      "numeroPedido": 206034,
+      "situacao": 7,
+      "formaEnvioNome": "Mercado Envios",
+      "numeroPedidoEcommerce": "2000013376916063",
+      "idNotaFiscal": 860271385,
+      "agrupamentosVerificados": 20,
+      "expedicao": null,
+      "etiquetas": null,
+      "temEtiqueta": false
+    },
+    {
+      "erpOrderId": "TINY-860199997",
+      "pedidoId": 860199997,
+      "numeroPedido": 206035,
+      "situacao": 7,
+      "formaEnvioNome": "Mercado Envios",
+      "numeroPedidoEcommerce": "2000016806335682",
+      "idNotaFiscal": 860299110,
+      "agrupamentosVerificados": 20,
+      "expedicao": null,
+      "etiquetas": null,
+      "temEtiqueta": false
+    },
+    {
+      "erpOrderId": "TINY-860202821",
+      "pedidoId": 860202821,
+      "numeroPedido": 206066,
+      "situacao": 7,
+      "formaEnvioNome": "Mercado Envios",
+      "numeroPedidoEcommerce": "2000016809923480",
+      "idNotaFiscal": 860271861,
+      "agrupamentosVerificados": 20,
+      "expedicao": null,
+      "etiquetas": null,
+      "temEtiqueta": false
+    },
+    {
+      "erpOrderId": "TINY-860202884",
+      "pedidoId": 860202884,
+      "numeroPedido": 206069,
+      "situacao": 7,
+      "formaEnvioNome": "Mercado Envios",
+      "numeroPedidoEcommerce": "2000016794440258",
+      "idNotaFiscal": 860237154,
+      "agrupamentosVerificados": 20,
+      "expedicao": null,
+      "etiquetas": null,
+      "temEtiqueta": false
+    },
+    {
+      "erpOrderId": "TINY-860206931",
+      "pedidoId": 860206931,
+      "numeroPedido": 206114,
+      "situacao": 7,
+      "formaEnvioNome": "Mercado Envios",
+      "numeroPedidoEcommerce": "2000016814993960",
+      "idNotaFiscal": 860298444,
+      "agrupamentosVerificados": 20,
+      "expedicao": null,
+      "etiquetas": null,
+      "temEtiqueta": false
+    }
+  ]
+}

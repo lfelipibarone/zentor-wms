@@ -79,6 +79,8 @@ export interface Product {
   imageUrl?: string | null;
   requiresItemScan: boolean;
   barcode: string | null;
+  supplierName?: string | null;
+  erpStockQuantity?: number | null;
   active: boolean;
   createdAt: Date;
   updatedAt: Date;
@@ -129,7 +131,9 @@ export interface Order {
 export interface OrderItem {
   id: string;
   orderId: string;
-  productId: string;
+  productId: string | null;
+  erpSku: string | null;
+  erpDescription: string | null;
   lineNumber: number;
   quantityOrdered: number;
   quantityPicked: number;
@@ -172,7 +176,7 @@ export interface OrderWithItems extends Order {
 }
 
 export interface OrderItemWithProduct extends OrderItem {
-  product: Product;
+  product: Product | null;
 }
 
 export interface OrderDetail extends Order {

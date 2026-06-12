@@ -1,0 +1,289 @@
+{
+  "fetchedAt": "2026-06-05T18:27:08.666Z",
+  "tenantId": "cmpyd0fs10000uvq47gv8e9fz",
+  "endpoints": {
+    "list": "GET /produtos",
+    "detail": "GET /produtos/{idProduto}"
+  },
+  "imageSource": {
+    "field": "detail.anexos[].url",
+    "doc": "https://api-docs.erp.olist.com/api-reference/produtos/obter-produto",
+    "note": "A listagem GET /produtos não traz imagens; só o detalhe com anexos."
+  },
+  "productImages": [
+    {
+      "id": 340702556,
+      "sku": "SKUTESTE",
+      "descricao": "PRODUTO",
+      "imageUrl": "https://s3.amazonaws.com/tiny-anexos-us/erp/MTMzNjQ1ODE0MA/36d4032fcd43d9fd6c29e877a7dbfa96.jpg",
+      "imageUrls": [
+        "https://s3.amazonaws.com/tiny-anexos-us/erp/MTMzNjQ1ODE0MA/36d4032fcd43d9fd6c29e877a7dbfa96.jpg"
+      ],
+      "anexos": [
+        {
+          "url": "https://s3.amazonaws.com/tiny-anexos-us/erp/MTMzNjQ1ODE0MA/36d4032fcd43d9fd6c29e877a7dbfa96.jpg",
+          "externo": false
+        }
+      ]
+    }
+  ],
+  "productsWithImages": 1,
+  "productsWithoutImages": 0,
+  "query": {
+    "limit": 50,
+    "offset": 0,
+    "situacao": "A"
+  },
+  "pagination": {
+    "limit": 50,
+    "offset": 0,
+    "total": 1
+  },
+  "fieldInventory": {
+    "listPaths": [
+      "[].dataAlteracao",
+      "[].dataCriacao",
+      "[].descricao",
+      "[].estoque.localizacao",
+      "[].gtin",
+      "[].id",
+      "[].precos.preco",
+      "[].precos.precoCusto",
+      "[].precos.precoCustoMedio",
+      "[].precos.precoPromocional",
+      "[].situacao",
+      "[].sku",
+      "[].tipo",
+      "[].tipoVariacao",
+      "[].unidade"
+    ],
+    "detailPaths": [
+      "[].anexos[].externo",
+      "[].anexos[].url",
+      "[].categoria",
+      "[].codigoListaServicos",
+      "[].descricao",
+      "[].descricaoComplementar",
+      "[].dimensoes.altura",
+      "[].dimensoes.comprimento",
+      "[].dimensoes.diametro",
+      "[].dimensoes.embalagem.descricao",
+      "[].dimensoes.embalagem.id",
+      "[].dimensoes.embalagem.tipo",
+      "[].dimensoes.largura",
+      "[].dimensoes.pesoBruto",
+      "[].dimensoes.pesoLiquido",
+      "[].dimensoes.quantidadeVolumes",
+      "[].estoque.controlar",
+      "[].estoque.diasPreparacao",
+      "[].estoque.localizacao",
+      "[].estoque.maximo",
+      "[].estoque.minimo",
+      "[].estoque.quantidade",
+      "[].estoque.sobEncomenda",
+      "[].fornecedores[].codigoProdutoNoFornecedor",
+      "[].fornecedores[].id",
+      "[].fornecedores[].nome",
+      "[].garantia",
+      "[].gtin",
+      "[].id",
+      "[].kit[]",
+      "[].marca",
+      "[].ncm",
+      "[].observacoes",
+      "[].origem",
+      "[].precos.preco",
+      "[].precos.precoCusto",
+      "[].precos.precoCustoMedio",
+      "[].precos.precoPromocional",
+      "[].producao",
+      "[].produtoPai",
+      "[].seo",
+      "[].situacao",
+      "[].sku",
+      "[].tipo",
+      "[].tipoVariacao",
+      "[].tributacao.classeIPI",
+      "[].tributacao.gtinEmbalagem",
+      "[].tributacao.valorIPIFixo",
+      "[].unidade",
+      "[].unidadePorCaixa",
+      "[].variacoes[]"
+    ],
+    "detailOnlyPaths": [
+      "[].anexos[].externo",
+      "[].anexos[].url",
+      "[].categoria",
+      "[].codigoListaServicos",
+      "[].descricaoComplementar",
+      "[].dimensoes.altura",
+      "[].dimensoes.comprimento",
+      "[].dimensoes.diametro",
+      "[].dimensoes.embalagem.descricao",
+      "[].dimensoes.embalagem.id",
+      "[].dimensoes.embalagem.tipo",
+      "[].dimensoes.largura",
+      "[].dimensoes.pesoBruto",
+      "[].dimensoes.pesoLiquido",
+      "[].dimensoes.quantidadeVolumes",
+      "[].estoque.controlar",
+      "[].estoque.diasPreparacao",
+      "[].estoque.maximo",
+      "[].estoque.minimo",
+      "[].estoque.quantidade",
+      "[].estoque.sobEncomenda",
+      "[].fornecedores[].codigoProdutoNoFornecedor",
+      "[].fornecedores[].id",
+      "[].fornecedores[].nome",
+      "[].garantia",
+      "[].kit[]",
+      "[].marca",
+      "[].ncm",
+      "[].observacoes",
+      "[].origem",
+      "[].producao",
+      "[].produtoPai",
+      "[].seo",
+      "[].tributacao.classeIPI",
+      "[].tributacao.gtinEmbalagem",
+      "[].tributacao.valorIPIFixo",
+      "[].unidadePorCaixa",
+      "[].variacoes[]"
+    ]
+  },
+  "wmsMappingHints": {
+    "sku": "Product.sku — vem de listagem/detalhe: sku",
+    "name": "Product.name — vem de descricao",
+    "barcode": "Product.barcode — candidatos: gtin, tributacao.gtinEmbalagem",
+    "unit": "Product.unit — vem de unidade",
+    "weight": "Product.weight — candidatos: dimensoes.pesoLiquido ou pesoBruto (kg)",
+    "imageUrl": "Product.imageUrl — detail.anexos[].url (primeira URL não vazia)",
+    "active": "Product.active — situacao A=ativo, I/E=inativo",
+    "tinyId": "referência ERP — id",
+    "erpLocation": "estoque.localizacao (Tiny, não WMS Location)"
+  },
+  "listItems": [
+    {
+      "id": 340702556,
+      "sku": "SKUTESTE",
+      "descricao": "PRODUTO",
+      "tipo": "S",
+      "situacao": "A",
+      "dataCriacao": "2026-05-19 14:18:58",
+      "dataAlteracao": "2026-05-19 14:18:58",
+      "unidade": "Peça",
+      "gtin": "",
+      "precos": {
+        "preco": 0,
+        "precoPromocional": 0,
+        "precoCusto": 0,
+        "precoCustoMedio": 0
+      },
+      "estoque": {
+        "localizacao": ""
+      },
+      "tipoVariacao": "N"
+    }
+  ],
+  "products": [
+    {
+      "id": 340702556,
+      "listItem": {
+        "id": 340702556,
+        "sku": "SKUTESTE",
+        "descricao": "PRODUTO",
+        "tipo": "S",
+        "situacao": "A",
+        "dataCriacao": "2026-05-19 14:18:58",
+        "dataAlteracao": "2026-05-19 14:18:58",
+        "unidade": "Peça",
+        "gtin": "",
+        "precos": {
+          "preco": 0,
+          "precoPromocional": 0,
+          "precoCusto": 0,
+          "precoCustoMedio": 0
+        },
+        "estoque": {
+          "localizacao": ""
+        },
+        "tipoVariacao": "N"
+      },
+      "detail": {
+        "id": 340702556,
+        "sku": "SKUTESTE",
+        "descricao": "PRODUTO",
+        "tipo": "S",
+        "descricaoComplementar": "",
+        "situacao": "A",
+        "produtoPai": null,
+        "unidade": "Peça",
+        "unidadePorCaixa": "",
+        "ncm": "",
+        "gtin": "",
+        "origem": "0",
+        "garantia": "",
+        "observacoes": "",
+        "categoria": null,
+        "marca": null,
+        "dimensoes": {
+          "embalagem": {
+            "id": null,
+            "tipo": 2,
+            "descricao": ""
+          },
+          "largura": 0,
+          "altura": 0,
+          "comprimento": 0,
+          "diametro": 0,
+          "pesoLiquido": 0,
+          "pesoBruto": 0,
+          "quantidadeVolumes": 0
+        },
+        "precos": {
+          "preco": 0,
+          "precoPromocional": 0,
+          "precoCusto": 0,
+          "precoCustoMedio": 0
+        },
+        "estoque": {
+          "controlar": true,
+          "sobEncomenda": false,
+          "diasPreparacao": 0,
+          "localizacao": "",
+          "minimo": 0,
+          "maximo": 0,
+          "quantidade": 475
+        },
+        "fornecedores": [
+          {
+            "id": 893028952,
+            "nome": "FORNECEDOR",
+            "codigoProdutoNoFornecedor": ""
+          }
+        ],
+        "seo": null,
+        "tributacao": {
+          "gtinEmbalagem": "",
+          "valorIPIFixo": 0,
+          "classeIPI": ""
+        },
+        "anexos": [
+          {
+            "url": "https://s3.amazonaws.com/tiny-anexos-us/erp/MTMzNjQ1ODE0MA/36d4032fcd43d9fd6c29e877a7dbfa96.jpg",
+            "externo": false
+          }
+        ],
+        "variacoes": [],
+        "kit": [],
+        "producao": null,
+        "codigoListaServicos": "",
+        "tipoVariacao": "N"
+      },
+      "imageUrl": "https://s3.amazonaws.com/tiny-anexos-us/erp/MTMzNjQ1ODE0MA/36d4032fcd43d9fd6c29e877a7dbfa96.jpg",
+      "imageUrls": [
+        "https://s3.amazonaws.com/tiny-anexos-us/erp/MTMzNjQ1ODE0MA/36d4032fcd43d9fd6c29e877a7dbfa96.jpg"
+      ]
+    }
+  ]
+}

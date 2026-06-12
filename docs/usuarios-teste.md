@@ -27,6 +27,7 @@ Contém dados de movimentação completos, dezenas de pedidos integrados (prefix
 | E-mail | Senha | Papel | Web Dashboard | App Mobile |
 | :--- | :--- | :--- | :--- | :--- |
 | `operador@wms.local` | `operador123` | Expedidor (`EXPEDITER`) | Sim | Não |
+| `operador2@wms.local` | `operador123` | Expedidor (`EXPEDITER`) | Sim | Não |
 | `picker@wms.local` | `dev` | Separador (`PICKER`) | Não | Sim |
 | `maria@wms.local` | `dev` | Separador (`PICKER`) | Não | Sim |
 | `carlos@wms.local` | `dev` | Separador (`PICKER`) | Não | Sim |

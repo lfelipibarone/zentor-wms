@@ -1,0 +1,135 @@
+{
+  "fetchedAt": "2026-06-12T18:37:27.789Z",
+  "tenantId": "cmpyd0fs10000uvq47gv8e9fz",
+  "erpOrderId": "TINY-860312794",
+  "pedidoId": 860312794,
+  "doc": {
+    "pedido": "https://api-docs.erp.olist.com/api-reference/pedidos/obter-pedido",
+    "expedicao": "https://api-docs.erp.olist.com/api-reference/expedição/obter-agrupamento-de-expedição",
+    "etiquetasAgrupamento": "https://api-docs.erp.olist.com/api-reference/expedição/obter-etiquetas-de-um-agrupamento-de-expedição",
+    "etiquetasExpedicao": "https://api-docs.erp.olist.com/api-reference/expedição/obter-etiquetas-de-uma-expedição-dentro-de-um-agrupamento",
+    "nota": null
+  },
+  "resumo": {
+    "numeroPedido": 207018,
+    "idNotaFiscal": null,
+    "idFormaEnvio": 860312768,
+    "codigoRastreamento": "",
+    "urlRastreamento": "",
+    "expedicoesEncontradas": 0
+  },
+  "rotas": {
+    "GET /pedidos/{idPedido}": {
+      "path": "/pedidos/860312794",
+      "resposta": {
+        "id": 860312794,
+        "numeroPedido": 207018,
+        "idNotaFiscal": 0,
+        "dataFaturamento": "",
+        "valorTotalProdutos": 10.1,
+        "valorTotalPedido": 10.1,
+        "listaPreco": {
+          "id": 0,
+          "nome": "Padrão",
+          "acrescimoDesconto": 0
+        },
+        "cliente": {
+          "nome": "Yuri Biatto Sekiguchi",
+          "codigo": "",
+          "fantasia": "",
+          "tipoPessoa": "J",
+          "cpfCnpj": "",
+          "inscricaoEstadual": "",
+          "rg": "",
+          "telefone": "",
+          "celular": "",
+          "email": "",
+          "endereco": null,
+          "id": 764111155
+        },
+        "enderecoEntrega": null,
+        "ecommerce": {
+          "id": 0,
+          "nome": "",
+          "numeroPedidoEcommerce": "",
+          "numeroPedidoCanalVenda": "",
+          "canalVenda": ""
+        },
+        "transportador": {
+          "id": 0,
+          "nome": "",
+          "fretePorConta": "R",
+          "formaEnvio": {
+            "id": 860312768,
+            "nome": "Transportadora Teste WMS"
+          },
+          "formaFrete": null,
+          "codigoRastreamento": "",
+          "urlRastreamento": ""
+        },
+        "deposito": {
+          "id": 743997833,
+          "nome": " Geral (Fiscal)"
+        },
+        "vendedor": null,
+        "naturezaOperacao": {
+          "id": 775374075,
+          "nome": "Venda de Mercadorias - Regime normal"
+        },
+        "intermediador": null,
+        "pagamento": null,
+        "itens": [
+          {
+            "produto": {
+              "id": 744044602,
+              "sku": "PUXPONTOPRF",
+              "descricao": "PUXADOR PZ 1009 BOTAO 30MM - Preto Fosco",
+              "tipo": "P"
+            },
+            "quantidade": 10,
+            "valorUnitario": 1.01,
+            "infoAdicional": ""
+          }
+        ],
+        "pagamentosIntegrados": null,
+        "situacao": 0,
+        "data": "2026-06-12",
+        "dataEntrega": "",
+        "numeroOrdemCompra": "",
+        "valorDesconto": 0,
+        "valorFrete": 0,
+        "valorOutrasDespesas": 0,
+        "dataPrevista": "",
+        "dataEnvio": "",
+        "observacoes": "",
+        "observacoesInternas": "",
+        "origemPedido": 0
+      }
+    },
+    "GET /pedidos/{idPedido}/marcadores": {
+      "path": "/pedidos/860312794/marcadores",
+      "resposta": [
+        {
+          "descricao": "1ª venda"
+        }
+      ]
+    },
+    "GET /formas-envio/{idFormaEnvio}": {
+      "path": "/formas-envio/860312768",
+      "resposta": {
+        "nome": "Transportadora Teste WMS",
+        "tipo": "6",
+        "situacao": "1",
+        "id": 860312768,
+        "gatewayLogistico": null,
+        "formasFrete": []
+      }
+    },
+    "GET /expedicao (busca por pedido)": {
+      "pedidoId": 860312794,
+      "encontradas": 0,
+      "matches": []
+    }
+  },
+  "expedicao": []
+}

@@ -4,6 +4,11 @@ export interface ParsedLocationRow {
   barcode: string;
   corridor: string;
   row: string;
+  barracao?: string;
+  setor?: string;
+  estante?: string;
+  prateleira?: string;
+  coluna?: string;
   type: string;
   productSku?: string;
   capacity: number;
@@ -23,6 +28,11 @@ export type ImportMode = "upsert" | "createOnly";
 
 const TEMPLATE_HEADERS = [
   "barcode",
+  "barracao",
+  "setor",
+  "estante",
+  "prateleira",
+  "coluna",
   "corredor",
   "fileira",
   "tipo",
@@ -35,6 +45,11 @@ const TEMPLATE_HEADERS = [
 
 const TEMPLATE_EXAMPLE = [
   "GON-A-01",
+  "B1",
+  "S1",
+  "E2",
+  "P3",
+  "C4",
   "A",
   "01",
   "Gôndola",
@@ -52,6 +67,12 @@ const HEADER_ALIASES: Record<string, keyof ParsedLocationRow | "skip"> = {
   codigo_de_barras: "barcode",
   codigobarras: "barcode",
   etiqueta: "barcode",
+  barracao: "barracao",
+  setor: "setor",
+  estante: "estante",
+  prateleira: "prateleira",
+  pratileira: "prateleira",
+  coluna: "coluna",
   corredor: "corridor",
   corridor: "corridor",
   fileira: "row",
@@ -179,6 +200,11 @@ export async function parseLocationsXlsx(file: File): Promise<{
       barcode,
       corridor,
       row: rowVal,
+      barracao: cellToString(raw.barracao) || undefined,
+      setor: cellToString(raw.setor) || undefined,
+      estante: cellToString(raw.estante) || undefined,
+      prateleira: cellToString(raw.prateleira) || undefined,
+      coluna: cellToString(raw.coluna) || undefined,
       type,
       productSku: cellToString(raw.productSku) || undefined,
       capacity,
@@ -214,6 +240,11 @@ export async function downloadLocationsTemplate(): Promise<void> {
   ]);
   ws["!cols"] = [
     { wch: 14 },
+    { wch: 10 },
+    { wch: 8 },
+    { wch: 8 },
+    { wch: 10 },
+    { wch: 8 },
     { wch: 10 },
     { wch: 8 },
     { wch: 12 },

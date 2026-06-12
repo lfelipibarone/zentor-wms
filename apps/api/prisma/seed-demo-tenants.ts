@@ -48,12 +48,6 @@ export async function seedDemoTenant(
   });
   const tenantId = tenant.id;
 
-  await prisma.tinyConnection.upsert({
-    where: { tenantId },
-    create: { tenantId, name: "Tiny ERP" },
-    update: {},
-  });
-
   const adminPerms = defaultPermissionsForRole("ADMIN");
   const pickerPerms = defaultPermissionsForRole("PICKER");
 
@@ -77,6 +71,20 @@ export async function seedDemoTenant(
       active: true,
     },
   });
+
+  const existingTiny = await prisma.tinyConnection.findFirst({
+    where: { tenantId, userId: admin.id, deletedAt: null },
+  });
+  if (!existingTiny) {
+    await prisma.tinyConnection.create({
+      data: {
+        tenantId,
+        userId: admin.id,
+        name: "Tiny ERP",
+        isDefault: true,
+      },
+    });
+  }
 
   const picker = await prisma.user.upsert({
     where: { email: config.pickerEmail },
@@ -212,6 +220,7 @@ export function printTestUsersGuide() {
   console.log("  admin@wms.local / admin123\n");
   console.log("Tenant default (dados completos):");
   console.log("  admin via plataforma ou operador@wms.local / operador123");
+  console.log("  operador2@wms.local / operador123");
   console.log("  picker@wms.local / dev\n");
   for (const c of DEMO_TENANT_CONFIGS) {
     console.log(`${c.name} (${c.slug}):`);

@@ -139,6 +139,7 @@ export async function buildWaveLinesFromOrders(
     for (const item of order.items) {
       const remaining = item.quantityOrdered - item.quantityPicked;
       if (remaining <= 0) continue;
+      if (!item.productId) continue;
 
       const product = await prisma.product.findUnique({
         where: { id: item.productId },

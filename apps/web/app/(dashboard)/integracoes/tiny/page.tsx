@@ -5,7 +5,9 @@ import { Loader2 } from "lucide-react";
 import { PageHeader } from "@/components/ops/page-header";
 import { apiFetch } from "@/lib/api/client";
 import {
+  syncTinyProducts,
   syncTinySalesOrders,
+  type SyncTinyProductsResult,
   type SyncTinySalesOrdersResult,
 } from "@/lib/api/operations";
 
@@ -28,6 +30,7 @@ interface TinyConnectionStatus {
   connected: boolean;
   status: string;
   uiStatus?: "NONE" | "VALID" | "PENDING" | "INVALID" | "BLOCKED";
+  name?: string;
   companyName?: string | null;
   metadata?: TinyConnectionMetadata | null;
   hasCredentials?: boolean;
@@ -39,7 +42,10 @@ interface TinyConnectionStatus {
   tokenExpiresAt?: string | null;
   lastValidatedAt?: string | null;
   isActive?: boolean;
+  isDefault?: boolean;
   isDraft?: boolean;
+  connectionId?: string;
+  connections?: TinyConnectionStatus[];
 }
 
 const STATUS_LABELS: Record<string, string> = {
@@ -58,6 +64,23 @@ const STATUS_COLORS: Record<string, string> = {
   NONE: "bg-slate-100 text-slate-700",
 };
 
+const EVENT_STATUS_COLORS: Record<string, string> = {
+  SUCCESS: "bg-emerald-100 text-emerald-800",
+  ERROR: "bg-red-100 text-red-800",
+  INFO: "bg-sky-100 text-sky-800",
+};
+
+const OAUTH_EVENT_LABELS: Record<string, string> = {
+  OAUTH_CALLBACK_STARTED: "OAuth iniciado",
+  OAUTH_STATE_INVALID: "State inválido",
+  OAUTH_CONNECTION_NOT_FOUND: "Conexão não encontrada",
+  OAUTH_CREDENTIALS_MISSING: "Credenciais ausentes",
+  OAUTH_TOKEN_EXCHANGE_FAILED: "Falha na troca de token",
+  OAUTH_TOKEN_MISSING: "Token não retornado",
+  OAUTH_API_VALIDATION_FAILED: "API negou acesso (403)",
+  OAUTH_CONNECTED: "Conectado",
+};
+
 function formatDateTime(iso: string | null | undefined) {
   if (!iso) return "—";
   return new Date(iso).toLocaleString("pt-BR");
@@ -73,13 +96,21 @@ export default function TinyIntegracaoPage() {
   const [disconnecting, setDisconnecting] = useState(false);
   const [cancellingDraft, setCancellingDraft] = useState(false);
   const [syncingOrders, setSyncingOrders] = useState(false);
+  const [syncingProducts, setSyncingProducts] = useState(false);
   const [syncOrdersResult, setSyncOrdersResult] =
     useState<SyncTinySalesOrdersResult | null>(null);
+  const [syncProductsResult, setSyncProductsResult] =
+    useState<SyncTinyProductsResult | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const [clientId, setClientId] = useState("");
   const [clientSecret, setClientSecret] = useState("");
+  const [activeConnectionId, setActiveConnectionId] = useState<string | null>(
+    null,
+  );
+  const [addingAccount, setAddingAccount] = useState(false);
+  const [settingDefault, setSettingDefault] = useState(false);
 
   const apiBase =
     typeof window !== "undefined"
@@ -122,6 +153,12 @@ export default function TinyIntegracaoPage() {
       ]);
       setEvents(evData.events);
       setConnection(conn);
+      const nextActive =
+        conn.connectionId ??
+        conn.connections?.find((item) => item.isDefault)?.connectionId ??
+        conn.connections?.[0]?.connectionId ??
+        null;
+      setActiveConnectionId(nextActive);
       if (conn.oauthClientId) setClientId(conn.oauthClientId);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Erro ao carregar");
@@ -144,6 +181,7 @@ export default function TinyIntegracaoPage() {
         load();
       } else {
         setError(event.data.error ?? "Falha na autenticação Olist");
+        load();
       }
     };
     window.addEventListener("message", onMessage);
@@ -162,6 +200,7 @@ export default function TinyIntegracaoPage() {
           body: JSON.stringify({
             clientId,
             clientSecret: clientSecret || undefined,
+            connectionId: activeConnectionId ?? undefined,
           }),
         },
       );
@@ -193,7 +232,12 @@ export default function TinyIntegracaoPage() {
 
       const { authUrl } = await apiFetch<{ authUrl: string }>(
         "/api/integrations/tiny/oauth/authorize",
-        { method: "POST", body: "{}" },
+        {
+          method: "POST",
+          body: JSON.stringify({
+            connectionId: activeConnectionId ?? undefined,
+          }),
+        },
       );
       if (!authUrl.includes("accounts.tiny.com.br")) {
         throw new Error("URL de autenticação Olist inválida. Tente salvar as credenciais novamente.");
@@ -222,7 +266,12 @@ export default function TinyIntegracaoPage() {
         ok: boolean;
         companyName?: string;
         message?: string;
-      }>("/api/integrations/tiny/test-connection", { method: "POST", body: "{}" });
+      }>("/api/integrations/tiny/test-connection", {
+        method: "POST",
+        body: JSON.stringify({
+          connectionId: activeConnectionId ?? undefined,
+        }),
+      });
       if (result.ok) {
         setSuccessMessage(
           result.companyName
@@ -245,7 +294,12 @@ export default function TinyIntegracaoPage() {
     setError(null);
     setSuccessMessage(null);
     try {
-      await apiFetch("/api/integrations/tiny/disconnect", { method: "POST", body: "{}" });
+      await apiFetch("/api/integrations/tiny/disconnect", {
+        method: "POST",
+        body: JSON.stringify({
+          connectionId: activeConnectionId ?? undefined,
+        }),
+      });
       setSuccessMessage("Conta desvinculada. Tokens removidos.");
       await load();
     } catch (e) {
@@ -261,7 +315,10 @@ export default function TinyIntegracaoPage() {
     setSuccessMessage(null);
     setSyncOrdersResult(null);
     try {
-      const result = await syncTinySalesOrders({ days: 30 });
+      const result = await syncTinySalesOrders({
+        days: 30,
+        connectionId: activeConnectionId ?? undefined,
+      });
       setSyncOrdersResult(result);
       if (!result.tinyConnected) {
         setError(result.warning ?? "Tiny ERP não conectado.");
@@ -297,12 +354,121 @@ export default function TinyIntegracaoPage() {
     }
   };
 
+  const syncProducts = async (opts?: {
+    forceRestart?: boolean;
+    refreshExisting?: boolean;
+  }) => {
+    setSyncingProducts(true);
+    setError(null);
+    setSuccessMessage(null);
+    setSyncProductsResult(null);
+    try {
+      const result = await syncTinyProducts({
+        connectionId: activeConnectionId ?? undefined,
+        forceRestart: opts?.forceRestart,
+        refreshExisting: opts?.refreshExisting,
+      });
+      setSyncProductsResult(result);
+      if (!result.tinyConnected) {
+        setError(result.warning ?? "Tiny ERP não conectado.");
+        return;
+      }
+      if (result.warning) {
+        setError(result.warning);
+      }
+      const parts = [
+        result.resumed
+          ? `retomado do offset ${result.fromOffset}`
+          : "concluído",
+        `${result.listedFromTiny} listado(s) no Tiny`,
+        `${result.created} criado(s)`,
+        `${result.updated} atualizado(s)`,
+        `${result.skipped} ignorado(s)`,
+      ];
+      if ((result.skippedExisting ?? 0) > 0) {
+        parts.push(`${result.skippedExisting} já no WMS (sem nova consulta)`);
+      }
+      setSuccessMessage(`Sync de produtos ${parts.join(", ")}.`);
+      await load();
+    } catch (e) {
+      setError(
+        e instanceof Error
+          ? `${e.message} Se o servidor reiniciou, clique em Sincronizar novamente para retomar de onde parou.`
+          : "Erro ao sincronizar produtos",
+      );
+    } finally {
+      setSyncingProducts(false);
+    }
+  };
+
+  const addAccount = async () => {
+    setAddingAccount(true);
+    setError(null);
+    setSuccessMessage(null);
+    try {
+      const conn = await apiFetch<TinyConnectionStatus>(
+        "/api/integrations/tiny/connections",
+        { method: "POST", body: "{}" },
+      );
+      setActiveConnectionId(conn.connectionId ?? null);
+      setConnection(conn);
+      if (conn.oauthClientId) setClientId(conn.oauthClientId);
+      setClientSecret("");
+      setSuccessMessage("Nova conta criada. Salve as credenciais e conecte com Olist.");
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Erro ao adicionar conta");
+    } finally {
+      setAddingAccount(false);
+    }
+  };
+
+  const makeDefault = async (connectionId: string) => {
+    setSettingDefault(true);
+    setError(null);
+    try {
+      const conn = await apiFetch<TinyConnectionStatus>(
+        "/api/integrations/tiny/connections/default",
+        {
+          method: "POST",
+          body: JSON.stringify({ connectionId }),
+        },
+      );
+      setConnection(conn);
+      setActiveConnectionId(connectionId);
+      setSuccessMessage("Conta padrão atualizada.");
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Erro ao definir conta padrão");
+    } finally {
+      setSettingDefault(false);
+    }
+  };
+
+  const selectConnection = async (connectionId: string) => {
+    setActiveConnectionId(connectionId);
+    setError(null);
+    try {
+      const conn = await apiFetch<TinyConnectionStatus>(
+        `/api/integrations/tiny/connection?connectionId=${encodeURIComponent(connectionId)}`,
+      );
+      setConnection(conn);
+      if (conn.oauthClientId) setClientId(conn.oauthClientId);
+      setClientSecret("");
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Erro ao carregar conta");
+    }
+  };
+
   const cancelDraft = async () => {
     setCancellingDraft(true);
     setError(null);
     setSuccessMessage(null);
     try {
-      await apiFetch("/api/integrations/tiny/draft", { method: "DELETE" });
+      const query = activeConnectionId
+        ? `?connectionId=${encodeURIComponent(activeConnectionId)}`
+        : "";
+      await apiFetch(`/api/integrations/tiny/draft${query}`, {
+        method: "DELETE",
+      });
       setSuccessMessage("Rascunho cancelado.");
       setClientId("");
       setClientSecret("");
@@ -324,9 +490,25 @@ export default function TinyIntegracaoPage() {
       <section className="rounded-xl border bg-white p-4 shadow-sm">
         <h2 className="text-sm font-semibold">Conexão OAuth (API v3)</h2>
         <p className="mt-2 text-sm text-muted-foreground">
+          Cada usuário conecta suas próprias contas Tiny/Olist. Você pode ter
+          mais de uma conta vinculada — escolha a conta ativa abaixo ou adicione
+          outra.
+        </p>
+        <p className="mt-2 text-sm text-muted-foreground">
           Crie um aplicativo em Configurações → Aplicativos no Olist/Tiny. O
           redirect URI abaixo deve ser <strong>idêntico</strong> ao registrado no
           painel (http/https, porta e path).
+        </p>
+        <p className="mt-2 text-sm text-muted-foreground">
+          No popup de autorização, use um <strong>usuário administrador</strong>{" "}
+          da conta Tiny e aceite as permissões do aplicativo (Dados da empresa,
+          Pedidos, Produtos, Notas).
+        </p>
+        <p className="mt-2 rounded-lg bg-slate-50 px-3 py-2 text-xs text-slate-600">
+          O WMS renova tokens automaticamente (access ~4h, refresh ~24h). Se a
+          API ficar parada por mais de um dia ou a{" "}
+          <code className="text-[11px]">ENCRYPTION_KEY</code> mudar, clique em{" "}
+          <strong>Conectar com Olist</strong> novamente.
         </p>
 
         {loading ? (
@@ -335,6 +517,87 @@ export default function TinyIntegracaoPage() {
           </div>
         ) : (
           <>
+            <div className="mt-4 space-y-2">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <p className="text-sm font-medium">Suas contas Tiny</p>
+                <button
+                  type="button"
+                  disabled={addingAccount}
+                  onClick={addAccount}
+                  className="rounded-lg border border-[#0d9488] px-3 py-1.5 text-sm font-medium text-[#0d9488] disabled:opacity-50"
+                >
+                  {addingAccount ? "Criando…" : "Adicionar conta"}
+                </button>
+              </div>
+              {(connection?.connections?.length ?? 0) === 0 ? (
+                <p className="text-sm text-muted-foreground">
+                  Nenhuma conta ainda. Salve as credenciais e conecte, ou clique em
+                  Adicionar conta.
+                </p>
+              ) : (
+                <div className="flex flex-wrap gap-2">
+                  {connection?.connections?.map((item) => {
+                    const itemStatus = item.uiStatus ?? "NONE";
+                    const selected = item.connectionId === activeConnectionId;
+                    const label =
+                      item.companyName ??
+                      item.name ??
+                      item.connectionId?.slice(0, 8) ??
+                      "Conta";
+                    return (
+                      <button
+                        key={item.connectionId}
+                        type="button"
+                        onClick={() => {
+                          if (item.connectionId) {
+                            void selectConnection(item.connectionId);
+                          }
+                        }}
+                        className={`rounded-lg border px-3 py-2 text-left text-sm ${
+                          selected
+                            ? "border-[#0d9488] bg-teal-50"
+                            : "border-slate-200 bg-white"
+                        }`}
+                      >
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span
+                            className={`rounded-full px-2 py-0.5 text-[11px] font-medium ${STATUS_COLORS[itemStatus] ?? STATUS_COLORS.NONE}`}
+                          >
+                            {STATUS_LABELS[itemStatus] ?? itemStatus}
+                          </span>
+                          {item.isDefault ? (
+                            <span className="text-[11px] font-medium text-[#0d9488]">
+                              Padrão
+                            </span>
+                          ) : item.connected && item.connectionId ? (
+                            <span
+                              role="button"
+                              tabIndex={0}
+                              onClick={(event) => {
+                                event.stopPropagation();
+                                void makeDefault(item.connectionId!);
+                              }}
+                              onKeyDown={(event) => {
+                                if (event.key === "Enter" || event.key === " ") {
+                                  event.preventDefault();
+                                  event.stopPropagation();
+                                  void makeDefault(item.connectionId!);
+                                }
+                              }}
+                              className="text-[11px] text-slate-500 underline"
+                            >
+                              {settingDefault ? "Salvando…" : "Tornar padrão"}
+                            </span>
+                          ) : null}
+                        </div>
+                        <p className="mt-1 font-medium">{label}</p>
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+
             <div className="mt-4 flex flex-wrap items-center gap-2">
               <span
                 className={`rounded-full px-2.5 py-0.5 text-xs font-medium ${STATUS_COLORS[uiStatus] ?? STATUS_COLORS.NONE}`}
@@ -501,6 +764,75 @@ export default function TinyIntegracaoPage() {
       </section>
 
       <section className="rounded-xl border bg-white p-4 shadow-sm">
+        <h2 className="text-sm font-semibold">Produtos</h2>
+        <p className="mt-2 text-sm text-muted-foreground">
+          Importa o catálogo do Tiny para a tabela{" "}
+          <code className="text-xs">products</code> do WMS (SKU, nome, GTIN,
+          unidade, peso e imagem). Pedidos de venda dependem desses SKUs
+          cadastrados.
+        </p>
+        {connection?.connected ? (
+          <div className="mt-4 space-y-3">
+            <div className="flex flex-wrap gap-2">
+              <button
+                type="button"
+                disabled={syncingProducts}
+                onClick={() => syncProducts()}
+                className="rounded-lg bg-[#0d9488] px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
+              >
+                {syncingProducts ? (
+                  <span className="inline-flex items-center gap-2">
+                    <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
+                    Sincronizando…
+                  </span>
+                ) : (
+                  "Sincronizar produtos"
+                )}
+              </button>
+              <button
+                type="button"
+                disabled={syncingProducts}
+                onClick={() => syncProducts({ forceRestart: true })}
+                className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 disabled:opacity-50"
+              >
+                Recomeçar do zero
+              </button>
+            </div>
+            {syncingProducts ? (
+              <p className="text-sm text-muted-foreground">
+                Importação em andamento. O progresso é salvo a cada página; se o
+                servidor reiniciar, clique em Sincronizar de novo para retomar.
+                SKUs já no WMS são ignorados (sem nova chamada à API Tiny).
+              </p>
+            ) : (
+              <p className="text-sm text-muted-foreground">
+                Retoma automaticamente um sync interrompido. Use «Recomeçar do
+                zero» apenas para forçar reimportação completa.
+              </p>
+            )}
+            {syncProductsResult && syncProductsResult.errors.length > 0 ? (
+              <div className="max-h-40 overflow-auto rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm">
+                <p className="font-medium text-amber-900">
+                  {syncProductsResult.errors.length} produto(s) com erro:
+                </p>
+                <ul className="mt-1 list-inside list-disc text-amber-800">
+                  {syncProductsResult.errors.slice(0, 10).map((err) => (
+                    <li key={`${err.sku}-${err.message}`}>
+                      {err.sku}: {err.message}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ) : null}
+          </div>
+        ) : (
+          <p className="mt-3 text-sm text-muted-foreground">
+            Conecte o OAuth acima para habilitar a sincronização.
+          </p>
+        )}
+      </section>
+
+      <section className="rounded-xl border bg-white p-4 shadow-sm">
         <h2 className="text-sm font-semibold">Webhook (vendas)</h2>
         <p className="mt-2 text-sm text-muted-foreground">
           Configure no Olist (Configurações → Webhooks → notificações de vendas) a
@@ -532,15 +864,22 @@ export default function TinyIntegracaoPage() {
           <ul className="max-h-96 space-y-2 overflow-auto text-sm">
             {events.map((ev) => (
               <li key={ev.id} className="rounded-lg border px-3 py-2">
-                <div className="flex justify-between gap-2">
-                  <span className="font-medium">{ev.status}</span>
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span
+                      className={`rounded-full px-2 py-0.5 text-xs font-medium ${EVENT_STATUS_COLORS[ev.status] ?? "bg-slate-100 text-slate-700"}`}
+                    >
+                      {ev.status}
+                    </span>
+                    <span className="font-medium">
+                      {OAUTH_EVENT_LABELS[ev.eventType] ?? ev.eventType}
+                    </span>
+                  </div>
                   <span className="text-muted-foreground">
                     {new Date(ev.createdAt).toLocaleString("pt-BR")}
                   </span>
                 </div>
-                <p className="text-muted-foreground">
-                  {ev.externalId ?? "—"} · {ev.message ?? ev.eventType}
-                </p>
+                <p className="mt-1 text-muted-foreground">{ev.message ?? "—"}</p>
               </li>
             ))}
           </ul>

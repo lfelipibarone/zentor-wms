@@ -1,9 +1,11 @@
-import { OrderStatus } from "@prisma/client";
+import { LocationType, OrderStatus } from "@prisma/client";
+import { Permission } from "@wms/shared";
 import { prisma } from "../lib/prisma.js";
 import {
   detectMarketplaceFromTiny,
   enrichOrderPriority,
 } from "./marketplace-priority.js";
+import { notifyUsersWithPermission } from "./notifications.js";
 import {
   extractTinyPriorityFromRecord,
   fetchTinyOrderPriority,
@@ -236,10 +238,151 @@ async function resolveErpPriorityForPayload(
   return fetchTinyOrderPriority(tenantId, payload.erpOrderId);
 }
 
+type ResolvedOrderLine = {
+  lineNumber: number;
+  productId?: string;
+  erpSku?: string;
+  erpDescription?: string;
+  qty: number;
+};
+
+type ResolvedOrderLines = {
+  lines: ResolvedOrderLine[];
+  missingProducts: string[];
+  missingLocations: string[];
+};
+
+async function resolveOrderLinesFromTiny(
+  tenantId: string,
+  items: TinyLineItem[],
+): Promise<ResolvedOrderLines> {
+  const lines: ResolvedOrderLine[] = [];
+  const missingProducts: string[] = [];
+  const missingLocations: string[] = [];
+  let lineNum = 0;
+
+  for (const item of items) {
+    lineNum += 1;
+    const sku = item.sku.trim();
+    const product = await prisma.product.findFirst({
+      where: {
+        tenantId,
+        active: true,
+        sku: { equals: sku, mode: "insensitive" },
+      },
+    });
+
+    if (!product) {
+      missingProducts.push(sku);
+      lines.push({
+        lineNumber: lineNum,
+        erpSku: sku,
+        erpDescription: item.description,
+        qty: item.quantity,
+      });
+      continue;
+    }
+
+    const pickFaceCount = await prisma.location.count({
+      where: {
+        tenantId,
+        productId: product.id,
+        type: LocationType.PICK_FACE,
+        active: true,
+      },
+    });
+    if (pickFaceCount === 0) {
+      missingLocations.push(product.sku);
+    }
+
+    lines.push({
+      lineNumber: lineNum,
+      productId: product.id,
+      qty: item.quantity,
+    });
+  }
+
+  return { lines, missingProducts, missingLocations };
+}
+
+function mapLinesToCreateInput(lines: ResolvedOrderLine[]) {
+  return lines.map((line) => ({
+    lineNumber: line.lineNumber,
+    quantityOrdered: line.qty,
+    ...(line.productId
+      ? { productId: line.productId }
+      : {
+          erpSku: line.erpSku,
+          erpDescription: line.erpDescription ?? null,
+        }),
+  }));
+}
+
+export type UpsertOrderFromTinyResult = {
+  orderId: string;
+  created: boolean;
+  missingProducts: string[];
+  missingLocations: string[];
+  hasIntegrationIssues: boolean;
+};
+
+async function notifyOrderIntegrationIssues(params: {
+  tenantId: string;
+  orderId: string;
+  erpOrderId: string;
+  missingProducts: string[];
+  missingLocations: string[];
+}): Promise<void> {
+  const parts: string[] = [];
+  if (params.missingProducts.length > 0) {
+    parts.push(
+      `Produto não cadastrado: ${params.missingProducts.join(", ")}`,
+    );
+  }
+  if (params.missingLocations.length > 0) {
+    parts.push(
+      `Sem localização cadastrada: ${params.missingLocations.join(", ")}`,
+    );
+  }
+  if (parts.length === 0) return;
+
+  await notifyUsersWithPermission(
+    Permission.SALES_VIEW,
+    {
+      title: `Pedido ${params.erpOrderId} com pendências`,
+      body: parts.join(". "),
+      category: "ORDER",
+      data: {
+        orderId: params.orderId,
+        erpOrderId: params.erpOrderId,
+        missingProducts: params.missingProducts,
+        missingLocations: params.missingLocations,
+      },
+    },
+    params.tenantId,
+  );
+
+  await notifyUsersWithPermission(
+    Permission.REGISTERS_VIEW,
+    {
+      title: `Cadastro pendente — ${params.erpOrderId}`,
+      body: parts.join(". "),
+      category: "ORDER",
+      data: {
+        orderId: params.orderId,
+        erpOrderId: params.erpOrderId,
+        missingProducts: params.missingProducts,
+        missingLocations: params.missingLocations,
+      },
+    },
+    params.tenantId,
+  );
+}
+
 export async function upsertOrderFromTiny(
   tenantId: string,
   payload: TinyOrderPayload,
-): Promise<{ orderId: string; created: boolean }> {
+): Promise<UpsertOrderFromTinyResult> {
   const existing = await prisma.order.findFirst({
     where: { tenantId, erpOrderId: payload.erpOrderId },
     include: { items: true },
@@ -250,32 +393,29 @@ export async function upsertOrderFromTiny(
     existing.status !== OrderStatus.PENDING &&
     existing.status !== OrderStatus.PAUSED_ISSUE
   ) {
-    return { orderId: existing.id, created: false };
+    return {
+      orderId: existing.id,
+      created: false,
+      missingProducts: [],
+      missingLocations: [],
+      hasIntegrationIssues: false,
+    };
   }
 
-  const productIds: { lineNumber: number; productId: string; qty: number }[] =
-    [];
-  let lineNum = 0;
-  for (const item of payload.items) {
-    const product = await prisma.product.findFirst({
-      where: { tenantId, sku: item.sku, active: true },
-    });
-    if (!product) continue;
-    lineNum += 1;
-    productIds.push({
-      lineNumber: lineNum,
-      productId: product.id,
-      qty: item.quantity,
-    });
+  if (payload.items.length === 0) {
+    throw new Error(`Pedido ${payload.erpOrderId} sem itens no ERP`);
   }
 
-  if (productIds.length === 0) {
-    throw new Error(
-      `Nenhum SKU do pedido ${payload.erpOrderId} encontrado no cadastro`,
-    );
-  }
+  const resolved = await resolveOrderLinesFromTiny(tenantId, payload.items);
+  const hasIntegrationIssues =
+    resolved.missingProducts.length > 0 ||
+    resolved.missingLocations.length > 0;
+  const targetStatus = hasIntegrationIssues
+    ? OrderStatus.PAUSED_ISSUE
+    : OrderStatus.PENDING;
 
   const erpPriority = await resolveErpPriorityForPayload(tenantId, payload);
+  const itemCreates = mapLinesToCreateInput(resolved.lines);
 
   if (existing) {
     await prisma.orderItem.deleteMany({ where: { orderId: existing.id } });
@@ -287,18 +427,28 @@ export async function upsertOrderFromTiny(
         collectionDeadline:
           payload.collectionDeadline ?? existing.collectionDeadline,
         erpSource: "TINY",
+        status: targetStatus,
         ...(erpPriority !== null ? { erpPriority } : {}),
-        items: {
-          create: productIds.map((p) => ({
-            lineNumber: p.lineNumber,
-            productId: p.productId,
-            quantityOrdered: p.qty,
-          })),
-        },
+        items: { create: itemCreates },
       },
     });
     await enrichOrderPriority(existing.id);
-    return { orderId: existing.id, created: false };
+    if (hasIntegrationIssues) {
+      await notifyOrderIntegrationIssues({
+        tenantId,
+        orderId: existing.id,
+        erpOrderId: payload.erpOrderId,
+        missingProducts: resolved.missingProducts,
+        missingLocations: resolved.missingLocations,
+      });
+    }
+    return {
+      orderId: existing.id,
+      created: false,
+      missingProducts: resolved.missingProducts,
+      missingLocations: resolved.missingLocations,
+      hasIntegrationIssues,
+    };
   }
 
   const order = await prisma.order.create({
@@ -309,25 +459,36 @@ export async function upsertOrderFromTiny(
       marketplace: payload.marketplace,
       collectionDeadline: payload.collectionDeadline,
       erpSource: "TINY",
-      status: OrderStatus.PENDING,
+      status: targetStatus,
       ...(erpPriority !== null ? { erpPriority } : {}),
-      items: {
-        create: productIds.map((p) => ({
-          lineNumber: p.lineNumber,
-          productId: p.productId,
-          quantityOrdered: p.qty,
-        })),
-      },
+      items: { create: itemCreates },
     },
   });
 
   await enrichOrderPriority(order.id);
-  return { orderId: order.id, created: true };
+  if (hasIntegrationIssues) {
+    await notifyOrderIntegrationIssues({
+      tenantId,
+      orderId: order.id,
+      erpOrderId: payload.erpOrderId,
+      missingProducts: resolved.missingProducts,
+      missingLocations: resolved.missingLocations,
+    });
+  }
+
+  return {
+    orderId: order.id,
+    created: true,
+    missingProducts: resolved.missingProducts,
+    missingLocations: resolved.missingLocations,
+    hasIntegrationIssues,
+  };
 }
 
 /** Reaplica prioridade Tiny + WMS em pedidos PENDING do tenant. */
 export async function syncPendingOrderPrioritiesFromTiny(
   tenantId: string,
+  userId?: string,
 ): Promise<{ updated: number; skipped: number }> {
   const orders = await prisma.order.findMany({
     where: {
@@ -343,7 +504,11 @@ export async function syncPendingOrderPrioritiesFromTiny(
   let skipped = 0;
 
   for (const o of orders) {
-    const erpPriority = await fetchTinyOrderPriority(tenantId, o.erpOrderId);
+    const erpPriority = await fetchTinyOrderPriority(
+      tenantId,
+      o.erpOrderId,
+      userId,
+    );
     if (erpPriority === null) {
       skipped += 1;
       continue;

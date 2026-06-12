@@ -19,10 +19,12 @@ Utilize os links abaixo para navegar pelas diferentes seções do sistema:
 *   [[logica-ondas|Lógica de Ondas e Packing]]: Estratégias de partição de ondas (`BY_PRODUCT`, `PROXIMITY`, `SINGLE_ITEM`), regras de priorização de marketplaces (ex: Mercado Livre) e fila consolidada de packing.
 
 ### 🔌 Integrações e Testes
+*   [[handoff-desenvolvimento-jun-2026|Handoff de desenvolvimento (jun/2026)]]: **Leia primeiro** — contexto do que foi feito, bloqueios (etiquetas Mercado Envios), pendências e scripts de diagnóstico.
 *   [[integracao-tiny-oauth|Integração Tiny ERP (v3)]]: Autenticação OAuth v3, tratamento automático de Rate Limit (HTTP 429), worker de refresh de tokens e logs de eventos.
 *   [[integracao-tiny-pedidos|Integração Tiny — Pedidos de venda]]: Webhooks, sync pull `GET /pedidos`, situações, SKU, diagnóstico e troubleshooting (jun/2026).
 *   [[tiny-conexao-conta-ajustes|Conexão Tiny — histórico e ajustes]]: Problemas encontrados ao conectar a conta, correções aplicadas e roteiro de teste local.
 *   [[usuarios-teste|Credenciais e Testes]]: Guia de usuários pré-cadastrados via seed, testes de isolamento multi-tenant e validação de acessos.
+*   [[Tarefas|Lista de tarefas soltas]]: Notas operacionais originais (referenciadas no handoff).
 
 ---
 

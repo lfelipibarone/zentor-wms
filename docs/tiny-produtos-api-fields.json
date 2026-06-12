@@ -1,0 +1,141 @@
+{
+  "source": "Olist ERP API v3 — MCP documentação (api-docs.erp.olist.com)",
+  "generatedAt": "2026-06-04",
+  "endpoints": {
+    "list": {
+      "method": "GET",
+      "path": "/produtos",
+      "doc": "https://api-docs.erp.olist.com/api-reference/produtos/listar-produtos",
+      "queryParams": {
+        "nome": "string — nome parcial ou completo",
+        "codigo": "string — código do produto",
+        "gtin": "integer — GTIN/EAN",
+        "situacao": "enum A|I|E — Ativo, Inativo, Excluído",
+        "dataCriacao": "string — filtro data criação",
+        "dataAlteracao": "string — filtro última alteração",
+        "idListaPreco": "integer — produtos com preço na lista",
+        "limit": "integer — default 100",
+        "offset": "integer — default 0"
+      },
+      "responseFields": {
+        "itens[]": {
+          "id": "integer",
+          "sku": "string",
+          "descricao": "string",
+          "tipo": "enum K|S|V|F|M — Kit, Simples, Com Variações, Fabricado, Matéria Prima",
+          "situacao": "enum A|I|E",
+          "dataCriacao": "string|null",
+          "dataAlteracao": "string|null",
+          "unidade": "string",
+          "gtin": "string",
+          "precos.preco": "number|null",
+          "precos.precoPromocional": "number|null",
+          "precos.precoCusto": "number|null",
+          "precos.precoCustoMedio": "number|null",
+          "estoque.localizacao": "string|null",
+          "tipoVariacao": "enum N|P|V|null — Normal, Pai, Variação"
+        },
+        "paginacao": {
+          "limit": "integer",
+          "offset": "integer",
+          "total": "integer"
+        }
+      }
+    },
+    "detail": {
+      "method": "GET",
+      "path": "/produtos/{idProduto}",
+      "doc": "https://api-docs.erp.olist.com/api-reference/produtos/obter-produto",
+      "responseFields": {
+        "id": "integer|null",
+        "sku": "string|null",
+        "descricao": "string|null",
+        "tipo": "enum K|S|V|F|M",
+        "descricaoComplementar": "string|null",
+        "situacao": "enum A|I|E",
+        "produtoPai": { "id": "integer", "sku": "string", "descricao": "string", "tipo": "enum P|S" },
+        "unidade": "string|null",
+        "unidadePorCaixa": "string|null",
+        "ncm": "string|null",
+        "gtin": "string|null",
+        "origem": "enum fiscal 0-8",
+        "garantia": "string|null",
+        "observacoes": "string|null",
+        "categoria": { "id": "integer", "nome": "string", "caminhoCompleto": "string" },
+        "marca": { "id": "integer", "nome": "string" },
+        "dimensoes": {
+          "embalagem": { "id": "integer", "tipo": "enum 0-3", "descricao": "string" },
+          "largura": "number",
+          "altura": "number",
+          "comprimento": "number",
+          "diametro": "number",
+          "pesoLiquido": "number",
+          "pesoBruto": "number",
+          "quantidadeVolumes": "integer"
+        },
+        "precos": {
+          "preco": "number",
+          "precoPromocional": "number",
+          "precoCusto": "number",
+          "precoCustoMedio": "number"
+        },
+        "estoque": {
+          "controlar": "boolean",
+          "sobEncomenda": "boolean",
+          "diasPreparacao": "integer",
+          "localizacao": "string — endereço físico no ERP, não é Location WMS",
+          "minimo": "number",
+          "maximo": "number",
+          "quantidade": "number"
+        },
+        "fornecedores[]": { "id": "integer", "nome": "string", "codigoProdutoNoFornecedor": "string" },
+        "seo": { "titulo": "string", "descricao": "string", "keywords[]": "string", "linkVideo": "string", "slug": "string" },
+        "tributacao": { "gtinEmbalagem": "string", "valorIPIFixo": "number", "classeIPI": "string" },
+        "anexos[]": { "url": "string", "externo": "boolean" },
+        "variacoes[]": {
+          "id": "integer",
+          "descricao": "string",
+          "sku": "string",
+          "gtin": "string",
+          "precos": "object",
+          "estoque": "object",
+          "grade[]": { "chave": "string", "valor": "string" }
+        },
+        "kit[]": { "produto": "object", "quantidade": "number" },
+        "producao": { "produtos[]": "object", "etapas[]": "string" },
+        "codigoListaServicos": "string|null",
+        "tipoVariacao": "enum N|P|V"
+      }
+    },
+    "stock": {
+      "method": "GET",
+      "path": "/estoque/{idProduto}",
+      "doc": "https://api-docs.erp.olist.com/api-reference/estoque/obter-o-estoque-de-um-produto",
+      "note": "Endpoint separado se precisar saldo/reservado/disponível por depósito"
+    }
+  },
+  "wmsProductMapping": {
+    "Product.sku": { "tiny": ["sku", "variacoes[].sku"], "required": true, "notes": "Deve bater com pedidos Tiny (produto.sku nos itens)" },
+    "Product.name": { "tiny": ["descricao", "variacoes[].descricao"], "required": true },
+    "Product.barcode": { "tiny": ["gtin", "tributacao.gtinEmbalagem", "variacoes[].gtin"], "required": false },
+    "Product.unit": { "tiny": ["unidade"], "required": false },
+    "Product.weight": { "tiny": ["dimensoes.pesoLiquido", "dimensoes.pesoBruto"], "required": false, "unit": "kg" },
+    "Product.imageUrl": { "tiny": ["anexos[].url"], "required": false, "notes": "Preferir anexo com externo=false ou primeira imagem" },
+    "Product.active": { "tiny": ["situacao"], "required": true, "transform": "A=true, I|E=false" },
+    "Product.supplierName": { "tiny": ["fornecedores[].nome"], "required": false, "notes": "Primeiro fornecedor da lista" },
+    "Product.erpStockQuantity": { "tiny": ["estoque.quantidade", "variacoes[].estoque.quantidade"], "required": false, "notes": "Saldo ERP Tiny — não confundir com estoque físico WMS (locations)" },
+    "Product.requiresItemScan": { "tiny": null, "required": false, "notes": "Campo só WMS — definir regra local ou padrão false" },
+    "erpReference": { "tiny": ["id"], "required": false, "notes": "Guardar tinyProductId se implementar sync incremental" }
+  },
+  "syncStrategyNotes": [
+    "Listagem GET /produtos com situacao=A e paginação offset/limit",
+    "Para cada id, GET /produtos/{id} traz gtin, dimensões, anexos e variações",
+    "Produtos tipo V (com variações): cada variacoes[] pode virar Product separado com SKU próprio",
+    "Produtos tipo K (kit): decidir se importa só o kit ou expande componentes",
+    "estoque.localizacao do Tiny NÃO mapeia para Location WMS — são conceitos diferentes",
+    "Rate limit: ~1 req/s (cliente já faz throttle 1200ms)"
+  ],
+  "sampleOutputFile": "docs/tiny-produtos-sample.json",
+  "note": "Este arquivo documenta a estrutura da API (MCP). Os dados reais da conta ficam em docs/tiny-produtos-sample.json (gerado por pnpm tiny:fetch-products).",
+  "fetchScript": "apps/api/scripts/fetch-tiny-products.ts"
+}

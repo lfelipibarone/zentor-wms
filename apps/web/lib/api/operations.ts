@@ -19,13 +19,34 @@ export interface OrderRow {
   updatedAt: string;
 }
 
+export interface WarehouseRef {
+  id: string;
+  code: string;
+  name: string | null;
+}
+
 export interface LocationRow {
   id: string;
   corridor: string;
   row: string;
   barcode: string;
+  barracaoId: string | null;
+  setorId: string | null;
+  corredorId: string | null;
+  fileiraId: string | null;
+  estanteId: string | null;
+  prateleiraId: string | null;
+  colunaId: string | null;
+  barracao: WarehouseRef | null;
+  setor: WarehouseRef | null;
+  corredor: WarehouseRef | null;
+  fileira: WarehouseRef | null;
+  estante: WarehouseRef | null;
+  prateleira: WarehouseRef | null;
+  coluna: WarehouseRef | null;
   type: string;
   productId: string | null;
+  product: { sku: string; name: string } | null;
   currentQuantity: number;
   capacity: number;
   minThreshold: number;
@@ -169,17 +190,19 @@ export function fetchOrderDetail(id: string) {
   return apiFetch<OrderDetail>(`/api/orders/${id}`);
 }
 
-export function fetchLocations(
-  q?: string,
-  page?: number,
-  pageSize?: number,
-  type?: "PULMAO" | "PICK_FACE",
-) {
+export function fetchLocations(params?: {
+  q?: string;
+  sku?: string;
+  page?: number;
+  pageSize?: number;
+  type?: "PULMAO" | "PICK_FACE";
+}) {
   const sp = new URLSearchParams();
-  if (q) sp.set("q", q);
-  if (type) sp.set("type", type);
-  if (page) sp.set("page", String(page));
-  sp.set("pageSize", String(pageSize ?? DEFAULT_PAGE_SIZE));
+  if (params?.q) sp.set("q", params.q);
+  if (params?.sku) sp.set("sku", params.sku);
+  if (params?.type) sp.set("type", params.type);
+  if (params?.page) sp.set("page", String(params.page));
+  sp.set("pageSize", String(params?.pageSize ?? DEFAULT_PAGE_SIZE));
   return apiFetch<{ locations: LocationRow[]; pagination: PaginationMeta }>(
     `/api/locations?${sp}`,
   );
@@ -371,9 +394,39 @@ export type SyncTinySalesOrdersResult = {
   warning?: string;
 };
 
-export function syncTinySalesOrders(params?: { days?: number }) {
+export function syncTinySalesOrders(params?: {
+  days?: number;
+  connectionId?: string;
+}) {
   return apiFetch<SyncTinySalesOrdersResult>(
     "/api/integrations/tiny/sync-orders",
+    {
+      method: "POST",
+      body: JSON.stringify(params ?? {}),
+    },
+  );
+}
+
+export type SyncTinyProductsResult = {
+  created: number;
+  updated: number;
+  skipped: number;
+  skippedExisting: number;
+  listedFromTiny: number;
+  errors: Array<{ sku: string; message: string }>;
+  tinyConnected: boolean;
+  resumed: boolean;
+  fromOffset: number;
+  warning?: string;
+};
+
+export function syncTinyProducts(params?: {
+  connectionId?: string;
+  forceRestart?: boolean;
+  refreshExisting?: boolean;
+}) {
+  return apiFetch<SyncTinyProductsResult>(
+    "/api/integrations/tiny/sync-products",
     {
       method: "POST",
       body: JSON.stringify(params ?? {}),

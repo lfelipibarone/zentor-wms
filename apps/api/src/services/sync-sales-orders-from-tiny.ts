@@ -8,11 +8,17 @@ import {
   parseTinyApiPedido,
   parseTinyPedidoSituacao,
   TINY_ORDER_SITUACAO_CANCELADA,
+  TINY_ORDER_SITUACOES_SYNC,
   upsertOrderFromTiny,
 } from "./tiny-integration.js";
 
 const LAST_SYNC_KEY = "tiny.orders.lastSyncAt";
 const TINY_MAX_SYNC_DAYS = 90;
+const TINY_LIST_PAGE_SIZE = 100;
+const TINY_LIST_MAX_OFFSET = 5000;
+const TINY_SYNCABLE_SITUACOES = [...TINY_ORDER_SITUACOES_SYNC].sort(
+  (a, b) => a - b,
+);
 
 function asRecord(v: unknown): Record<string, unknown> | null {
   return v && typeof v === "object" && !Array.isArray(v)
@@ -123,6 +129,8 @@ async function removeCancelledTinyPending(
 
 export async function syncSalesOrdersFromTiny(params: {
   tenantId: string;
+  userId?: string;
+  connectionId?: string;
   days?: number;
 }): Promise<SyncSalesOrdersResult> {
   const days = Math.min(Math.max(params.days ?? 30, 1), TINY_MAX_SYNC_DAYS);
@@ -141,7 +149,11 @@ export async function syncSalesOrdersFromTiny(params: {
 
   let client;
   try {
-    client = await getTinyApiClient(params.tenantId);
+    client = await getTinyApiClient({
+      tenantId: params.tenantId,
+      userId: params.userId,
+      connectionId: params.connectionId,
+    });
   } catch (e) {
     if (isTinyConnectedError(e) || e instanceof TinyApiError) {
       return {
@@ -167,109 +179,135 @@ export async function syncSalesOrdersFromTiny(params: {
   const end = new Date();
   const start = new Date();
   start.setDate(start.getDate() - days);
+  const dateRange = {
+    dataInicial: formatDate(start),
+    dataFinal: formatDate(end),
+  };
 
-  const limit = 100;
-  let offset = 0;
-  let total = Infinity;
+  const processSyncablePedido = async (pedidoId: number) => {
+    const erpOrderId = tinyErpOrderId(pedidoId);
+    try {
+      const full = await client.getPedido(pedidoId);
+      const fullSituacao = parseTinyPedidoSituacao(full);
 
-  while (offset < total) {
-    const page = await client.listPedidos({
-      dataInicial: formatDate(start),
-      dataFinal: formatDate(end),
-      limit,
-      offset,
-    });
-
-    result.listedFromTiny += page.items.length;
-
-    for (const raw of page.items) {
-      const row = asRecord(raw);
-      if (!row) continue;
-      const pedidoId = num(row.id);
-      if (!pedidoId) continue;
-
-      const listSituacao = parseTinyPedidoSituacao(row);
-      const erpOrderId = tinyErpOrderId(pedidoId);
-
-      if (listSituacao === TINY_ORDER_SITUACAO_CANCELADA) {
+      if (fullSituacao === TINY_ORDER_SITUACAO_CANCELADA) {
         if (await removeCancelledTinyPending(params.tenantId, pedidoId)) {
           result.cancelledRemoved += 1;
         } else {
           result.skipped += 1;
         }
-        continue;
+        return;
       }
 
-      if (!isTinyOrderSituacaoSyncable(listSituacao)) {
+      if (!isTinyOrderSituacaoSyncable(fullSituacao)) {
         result.skipped += 1;
-        continue;
+        return;
       }
 
-      try {
-        const full = await client.getPedido(pedidoId);
-        const fullSituacao = parseTinyPedidoSituacao(full);
-
-        if (fullSituacao === TINY_ORDER_SITUACAO_CANCELADA) {
-          if (await removeCancelledTinyPending(params.tenantId, pedidoId)) {
-            result.cancelledRemoved += 1;
-          } else {
-            result.skipped += 1;
-          }
-          continue;
-        }
-
-        if (!isTinyOrderSituacaoSyncable(fullSituacao)) {
-          result.skipped += 1;
-          continue;
-        }
-
-        const payload = parseTinyApiPedido(full);
-        if (!payload) {
-          result.skipped += 1;
-          continue;
-        }
-
-        const upsert = await upsertOrderFromTiny(params.tenantId, payload);
-        if (upsert.created) {
-          result.created += 1;
-        } else {
-          const order = await prisma.order.findUnique({
-            where: { id: upsert.orderId },
-            select: { status: true },
-          });
-          if (
-            order &&
-            (order.status === OrderStatus.PENDING ||
-              order.status === OrderStatus.PAUSED_ISSUE)
-          ) {
-            result.updated += 1;
-          } else {
-            result.skipped += 1;
-          }
-        }
-      } catch (e) {
-        const message =
-          e instanceof Error ? e.message : "Erro ao processar pedido";
-        result.errors.push({ erpOrderId, message });
+      const payload = parseTinyApiPedido(full);
+      if (!payload) {
+        result.skipped += 1;
+        return;
       }
+
+      const upsert = await upsertOrderFromTiny(params.tenantId, payload);
+      if (upsert.created) {
+        result.created += 1;
+        return;
+      }
+
+      const order = await prisma.order.findUnique({
+        where: { id: upsert.orderId },
+        select: { status: true },
+      });
+      if (
+        order &&
+        (order.status === OrderStatus.PENDING ||
+          order.status === OrderStatus.PAUSED_ISSUE)
+      ) {
+        result.updated += 1;
+      } else {
+        result.skipped += 1;
+      }
+    } catch (e) {
+      const message =
+        e instanceof Error ? e.message : "Erro ao processar pedido";
+      result.errors.push({ erpOrderId, message });
     }
+  };
 
-    const pag = asRecord(page.pagination);
-    total = num(pag?.total) || page.items.length;
-    if (page.items.length < limit) break;
-    offset += limit;
-    if (offset > 5000) break;
+  const processCancelledPedido = async (pedidoId: number) => {
+    if (await removeCancelledTinyPending(params.tenantId, pedidoId)) {
+      result.cancelledRemoved += 1;
+    } else {
+      result.skipped += 1;
+    }
+  };
+
+  for (const situacao of TINY_SYNCABLE_SITUACOES) {
+    let offset = 0;
+    let total = Infinity;
+
+    while (offset < total) {
+      const page = await client.listPedidos({
+        ...dateRange,
+        situacao,
+        limit: TINY_LIST_PAGE_SIZE,
+        offset,
+      });
+
+      result.listedFromTiny += page.items.length;
+
+      for (const raw of page.items) {
+        const pedidoId = num(asRecord(raw)?.id);
+        if (!pedidoId) continue;
+        await processSyncablePedido(pedidoId);
+      }
+
+      const pag = asRecord(page.pagination);
+      total = num(pag?.total) || page.items.length;
+      if (page.items.length < TINY_LIST_PAGE_SIZE) break;
+      offset += TINY_LIST_PAGE_SIZE;
+      if (offset > TINY_LIST_MAX_OFFSET) break;
+    }
+  }
+
+  {
+    let offset = 0;
+    let total = Infinity;
+
+    while (offset < total) {
+      const page = await client.listPedidos({
+        ...dateRange,
+        situacao: TINY_ORDER_SITUACAO_CANCELADA,
+        limit: TINY_LIST_PAGE_SIZE,
+        offset,
+      });
+
+      for (const raw of page.items) {
+        const pedidoId = num(asRecord(raw)?.id);
+        if (!pedidoId) continue;
+        await processCancelledPedido(pedidoId);
+      }
+
+      const pag = asRecord(page.pagination);
+      total = num(pag?.total) || page.items.length;
+      if (page.items.length < TINY_LIST_PAGE_SIZE) break;
+      offset += TINY_LIST_PAGE_SIZE;
+      if (offset > TINY_LIST_MAX_OFFSET) break;
+    }
   }
 
   await setLastSyncAt(params.tenantId);
 
   if (result.listedFromTiny === 0) {
     result.warning =
-      "A API Tiny não retornou pedidos de venda no período. Confira se existem pedidos no ERP (últimos " +
-      `${days} dias), se o aplicativo OAuth tem permissão de Pedidos de Venda e se a conta conectada é a correta.`;
-  } else if (result.created === 0 && result.updated === 0 && result.errors.length === 0) {
+      `Nenhum pedido importável nos últimos ${days} dias. O WMS importa apenas Aberta (0), Faturada (1), Aprovada (3), Preparando envio (4) e Pronto envio (7). Pedidos já enviados (5) ou entregues (6) são ignorados. Confira se há pedidos pendentes no ERP e se o OAuth tem permissão de Pedidos de Venda.`;
+  } else if (result.errors.length > 0) {
+    result.warning = `${result.errors.length} pedido(s) com erro ao importar. Veja errors[] no resultado.`;
+  } else if (result.created === 0 && result.updated === 0) {
     result.warning =
-      `${result.listedFromTiny} pedido(s) listado(s), mas nenhum foi importado. Situações aceitas: Aberta (0), Faturada (1), Aprovada (3), Preparando envio (4), Pronto envio (7). Cancelados (2) removem pedido PENDING existente. SKUs precisam existir no cadastro WMS.`;
+      `${result.listedFromTiny} pedido(s) elegível(is), mas nenhum foi importado. Os pedidos podem já existir no WMS em outro status.`;
   }
 
   await logIntegrationEvent({

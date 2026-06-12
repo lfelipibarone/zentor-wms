@@ -2,6 +2,7 @@ import { decrypt, encrypt } from "../lib/encryption.js";
 import { prisma } from "../lib/prisma.js";
 import { TinyConnectionStatus } from "@prisma/client";
 import { formatOAuthErrorMessage } from "./tiny-oauth-errors.js";
+import { shouldRefreshTinyToken } from "./tiny-oauth-refresh.js";
 
 const BASE_URL = "https://api.tiny.com.br/public-api/v3";
 const TOKEN_URL =
@@ -22,6 +23,118 @@ export class TinyApiError extends Error {
 }
 
 const lastRequestAtByConnection = new Map<string, number>();
+const refreshLocks = new Map<string, Promise<string>>();
+
+async function performTinyOAuthTokenRefresh(connectionId: string): Promise<string> {
+  const conn = await prisma.tinyConnection.findUnique({
+    where: { id: connectionId },
+  });
+  if (
+    !conn?.refreshToken ||
+    !conn.oauthClientId ||
+    !conn.oauthClientSecret
+  ) {
+    throw new TinyApiError(
+      "Credenciais OAuth incompletas. Reconecte o Tiny nas integrações.",
+      401,
+      "OAUTH_INCOMPLETE",
+    );
+  }
+
+  const refreshToken = decrypt(conn.refreshToken);
+  const clientSecret = decrypt(conn.oauthClientSecret);
+
+  const res = await fetch(TOKEN_URL, {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: new URLSearchParams({
+      grant_type: "refresh_token",
+      client_id: conn.oauthClientId,
+      client_secret: clientSecret,
+      refresh_token: refreshToken,
+    }),
+    signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+  });
+
+  if (!res.ok) {
+    const err = (await res.json().catch(() => ({}))) as {
+      error_description?: string;
+      error?: string;
+    };
+    const message = formatOAuthErrorMessage(err);
+    const isInvalidGrant = err.error?.toLowerCase() === "invalid_grant";
+
+    if (isInvalidGrant) {
+      await prisma.tinyConnection.update({
+        where: { id: connectionId },
+        data: {
+          status: TinyConnectionStatus.ERROR,
+          lastError: message,
+          accessToken: null,
+          refreshToken: null,
+          oauthIdToken: null,
+          tokenExpiresAt: null,
+        },
+      });
+    } else {
+      await prisma.tinyConnection.update({
+        where: { id: connectionId },
+        data: { lastError: message },
+      });
+    }
+
+    throw new TinyApiError(
+      message,
+      401,
+      isInvalidGrant ? "INVALID_GRANT" : "TOKEN_EXPIRED",
+    );
+  }
+
+  const data = (await res.json()) as {
+    access_token?: string;
+    refresh_token?: string;
+    id_token?: string;
+    expires_in?: number;
+  };
+  if (!data.access_token) {
+    throw new TinyApiError("Resposta OAuth sem access_token");
+  }
+
+  const expiresAt = data.expires_in
+    ? new Date(Date.now() + data.expires_in * 1000)
+    : null;
+  const now = new Date();
+
+  await prisma.tinyConnection.update({
+    where: { id: connectionId },
+    data: {
+      accessToken: encrypt(data.access_token),
+      refreshToken: data.refresh_token
+        ? encrypt(data.refresh_token)
+        : conn.refreshToken,
+      oauthIdToken: data.id_token ? encrypt(data.id_token) : conn.oauthIdToken,
+      tokenExpiresAt: expiresAt,
+      status: TinyConnectionStatus.CONNECTED,
+      lastError: null,
+      lastValidatedAt: now,
+    },
+  });
+
+  return data.access_token;
+}
+
+export async function refreshTinyAccessTokenLocked(
+  connectionId: string,
+): Promise<string> {
+  const pending = refreshLocks.get(connectionId);
+  if (pending) return pending;
+
+  const job = performTinyOAuthTokenRefresh(connectionId).finally(() => {
+    refreshLocks.delete(connectionId);
+  });
+  refreshLocks.set(connectionId, job);
+  return job;
+}
 
 function asRecord(v: unknown): Record<string, unknown> | null {
   return v && typeof v === "object" && !Array.isArray(v)
@@ -67,91 +180,9 @@ export class TinyApiV3Client {
   }
 
   async refreshAccessToken(): Promise<string> {
-    const conn = await prisma.tinyConnection.findUnique({
-      where: { id: this.connectionId },
-    });
-    if (
-      !conn?.refreshToken ||
-      !conn.oauthClientId ||
-      !conn.oauthClientSecret
-    ) {
-      throw new TinyApiError(
-        "Credenciais OAuth incompletas. Reconecte o Tiny nas integrações.",
-        401,
-        "OAUTH_INCOMPLETE",
-      );
-    }
-
-    const refreshToken = decrypt(conn.refreshToken);
-    const clientSecret = decrypt(conn.oauthClientSecret);
-
-    const res = await fetch(TOKEN_URL, {
-      method: "POST",
-      headers: { "Content-Type": "application/x-www-form-urlencoded" },
-      body: new URLSearchParams({
-        grant_type: "refresh_token",
-        client_id: conn.oauthClientId,
-        client_secret: clientSecret,
-        refresh_token: refreshToken,
-      }),
-      signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
-    });
-
-    if (!res.ok) {
-      const err = (await res.json().catch(() => ({}))) as {
-        error_description?: string;
-        error?: string;
-      };
-      const message = formatOAuthErrorMessage(err);
-      const isInvalidGrant = err.error?.toLowerCase() === "invalid_grant";
-      await prisma.tinyConnection.update({
-        where: { id: this.connectionId },
-        data: {
-          status: TinyConnectionStatus.ERROR,
-          lastError: message,
-          ...(isInvalidGrant
-            ? {
-                accessToken: null,
-                refreshToken: null,
-                oauthIdToken: null,
-                tokenExpiresAt: null,
-              }
-            : {}),
-        },
-      });
-      throw new TinyApiError(message, 401, isInvalidGrant ? "INVALID_GRANT" : "TOKEN_EXPIRED");
-    }
-
-    const data = (await res.json()) as {
-      access_token?: string;
-      refresh_token?: string;
-      id_token?: string;
-      expires_in?: number;
-    };
-    if (!data.access_token) {
-      throw new TinyApiError("Resposta OAuth sem access_token");
-    }
-
-    const expiresAt = data.expires_in
-      ? new Date(Date.now() + data.expires_in * 1000)
-      : null;
-
-    await prisma.tinyConnection.update({
-      where: { id: this.connectionId },
-      data: {
-        accessToken: encrypt(data.access_token),
-        refreshToken: data.refresh_token
-          ? encrypt(data.refresh_token)
-          : conn.refreshToken,
-        oauthIdToken: data.id_token ? encrypt(data.id_token) : conn.oauthIdToken,
-        tokenExpiresAt: expiresAt,
-        status: TinyConnectionStatus.CONNECTED,
-        lastError: null,
-      },
-    });
-
-    this.accessToken = data.access_token;
-    return data.access_token;
+    const token = await refreshTinyAccessTokenLocked(this.connectionId);
+    this.accessToken = token;
+    return token;
   }
 
   async request<T>(
@@ -295,6 +326,31 @@ export class TinyApiV3Client {
     return this.request<Record<string, unknown>>("GET", `/pedidos/${id}`);
   }
 
+  async listProdutos(params: {
+    situacao?: "A" | "I" | "E";
+    limit?: number;
+    offset?: number;
+  }) {
+    const body = await this.request<{
+      itens?: unknown[];
+      paginacao?: { total?: number; limit?: number; offset?: number };
+    }>("GET", "/produtos", {
+      query: {
+        limit: params.limit ?? 100,
+        offset: params.offset ?? 0,
+        ...(params.situacao ? { situacao: params.situacao } : {}),
+      },
+    });
+    return {
+      items: asArray(body.itens),
+      pagination: body.paginacao ?? {},
+    };
+  }
+
+  async getProduto(id: number | string) {
+    return this.request<Record<string, unknown>>("GET", `/produtos/${id}`);
+  }
+
   async tryMarkReadyForConference(notaId: number | string): Promise<{
     ok: boolean;
     endpoint?: string;
@@ -325,18 +381,55 @@ export class TinyApiV3Client {
 }
 
 export async function refreshTinyAccessToken(connectionId: string): Promise<string> {
-  const conn = await prisma.tinyConnection.findUnique({ where: { id: connectionId } });
-  if (!conn?.accessToken) {
-    throw new TinyApiError("Conexão Tiny sem token.");
-  }
-  const client = new TinyApiV3Client(decrypt(conn.accessToken), connectionId);
-  return client.refreshAccessToken();
+  return refreshTinyAccessTokenLocked(connectionId);
 }
 
-export async function getTinyApiClient(tenantId: string): Promise<TinyApiV3Client> {
-  const conn = await prisma.tinyConnection.findUnique({
-    where: { tenantId },
-  });
+export type TinyApiClientParams = {
+  tenantId: string;
+  userId?: string;
+  connectionId?: string;
+};
+
+export async function getTinyApiClient(
+  params: string | TinyApiClientParams,
+): Promise<TinyApiV3Client> {
+  const resolved =
+    typeof params === "string" ? { tenantId: params } : params;
+
+  let conn;
+  if (resolved.connectionId) {
+    conn = await prisma.tinyConnection.findFirst({
+      where: {
+        id: resolved.connectionId,
+        tenantId: resolved.tenantId,
+        deletedAt: null,
+      },
+    });
+  } else if (resolved.userId) {
+    conn = await prisma.tinyConnection.findFirst({
+      where: {
+        tenantId: resolved.tenantId,
+        userId: resolved.userId,
+        deletedAt: null,
+        isActive: true,
+        status: TinyConnectionStatus.CONNECTED,
+        accessToken: { not: null },
+      },
+      orderBy: [{ isDefault: "desc" }, { updatedAt: "desc" }],
+    });
+  } else {
+    conn = await prisma.tinyConnection.findFirst({
+      where: {
+        tenantId: resolved.tenantId,
+        deletedAt: null,
+        isActive: true,
+        status: TinyConnectionStatus.CONNECTED,
+        accessToken: { not: null },
+      },
+      orderBy: [{ isDefault: "desc" }, { updatedAt: "desc" }],
+    });
+  }
+
   if (
     !conn?.accessToken ||
     conn.status !== TinyConnectionStatus.CONNECTED ||
@@ -357,13 +450,15 @@ export async function getTinyApiClient(tenantId: string): Promise<TinyApiV3Clien
     throw new TinyApiError("Falha ao ler token Tiny (ENCRYPTION_KEY).", 500);
   }
 
-  const expiresSoon =
-    conn.tokenExpiresAt &&
-    conn.tokenExpiresAt.getTime() < Date.now() + 60_000;
-
-  if (expiresSoon && conn.refreshToken) {
-    const fresh = await refreshTinyAccessToken(conn.id);
-    return new TinyApiV3Client(fresh, conn.id);
+  if (
+    conn.refreshToken &&
+    shouldRefreshTinyToken({
+      now: Date.now(),
+      tokenExpiresAt: conn.tokenExpiresAt?.getTime() ?? null,
+      updatedAt: conn.updatedAt.getTime(),
+    })
+  ) {
+    token = await refreshTinyAccessTokenLocked(conn.id);
   }
 
   return new TinyApiV3Client(token, conn.id);

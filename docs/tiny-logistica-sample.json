@@ -1,0 +1,157 @@
+{
+  "fetchedAt": "2026-06-11T15:30:44.025Z",
+  "tenantId": "cmpyd0fs10000uvq47gv8e9fz",
+  "doc": "https://api-docs.erp.olist.com/api-reference/expedição/listar-agrupamentos-de-expedição",
+  "endpoints": [
+    "GET /formas-envio",
+    "GET /formas-envio/{idFormaEnvio}",
+    "GET /expedicao"
+  ],
+  "query": {
+    "limit": 5,
+    "detailLimit": 2,
+    "dataInicial": null,
+    "dataFinal": null,
+    "idFormaEnvio": null,
+    "agrupamentoId": null,
+    "expedicaoId": null
+  },
+  "fieldInventory": {
+    "formasEnvioList": [
+      "[].gatewayLogistico",
+      "[].id",
+      "[].nome",
+      "[].situacao",
+      "[].tipo"
+    ],
+    "formasEnvioDetail": [
+      "[].formasFrete[]",
+      "[].gatewayLogistico",
+      "[].id",
+      "[].nome",
+      "[].situacao",
+      "[].tipo"
+    ],
+    "expedicaoList": [],
+    "agrupamentoDetail": [],
+    "etiquetasAgrupamento": [],
+    "etiquetasExpedicao": []
+  },
+  "wmsMappingHints": {
+    "shippingMethod": "Transportadora — candidatos: formaEnvio.id/nome (listagem e detalhe de agrupamento)",
+    "trackingCode": "Rastreio — candidato: expedicoes[].logistica.codigoRastreio (detalhe agrupamento)",
+    "trackingUrl": "URL rastreio — candidato: expedicoes[].logistica.urlRastreio",
+    "labelUrls": "Etiquetas — GET .../etiquetas retorna urls[] (agrupamento ou expedição individual)",
+    "salesOrderRef": "Pedido WMS — candidatos: expedicoes[].venda.id/numero, expedicoes[].idObjeto",
+    "recipient": "Destinatário — expedicoes[].destinatario.* (nome, cpfCnpj, endereco)",
+    "volume": "Dimensões/peso — expedicoes[].volume.* (embalagem, pesoBruto, quantidadeVolumes)",
+    "freightType": "Modalidade frete — expedicoes[].logistica.formaFrete.id/nome",
+    "carrier": "Transportador — expedicoes[].logistica.transportador.id/nome",
+    "grouping": "Agrupamento — id, identificacao, data, quantidadeObjetos (listagem)"
+  },
+  "formasEnvio": {
+    "list": {
+      "ok": true,
+      "path": "/formas-envio",
+      "data": {
+        "itens": [
+          {
+            "nome": "Correios",
+            "tipo": "1",
+            "situacao": "1",
+            "id": 340682967,
+            "gatewayLogistico": null
+          },
+          {
+            "nome": "Transportadora",
+            "tipo": "2",
+            "situacao": "1",
+            "id": 340682971,
+            "gatewayLogistico": null
+          },
+          {
+            "nome": "Retirar pessoalmente",
+            "tipo": "6",
+            "situacao": "1",
+            "id": 340682972,
+            "gatewayLogistico": null
+          }
+        ],
+        "paginacao": {
+          "limit": 5,
+          "offset": 0,
+          "total": 3
+        }
+      }
+    },
+    "details": [
+      {
+        "id": 340682967,
+        "listItem": {
+          "nome": "Correios",
+          "tipo": "1",
+          "situacao": "1",
+          "id": 340682967,
+          "gatewayLogistico": null
+        },
+        "detail": {
+          "ok": true,
+          "path": "/formas-envio/340682967",
+          "data": {
+            "nome": "Correios",
+            "tipo": "1",
+            "situacao": "1",
+            "id": 340682967,
+            "gatewayLogistico": null,
+            "formasFrete": []
+          }
+        }
+      },
+      {
+        "id": 340682971,
+        "listItem": {
+          "nome": "Transportadora",
+          "tipo": "2",
+          "situacao": "1",
+          "id": 340682971,
+          "gatewayLogistico": null
+        },
+        "detail": {
+          "ok": true,
+          "path": "/formas-envio/340682971",
+          "data": {
+            "nome": "Transportadora",
+            "tipo": "2",
+            "situacao": "1",
+            "id": 340682971,
+            "gatewayLogistico": null,
+            "formasFrete": []
+          }
+        }
+      }
+    ]
+  },
+  "expedicao": {
+    "list": {
+      "ok": true,
+      "path": "/expedicao",
+      "data": {
+        "itens": [],
+        "paginacao": {
+          "limit": 5,
+          "offset": 0,
+          "total": 0
+        }
+      }
+    },
+    "agrupamentos": []
+  },
+  "summary": {
+    "formasEnvioListed": 3,
+    "formasEnvioDetailed": 2,
+    "agrupamentosInspected": 0,
+    "etiquetasAgrupamentoComUrl": 0,
+    "etiquetasExpedicaoComUrl": 0,
+    "errors": []
+  }
+}

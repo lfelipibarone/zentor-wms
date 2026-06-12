@@ -1,0 +1,453 @@
+{
+  "fetchedAt": "2026-06-12T18:12:37.071Z",
+  "tenantId": "cmpyd0fs10000uvq47gv8e9fz",
+  "erpOrderId": "TINY-860184598",
+  "pedidoId": 860184598,
+  "doc": {
+    "pedido": "https://api-docs.erp.olist.com/api-reference/pedidos/obter-pedido",
+    "expedicao": "https://api-docs.erp.olist.com/api-reference/expedição/obter-agrupamento-de-expedição",
+    "etiquetasAgrupamento": "https://api-docs.erp.olist.com/api-reference/expedição/obter-etiquetas-de-um-agrupamento-de-expedição",
+    "etiquetasExpedicao": "https://api-docs.erp.olist.com/api-reference/expedição/obter-etiquetas-de-uma-expedição-dentro-de-um-agrupamento",
+    "nota": "https://api-docs.erp.olist.com/api-reference/notas/obter-nota-fiscal"
+  },
+  "resumo": {
+    "numeroPedido": 205845,
+    "situacao": 7,
+    "situacaoLabel": "Pronto Envio",
+    "dataPedido": "2026-06-05",
+    "idNotaFiscal": 860298070,
+    "idFormaEnvio": 744061814,
+    "formaEnvioNome": "Mercado Envios",
+    "codigoRastreamento": "",
+    "urlRastreamento": "",
+    "expedicoesEncontradas": 0,
+    "observacao": "Pedido Pronto Envio, mas ainda não está em agrupamento de expedição no Tiny. Etiqueta/rastreio podem vir do marketplace (ex.: Mercado Envios) e não das rotas /expedicao/.../etiquetas.",
+    "buscaExpedicao": {
+      "idFormaEnvio": 744061814,
+      "idNotaFiscal": 860298070,
+      "dataInicial": "2026-04-27",
+      "dataFinal": "2026-06-25"
+    }
+  },
+  "rotas": {
+    "GET /pedidos/{idPedido}": {
+      "path": "/pedidos/860184598",
+      "resposta": {
+        "id": 860184598,
+        "numeroPedido": 205845,
+        "idNotaFiscal": 860298070,
+        "dataFaturamento": "2026-06-11",
+        "valorTotalProdutos": 64.9,
+        "valorTotalPedido": 64.9,
+        "listaPreco": {
+          "id": 0,
+          "nome": "Padrão",
+          "acrescimoDesconto": 0
+        },
+        "cliente": {
+          "nome": "Larissa da Costa Coutrim Caridade",
+          "codigo": "",
+          "fantasia": "",
+          "tipoPessoa": "F",
+          "cpfCnpj": "695.026.921-87",
+          "inscricaoEstadual": "",
+          "rg": "",
+          "telefone": "",
+          "celular": "",
+          "email": "",
+          "endereco": {
+            "endereco": "QUADRA QE 34 BLOCO B",
+            "numero": "26",
+            "complemento": "",
+            "bairro": "Guará Ii",
+            "municipio": "Brasília",
+            "cep": "71.065-622",
+            "uf": "DF",
+            "pais": "Brasil"
+          },
+          "id": 766864941
+        },
+        "enderecoEntrega": {
+          "endereco": "QUADRA QE 34 BLOCO B",
+          "numero": "26",
+          "complemento": "",
+          "bairro": "Guará Ii",
+          "municipio": "Brasília",
+          "cep": "71.065-622",
+          "uf": "DF",
+          "pais": "Brasil",
+          "nomeDestinatario": "larissa caridade",
+          "cpfCnpj": "695.026.921-87",
+          "tipoPessoa": "F",
+          "telefone": "",
+          "inscricaoEstadual": ""
+        },
+        "ecommerce": {
+          "id": 4751,
+          "nome": "Mercado Livre Mamute",
+          "numeroPedidoEcommerce": "2000016789363566",
+          "numeroPedidoCanalVenda": "",
+          "canalVenda": ""
+        },
+        "transportador": {
+          "id": 0,
+          "nome": "",
+          "fretePorConta": "R",
+          "formaEnvio": {
+            "id": 744061814,
+            "nome": "Mercado Envios"
+          },
+          "formaFrete": null,
+          "codigoRastreamento": "",
+          "urlRastreamento": ""
+        },
+        "deposito": null,
+        "vendedor": null,
+        "naturezaOperacao": {
+          "id": 775374075,
+          "nome": "Venda de Mercadorias - Regime normal"
+        },
+        "intermediador": {
+          "id": 381,
+          "nome": "624895842",
+          "cnpj": "03.007.331/0001-41",
+          "cnpjPagamentoInstituicao": ""
+        },
+        "pagamento": null,
+        "itens": [
+          {
+            "produto": {
+              "id": 856451560,
+              "sku": "TRMAGCLKVAPR",
+              "descricao": "CLICK TM VIDRO/ALVENARIA  TRAVA MAGNETICA P/PORTA - Preto",
+              "tipo": "P"
+            },
+            "quantidade": 1,
+            "valorUnitario": 64.9,
+            "infoAdicional": ""
+          }
+        ],
+        "pagamentosIntegrados": [
+          {
+            "valor": 64.9,
+            "tipoPagamento": 3,
+            "cnpjIntermediador": "03007331000141",
+            "codigoAutorizacao": "695009",
+            "codigoBandeira": 2
+          }
+        ],
+        "situacao": 7,
+        "data": "2026-06-05",
+        "dataEntrega": "",
+        "numeroOrdemCompra": "2000016789363566",
+        "valorDesconto": 0,
+        "valorFrete": 0,
+        "valorOutrasDespesas": 0,
+        "dataPrevista": "2026-06-11",
+        "dataEnvio": "",
+        "observacoes": "Endereço:  ",
+        "observacoesInternas": "",
+        "origemPedido": 0
+      }
+    },
+    "GET /pedidos/{idPedido}/marcadores": {
+      "path": "/pedidos/860184598/marcadores",
+      "resposta": [
+        {
+          "descricao": "MercadoEnvios Coleta"
+        },
+        {
+          "descricao": "Etiqueta com data programada"
+        },
+        {
+          "descricao": "1ª venda"
+        }
+      ]
+    },
+    "GET /notas/{idNota}": {
+      "path": "/notas/860298070",
+      "resposta": {
+        "situacao": "6",
+        "tipo": "S",
+        "numero": "155816",
+        "serie": "5",
+        "chaveAcesso": "35260637919979000106550050001558161602980704",
+        "dataEmissao": "2026-06-11",
+        "dataPrevista": "2026-06-11",
+        "cliente": {
+          "nome": "Larissa da Costa Coutrim Caridade",
+          "codigo": null,
+          "fantasia": null,
+          "tipoPessoa": "F",
+          "cpfCnpj": "695.026.921-87",
+          "inscricaoEstadual": "",
+          "rg": null,
+          "telefone": "",
+          "celular": null,
+          "email": "",
+          "endereco": {
+            "endereco": "QUADRA QE 34 BLOCO B",
+            "numero": "26",
+            "complemento": "",
+            "bairro": "Guará Ii",
+            "municipio": "Brasília",
+            "cep": "71.065-622",
+            "uf": "DF",
+            "pais": "Brasil"
+          },
+          "id": 766864941
+        },
+        "enderecoEntrega": {
+          "endereco": "QUADRA QE 34 BLOCO B",
+          "numero": "26",
+          "complemento": "",
+          "bairro": "Guará Ii",
+          "municipio": "Brasília",
+          "cep": "71.065-622",
+          "uf": "DF",
+          "pais": "Brasil",
+          "nomeDestinatario": "larissa caridade",
+          "cpfCnpj": "695.026.921-87",
+          "tipoPessoa": "F",
+          "telefone": "",
+          "inscricaoEstadual": null
+        },
+        "valor": 64.9,
+        "valorProdutos": 64.9,
+        "valorFrete": 0,
+        "vendedor": null,
+        "idFormaEnvio": 744061814,
+        "idFormaFrete": 0,
+        "codigoRastreamento": "",
+        "urlRastreamento": "",
+        "fretePorConta": "R",
+        "qtdVolumes": 1,
+        "pesoBruto": 0.065,
+        "pesoLiquido": 0.065,
+        "id": 860298070,
+        "finalidade": "1",
+        "regimeTributario": 3,
+        "dataInclusao": "2026-06-11 16:31:02",
+        "baseIcms": 64.9,
+        "valorIcms": 2.6,
+        "baseIcmsSt": 0,
+        "valorIcmsSt": 0,
+        "valorServicos": 0,
+        "valorSeguro": 0,
+        "valorOutras": 0,
+        "valorIpi": 0,
+        "valorIssqn": 0,
+        "valorDesconto": 0,
+        "valorFaturado": 64.9,
+        "idIntermediador": 381,
+        "idNaturezaOperacao": 775374075,
+        "idFormaPagamento": 0,
+        "idMeioPagamento": 0,
+        "observacoes": "Endereço:\nOC: 2000016789363566\nNº Pedido: 205845\r\nTributos aproximados: R$ 20,24 (Federal) e R$ 11,68 (Estadual). Fonte: IBPT 5F6AA1\n",
+        "condicaoPagamento": "",
+        "valorNotaComImpostos": 64.9,
+        "valorBaseDiferimento": 0,
+        "percentualICMSPartilhaDestino": 100,
+        "valorTotalICMSFCPDestino": 0,
+        "valorIPIDevolvido": 0,
+        "tipoNotaCredito": "",
+        "tipoNotaDebito": "",
+        "valorTotalBCIBSCBS": 49.65,
+        "valorTotalIBSUF": 0.05,
+        "valorTotalCBS": 0.45,
+        "itens": [
+          {
+            "idItem": 780289755,
+            "idProduto": 856451560,
+            "codigo": "TRMAGCLKVAPR",
+            "ncm": "8302.41.00",
+            "descricao": "CLICK TM VIDRO/ALVENARIA  TRAVA MAGNETICA P/PORTA - Preto",
+            "unidade": "UN",
+            "quantidade": 1,
+            "valorUnitario": 64.9,
+            "valorTotal": 64.9,
+            "cfop": "6102",
+            "naturezaOperacao": "Venda de Mercadorias - Regime normal"
+          }
+        ],
+        "parcelas": [],
+        "pagamentosIntegrados": [
+          {
+            "valor": 64.9,
+            "tipoPagamento": 3,
+            "cnpjIntermediador": "03007331000141",
+            "codigoAutorizacao": "695009",
+            "codigoBandeira": 2
+          }
+        ],
+        "ecommerce": {
+          "id": 4751,
+          "nome": "Mercado Livre Mamute",
+          "numeroPedidoEcommerce": "2000016789363566",
+          "numeroPedidoCanalVenda": "",
+          "canalVenda": ""
+        },
+        "marcadores": [],
+        "transportador": {
+          "nome": "",
+          "cpfCnpj": "",
+          "ie": "",
+          "endereco": "",
+          "municipio": null,
+          "uf": ""
+        },
+        "origem": {
+          "id": "860184598",
+          "tipo": "venda"
+        }
+      }
+    },
+    "GET /notas/{idNota}/link": {
+      "path": "/notas/860298070/link",
+      "resposta": {
+        "link": "https://erp.tiny.com.br/doc.view?id=5fe6069533b04bd62efea6cf48737be0"
+      }
+    },
+    "GET /notas/{idNota}/marcadores": {
+      "path": "/notas/860298070/marcadores",
+      "resposta": []
+    },
+    "GET /formas-envio/{idFormaEnvio}": {
+      "path": "/formas-envio/744061814",
+      "resposta": {
+        "nome": "Mercado Envios",
+        "tipo": "3",
+        "situacao": "1",
+        "id": 744061814,
+        "gatewayLogistico": null,
+        "formasFrete": [
+          {
+            "id": 760093007,
+            "nome": "Coleta Normal",
+            "codigo": "101",
+            "codigoExterno": "",
+            "tipoEntrega": "0"
+          },
+          {
+            "id": 760093008,
+            "nome": "Coleta Express",
+            "codigo": "102",
+            "codigoExterno": "",
+            "tipoEntrega": "0"
+          },
+          {
+            "id": 760093009,
+            "nome": "Coleta Express",
+            "codigo": "103",
+            "codigoExterno": "",
+            "tipoEntrega": "0"
+          },
+          {
+            "id": 760093010,
+            "nome": "Coleta Correios PAC Agência",
+            "codigo": "1051",
+            "codigoExterno": "",
+            "tipoEntrega": "0"
+          },
+          {
+            "id": 760093011,
+            "nome": "Coleta Correios Sedex Agência",
+            "codigo": "1061",
+            "codigoExterno": "",
+            "tipoEntrega": "0"
+          },
+          {
+            "id": 760093012,
+            "nome": "Shipping Network Fast",
+            "codigo": "155413",
+            "codigoExterno": "",
+            "tipoEntrega": "0"
+          },
+          {
+            "id": 760093013,
+            "nome": "Shipping Network Fast",
+            "codigo": "165366",
+            "codigoExterno": "",
+            "tipoEntrega": "0"
+          },
+          {
+            "id": 760093014,
+            "nome": "Coleta Normal",
+            "codigo": "101",
+            "codigoExterno": "",
+            "tipoEntrega": "0"
+          },
+          {
+            "id": 760093015,
+            "nome": "Coleta Express",
+            "codigo": "102",
+            "codigoExterno": "",
+            "tipoEntrega": "0"
+          },
+          {
+            "id": 760093016,
+            "nome": "Coleta Express",
+            "codigo": "103",
+            "codigoExterno": "",
+            "tipoEntrega": "0"
+          },
+          {
+            "id": 760093017,
+            "nome": "Coleta Correios PAC Agência",
+            "codigo": "1051",
+            "codigoExterno": "",
+            "tipoEntrega": "0"
+          },
+          {
+            "id": 760093018,
+            "nome": "Coleta Correios Sedex Agência",
+            "codigo": "1061",
+            "codigoExterno": "",
+            "tipoEntrega": "0"
+          },
+          {
+            "id": 760093020,
+            "nome": "Shipping Network Fast",
+            "codigo": "155413",
+            "codigoExterno": "",
+            "tipoEntrega": "0"
+          },
+          {
+            "id": 760093021,
+            "nome": "Shipping Network Fast",
+            "codigo": "165366",
+            "codigoExterno": "",
+            "tipoEntrega": "0"
+          },
+          {
+            "id": 760093022,
+            "nome": "Mercadoenvios Next Day",
+            "codigo": "991",
+            "codigoExterno": "",
+            "tipoEntrega": "0"
+          }
+        ]
+      }
+    },
+    "GET /expedicao (busca por pedido)": {
+      "pedidoId": 860184598,
+      "encontradas": 0,
+      "matches": []
+    }
+  },
+  "etiquetas": {
+    "disponivel": false,
+    "urls": [],
+    "rotasTinyV3": {
+      "agrupamento": "GET /expedicao/{idAgrupamento}/etiquetas → { urls: string[] }",
+      "individual": "GET /expedicao/{idAgrupamento}/expedicao/{idExpedicao}/etiquetas → { urls: string[] }",
+      "pedido": "Não existe GET /pedidos/{id}/etiquetas na API v3"
+    },
+    "motivoIndisponivel": "Pedido/NF não está em nenhum agrupamento de expedição no Tiny. Sem agrupamento, as rotas de etiqueta retornam vazio ou 404.",
+    "naoConfundirCom": {
+      "linkNotaFiscal": "https://erp.tiny.com.br/doc.view?id=5fe6069533b04bd62efea6cf48737be0",
+      "descricao": "O link acima é da DANFE (documento fiscal), não da etiqueta de transporte."
+    }
+  },
+  "expedicao": []
+}

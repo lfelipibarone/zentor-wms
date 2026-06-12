@@ -1,11 +1,20 @@
 import { LocationType, Prisma } from "@prisma/client";
 import { prisma } from "../lib/prisma.js";
 import { assertMaxPickFaceLocations } from "./location-rules.js";
+import {
+  resolveLayoutCodes,
+  resolveLocationLayout,
+} from "./warehouse-layout.js";
 
 export interface LocationImportInput {
   barcode: string;
   corridor: string;
   row: string;
+  barracao?: string;
+  setor?: string;
+  estante?: string;
+  prateleira?: string;
+  coluna?: string;
   type: LocationType;
   productSku?: string;
   capacity: number;
@@ -113,12 +122,21 @@ export function normalizeImportRow(
   const productSku = raw.productSku
     ? String(raw.productSku).trim()
     : undefined;
+  const optionalText = (key: string) => {
+    const v = String(raw[key] ?? "").trim();
+    return v || undefined;
+  };
 
   return {
     data: {
       barcode,
       corridor,
       row,
+      barracao: optionalText("barracao"),
+      setor: optionalText("setor"),
+      estante: optionalText("estante"),
+      prateleira: optionalText("prateleira"),
+      coluna: optionalText("coluna"),
       type,
       productSku: productSku || undefined,
       capacity: Math.floor(capacity),
@@ -189,6 +207,20 @@ export async function importLocations(
         }
       }
 
+      const layoutIds = await resolveLayoutCodes(tenantId, {
+        barracao: input.barracao,
+        setor: input.setor,
+        corredor: input.corridor,
+        fileira: input.row,
+        estante: input.estante,
+        prateleira: input.prateleira,
+        coluna: input.coluna,
+      });
+      const layout = await resolveLocationLayout(tenantId, layoutIds, {
+        corridor: input.corridor,
+        row: input.row,
+      });
+
       const existing = await prisma.location.findFirst({
         where: { tenantId, barcode: input.barcode },
         select: { id: true },
@@ -199,17 +231,21 @@ export async function importLocations(
         continue;
       }
 
-      const data: Prisma.LocationUncheckedCreateInput = {
-        tenantId,
-        corridor: input.corridor,
-        row: input.row,
-        barcode: input.barcode,
+      const baseData = {
+        corridor: layout.corridor,
+        row: layout.row,
+        barracaoId: layout.barracaoId,
+        setorId: layout.setorId,
+        corredorId: layout.corredorId,
+        fileiraId: layout.fileiraId,
+        estanteId: layout.estanteId,
+        prateleiraId: layout.prateleiraId,
+        colunaId: layout.colunaId,
         type: input.type,
         capacity: input.capacity,
         minThreshold: input.minThreshold,
         currentQuantity: input.currentQuantity ?? 0,
         active: input.active ?? true,
-        ...(productId ? { product: { connect: { id: productId } } } : {}),
       };
 
       if (productId && input.type === "PICK_FACE") {
@@ -225,21 +261,24 @@ export async function importLocations(
         await prisma.location.update({
           where: { id: existing.id },
           data: {
-            corridor: input.corridor,
-            row: input.row,
-            type: input.type,
-            capacity: input.capacity,
-            minThreshold: input.minThreshold,
+            ...baseData,
             ...(input.currentQuantity !== undefined
               ? { currentQuantity: input.currentQuantity }
               : {}),
             ...(input.active !== undefined ? { active: input.active } : {}),
-            productId: input.productSku ? productId : null,
+            productId: input.productSku ? productId : undefined,
           },
         });
         result.updated++;
       } else {
-        await prisma.location.create({ data });
+        await prisma.location.create({
+          data: {
+            tenantId,
+            barcode: input.barcode,
+            ...baseData,
+            productId,
+          },
+        });
         result.created++;
       }
     } catch (e) {

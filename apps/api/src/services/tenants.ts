@@ -45,7 +45,11 @@ export async function listTenants(opts?: { q?: string; page?: number; pageSize?:
       take: pageSize,
       include: {
         _count: { select: { users: true, orders: true } },
-        tinyConnection: { select: { status: true, companyName: true } },
+        tinyConnections: {
+          where: { isDefault: true, deletedAt: null },
+          take: 1,
+          select: { status: true, companyName: true },
+        },
       },
     }),
     prisma.tenant.count({ where }),
@@ -59,8 +63,8 @@ export async function listTenants(opts?: { q?: string; page?: number; pageSize?:
       active: t.active,
       userCount: t._count.users,
       orderCount: t._count.orders,
-      tinyStatus: t.tinyConnection?.status ?? null,
-      tinyCompanyName: t.tinyConnection?.companyName ?? null,
+      tinyStatus: t.tinyConnections[0]?.status ?? null,
+      tinyCompanyName: t.tinyConnections[0]?.companyName ?? null,
       createdAt: t.createdAt.toISOString(),
     })),
     total,
@@ -82,9 +86,6 @@ export async function createTenant(params: { name: string; slug?: string }) {
   const tenant = await prisma.$transaction(async (tx) => {
     const t = await tx.tenant.create({
       data: { name, slug, active: true },
-    });
-    await tx.tinyConnection.create({
-      data: { tenantId: t.id, name: "Tiny ERP" },
     });
     return t;
   });

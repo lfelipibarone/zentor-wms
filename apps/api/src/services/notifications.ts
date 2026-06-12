@@ -30,9 +30,13 @@ export async function notifyUsersWithPermission(
     category?: string;
     data?: Record<string, unknown>;
   },
+  tenantId?: string,
 ) {
   const users = await prisma.user.findMany({
-    where: { active: true },
+    where: {
+      active: true,
+      ...(tenantId ? { tenantId } : {}),
+    },
     select: { id: true, role: true, permissions: true },
   });
 

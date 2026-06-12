@@ -156,7 +156,13 @@ export async function getOrderDetail(tenantId: string, orderId: string) {
       lineNumber: i.lineNumber,
       quantityOrdered: i.quantityOrdered,
       quantityPicked: i.quantityPicked,
-      product: i.product,
+      product: i.product
+        ? { sku: i.product.sku, name: i.product.name }
+        : {
+            sku: i.erpSku ?? "—",
+            name: i.erpDescription ?? "Produto não cadastrado",
+          },
+      integrationPending: !i.productId,
     })),
   };
 }

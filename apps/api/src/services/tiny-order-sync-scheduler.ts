@@ -65,10 +65,14 @@ async function setLastAutoSyncDate(
   });
 }
 
-async function tryAutoSyncForTenant(tenantId: string): Promise<void> {
+async function tryAutoSyncForConnection(connection: {
+  id: string;
+  tenantId: string;
+  userId: string;
+}): Promise<void> {
   const todayKey = todayKeyInSaoPaulo();
   const nowMinutes = currentMinutesInSaoPaulo();
-  const lastRunDate = await getLastAutoSyncDate(tenantId);
+  const lastRunDate = await getLastAutoSyncDate(connection.tenantId);
 
   if (
     !shouldRunTinyDailySync({
@@ -81,12 +85,16 @@ async function tryAutoSyncForTenant(tenantId: string): Promise<void> {
     return;
   }
 
-  const result = await syncSalesOrdersFromTiny({ tenantId });
+  const result = await syncSalesOrdersFromTiny({
+    tenantId: connection.tenantId,
+    userId: connection.userId,
+    connectionId: connection.id,
+  });
   if (!result.tinyConnected) return;
 
-  await setLastAutoSyncDate(tenantId, todayKey);
+  await setLastAutoSyncDate(connection.tenantId, todayKey);
   console.log(
-    `[tiny-order-sync] ${tenantId}: ${result.created} criados, ${result.updated} atualizados, ${result.skipped} ignorados`,
+    `[tiny-order-sync] ${connection.tenantId}/${connection.id}: ${result.created} criados, ${result.updated} atualizados, ${result.skipped} ignorados`,
   );
 }
 
@@ -96,16 +104,20 @@ export async function tryAutoSyncTinyOrders(): Promise<void> {
       isActive: true,
       deletedAt: null,
       status: TinyConnectionStatus.CONNECTED,
+      isDefault: true,
       tenant: { active: true },
     },
-    select: { tenantId: true },
+    select: { id: true, tenantId: true, userId: true },
   });
 
+  const seenTenants = new Set<string>();
   for (const connection of connections) {
+    if (seenTenants.has(connection.tenantId)) continue;
+    seenTenants.add(connection.tenantId);
     try {
-      await tryAutoSyncForTenant(connection.tenantId);
+      await tryAutoSyncForConnection(connection);
     } catch (e) {
-      console.warn(`[tiny-order-sync] ${connection.tenantId}`, e);
+      console.warn(`[tiny-order-sync] ${connection.tenantId}/${connection.id}`, e);
     }
   }
 }

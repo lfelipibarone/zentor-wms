@@ -46,15 +46,32 @@ O Tiny ERP limita severamente a taxa de requisições enviadas para a sua API v3
 
 ## 🔄 Renovação de Tokens OAuth
 
-O token de acesso do Tiny expira periodicamente. O WMS possui duas estratégias complementares de renovação:
+Conforme a [documentação oficial Olist/Tiny](https://api-docs.erp.olist.com/documentacao/comecando/autenticacao):
+
+| Token | Validade | Estratégia WMS |
+|-------|----------|----------------|
+| **access_token** | ~4 horas | Renovar quando faltam **30 min** para expirar, ou a cada **3 h** sem renovação |
+| **refresh_token** | ~24 horas | Renovar proativamente a cada **20 h** (worker + chamadas API) para manter a sessão |
+
+> [!IMPORTANT]
+> Se o WMS ficar **mais de 24 h sem renovar** o refresh token (API parada, worker desabilitado ou `ENCRYPTION_KEY` alterada), será necessário **Conectar com Olist** novamente.
 
 ### 1. Atualização por Demanda (Renovação Ativa)
-Toda requisição feita pelo cliente de API verifica o tempo restante de expiração do token atual (`tokenExpiresAt`).
-*   Se o token estiver a **menos de 60 segundos** de expirar, a chamada bloqueia temporariamente, aciona a rota do Tiny para realizar o refresh, atualiza o banco de dados com os novos tokens criptografados e segue com a chamada original de forma transparente.
+Toda requisição via `getTinyApiClient` verifica `tokenExpiresAt` e `updatedAt`. Se o token estiver próximo de expirar ou a conexão estiver há mais de 20 h sem refresh, renova **antes** da chamada à API Tiny.
 
-### 2. Atualização Automática em Lote (Refresh Worker)
-Se a variável de ambiente `START_OAUTH_REFRESH_WORKER` estiver definida como `true`, um worker secundário em segundo plano (`tiny-oauth-refresh-worker.ts`) é inicializado junto com a API.
-*   Este worker varre o banco de dados de tempos em tempos em busca de conexões cuja validade do token expire em menos de 10 minutos e realiza a renovação proativa antes de qualquer requisição de usuário.
+Chamadas que recebem HTTP **401** também disparam refresh com **mutex** (evita renovações simultâneas que invalidam o refresh token).
+
+### 2. Worker em Background (`tiny-oauth-refresh-worker.ts`)
+Iniciado junto com a API (desabilitar com `START_OAUTH_REFRESH_WORKER=false`).
+
+*   Roda a cada **10 minutos**
+*   Varre conexões `CONNECTED` com refresh token
+*   Renova quando a política acima indicar necessidade
+
+### Erros transitórios vs. sessão expirada
+
+*   **Falha de rede / OAuth temporário**: mantém status `CONNECTED` e tokens — o worker tenta de novo
+* **`invalid_grant`**: refresh token expirou ou foi revogado — limpa tokens e exige reconexão manual
 
 ---
 

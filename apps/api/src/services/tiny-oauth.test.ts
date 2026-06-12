@@ -8,7 +8,21 @@ import {
   resolveOAuthRedirectUri,
   defaultOAuthRedirectUri,
 } from "./tiny-oauth.js";
-import { formatOAuthErrorMessage } from "./tiny-oauth-errors.js";
+import {
+  formatOAuthErrorMessage,
+  formatOAuthCallbackQueryError,
+  formatTinyApiForbiddenMessage,
+  formatTinyApiValidationMessage,
+} from "./tiny-oauth-errors.js";
+import {
+  decodeJwtPayload,
+  extractAuthorizedUserFromIdToken,
+} from "./tiny-oauth-log.js";
+import {
+  ACCESS_REFRESH_BEFORE_MS,
+  REFRESH_TOKEN_SLIDE_MS,
+  shouldRefreshTinyToken,
+} from "./tiny-oauth-refresh.js";
 import { TinyConnectionStatus } from "@prisma/client";
 
 describe("tiny-oauth", () => {
@@ -101,5 +115,74 @@ describe("tiny-oauth-errors", () => {
       error_description: "redirect_uri mismatch",
     });
     assert.match(msg, /Redirect URI/i);
+  });
+
+  it("formata HTTP 403 da API v3 com orientação de permissões", () => {
+    const msg = formatTinyApiValidationMessage(403, {
+      mensagem: "Permissão negada",
+    });
+    assert.match(msg, /HTTP 403/i);
+    assert.match(msg, /administrador/i);
+    assert.match(msg, /Permissão negada/);
+  });
+
+  it("formata 403 sem corpo da API", () => {
+    const msg = formatTinyApiForbiddenMessage();
+    assert.match(msg, /Acesso negado pela API Olist/i);
+    assert.match(msg, /Configurações → Aplicativos/i);
+  });
+
+  it("formata access_denied no callback", () => {
+    const msg = formatOAuthCallbackQueryError("access_denied");
+    assert.match(msg, /administrador/i);
+  });
+});
+
+describe("tiny-oauth-log", () => {
+  it("extrai e-mail do id_token para auditoria", () => {
+    const payload = Buffer.from(
+      JSON.stringify({ email: "admin@loja.test", sub: "abc" }),
+    ).toString("base64url");
+    const token = `hdr.${payload}.sig`;
+    assert.equal(extractAuthorizedUserFromIdToken(token), "admin@loja.test");
+    assert.equal(decodeJwtPayload(token)?.email, "admin@loja.test");
+  });
+});
+
+describe("tiny-oauth-refresh policy", () => {
+  it("renova access token antes de expirar", () => {
+    const now = Date.now();
+    assert.equal(
+      shouldRefreshTinyToken({
+        now,
+        tokenExpiresAt: now + ACCESS_REFRESH_BEFORE_MS - 60_000,
+        updatedAt: now - 60_000,
+      }),
+      true,
+    );
+  });
+
+  it("renova refresh token antes de completar 24h", () => {
+    const now = Date.now();
+    assert.equal(
+      shouldRefreshTinyToken({
+        now,
+        tokenExpiresAt: now + 2 * 60 * 60 * 1000,
+        updatedAt: now - REFRESH_TOKEN_SLIDE_MS - 1,
+      }),
+      true,
+    );
+  });
+
+  it("não renova token recém emitido", () => {
+    const now = Date.now();
+    assert.equal(
+      shouldRefreshTinyToken({
+        now,
+        tokenExpiresAt: now + 4 * 60 * 60 * 1000,
+        updatedAt: now - 30 * 60 * 1000,
+      }),
+      false,
+    );
   });
 });

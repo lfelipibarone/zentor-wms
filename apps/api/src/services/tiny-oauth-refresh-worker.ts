@@ -1,9 +1,9 @@
-import { refreshTinyAccessToken } from "./tiny-api-v3-client.js";
+import { refreshTinyAccessTokenLocked } from "./tiny-api-v3-client.js";
 import { listConnectionsForRefresh } from "./tiny-oauth.js";
-
-const INTERVAL_MS = 30 * 60 * 1000;
-const REFRESH_BEFORE_MS = 90 * 60 * 1000;
-const STALE_REFRESH_MS = 3 * 60 * 60 * 1000;
+import {
+  OAUTH_REFRESH_WORKER_INTERVAL_MS,
+  shouldRefreshTinyToken,
+} from "./tiny-oauth-refresh.js";
 
 export function startTinyOAuthRefreshWorker() {
   const enabled = process.env.START_OAUTH_REFRESH_WORKER !== "false";
@@ -18,14 +18,16 @@ export function startTinyOAuthRefreshWorker() {
       const now = Date.now();
 
       for (const conn of connections) {
-        const expiresAt = conn.tokenExpiresAt?.getTime() ?? 0;
-        const stale = now - conn.updatedAt.getTime() > STALE_REFRESH_MS;
-        const expiringSoon = expiresAt > 0 && expiresAt < now + REFRESH_BEFORE_MS;
+        const shouldRefresh = shouldRefreshTinyToken({
+          now,
+          tokenExpiresAt: conn.tokenExpiresAt?.getTime() ?? null,
+          updatedAt: conn.updatedAt.getTime(),
+        });
 
-        if (!expiringSoon && !stale) continue;
+        if (!shouldRefresh) continue;
 
         try {
-          await refreshTinyAccessToken(conn.id);
+          await refreshTinyAccessTokenLocked(conn.id);
           console.log(`[tiny-oauth-worker] token renovado tenant=${conn.tenantId}`);
         } catch (e) {
           const msg = e instanceof Error ? e.message : String(e);
@@ -38,6 +40,8 @@ export function startTinyOAuthRefreshWorker() {
   };
 
   void tick();
-  setInterval(tick, INTERVAL_MS);
-  console.log("[tiny-oauth-worker] iniciado (intervalo 30 min)");
+  setInterval(tick, OAUTH_REFRESH_WORKER_INTERVAL_MS);
+  console.log(
+    `[tiny-oauth-worker] iniciado (intervalo ${OAUTH_REFRESH_WORKER_INTERVAL_MS / 60_000} min)`,
+  );
 }

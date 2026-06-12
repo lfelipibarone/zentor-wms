@@ -3,6 +3,11 @@
 import { useCallback, useEffect, useState } from "react";
 import { FileUp, Plus } from "lucide-react";
 import { LocationImportModal } from "@/components/cadastros/location-import-modal";
+import {
+  LocationLayoutFields,
+  emptyLayout,
+  type LocationLayoutValue,
+} from "@/components/cadastros/location-layout-fields";
 import { PageHeader } from "@/components/ops/page-header";
 import { DataState } from "@/components/ops/data-state";
 import {
@@ -29,6 +34,7 @@ type LocTypeFilter = "" | "PULMAO" | "PICK_FACE";
 export default function CadastrosPage() {
   const [tab, setTab] = useState<Tab>("locations");
   const [locTypeFilter, setLocTypeFilter] = useState<LocTypeFilter>("");
+  const [skuFilter, setSkuFilter] = useState("");
   const [locations, setLocations] = useState<LocationRow[]>([]);
   const [baskets, setBaskets] = useState<
     Awaited<ReturnType<typeof fetchBaskets>>["baskets"]
@@ -43,19 +49,18 @@ export default function CadastrosPage() {
 
   useEffect(() => {
     setPage(1);
-  }, [tab, locTypeFilter]);
+  }, [tab, locTypeFilter, skuFilter]);
 
   const load = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
       if (tab === "locations") {
-        const loc = await fetchLocations(
-          undefined,
+        const loc = await fetchLocations({
           page,
-          undefined,
-          locTypeFilter || undefined,
-        );
+          type: locTypeFilter || undefined,
+          sku: skuFilter.trim() || undefined,
+        });
         setLocations(loc.locations);
         setPagination(loc.pagination);
       } else {
@@ -68,7 +73,7 @@ export default function CadastrosPage() {
     } finally {
       setLoading(false);
     }
-  }, [tab, page, locTypeFilter]);
+  }, [tab, page, locTypeFilter, skuFilter]);
 
   useEffect(() => {
     load();
@@ -117,7 +122,7 @@ export default function CadastrosPage() {
       </div>
 
       {tab === "locations" ? (
-        <div className="mb-4 flex flex-wrap gap-2">
+        <div className="mb-4 flex flex-wrap items-center gap-2">
           {(
             [
               { key: "" as const, label: "Todos" },
@@ -138,35 +143,58 @@ export default function CadastrosPage() {
               {f.label}
             </button>
           ))}
+          <input
+            type="search"
+            placeholder="Filtrar por SKU"
+            value={skuFilter}
+            onChange={(e) => setSkuFilter(e.target.value)}
+            className="ml-auto min-w-[180px] rounded-lg border px-3 py-1.5 text-sm"
+          />
         </div>
       ) : null}
 
       <DataState loading={loading} error={error} empty={false}>
         {tab === "locations" ? (
-          <div className="overflow-hidden rounded-xl border bg-white shadow-sm">
+          <div className="overflow-x-auto rounded-xl border bg-white shadow-sm">
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Barcode</TableHead>
+                  <TableHead>SKU</TableHead>
+                  <TableHead>Localização</TableHead>
+                  <TableHead>Barracão</TableHead>
+                  <TableHead>Setor</TableHead>
+                  <TableHead>Estante</TableHead>
+                  <TableHead>Prateleira</TableHead>
+                  <TableHead>Coluna</TableHead>
                   <TableHead>Corredor</TableHead>
                   <TableHead>Fileira</TableHead>
                   <TableHead>Tipo</TableHead>
-                  <TableHead>Tamanho (cap.)</TableHead>
-                  <TableHead>Qtd atual</TableHead>
+                  <TableHead title="Capacidade máxima / estoque atual">
+                    Estoque
+                  </TableHead>
                   <TableHead>Mín.</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {locations.map((l) => (
                   <TableRow key={l.id}>
+                    <TableCell className="font-mono">
+                      {l.product?.sku ?? "—"}
+                    </TableCell>
                     <TableCell className="font-mono">{l.barcode}</TableCell>
-                    <TableCell>{l.corridor}</TableCell>
-                    <TableCell>{l.row}</TableCell>
+                    <TableCell>{l.barracao?.code ?? "—"}</TableCell>
+                    <TableCell>{l.setor?.code ?? "—"}</TableCell>
+                    <TableCell>{l.estante?.code ?? "—"}</TableCell>
+                    <TableCell>{l.prateleira?.code ?? "—"}</TableCell>
+                    <TableCell>{l.coluna?.code ?? "—"}</TableCell>
+                    <TableCell>{l.corredor?.code ?? l.corridor}</TableCell>
+                    <TableCell>{l.fileira?.code ?? l.row}</TableCell>
                     <TableCell>
                       {LOCATION_TYPE_LABEL[l.type] ?? l.type}
                     </TableCell>
-                    <TableCell>{l.capacity}</TableCell>
-                    <TableCell>{l.currentQuantity}</TableCell>
+                    <TableCell className="font-mono tabular-nums">
+                      {l.capacity}/{l.currentQuantity}
+                    </TableCell>
                     <TableCell>{l.minThreshold}</TableCell>
                   </TableRow>
                 ))}
@@ -262,9 +290,8 @@ function LocationFormModal({
   onClose: () => void;
   onSaved: () => void;
 }) {
-  const [corridor, setCorridor] = useState("A");
-  const [row, setRow] = useState("01");
   const [barcode, setBarcode] = useState("");
+  const [layout, setLayout] = useState<LocationLayoutValue>(emptyLayout);
   const [type, setType] = useState("PICK_FACE");
   const [capacity, setCapacity] = useState("100");
   const [minThreshold, setMinThreshold] = useState("10");
@@ -273,9 +300,14 @@ function LocationFormModal({
     await apiFetch("/api/locations", {
       method: "POST",
       body: JSON.stringify({
-        corridor,
-        row,
         barcode,
+        barracaoId: layout.barracaoId || null,
+        setorId: layout.setorId || null,
+        corredorId: layout.corredorId || null,
+        fileiraId: layout.fileiraId || null,
+        estanteId: layout.estanteId || null,
+        prateleiraId: layout.prateleiraId || null,
+        colunaId: layout.colunaId || null,
         type,
         capacity: Number(capacity),
         minThreshold: Number(minThreshold),
@@ -287,9 +319,13 @@ function LocationFormModal({
   return (
     <Modal title="Nova localização" onClose={onClose} onSave={save}>
       <div className="grid gap-3 sm:grid-cols-2">
-        <Field label="Corredor" value={corridor} onChange={setCorridor} />
-        <Field label="Fileira" value={row} onChange={setRow} />
-        <Field label="Barcode" value={barcode} onChange={setBarcode} className="sm:col-span-2" />
+        <Field
+          label="Localização (código de barras)"
+          value={barcode}
+          onChange={setBarcode}
+          className="sm:col-span-2"
+        />
+        <LocationLayoutFields value={layout} onChange={setLayout} />
         <label className="text-sm sm:col-span-2">
           Tipo
           <select
