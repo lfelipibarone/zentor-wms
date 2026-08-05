@@ -1,0 +1,471 @@
+{
+  "meta": {
+    "fetchedAt": "2026-06-17T18:02:18.788Z",
+    "pedidoId": 860354220,
+    "erpOrderId": "TINY-860354220",
+    "numeroPedido": 207466,
+    "situacao": 6,
+    "situacaoLabel": "Entregue",
+    "formaEnvioNome": "Mercado Envios",
+    "diagnostico": "FORA_EXPEDICAO",
+    "resumoTesteAnterior": {
+      "pedidoId": 860354220,
+      "erpOrderId": "TINY-860354220",
+      "numeroPedido": 207466,
+      "situacao": 6,
+      "situacaoLabel": "Entregue",
+      "formaEnvioNome": "Mercado Envios",
+      "codigoRastreamento": null,
+      "idNotaFiscal": 860358957,
+      "naExpedicao": false,
+      "expedicao": null,
+      "etiquetas": {
+        "urls": [],
+        "marketplaceError": null,
+        "diagnostico": "FORA_EXPEDICAO"
+      }
+    }
+  },
+  "pedido": {
+    "rotas": {
+      "GET /pedidos/860354220": {
+        "rota": "GET /pedidos/860354220",
+        "params": {
+          "idPedido": 860354220
+        },
+        "ok": true,
+        "urls": [],
+        "resposta": {
+          "id": 860354220,
+          "numeroPedido": 207466,
+          "idNotaFiscal": 860358957,
+          "dataFaturamento": "2026-06-16",
+          "valorTotalProdutos": 48.9,
+          "valorTotalPedido": 48.9,
+          "listaPreco": {
+            "id": 0,
+            "nome": "Padrão",
+            "acrescimoDesconto": 0
+          },
+          "cliente": {
+            "nome": "Jose Carlos Dos Santos",
+            "codigo": "",
+            "fantasia": "",
+            "tipoPessoa": "F",
+            "cpfCnpj": "072.496.388-07",
+            "inscricaoEstadual": "",
+            "rg": "",
+            "telefone": "",
+            "celular": "",
+            "email": "",
+            "endereco": {
+              "endereco": "Rua Coronel Bento Furtado",
+              "numero": "29",
+              "complemento": "Nao consta",
+              "bairro": "Alto Sao Pedro",
+              "municipio": "Taubaté",
+              "cep": "12.082-710",
+              "uf": "SP",
+              "pais": "Brasil"
+            },
+            "id": 766891027
+          },
+          "enderecoEntrega": null,
+          "ecommerce": {
+            "id": 7272,
+            "nome": "Mercado Livre Full Mamute",
+            "numeroPedidoEcommerce": "2000016955309802",
+            "numeroPedidoCanalVenda": "",
+            "canalVenda": ""
+          },
+          "transportador": {
+            "id": 0,
+            "nome": "",
+            "fretePorConta": "R",
+            "formaEnvio": {
+              "id": 744061814,
+              "nome": "Mercado Envios"
+            },
+            "formaFrete": null,
+            "codigoRastreamento": "",
+            "urlRastreamento": ""
+          },
+          "deposito": {
+            "id": 744051267,
+            "nome": "Fullfilment"
+          },
+          "vendedor": null,
+          "naturezaOperacao": {
+            "id": 775374075,
+            "nome": "Venda de Mercadorias - Regime normal"
+          },
+          "intermediador": {
+            "id": 381,
+            "nome": "624895842",
+            "cnpj": "03.007.331/0001-41",
+            "cnpjPagamentoInstituicao": ""
+          },
+          "pagamento": null,
+          "itens": [
+            {
+              "produto": {
+                "id": 763712344,
+                "sku": "PUXASA970PRF",
+                "descricao": "PUXADOR ALUMINIO ASA 970MM TOTAL 1000MM - Preto Fosco",
+                "tipo": "P"
+              },
+              "quantidade": 1,
+              "valorUnitario": 48.9,
+              "infoAdicional": ""
+            }
+          ],
+          "pagamentosIntegrados": [
+            {
+              "valor": 48.9,
+              "tipoPagamento": 99,
+              "cnpjIntermediador": "03007331000141",
+              "codigoAutorizacao": "PIXE00416968202606152139UIrfRMye9LV",
+              "codigoBandeira": 99
+            }
+          ],
+          "situacao": 6,
+          "data": "2026-06-15",
+          "dataEntrega": "2026-06-17",
+          "numeroOrdemCompra": "2000016955309802",
+          "valorDesconto": 0,
+          "valorFrete": 0,
+          "valorOutrasDespesas": 0,
+          "dataPrevista": "2026-06-17",
+          "dataEnvio": "",
+          "observacoes": "Endereço:  ",
+          "observacoesInternas": "",
+          "origemPedido": 0
+        }
+      },
+      "GET /pedidos/860354220/marcadores": {
+        "rota": "GET /pedidos/860354220/marcadores",
+        "params": {
+          "idPedido": 860354220
+        },
+        "ok": true,
+        "urls": [],
+        "resposta": [
+          {
+            "descricao": "Fulfillment"
+          },
+          {
+            "descricao": "1ª venda"
+          }
+        ]
+      }
+    }
+  },
+  "nota": {
+    "idNotaFiscal": 860358957,
+    "rotas": {
+      "GET /notas/860358957": {
+        "rota": "GET /notas/860358957",
+        "params": {
+          "idNota": 860358957
+        },
+        "ok": true,
+        "urls": [],
+        "resposta": {
+          "situacao": "6",
+          "tipo": "S",
+          "numero": "230482",
+          "serie": "2",
+          "chaveAcesso": "35260637919979000106550020002304821407449814",
+          "dataEmissao": "2026-06-16",
+          "dataPrevista": "",
+          "cliente": {
+            "nome": "Jose Carlos Dos Santos",
+            "codigo": null,
+            "fantasia": null,
+            "tipoPessoa": "F",
+            "cpfCnpj": "072.496.388-07",
+            "inscricaoEstadual": "",
+            "rg": null,
+            "telefone": "",
+            "celular": null,
+            "email": "",
+            "endereco": {
+              "endereco": "Rua Coronel Bento Furtado",
+              "numero": "29",
+              "complemento": "Nao consta",
+              "bairro": "Alto Sao Pedro",
+              "municipio": "Taubaté",
+              "cep": "12.082-710",
+              "uf": "SP",
+              "pais": "Brasil"
+            },
+            "id": 766891027
+          },
+          "enderecoEntrega": null,
+          "valor": 48.9,
+          "valorProdutos": 48.9,
+          "valorFrete": 0,
+          "vendedor": null,
+          "idFormaEnvio": 743997873,
+          "idFormaFrete": 0,
+          "codigoRastreamento": "",
+          "urlRastreamento": "",
+          "fretePorConta": "T",
+          "qtdVolumes": 1,
+          "pesoBruto": 0.13,
+          "pesoLiquido": 0.13,
+          "id": 860358957,
+          "finalidade": "1",
+          "regimeTributario": 3,
+          "dataInclusao": "2026-06-16 00:47:05",
+          "baseIcms": 48.9,
+          "valorIcms": 8.8,
+          "baseIcmsSt": 0,
+          "valorIcmsSt": 0,
+          "valorServicos": 0,
+          "valorSeguro": 0,
+          "valorOutras": 0,
+          "valorIpi": 0,
+          "valorIssqn": 0,
+          "valorDesconto": 0,
+          "valorFaturado": 48.9,
+          "idIntermediador": 381,
+          "idNaturezaOperacao": 743997760,
+          "idFormaPagamento": 0,
+          "idMeioPagamento": 782606403,
+          "observacoes": "Enviado diretamente do deposito temporario - operador logistico: EBAZAR.COM.BR LTDA, Cnpj: 03007331012158, Inscricao Estadual: 312210513110 saindo do endereco: Rod. Pres. Tancredo de Almeida Neves, Numero: 45, Complemento: , Bairro: Parque Santa Delfa, Cidade: Franco da Rocha, Cep: 07809105, Estado: SP, Pais: BR. Nota fiscal de retorno simbolico n 230481, emitida em 16/06/2026, serie 2, nos termos da Portaria CAT 31/2019 Valor aproximado dos tributos (IBPT) R$19,82. Valores totais do ICMS Interestadual: DIFAL da UF destino R$0,00 + FCP R$0,00; DIFAL da UF Origem R$0,00.\r\nEnviado diretamente do deposito temporario - operador logistico: EBAZAR.COM.BR LTDA, Cnpj: 03007331012158, Inscricao Estadual: 312210513110 saindo do endereco: Rod. Pres. Tancredo de Almeida Neves, Numero: 45, Complemento: , Bairro: Parque Santa Delfa, Cidade: Franco da Rocha, Cep: 07809105, Estado: SP, Pais: BR. Nota fiscal de retorno simbolico n 230481, emitida em 16/06/2026, serie 2, nos termos da Portaria CAT 31/2019 Valor aproximado dos tributos (IBPT) R$19,82. Valores totais do ICMS Interestadual: DIFAL da UF destino R$0,00 + FCP R$0,00; DIFAL da UF Origem R$0,00.",
+          "condicaoPagamento": "0",
+          "valorNotaComImpostos": 0,
+          "valorBaseDiferimento": 0,
+          "percentualICMSPartilhaDestino": 0,
+          "valorTotalICMSFCPDestino": 0,
+          "valorIPIDevolvido": 0,
+          "tipoNotaCredito": "",
+          "tipoNotaDebito": "",
+          "valorTotalBCIBSCBS": 38.64,
+          "valorTotalIBSUF": 0.04,
+          "valorTotalCBS": 0.35,
+          "itens": [
+            {
+              "idItem": 780297795,
+              "idProduto": 763712344,
+              "codigo": "PUXASA970PRF",
+              "ncm": "8302.42.00",
+              "descricao": "F PUXADOR ALUMINIO ASA 970MM TOTAL 1000MM",
+              "unidade": "UNID",
+              "quantidade": 1,
+              "valorUnitario": 48.9,
+              "valorTotal": 48.9,
+              "cfop": "5106",
+              "naturezaOperacao": "Venda de mercadorias"
+            }
+          ],
+          "parcelas": [
+            {
+              "dias": 0,
+              "data": "2026-06-16",
+              "valor": 48.9,
+              "observacoes": "",
+              "idFormaPagamento": "743997870",
+              "idMeioPagamento": "782606403"
+            }
+          ],
+          "pagamentosIntegrados": [
+            {
+              "valor": 48.9,
+              "tipoPagamento": 17,
+              "cnpjIntermediador": "03007331000141",
+              "codigoAutorizacao": "PIXE00416968202606152139UIrfRMye9LV",
+              "codigoBandeira": 99
+            }
+          ],
+          "ecommerce": {
+            "id": 7272,
+            "nome": "Mercado Livre Full Mamute",
+            "numeroPedidoEcommerce": "2000016955309802",
+            "numeroPedidoCanalVenda": "",
+            "canalVenda": ""
+          },
+          "marcadores": [
+            {
+              "descricao": "Fulfillment",
+              "cor": "#808080"
+            }
+          ],
+          "transportador": {
+            "nome": "EBAZAR.COM.BR LTDA",
+            "cpfCnpj": "03007331012239",
+            "ie": "120519234116",
+            "endereco": "AVENIDA DAS NACOES UNIDAS 3000 3003",
+            "municipio": null,
+            "uf": "SP"
+          },
+          "origem": {
+            "id": "860354220",
+            "tipo": "venda"
+          }
+        }
+      },
+      "GET /notas/860358957/link": {
+        "rota": "GET /notas/860358957/link",
+        "params": {
+          "idNota": 860358957
+        },
+        "ok": true,
+        "urls": [],
+        "resposta": {
+          "link": "https://erp.tiny.com.br/doc.view?id=5d584d64c33c58c8239dfd198dc2604e"
+        }
+      },
+      "GET /notas/860358957/marcadores": {
+        "rota": "GET /notas/860358957/marcadores",
+        "params": {
+          "idNota": 860358957
+        },
+        "ok": true,
+        "urls": [],
+        "resposta": [
+          {
+            "descricao": "Fulfillment"
+          }
+        ]
+      }
+    }
+  },
+  "formaEnvio": {
+    "idFormaEnvio": 744061814,
+    "rotas": {
+      "GET /formas-envio/744061814": {
+        "rota": "GET /formas-envio/744061814",
+        "params": {
+          "idFormaEnvio": 744061814
+        },
+        "ok": true,
+        "urls": [],
+        "resposta": {
+          "nome": "Mercado Envios",
+          "tipo": "3",
+          "situacao": "1",
+          "id": 744061814,
+          "gatewayLogistico": null,
+          "formasFrete": [
+            {
+              "id": 760093007,
+              "nome": "Coleta Normal",
+              "codigo": "101",
+              "codigoExterno": "",
+              "tipoEntrega": "0"
+            },
+            {
+              "id": 760093008,
+              "nome": "Coleta Express",
+              "codigo": "102",
+              "codigoExterno": "",
+              "tipoEntrega": "0"
+            },
+            {
+              "id": 760093009,
+              "nome": "Coleta Express",
+              "codigo": "103",
+              "codigoExterno": "",
+              "tipoEntrega": "0"
+            },
+            {
+              "id": 760093010,
+              "nome": "Coleta Correios PAC Agência",
+              "codigo": "1051",
+              "codigoExterno": "",
+              "tipoEntrega": "0"
+            },
+            {
+              "id": 760093011,
+              "nome": "Coleta Correios Sedex Agência",
+              "codigo": "1061",
+              "codigoExterno": "",
+              "tipoEntrega": "0"
+            },
+            {
+              "id": 760093012,
+              "nome": "Shipping Network Fast",
+              "codigo": "155413",
+              "codigoExterno": "",
+              "tipoEntrega": "0"
+            },
+            {
+              "id": 760093013,
+              "nome": "Shipping Network Fast",
+              "codigo": "165366",
+              "codigoExterno": "",
+              "tipoEntrega": "0"
+            },
+            {
+              "id": 760093014,
+              "nome": "Coleta Normal",
+              "codigo": "101",
+              "codigoExterno": "",
+              "tipoEntrega": "0"
+            },
+            {
+              "id": 760093015,
+              "nome": "Coleta Express",
+              "codigo": "102",
+              "codigoExterno": "",
+              "tipoEntrega": "0"
+            },
+            {
+              "id": 760093016,
+              "nome": "Coleta Express",
+              "codigo": "103",
+              "codigoExterno": "",
+              "tipoEntrega": "0"
+            },
+            {
+              "id": 760093017,
+              "nome": "Coleta Correios PAC Agência",
+              "codigo": "1051",
+              "codigoExterno": "",
+              "tipoEntrega": "0"
+            },
+            {
+              "id": 760093018,
+              "nome": "Coleta Correios Sedex Agência",
+              "codigo": "1061",
+              "codigoExterno": "",
+              "tipoEntrega": "0"
+            },
+            {
+              "id": 760093020,
+              "nome": "Shipping Network Fast",
+              "codigo": "155413",
+              "codigoExterno": "",
+              "tipoEntrega": "0"
+            },
+            {
+              "id": 760093021,
+              "nome": "Shipping Network Fast",
+              "codigo": "165366",
+              "codigoExterno": "",
+              "tipoEntrega": "0"
+            },
+            {
+              "id": 760093022,
+              "nome": "Mercadoenvios Next Day",
+              "codigo": "991",
+              "codigoExterno": "",
+              "tipoEntrega": "0"
+            }
+          ]
+        }
+      }
+    }
+  },
+  "expedicao": {
+    "encontrada": false,
+    "match": null,
+    "rotas": {}
+  },
+  "etiquetas": {
+    "urls": [],
+    "rotas": {}
+  }
+}

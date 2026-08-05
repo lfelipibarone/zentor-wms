@@ -761,7 +761,7 @@ async function buildLowStockReport(tenantId: string): Promise<ReportResult> {
   const rows = low.map((l) => ({
     local: l.barcode,
     corredor: l.corridor,
-    fileira: l.row,
+    linha: l.row,
     sku: l.product?.sku ?? null,
     produto: l.product?.name ?? null,
     quantidadeAtual: l.currentQuantity,
@@ -778,7 +778,7 @@ async function buildLowStockReport(tenantId: string): Promise<ReportResult> {
     columns: [
       { key: "local", header: "Local" },
       { key: "corredor", header: "Corredor" },
-      { key: "fileira", header: "Fileira" },
+      { key: "linha", header: "Linha" },
       { key: "sku", header: "SKU" },
       { key: "produto", header: "Produto" },
       { key: "quantidadeAtual", header: "Qtd atual" },

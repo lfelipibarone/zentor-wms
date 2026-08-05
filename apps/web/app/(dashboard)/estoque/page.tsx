@@ -22,6 +22,7 @@ type TypeFilter = "" | "PULMAO" | "PICK_FACE";
 export default function EstoquePage() {
   const [typeFilter, setTypeFilter] = useState<TypeFilter>("");
   const [lowOnly, setLowOnly] = useState(false);
+  const [q, setQ] = useState("");
   const [locations, setLocations] = useState<
     Awaited<ReturnType<typeof fetchStockLocations>>["locations"]
   >([]);
@@ -32,14 +33,14 @@ export default function EstoquePage() {
 
   useEffect(() => {
     setPage(1);
-  }, [typeFilter, lowOnly]);
+  }, [typeFilter, lowOnly, q]);
 
   const load = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
       const data = await fetchStockLocations(
-        undefined,
+        q || undefined,
         lowOnly,
         page,
         undefined,
@@ -52,7 +53,7 @@ export default function EstoquePage() {
     } finally {
       setLoading(false);
     }
-  }, [typeFilter, lowOnly, page]);
+  }, [typeFilter, lowOnly, page, q]);
 
   useEffect(() => {
     load();
@@ -97,6 +98,15 @@ export default function EstoquePage() {
         </label>
       </div>
 
+      <div className="mb-4">
+        <input
+          value={q}
+          onChange={(e) => setQ(e.target.value)}
+          placeholder="Buscar por SKU ou código de barras…"
+          className="min-w-[240px] max-w-md rounded-lg border bg-white px-3 py-2 text-sm"
+        />
+      </div>
+
       <DataState
         loading={loading}
         error={error}
@@ -107,11 +117,13 @@ export default function EstoquePage() {
           <Table>
             <TableHeader>
               <TableRow>
+                <TableHead>SKU</TableHead>
                 <TableHead>Tipo</TableHead>
                 <TableHead>Endereço</TableHead>
-                <TableHead>Ocupado</TableHead>
-                <TableHead>Disponível</TableHead>
-                <TableHead>Capacidade</TableHead>
+                <TableHead className="text-right">Estoque</TableHead>
+                <TableHead className="text-right">Disponível</TableHead>
+                <TableHead className="text-right">Capacidade</TableHead>
+                <TableHead className="text-right">Mínimo</TableHead>
                 <TableHead>Alerta</TableHead>
               </TableRow>
             </TableHeader>
@@ -122,6 +134,20 @@ export default function EstoquePage() {
                 return (
                   <TableRow key={l.id} className={alert ? "bg-amber-50" : ""}>
                     <TableCell>
+                      {l.product ? (
+                        <>
+                          <span className="font-mono text-sm font-medium">
+                            {l.product.sku}
+                          </span>
+                          <span className="block text-xs text-muted-foreground">
+                            {l.product.name}
+                          </span>
+                        </>
+                      ) : (
+                        <span className="text-sm text-muted-foreground">—</span>
+                      )}
+                    </TableCell>
+                    <TableCell>
                       {LOCATION_TYPE_LABEL[l.type] ?? l.type}
                     </TableCell>
                     <TableCell className="font-mono text-sm">
@@ -130,9 +156,18 @@ export default function EstoquePage() {
                         {l.barcode}
                       </span>
                     </TableCell>
-                    <TableCell>{l.currentQuantity}</TableCell>
-                    <TableCell>{available}</TableCell>
-                    <TableCell>{l.capacity}</TableCell>
+                    <TableCell className="text-right tabular-nums">
+                      {l.currentQuantity}
+                    </TableCell>
+                    <TableCell className="text-right tabular-nums">
+                      {available}
+                    </TableCell>
+                    <TableCell className="text-right tabular-nums">
+                      {l.capacity}
+                    </TableCell>
+                    <TableCell className="text-right tabular-nums">
+                      {l.minThreshold}
+                    </TableCell>
                     <TableCell>{alert ? "Repor" : "OK"}</TableCell>
                   </TableRow>
                 );

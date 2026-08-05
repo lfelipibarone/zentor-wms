@@ -71,4 +71,15 @@ describe("tiny product sync", () => {
     });
     assert.equal(payloads.length, 0);
   });
+
+  it("omite kits (tipo K)", () => {
+    const payloads = parseTinyProductDetail({
+      id: 10,
+      sku: "KIT-01",
+      descricao: "Kit promocional",
+      situacao: "A",
+      tipo: "K",
+    });
+    assert.equal(payloads.length, 0);
+  });
 });

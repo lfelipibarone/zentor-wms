@@ -70,8 +70,10 @@ export function useAttachBasket(orderId: string) {
   return useMutation({
     mutationFn: (basketBarcode: string) =>
       api.attachBasket(orderId, basketBarcode),
-    onSuccess: () =>
-      qc.invalidateQueries({ queryKey: pickingKeys.session(orderId) }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: pickingKeys.session(orderId) });
+      qc.invalidateQueries({ queryKey: pickingKeys.queue });
+    },
   });
 }
 

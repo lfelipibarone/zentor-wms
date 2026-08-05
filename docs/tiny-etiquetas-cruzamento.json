@@ -1,0 +1,3283 @@
+{
+  "fetchedAt": "2026-06-15T17:39:59.861Z",
+  "fontes": {
+    "expedicao": "D:\\zentor-wms\\docs\\tiny-etiquetas-expedicao.json",
+    "testesPedido": [
+      "tiny-etiquetas-860184598.json",
+      "tiny-etiquetas-860301754.json",
+      "tiny-etiquetas-lote-2.json",
+      "tiny-etiquetas-lote-3.json",
+      "tiny-etiquetas-lote.json"
+    ]
+  },
+  "recomendacao": {
+    "fluxoWms": "Expedição-first com índice pedido→expedição; busca de etiqueta só quando o pedido está no índice.",
+    "porQueNaoPedidoFirst": "Busca pedido-a-pedido varreu 20–22 agrupamentos (filtro forma envio) e não achou pedidos que estão na expedição com outra forma/logística; lento e incompleto.",
+    "chavesDeLigacao": {
+      "primaria": "expedicoes[].venda.id === pedidoId Tiny",
+      "secundaria": "expedicoes[].notaFiscal.id === pedido.idNotaFiscal",
+      "terciaria": "expedicoes[].idObjeto + tipoObjeto (notafiscal/pedido/venda)"
+    },
+    "rotasEtiqueta": {
+      "preferida": "GET /expedicao/{idAgrupamento}/expedicao/{idExpedicao}/etiquetas",
+      "fallback": "GET /expedicao/{idAgrupamento}/etiquetas"
+    },
+    "dadosColetados": {
+      "pedidosNaExpedicaoAmostra": 122,
+      "comEtiquetaUrl": 0,
+      "erroMarketplace": 122,
+      "pedidosTestadosSemExpedicao": 101,
+      "cruzamentos": [
+        {
+          "pedidoId": 860301754,
+          "erpOrderId": "TINY-860301754",
+          "formaEnvioNome": "Mercado Envios",
+          "expedicao": {
+            "idAgrupamento": 746503742,
+            "idExpedicao": 749882106,
+            "identificacao": "3182",
+            "data": "2026-06-12"
+          },
+          "viaExpedicaoFirst": {
+            "temEtiqueta": false,
+            "urls": [],
+            "fonte": null,
+            "marketplaceError": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Não foi possível obter as etiquetas dos seguintes pedidos: S47281733718"
+          },
+          "viaPedidoFirst": {
+            "testado": true,
+            "expedicaoEncontrada": true,
+            "temEtiqueta": false,
+            "agrupamentosVerificados": null,
+            "marketplaceError": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Não foi possível obter as etiquetas dos seguintes pedidos: S47281733718"
+          },
+          "diagnostico": "CONSISTENTE — expedição encontrada nos dois fluxos, sem URL (marketplace)"
+        }
+      ]
+    },
+    "passosImplementacao": [
+      "1. Manter índice em memória/cache: pedidoId → { idAgrupamento, idExpedicao } construído via GET /expedicao + GET /expedicao/{id} (expedição-first), atualizado periodicamente ou sob demanda no packing.",
+      "2. Para pedido WMS (TINY-{id}): consultar índice. Se não existir → status NOT_IN_EXPEDICAO (não varrer 500 agrupamentos por pedido).",
+      "3. Com idAgrupamento + idExpedicao: GET /expedicao/{agrup}/expedicao/{exp}/etiquetas (individual primeiro); fallback GET /expedicao/{agrup}/etiquetas.",
+      "4. Se urls[] vazio com erro marketplace → MARKETPLACE_ERROR na UI; não confundir com DANFE.",
+      "5. Marketplace (ML/Shopee/Amazon): etiqueta só após agrupamento; URL depende da integração do marketplace."
+    ]
+  },
+  "estatisticas": {
+    "expedicao": {
+      "agrupamentosNoArquivo": {
+        "agrupamentosAnalisados": 21,
+        "itensListagemBruta": 21,
+        "comEtiqueta": 0,
+        "semEtiqueta": 21,
+        "comEtiquetaAgrupamento": 0,
+        "comEtiquetaIndividual": 0,
+        "comErroMarketplace": 21,
+        "porFormaEnvio": [
+          {
+            "formaEnvio": "Amazon DBA",
+            "total": 20,
+            "comEtiqueta": 0
+          },
+          {
+            "formaEnvio": "Mercado Envios",
+            "total": 1,
+            "comEtiqueta": 0
+          }
+        ]
+      },
+      "pedidosNaExpedicao": 122,
+      "comEtiqueta": 0,
+      "comErroMarketplace": 122,
+      "porFormaEnvio": [
+        {
+          "formaEnvio": "Amazon DBA",
+          "total": 121,
+          "comEtiqueta": 0,
+          "comErro": 121
+        },
+        {
+          "formaEnvio": "Mercado Envios",
+          "total": 1,
+          "comEtiqueta": 0,
+          "comErro": 1
+        }
+      ]
+    },
+    "testesPedido": {
+      "pedidosTestados": 102,
+      "viaPedidoExpedicaoEncontrada": 1,
+      "viaPedidoSemExpedicao": 101
+    },
+    "cruzados": 1,
+    "soNaExpedicao": 121,
+    "soNoTestePedido": 101
+  },
+  "cruzamentos": [
+    {
+      "pedidoId": 860301754,
+      "erpOrderId": "TINY-860301754",
+      "formaEnvioNome": "Mercado Envios",
+      "expedicao": {
+        "idAgrupamento": 746503742,
+        "idExpedicao": 749882106,
+        "identificacao": "3182",
+        "data": "2026-06-12"
+      },
+      "viaExpedicaoFirst": {
+        "temEtiqueta": false,
+        "urls": [],
+        "fonte": null,
+        "marketplaceError": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Não foi possível obter as etiquetas dos seguintes pedidos: S47281733718"
+      },
+      "viaPedidoFirst": {
+        "testado": true,
+        "expedicaoEncontrada": true,
+        "temEtiqueta": false,
+        "agrupamentosVerificados": null,
+        "marketplaceError": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Não foi possível obter as etiquetas dos seguintes pedidos: S47281733718"
+      },
+      "diagnostico": "CONSISTENTE — expedição encontrada nos dois fluxos, sem URL (marketplace)"
+    }
+  ],
+  "pedidosSoNaExpedicao": [
+    {
+      "pedidoId": 860342783,
+      "erpOrderId": "TINY-860342783",
+      "formaEnvioNome": "Amazon DBA",
+      "idAgrupamento": 746503773,
+      "idExpedicao": 749884319,
+      "melhorEtiqueta": {
+        "temEtiqueta": false,
+        "urls": [],
+        "fonte": null,
+        "marketplaceError": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Url das etiquetas não encontrada na Amazon."
+      }
+    },
+    {
+      "pedidoId": 860344011,
+      "erpOrderId": "TINY-860344011",
+      "formaEnvioNome": "Amazon DBA",
+      "idAgrupamento": 746503773,
+      "idExpedicao": 749884373,
+      "melhorEtiqueta": {
+        "temEtiqueta": false,
+        "urls": [],
+        "fonte": null,
+        "marketplaceError": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Url das etiquetas não encontrada na Amazon."
+      }
+    },
+    {
+      "pedidoId": 860321899,
+      "erpOrderId": "TINY-860321899",
+      "formaEnvioNome": "Amazon DBA",
+      "idAgrupamento": 746503757,
+      "idExpedicao": 749883161,
+      "melhorEtiqueta": {
+        "temEtiqueta": false,
+        "urls": [],
+        "fonte": null,
+        "marketplaceError": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Url das etiquetas não encontrada na Amazon."
+      }
+    },
+    {
+      "pedidoId": 860322337,
+      "erpOrderId": "TINY-860322337",
+      "formaEnvioNome": "Amazon DBA",
+      "idAgrupamento": 746503757,
+      "idExpedicao": 749883186,
+      "melhorEtiqueta": {
+        "temEtiqueta": false,
+        "urls": [],
+        "fonte": null,
+        "marketplaceError": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Url das etiquetas não encontrada na Amazon."
+      }
+    },
+    {
+      "pedidoId": 860324034,
+      "erpOrderId": "TINY-860324034",
+      "formaEnvioNome": "Amazon DBA",
+      "idAgrupamento": 746503757,
+      "idExpedicao": 749883241,
+      "melhorEtiqueta": {
+        "temEtiqueta": false,
+        "urls": [],
+        "fonte": null,
+        "marketplaceError": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Url das etiquetas não encontrada na Amazon."
+      }
+    },
+    {
+      "pedidoId": 860324578,
+      "erpOrderId": "TINY-860324578",
+      "formaEnvioNome": "Amazon DBA",
+      "idAgrupamento": 746503757,
+      "idExpedicao": 749883266,
+      "melhorEtiqueta": {
+        "temEtiqueta": false,
+        "urls": [],
+        "fonte": null,
+        "marketplaceError": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Url das etiquetas não encontrada na Amazon."
+      }
+    },
+    {
+      "pedidoId": 860324820,
+      "erpOrderId": "TINY-860324820",
+      "formaEnvioNome": "Amazon DBA",
+      "idAgrupamento": 746503757,
+      "idExpedicao": 749883278,
+      "melhorEtiqueta": {
+        "temEtiqueta": false,
+        "urls": [],
+        "fonte": null,
+        "marketplaceError": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Url das etiquetas não encontrada na Amazon."
+      }
+    },
+    {
+      "pedidoId": 860324974,
+      "erpOrderId": "TINY-860324974",
+      "formaEnvioNome": "Amazon DBA",
+      "idAgrupamento": 746503757,
+      "idExpedicao": 749883281,
+      "melhorEtiqueta": {
+        "temEtiqueta": false,
+        "urls": [],
+        "fonte": null,
+        "marketplaceError": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Url das etiquetas não encontrada na Amazon."
+      }
+    },
+    {
+      "pedidoId": 860326478,
+      "erpOrderId": "TINY-860326478",
+      "formaEnvioNome": "Amazon DBA",
+      "idAgrupamento": 746503757,
+      "idExpedicao": 749883342,
+      "melhorEtiqueta": {
+        "temEtiqueta": false,
+        "urls": [],
+        "fonte": null,
+        "marketplaceError": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Url das etiquetas não encontrada na Amazon."
+      }
+    },
+    {
+      "pedidoId": 860329599,
+      "erpOrderId": "TINY-860329599",
+      "formaEnvioNome": "Amazon DBA",
+      "idAgrupamento": 746503757,
+      "idExpedicao": 749883501,
+      "melhorEtiqueta": {
+        "temEtiqueta": false,
+        "urls": [],
+        "fonte": null,
+        "marketplaceError": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Url das etiquetas não encontrada na Amazon."
+      }
+    },
+    {
+      "pedidoId": 860330865,
+      "erpOrderId": "TINY-860330865",
+      "formaEnvioNome": "Amazon DBA",
+      "idAgrupamento": 746503757,
+      "idExpedicao": 749883566,
+      "melhorEtiqueta": {
+        "temEtiqueta": false,
+        "urls": [],
+        "fonte": null,
+        "marketplaceError": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Url das etiquetas não encontrada na Amazon."
+      }
+    },
+    {
+      "pedidoId": 860333063,
+      "erpOrderId": "TINY-860333063",
+      "formaEnvioNome": "Amazon DBA",
+      "idAgrupamento": 746503757,
+      "idExpedicao": 749883674,
+      "melhorEtiqueta": {
+        "temEtiqueta": false,
+        "urls": [],
+        "fonte": null,
+        "marketplaceError": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Url das etiquetas não encontrada na Amazon."
+      }
+    },
+    {
+      "pedidoId": 860333456,
+      "erpOrderId": "TINY-860333456",
+      "formaEnvioNome": "Amazon DBA",
+      "idAgrupamento": 746503757,
+      "idExpedicao": 749883696,
+      "melhorEtiqueta": {
+        "temEtiqueta": false,
+        "urls": [],
+        "fonte": null,
+        "marketplaceError": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Url das etiquetas não encontrada na Amazon."
+      }
+    },
+    {
+      "pedidoId": 860334351,
+      "erpOrderId": "TINY-860334351",
+      "formaEnvioNome": "Amazon DBA",
+      "idAgrupamento": 746503757,
+      "idExpedicao": 749883743,
+      "melhorEtiqueta": {
+        "temEtiqueta": false,
+        "urls": [],
+        "fonte": null,
+        "marketplaceError": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Url das etiquetas não encontrada na Amazon."
+      }
+    },
+    {
+      "pedidoId": 860334475,
+      "erpOrderId": "TINY-860334475",
+      "formaEnvioNome": "Amazon DBA",
+      "idAgrupamento": 746503757,
+      "idExpedicao": 749883750,
+      "melhorEtiqueta": {
+        "temEtiqueta": false,
+        "urls": [],
+        "fonte": null,
+        "marketplaceError": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Url das etiquetas não encontrada na Amazon."
+      }
+    },
+    {
+      "pedidoId": 860334804,
+      "erpOrderId": "TINY-860334804",
+      "formaEnvioNome": "Amazon DBA",
+      "idAgrupamento": 746503757,
+      "idExpedicao": 749883762,
+      "melhorEtiqueta": {
+        "temEtiqueta": false,
+        "urls": [],
+        "fonte": null,
+        "marketplaceError": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Url das etiquetas não encontrada na Amazon."
+      }
+    },
+    {
+      "pedidoId": 860334824,
+      "erpOrderId": "TINY-860334824",
+      "formaEnvioNome": "Amazon DBA",
+      "idAgrupamento": 746503757,
+      "idExpedicao": 749883764,
+      "melhorEtiqueta": {
+        "temEtiqueta": false,
+        "urls": [],
+        "fonte": null,
+        "marketplaceError": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Url das etiquetas não encontrada na Amazon."
+      }
+    },
+    {
+      "pedidoId": 860312831,
+      "erpOrderId": "TINY-860312831",
+      "formaEnvioNome": "Amazon DBA",
+      "idAgrupamento": 746503747,
+      "idExpedicao": 749882720,
+      "melhorEtiqueta": {
+        "temEtiqueta": false,
+        "urls": [],
+        "fonte": null,
+        "marketplaceError": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Url das etiquetas não encontrada na Amazon."
+      }
+    },
+    {
+      "pedidoId": 860313147,
+      "erpOrderId": "TINY-860313147",
+      "formaEnvioNome": "Amazon DBA",
+      "idAgrupamento": 746503747,
+      "idExpedicao": 749882739,
+      "melhorEtiqueta": {
+        "temEtiqueta": false,
+        "urls": [],
+        "fonte": null,
+        "marketplaceError": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Url das etiquetas não encontrada na Amazon."
+      }
+    },
+    {
+      "pedidoId": 860313177,
+      "erpOrderId": "TINY-860313177",
+      "formaEnvioNome": "Amazon DBA",
+      "idAgrupamento": 746503747,
+      "idExpedicao": 749882741,
+      "melhorEtiqueta": {
+        "temEtiqueta": false,
+        "urls": [],
+        "fonte": null,
+        "marketplaceError": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Erro ao obter etiquetas na Amazon."
+      }
+    },
+    {
+      "pedidoId": 860313782,
+      "erpOrderId": "TINY-860313782",
+      "formaEnvioNome": "Amazon DBA",
+      "idAgrupamento": 746503747,
+      "idExpedicao": 749882755,
+      "melhorEtiqueta": {
+        "temEtiqueta": false,
+        "urls": [],
+        "fonte": null,
+        "marketplaceError": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Url das etiquetas não encontrada na Amazon."
+      }
+    },
+    {
+      "pedidoId": 860317537,
+      "erpOrderId": "TINY-860317537",
+      "formaEnvioNome": "Amazon DBA",
+      "idAgrupamento": 746503747,
+      "idExpedicao": 749882929,
+      "melhorEtiqueta": {
+        "temEtiqueta": false,
+        "urls": [],
+        "fonte": null,
+        "marketplaceError": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Url das etiquetas não encontrada na Amazon."
+      }
+    },
+    {
+      "pedidoId": 860308622,
+      "erpOrderId": "TINY-860308622",
+      "formaEnvioNome": "Amazon DBA",
+      "idAgrupamento": 746503719,
+      "idExpedicao": 749882504,
+      "melhorEtiqueta": {
+        "temEtiqueta": false,
+        "urls": [],
+        "fonte": null,
+        "marketplaceError": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Url das etiquetas não encontrada na Amazon."
+      }
+    },
+    {
+      "pedidoId": 860309480,
+      "erpOrderId": "TINY-860309480",
+      "formaEnvioNome": "Amazon DBA",
+      "idAgrupamento": 746503719,
+      "idExpedicao": 749882559,
+      "melhorEtiqueta": {
+        "temEtiqueta": false,
+        "urls": [],
+        "fonte": null,
+        "marketplaceError": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Url das etiquetas não encontrada na Amazon."
+      }
+    },
+    {
+      "pedidoId": 860280807,
+      "erpOrderId": "TINY-860280807",
+      "formaEnvioNome": "Amazon DBA",
+      "idAgrupamento": 746503703,
+      "idExpedicao": 749881546,
+      "melhorEtiqueta": {
+        "temEtiqueta": false,
+        "urls": [],
+        "fonte": null,
+        "marketplaceError": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Url das etiquetas não encontrada na Amazon."
+      }
+    },
+    {
+      "pedidoId": 860284778,
+      "erpOrderId": "TINY-860284778",
+      "formaEnvioNome": "Amazon DBA",
+      "idAgrupamento": 746503703,
+      "idExpedicao": 749881818,
+      "melhorEtiqueta": {
+        "temEtiqueta": false,
+        "urls": [],
+        "fonte": null,
+        "marketplaceError": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Url das etiquetas não encontrada na Amazon."
+      }
+    },
+    {
+      "pedidoId": 860286006,
+      "erpOrderId": "TINY-860286006",
+      "formaEnvioNome": "Amazon DBA",
+      "idAgrupamento": 746503703,
+      "idExpedicao": 749881883,
+      "melhorEtiqueta": {
+        "temEtiqueta": false,
+        "urls": [],
+        "fonte": null,
+        "marketplaceError": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Url das etiquetas não encontrada na Amazon."
+      }
+    },
+    {
+      "pedidoId": 860286588,
+      "erpOrderId": "TINY-860286588",
+      "formaEnvioNome": "Amazon DBA",
+      "idAgrupamento": 746503703,
+      "idExpedicao": 749882109,
+      "melhorEtiqueta": {
+        "temEtiqueta": false,
+        "urls": [],
+        "fonte": null,
+        "marketplaceError": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Url das etiquetas não encontrada na Amazon."
+      }
+    },
+    {
+      "pedidoId": 860303355,
+      "erpOrderId": "TINY-860303355",
+      "formaEnvioNome": "Amazon DBA",
+      "idAgrupamento": 746503703,
+      "idExpedicao": 749882197,
+      "melhorEtiqueta": {
+        "temEtiqueta": false,
+        "urls": [],
+        "fonte": null,
+        "marketplaceError": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Url das etiquetas não encontrada na Amazon."
+      }
+    },
+    {
+      "pedidoId": 860303730,
+      "erpOrderId": "TINY-860303730",
+      "formaEnvioNome": "Amazon DBA",
+      "idAgrupamento": 746503703,
+      "idExpedicao": 749882215,
+      "melhorEtiqueta": {
+        "temEtiqueta": false,
+        "urls": [],
+        "fonte": null,
+        "marketplaceError": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Url das etiquetas não encontrada na Amazon."
+      }
+    },
+    {
+      "pedidoId": 860304258,
+      "erpOrderId": "TINY-860304258",
+      "formaEnvioNome": "Amazon DBA",
+      "idAgrupamento": 746503703,
+      "idExpedicao": 749882243,
+      "melhorEtiqueta": {
+        "temEtiqueta": false,
+        "urls": [],
+        "fonte": null,
+        "marketplaceError": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Url das etiquetas não encontrada na Amazon."
+      }
+    },
+    {
+      "pedidoId": 860304498,
+      "erpOrderId": "TINY-860304498",
+      "formaEnvioNome": "Amazon DBA",
+      "idAgrupamento": 746503703,
+      "idExpedicao": 749882248,
+      "melhorEtiqueta": {
+        "temEtiqueta": false,
+        "urls": [],
+        "fonte": null,
+        "marketplaceError": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Url das etiquetas não encontrada na Amazon."
+      }
+    },
+    {
+      "pedidoId": 860266314,
+      "erpOrderId": "TINY-860266314",
+      "formaEnvioNome": "Amazon DBA",
+      "idAgrupamento": 746503670,
+      "idExpedicao": 749880778,
+      "melhorEtiqueta": {
+        "temEtiqueta": false,
+        "urls": [],
+        "fonte": null,
+        "marketplaceError": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Url das etiquetas não encontrada na Amazon."
+      }
+    },
+    {
+      "pedidoId": 860268763,
+      "erpOrderId": "TINY-860268763",
+      "formaEnvioNome": "Amazon DBA",
+      "idAgrupamento": 746503670,
+      "idExpedicao": 749880901,
+      "melhorEtiqueta": {
+        "temEtiqueta": false,
+        "urls": [],
+        "fonte": null,
+        "marketplaceError": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Url das etiquetas não encontrada na Amazon."
+      }
+    },
+    {
+      "pedidoId": 860272116,
+      "erpOrderId": "TINY-860272116",
+      "formaEnvioNome": "Amazon DBA",
+      "idAgrupamento": 746503670,
+      "idExpedicao": 749881067,
+      "melhorEtiqueta": {
+        "temEtiqueta": false,
+        "urls": [],
+        "fonte": null,
+        "marketplaceError": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Url das etiquetas não encontrada na Amazon."
+      }
+    },
+    {
+      "pedidoId": 860276016,
+      "erpOrderId": "TINY-860276016",
+      "formaEnvioNome": "Amazon DBA",
+      "idAgrupamento": 746503670,
+      "idExpedicao": 749881249,
+      "melhorEtiqueta": {
+        "temEtiqueta": false,
+        "urls": [],
+        "fonte": null,
+        "marketplaceError": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Url das etiquetas não encontrada na Amazon."
+      }
+    },
+    {
+      "pedidoId": 860261922,
+      "erpOrderId": "TINY-860261922",
+      "formaEnvioNome": "Amazon DBA",
+      "idAgrupamento": 746503636,
+      "idExpedicao": 749880412,
+      "melhorEtiqueta": {
+        "temEtiqueta": false,
+        "urls": [],
+        "fonte": null,
+        "marketplaceError": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Url das etiquetas não encontrada na Amazon."
+      }
+    },
+    {
+      "pedidoId": 860249132,
+      "erpOrderId": "TINY-860249132",
+      "formaEnvioNome": "Amazon DBA",
+      "idAgrupamento": 746503628,
+      "idExpedicao": 749879885,
+      "melhorEtiqueta": {
+        "temEtiqueta": false,
+        "urls": [],
+        "fonte": null,
+        "marketplaceError": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Url das etiquetas não encontrada na Amazon."
+      }
+    },
+    {
+      "pedidoId": 860249725,
+      "erpOrderId": "TINY-860249725",
+      "formaEnvioNome": "Amazon DBA",
+      "idAgrupamento": 746503628,
+      "idExpedicao": 749879948,
+      "melhorEtiqueta": {
+        "temEtiqueta": false,
+        "urls": [],
+        "fonte": null,
+        "marketplaceError": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Url das etiquetas não encontrada na Amazon."
+      }
+    },
+    {
+      "pedidoId": 860251921,
+      "erpOrderId": "TINY-860251921",
+      "formaEnvioNome": "Amazon DBA",
+      "idAgrupamento": 746503628,
+      "idExpedicao": 749880027,
+      "melhorEtiqueta": {
+        "temEtiqueta": false,
+        "urls": [],
+        "fonte": null,
+        "marketplaceError": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Url das etiquetas não encontrada na Amazon."
+      }
+    },
+    {
+      "pedidoId": 860252684,
+      "erpOrderId": "TINY-860252684",
+      "formaEnvioNome": "Amazon DBA",
+      "idAgrupamento": 746503628,
+      "idExpedicao": 749880045,
+      "melhorEtiqueta": {
+        "temEtiqueta": false,
+        "urls": [],
+        "fonte": null,
+        "marketplaceError": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Erro ao obter etiquetas na Amazon."
+      }
+    },
+    {
+      "pedidoId": 860254912,
+      "erpOrderId": "TINY-860254912",
+      "formaEnvioNome": "Amazon DBA",
+      "idAgrupamento": 746503628,
+      "idExpedicao": 749880119,
+      "melhorEtiqueta": {
+        "temEtiqueta": false,
+        "urls": [],
+        "fonte": null,
+        "marketplaceError": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Url das etiquetas não encontrada na Amazon."
+      }
+    },
+    {
+      "pedidoId": 860258239,
+      "erpOrderId": "TINY-860258239",
+      "formaEnvioNome": "Amazon DBA",
+      "idAgrupamento": 746503628,
+      "idExpedicao": 749880257,
+      "melhorEtiqueta": {
+        "temEtiqueta": false,
+        "urls": [],
+        "fonte": null,
+        "marketplaceError": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Url das etiquetas não encontrada na Amazon."
+      }
+    },
+    {
+      "pedidoId": 860245673,
+      "erpOrderId": "TINY-860245673",
+      "formaEnvioNome": "Amazon DBA",
+      "idAgrupamento": 746503601,
+      "idExpedicao": 749879607,
+      "melhorEtiqueta": {
+        "temEtiqueta": false,
+        "urls": [],
+        "fonte": null,
+        "marketplaceError": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Url das etiquetas não encontrada na Amazon."
+      }
+    },
+    {
+      "pedidoId": 860247252,
+      "erpOrderId": "TINY-860247252",
+      "formaEnvioNome": "Amazon DBA",
+      "idAgrupamento": 746503601,
+      "idExpedicao": 749879768,
+      "melhorEtiqueta": {
+        "temEtiqueta": false,
+        "urls": [],
+        "fonte": null,
+        "marketplaceError": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Url das etiquetas não encontrada na Amazon."
+      }
+    },
+    {
+      "pedidoId": 860247527,
+      "erpOrderId": "TINY-860247527",
+      "formaEnvioNome": "Amazon DBA",
+      "idAgrupamento": 746503601,
+      "idExpedicao": 749879791,
+      "melhorEtiqueta": {
+        "temEtiqueta": false,
+        "urls": [],
+        "fonte": null,
+        "marketplaceError": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Url das etiquetas não encontrada na Amazon."
+      }
+    },
+    {
+      "pedidoId": 860247696,
+      "erpOrderId": "TINY-860247696",
+      "formaEnvioNome": "Amazon DBA",
+      "idAgrupamento": 746503601,
+      "idExpedicao": 749879809,
+      "melhorEtiqueta": {
+        "temEtiqueta": false,
+        "urls": [],
+        "fonte": null,
+        "marketplaceError": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Url das etiquetas não encontrada na Amazon."
+      }
+    },
+    {
+      "pedidoId": 860232966,
+      "erpOrderId": "TINY-860232966",
+      "formaEnvioNome": "Amazon DBA",
+      "idAgrupamento": 746503579,
+      "idExpedicao": 749879017,
+      "melhorEtiqueta": {
+        "temEtiqueta": false,
+        "urls": [],
+        "fonte": null,
+        "marketplaceError": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Url das etiquetas não encontrada na Amazon."
+      }
+    },
+    {
+      "pedidoId": 860236468,
+      "erpOrderId": "TINY-860236468",
+      "formaEnvioNome": "Amazon DBA",
+      "idAgrupamento": 746503579,
+      "idExpedicao": 749879124,
+      "melhorEtiqueta": {
+        "temEtiqueta": false,
+        "urls": [],
+        "fonte": null,
+        "marketplaceError": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Url das etiquetas não encontrada na Amazon."
+      }
+    },
+    {
+      "pedidoId": 860239738,
+      "erpOrderId": "TINY-860239738",
+      "formaEnvioNome": "Amazon DBA",
+      "idAgrupamento": 746503579,
+      "idExpedicao": 749879304,
+      "melhorEtiqueta": {
+        "temEtiqueta": false,
+        "urls": [],
+        "fonte": null,
+        "marketplaceError": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Url das etiquetas não encontrada na Amazon."
+      }
+    },
+    {
+      "pedidoId": 860242388,
+      "erpOrderId": "TINY-860242388",
+      "formaEnvioNome": "Amazon DBA",
+      "idAgrupamento": 746503579,
+      "idExpedicao": 749879408,
+      "melhorEtiqueta": {
+        "temEtiqueta": false,
+        "urls": [],
+        "fonte": null,
+        "marketplaceError": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Url das etiquetas não encontrada na Amazon."
+      }
+    },
+    {
+      "pedidoId": 860200901,
+      "erpOrderId": "TINY-860200901",
+      "formaEnvioNome": "Amazon DBA",
+      "idAgrupamento": 746503571,
+      "idExpedicao": 749876734,
+      "melhorEtiqueta": {
+        "temEtiqueta": false,
+        "urls": [],
+        "fonte": null,
+        "marketplaceError": "Agrupamento ainda não foi concluído"
+      }
+    },
+    {
+      "pedidoId": 860203156,
+      "erpOrderId": "TINY-860203156",
+      "formaEnvioNome": "Amazon DBA",
+      "idAgrupamento": 746503571,
+      "idExpedicao": 749876864,
+      "melhorEtiqueta": {
+        "temEtiqueta": false,
+        "urls": [],
+        "fonte": null,
+        "marketplaceError": "Agrupamento ainda não foi concluído"
+      }
+    },
+    {
+      "pedidoId": 860225913,
+      "erpOrderId": "TINY-860225913",
+      "formaEnvioNome": "Amazon DBA",
+      "idAgrupamento": 746503558,
+      "idExpedicao": 749878277,
+      "melhorEtiqueta": {
+        "temEtiqueta": false,
+        "urls": [],
+        "fonte": null,
+        "marketplaceError": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Url das etiquetas não encontrada na Amazon."
+      }
+    },
+    {
+      "pedidoId": 860215833,
+      "erpOrderId": "TINY-860215833",
+      "formaEnvioNome": "Amazon DBA",
+      "idAgrupamento": 746503557,
+      "idExpedicao": 749877642,
+      "melhorEtiqueta": {
+        "temEtiqueta": false,
+        "urls": [],
+        "fonte": null,
+        "marketplaceError": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Url das etiquetas não encontrada na Amazon."
+      }
+    },
+    {
+      "pedidoId": 860216338,
+      "erpOrderId": "TINY-860216338",
+      "formaEnvioNome": "Amazon DBA",
+      "idAgrupamento": 746503557,
+      "idExpedicao": 749877677,
+      "melhorEtiqueta": {
+        "temEtiqueta": false,
+        "urls": [],
+        "fonte": null,
+        "marketplaceError": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Url das etiquetas não encontrada na Amazon."
+      }
+    },
+    {
+      "pedidoId": 860218014,
+      "erpOrderId": "TINY-860218014",
+      "formaEnvioNome": "Amazon DBA",
+      "idAgrupamento": 746503557,
+      "idExpedicao": 749877781,
+      "melhorEtiqueta": {
+        "temEtiqueta": false,
+        "urls": [],
+        "fonte": null,
+        "marketplaceError": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Url das etiquetas não encontrada na Amazon."
+      }
+    },
+    {
+      "pedidoId": 860218321,
+      "erpOrderId": "TINY-860218321",
+      "formaEnvioNome": "Amazon DBA",
+      "idAgrupamento": 746503557,
+      "idExpedicao": 749877795,
+      "melhorEtiqueta": {
+        "temEtiqueta": false,
+        "urls": [],
+        "fonte": null,
+        "marketplaceError": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Url das etiquetas não encontrada na Amazon."
+      }
+    },
+    {
+      "pedidoId": 860222658,
+      "erpOrderId": "TINY-860222658",
+      "formaEnvioNome": "Amazon DBA",
+      "idAgrupamento": 746503557,
+      "idExpedicao": 749878018,
+      "melhorEtiqueta": {
+        "temEtiqueta": false,
+        "urls": [],
+        "fonte": null,
+        "marketplaceError": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Url das etiquetas não encontrada na Amazon."
+      }
+    },
+    {
+      "pedidoId": 860228447,
+      "erpOrderId": "TINY-860228447",
+      "formaEnvioNome": "Amazon DBA",
+      "idAgrupamento": 746503557,
+      "idExpedicao": 749878614,
+      "melhorEtiqueta": {
+        "temEtiqueta": false,
+        "urls": [],
+        "fonte": null,
+        "marketplaceError": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Url das etiquetas não encontrada na Amazon."
+      }
+    },
+    {
+      "pedidoId": 860198874,
+      "erpOrderId": "TINY-860198874",
+      "formaEnvioNome": "Amazon DBA",
+      "idAgrupamento": 746503556,
+      "idExpedicao": 749876630,
+      "melhorEtiqueta": {
+        "temEtiqueta": false,
+        "urls": [],
+        "fonte": null,
+        "marketplaceError": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Url das etiquetas não encontrada na Amazon."
+      }
+    },
+    {
+      "pedidoId": 860198449,
+      "erpOrderId": "TINY-860198449",
+      "formaEnvioNome": "Amazon DBA",
+      "idAgrupamento": 746503556,
+      "idExpedicao": 749876663,
+      "melhorEtiqueta": {
+        "temEtiqueta": false,
+        "urls": [],
+        "fonte": null,
+        "marketplaceError": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Url das etiquetas não encontrada na Amazon."
+      }
+    },
+    {
+      "pedidoId": 860201059,
+      "erpOrderId": "TINY-860201059",
+      "formaEnvioNome": "Amazon DBA",
+      "idAgrupamento": 746503556,
+      "idExpedicao": 749876746,
+      "melhorEtiqueta": {
+        "temEtiqueta": false,
+        "urls": [],
+        "fonte": null,
+        "marketplaceError": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Url das etiquetas não encontrada na Amazon."
+      }
+    },
+    {
+      "pedidoId": 860201177,
+      "erpOrderId": "TINY-860201177",
+      "formaEnvioNome": "Amazon DBA",
+      "idAgrupamento": 746503556,
+      "idExpedicao": 749876753,
+      "melhorEtiqueta": {
+        "temEtiqueta": false,
+        "urls": [],
+        "fonte": null,
+        "marketplaceError": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Url das etiquetas não encontrada na Amazon."
+      }
+    },
+    {
+      "pedidoId": 860202103,
+      "erpOrderId": "TINY-860202103",
+      "formaEnvioNome": "Amazon DBA",
+      "idAgrupamento": 746503556,
+      "idExpedicao": 749876801,
+      "melhorEtiqueta": {
+        "temEtiqueta": false,
+        "urls": [],
+        "fonte": null,
+        "marketplaceError": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Url das etiquetas não encontrada na Amazon."
+      }
+    },
+    {
+      "pedidoId": 860202773,
+      "erpOrderId": "TINY-860202773",
+      "formaEnvioNome": "Amazon DBA",
+      "idAgrupamento": 746503556,
+      "idExpedicao": 749876836,
+      "melhorEtiqueta": {
+        "temEtiqueta": false,
+        "urls": [],
+        "fonte": null,
+        "marketplaceError": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Url das etiquetas não encontrada na Amazon."
+      }
+    },
+    {
+      "pedidoId": 860203635,
+      "erpOrderId": "TINY-860203635",
+      "formaEnvioNome": "Amazon DBA",
+      "idAgrupamento": 746503556,
+      "idExpedicao": 749876884,
+      "melhorEtiqueta": {
+        "temEtiqueta": false,
+        "urls": [],
+        "fonte": null,
+        "marketplaceError": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Url das etiquetas não encontrada na Amazon."
+      }
+    },
+    {
+      "pedidoId": 860204210,
+      "erpOrderId": "TINY-860204210",
+      "formaEnvioNome": "Amazon DBA",
+      "idAgrupamento": 746503556,
+      "idExpedicao": 749876901,
+      "melhorEtiqueta": {
+        "temEtiqueta": false,
+        "urls": [],
+        "fonte": null,
+        "marketplaceError": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Url das etiquetas não encontrada na Amazon."
+      }
+    },
+    {
+      "pedidoId": 860204525,
+      "erpOrderId": "TINY-860204525",
+      "formaEnvioNome": "Amazon DBA",
+      "idAgrupamento": 746503556,
+      "idExpedicao": 749876915,
+      "melhorEtiqueta": {
+        "temEtiqueta": false,
+        "urls": [],
+        "fonte": null,
+        "marketplaceError": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Url das etiquetas não encontrada na Amazon."
+      }
+    },
+    {
+      "pedidoId": 860207894,
+      "erpOrderId": "TINY-860207894",
+      "formaEnvioNome": "Amazon DBA",
+      "idAgrupamento": 746503556,
+      "idExpedicao": 749877145,
+      "melhorEtiqueta": {
+        "temEtiqueta": false,
+        "urls": [],
+        "fonte": null,
+        "marketplaceError": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Url das etiquetas não encontrada na Amazon."
+      }
+    },
+    {
+      "pedidoId": 860208242,
+      "erpOrderId": "TINY-860208242",
+      "formaEnvioNome": "Amazon DBA",
+      "idAgrupamento": 746503556,
+      "idExpedicao": 749877161,
+      "melhorEtiqueta": {
+        "temEtiqueta": false,
+        "urls": [],
+        "fonte": null,
+        "marketplaceError": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Url das etiquetas não encontrada na Amazon."
+      }
+    },
+    {
+      "pedidoId": 860208518,
+      "erpOrderId": "TINY-860208518",
+      "formaEnvioNome": "Amazon DBA",
+      "idAgrupamento": 746503556,
+      "idExpedicao": 749877168,
+      "melhorEtiqueta": {
+        "temEtiqueta": false,
+        "urls": [],
+        "fonte": null,
+        "marketplaceError": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Url das etiquetas não encontrada na Amazon."
+      }
+    },
+    {
+      "pedidoId": 860209020,
+      "erpOrderId": "TINY-860209020",
+      "formaEnvioNome": "Amazon DBA",
+      "idAgrupamento": 746503556,
+      "idExpedicao": 749877192,
+      "melhorEtiqueta": {
+        "temEtiqueta": false,
+        "urls": [],
+        "fonte": null,
+        "marketplaceError": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Url das etiquetas não encontrada na Amazon."
+      }
+    },
+    {
+      "pedidoId": 860210708,
+      "erpOrderId": "TINY-860210708",
+      "formaEnvioNome": "Amazon DBA",
+      "idAgrupamento": 746503556,
+      "idExpedicao": 749877297,
+      "melhorEtiqueta": {
+        "temEtiqueta": false,
+        "urls": [],
+        "fonte": null,
+        "marketplaceError": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Erro ao obter etiquetas na Amazon."
+      }
+    },
+    {
+      "pedidoId": 860211772,
+      "erpOrderId": "TINY-860211772",
+      "formaEnvioNome": "Amazon DBA",
+      "idAgrupamento": 746503556,
+      "idExpedicao": 749877357,
+      "melhorEtiqueta": {
+        "temEtiqueta": false,
+        "urls": [],
+        "fonte": null,
+        "marketplaceError": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Url das etiquetas não encontrada na Amazon."
+      }
+    },
+    {
+      "pedidoId": 860211955,
+      "erpOrderId": "TINY-860211955",
+      "formaEnvioNome": "Amazon DBA",
+      "idAgrupamento": 746503556,
+      "idExpedicao": 749877373,
+      "melhorEtiqueta": {
+        "temEtiqueta": false,
+        "urls": [],
+        "fonte": null,
+        "marketplaceError": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Erro ao obter etiquetas na Amazon."
+      }
+    },
+    {
+      "pedidoId": 860212880,
+      "erpOrderId": "TINY-860212880",
+      "formaEnvioNome": "Amazon DBA",
+      "idAgrupamento": 746503556,
+      "idExpedicao": 749877433,
+      "melhorEtiqueta": {
+        "temEtiqueta": false,
+        "urls": [],
+        "fonte": null,
+        "marketplaceError": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Url das etiquetas não encontrada na Amazon."
+      }
+    },
+    {
+      "pedidoId": 860213177,
+      "erpOrderId": "TINY-860213177",
+      "formaEnvioNome": "Amazon DBA",
+      "idAgrupamento": 746503556,
+      "idExpedicao": 749877452,
+      "melhorEtiqueta": {
+        "temEtiqueta": false,
+        "urls": [],
+        "fonte": null,
+        "marketplaceError": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Url das etiquetas não encontrada na Amazon."
+      }
+    },
+    {
+      "pedidoId": 860214007,
+      "erpOrderId": "TINY-860214007",
+      "formaEnvioNome": "Amazon DBA",
+      "idAgrupamento": 746503556,
+      "idExpedicao": 749877513,
+      "melhorEtiqueta": {
+        "temEtiqueta": false,
+        "urls": [],
+        "fonte": null,
+        "marketplaceError": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Url das etiquetas não encontrada na Amazon."
+      }
+    },
+    {
+      "pedidoId": 860214687,
+      "erpOrderId": "TINY-860214687",
+      "formaEnvioNome": "Amazon DBA",
+      "idAgrupamento": 746503556,
+      "idExpedicao": 749877555,
+      "melhorEtiqueta": {
+        "temEtiqueta": false,
+        "urls": [],
+        "fonte": null,
+        "marketplaceError": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Url das etiquetas não encontrada na Amazon."
+      }
+    },
+    {
+      "pedidoId": 860215171,
+      "erpOrderId": "TINY-860215171",
+      "formaEnvioNome": "Amazon DBA",
+      "idAgrupamento": 746503556,
+      "idExpedicao": 749877586,
+      "melhorEtiqueta": {
+        "temEtiqueta": false,
+        "urls": [],
+        "fonte": null,
+        "marketplaceError": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Url das etiquetas não encontrada na Amazon."
+      }
+    },
+    {
+      "pedidoId": 860215204,
+      "erpOrderId": "TINY-860215204",
+      "formaEnvioNome": "Amazon DBA",
+      "idAgrupamento": 746503556,
+      "idExpedicao": 749877592,
+      "melhorEtiqueta": {
+        "temEtiqueta": false,
+        "urls": [],
+        "fonte": null,
+        "marketplaceError": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Url das etiquetas não encontrada na Amazon."
+      }
+    },
+    {
+      "pedidoId": 860184643,
+      "erpOrderId": "TINY-860184643",
+      "formaEnvioNome": "Amazon DBA",
+      "idAgrupamento": 746503526,
+      "idExpedicao": 749875752,
+      "melhorEtiqueta": {
+        "temEtiqueta": false,
+        "urls": [],
+        "fonte": null,
+        "marketplaceError": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Erro ao obter etiquetas na Amazon."
+      }
+    },
+    {
+      "pedidoId": 860186047,
+      "erpOrderId": "TINY-860186047",
+      "formaEnvioNome": "Amazon DBA",
+      "idAgrupamento": 746503526,
+      "idExpedicao": 749875808,
+      "melhorEtiqueta": {
+        "temEtiqueta": false,
+        "urls": [],
+        "fonte": null,
+        "marketplaceError": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Url das etiquetas não encontrada na Amazon."
+      }
+    },
+    {
+      "pedidoId": 860186563,
+      "erpOrderId": "TINY-860186563",
+      "formaEnvioNome": "Amazon DBA",
+      "idAgrupamento": 746503526,
+      "idExpedicao": 749875825,
+      "melhorEtiqueta": {
+        "temEtiqueta": false,
+        "urls": [],
+        "fonte": null,
+        "marketplaceError": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Erro ao obter etiquetas na Amazon."
+      }
+    },
+    {
+      "pedidoId": 860188087,
+      "erpOrderId": "TINY-860188087",
+      "formaEnvioNome": "Amazon DBA",
+      "idAgrupamento": 746503526,
+      "idExpedicao": 749875918,
+      "melhorEtiqueta": {
+        "temEtiqueta": false,
+        "urls": [],
+        "fonte": null,
+        "marketplaceError": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Erro ao obter etiquetas na Amazon."
+      }
+    },
+    {
+      "pedidoId": 860188621,
+      "erpOrderId": "TINY-860188621",
+      "formaEnvioNome": "Amazon DBA",
+      "idAgrupamento": 746503526,
+      "idExpedicao": 749875952,
+      "melhorEtiqueta": {
+        "temEtiqueta": false,
+        "urls": [],
+        "fonte": null,
+        "marketplaceError": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Url das etiquetas não encontrada na Amazon."
+      }
+    },
+    {
+      "pedidoId": 860190939,
+      "erpOrderId": "TINY-860190939",
+      "formaEnvioNome": "Amazon DBA",
+      "idAgrupamento": 746503526,
+      "idExpedicao": 749876095,
+      "melhorEtiqueta": {
+        "temEtiqueta": false,
+        "urls": [],
+        "fonte": null,
+        "marketplaceError": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Url das etiquetas não encontrada na Amazon."
+      }
+    },
+    {
+      "pedidoId": 860191188,
+      "erpOrderId": "TINY-860191188",
+      "formaEnvioNome": "Amazon DBA",
+      "idAgrupamento": 746503526,
+      "idExpedicao": 749876112,
+      "melhorEtiqueta": {
+        "temEtiqueta": false,
+        "urls": [],
+        "fonte": null,
+        "marketplaceError": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Erro ao obter etiquetas na Amazon."
+      }
+    },
+    {
+      "pedidoId": 860193464,
+      "erpOrderId": "TINY-860193464",
+      "formaEnvioNome": "Amazon DBA",
+      "idAgrupamento": 746503526,
+      "idExpedicao": 749876244,
+      "melhorEtiqueta": {
+        "temEtiqueta": false,
+        "urls": [],
+        "fonte": null,
+        "marketplaceError": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Url das etiquetas não encontrada na Amazon."
+      }
+    },
+    {
+      "pedidoId": 860194204,
+      "erpOrderId": "TINY-860194204",
+      "formaEnvioNome": "Amazon DBA",
+      "idAgrupamento": 746503526,
+      "idExpedicao": 749876294,
+      "melhorEtiqueta": {
+        "temEtiqueta": false,
+        "urls": [],
+        "fonte": null,
+        "marketplaceError": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Url das etiquetas não encontrada na Amazon."
+      }
+    },
+    {
+      "pedidoId": 860194658,
+      "erpOrderId": "TINY-860194658",
+      "formaEnvioNome": "Amazon DBA",
+      "idAgrupamento": 746503526,
+      "idExpedicao": 749876310,
+      "melhorEtiqueta": {
+        "temEtiqueta": false,
+        "urls": [],
+        "fonte": null,
+        "marketplaceError": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Url das etiquetas não encontrada na Amazon."
+      }
+    },
+    {
+      "pedidoId": 860174179,
+      "erpOrderId": "TINY-860174179",
+      "formaEnvioNome": "Amazon DBA",
+      "idAgrupamento": 746503487,
+      "idExpedicao": 749874884,
+      "melhorEtiqueta": {
+        "temEtiqueta": false,
+        "urls": [],
+        "fonte": null,
+        "marketplaceError": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Url das etiquetas não encontrada na Amazon."
+      }
+    },
+    {
+      "pedidoId": 860169702,
+      "erpOrderId": "TINY-860169702",
+      "formaEnvioNome": "Amazon DBA",
+      "idAgrupamento": 746503478,
+      "idExpedicao": 749874574,
+      "melhorEtiqueta": {
+        "temEtiqueta": false,
+        "urls": [],
+        "fonte": null,
+        "marketplaceError": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Url das etiquetas não encontrada na Amazon."
+      }
+    },
+    {
+      "pedidoId": 860148791,
+      "erpOrderId": "TINY-860148791",
+      "formaEnvioNome": "Amazon DBA",
+      "idAgrupamento": 746503477,
+      "idExpedicao": 749873880,
+      "melhorEtiqueta": {
+        "temEtiqueta": false,
+        "urls": [],
+        "fonte": null,
+        "marketplaceError": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Url das etiquetas não encontrada na Amazon."
+      }
+    },
+    {
+      "pedidoId": 860149369,
+      "erpOrderId": "TINY-860149369",
+      "formaEnvioNome": "Amazon DBA",
+      "idAgrupamento": 746503477,
+      "idExpedicao": 749873906,
+      "melhorEtiqueta": {
+        "temEtiqueta": false,
+        "urls": [],
+        "fonte": null,
+        "marketplaceError": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Erro ao obter etiquetas na Amazon."
+      }
+    },
+    {
+      "pedidoId": 860149725,
+      "erpOrderId": "TINY-860149725",
+      "formaEnvioNome": "Amazon DBA",
+      "idAgrupamento": 746503477,
+      "idExpedicao": 749873942,
+      "melhorEtiqueta": {
+        "temEtiqueta": false,
+        "urls": [],
+        "fonte": null,
+        "marketplaceError": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Url das etiquetas não encontrada na Amazon."
+      }
+    },
+    {
+      "pedidoId": 860160070,
+      "erpOrderId": "TINY-860160070",
+      "formaEnvioNome": "Amazon DBA",
+      "idAgrupamento": 746503477,
+      "idExpedicao": 749874126,
+      "melhorEtiqueta": {
+        "temEtiqueta": false,
+        "urls": [],
+        "fonte": null,
+        "marketplaceError": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Url das etiquetas não encontrada na Amazon."
+      }
+    },
+    {
+      "pedidoId": 860165272,
+      "erpOrderId": "TINY-860165272",
+      "formaEnvioNome": "Amazon DBA",
+      "idAgrupamento": 746503477,
+      "idExpedicao": 749874366,
+      "melhorEtiqueta": {
+        "temEtiqueta": false,
+        "urls": [],
+        "fonte": null,
+        "marketplaceError": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Url das etiquetas não encontrada na Amazon."
+      }
+    },
+    {
+      "pedidoId": 860165669,
+      "erpOrderId": "TINY-860165669",
+      "formaEnvioNome": "Amazon DBA",
+      "idAgrupamento": 746503477,
+      "idExpedicao": 749874396,
+      "melhorEtiqueta": {
+        "temEtiqueta": false,
+        "urls": [],
+        "fonte": null,
+        "marketplaceError": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Url das etiquetas não encontrada na Amazon."
+      }
+    },
+    {
+      "pedidoId": 860169085,
+      "erpOrderId": "TINY-860169085",
+      "formaEnvioNome": "Amazon DBA",
+      "idAgrupamento": 746503477,
+      "idExpedicao": 749874552,
+      "melhorEtiqueta": {
+        "temEtiqueta": false,
+        "urls": [],
+        "fonte": null,
+        "marketplaceError": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Url das etiquetas não encontrada na Amazon."
+      }
+    },
+    {
+      "pedidoId": 860169434,
+      "erpOrderId": "TINY-860169434",
+      "formaEnvioNome": "Amazon DBA",
+      "idAgrupamento": 746503477,
+      "idExpedicao": 749874560,
+      "melhorEtiqueta": {
+        "temEtiqueta": false,
+        "urls": [],
+        "fonte": null,
+        "marketplaceError": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Erro ao obter etiquetas na Amazon."
+      }
+    },
+    {
+      "pedidoId": 860168395,
+      "erpOrderId": "TINY-860168395",
+      "formaEnvioNome": "Amazon DBA",
+      "idAgrupamento": 746503477,
+      "idExpedicao": 749874570,
+      "melhorEtiqueta": {
+        "temEtiqueta": false,
+        "urls": [],
+        "fonte": null,
+        "marketplaceError": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Erro ao obter etiquetas na Amazon."
+      }
+    },
+    {
+      "pedidoId": 860171873,
+      "erpOrderId": "TINY-860171873",
+      "formaEnvioNome": "Amazon DBA",
+      "idAgrupamento": 746503477,
+      "idExpedicao": 749874758,
+      "melhorEtiqueta": {
+        "temEtiqueta": false,
+        "urls": [],
+        "fonte": null,
+        "marketplaceError": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Url das etiquetas não encontrada na Amazon."
+      }
+    },
+    {
+      "pedidoId": 860172202,
+      "erpOrderId": "TINY-860172202",
+      "formaEnvioNome": "Amazon DBA",
+      "idAgrupamento": 746503477,
+      "idExpedicao": 749874777,
+      "melhorEtiqueta": {
+        "temEtiqueta": false,
+        "urls": [],
+        "fonte": null,
+        "marketplaceError": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Url das etiquetas não encontrada na Amazon."
+      }
+    },
+    {
+      "pedidoId": 860128290,
+      "erpOrderId": "TINY-860128290",
+      "formaEnvioNome": "Amazon DBA",
+      "idAgrupamento": 746503439,
+      "idExpedicao": 749872823,
+      "melhorEtiqueta": {
+        "temEtiqueta": false,
+        "urls": [],
+        "fonte": null,
+        "marketplaceError": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Url das etiquetas não encontrada na Amazon."
+      }
+    },
+    {
+      "pedidoId": 860128663,
+      "erpOrderId": "TINY-860128663",
+      "formaEnvioNome": "Amazon DBA",
+      "idAgrupamento": 746503439,
+      "idExpedicao": 749872847,
+      "melhorEtiqueta": {
+        "temEtiqueta": false,
+        "urls": [],
+        "fonte": null,
+        "marketplaceError": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Erro ao obter etiquetas na Amazon."
+      }
+    },
+    {
+      "pedidoId": 860130640,
+      "erpOrderId": "TINY-860130640",
+      "formaEnvioNome": "Amazon DBA",
+      "idAgrupamento": 746503439,
+      "idExpedicao": 749872993,
+      "melhorEtiqueta": {
+        "temEtiqueta": false,
+        "urls": [],
+        "fonte": null,
+        "marketplaceError": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Url das etiquetas não encontrada na Amazon."
+      }
+    },
+    {
+      "pedidoId": 860132216,
+      "erpOrderId": "TINY-860132216",
+      "formaEnvioNome": "Amazon DBA",
+      "idAgrupamento": 746503439,
+      "idExpedicao": 749873067,
+      "melhorEtiqueta": {
+        "temEtiqueta": false,
+        "urls": [],
+        "fonte": null,
+        "marketplaceError": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Erro ao obter etiquetas na Amazon."
+      }
+    },
+    {
+      "pedidoId": 860132267,
+      "erpOrderId": "TINY-860132267",
+      "formaEnvioNome": "Amazon DBA",
+      "idAgrupamento": 746503439,
+      "idExpedicao": 749873068,
+      "melhorEtiqueta": {
+        "temEtiqueta": false,
+        "urls": [],
+        "fonte": null,
+        "marketplaceError": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Url das etiquetas não encontrada na Amazon."
+      }
+    },
+    {
+      "pedidoId": 860132943,
+      "erpOrderId": "TINY-860132943",
+      "formaEnvioNome": "Amazon DBA",
+      "idAgrupamento": 746503439,
+      "idExpedicao": 749873097,
+      "melhorEtiqueta": {
+        "temEtiqueta": false,
+        "urls": [],
+        "fonte": null,
+        "marketplaceError": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Url das etiquetas não encontrada na Amazon."
+      }
+    },
+    {
+      "pedidoId": 860133251,
+      "erpOrderId": "TINY-860133251",
+      "formaEnvioNome": "Amazon DBA",
+      "idAgrupamento": 746503439,
+      "idExpedicao": 749873119,
+      "melhorEtiqueta": {
+        "temEtiqueta": false,
+        "urls": [],
+        "fonte": null,
+        "marketplaceError": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Erro ao obter etiquetas na Amazon."
+      }
+    },
+    {
+      "pedidoId": 860133385,
+      "erpOrderId": "TINY-860133385",
+      "formaEnvioNome": "Amazon DBA",
+      "idAgrupamento": 746503439,
+      "idExpedicao": 749873123,
+      "melhorEtiqueta": {
+        "temEtiqueta": false,
+        "urls": [],
+        "fonte": null,
+        "marketplaceError": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Url das etiquetas não encontrada na Amazon."
+      }
+    },
+    {
+      "pedidoId": 860135254,
+      "erpOrderId": "TINY-860135254",
+      "formaEnvioNome": "Amazon DBA",
+      "idAgrupamento": 746503439,
+      "idExpedicao": 749873242,
+      "melhorEtiqueta": {
+        "temEtiqueta": false,
+        "urls": [],
+        "fonte": null,
+        "marketplaceError": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Url das etiquetas não encontrada na Amazon."
+      }
+    },
+    {
+      "pedidoId": 860135732,
+      "erpOrderId": "TINY-860135732",
+      "formaEnvioNome": "Amazon DBA",
+      "idAgrupamento": 746503439,
+      "idExpedicao": 749873260,
+      "melhorEtiqueta": {
+        "temEtiqueta": false,
+        "urls": [],
+        "fonte": null,
+        "marketplaceError": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Url das etiquetas não encontrada na Amazon."
+      }
+    },
+    {
+      "pedidoId": 860136002,
+      "erpOrderId": "TINY-860136002",
+      "formaEnvioNome": "Amazon DBA",
+      "idAgrupamento": 746503439,
+      "idExpedicao": 749873277,
+      "melhorEtiqueta": {
+        "temEtiqueta": false,
+        "urls": [],
+        "fonte": null,
+        "marketplaceError": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Url das etiquetas não encontrada na Amazon."
+      }
+    },
+    {
+      "pedidoId": 860136964,
+      "erpOrderId": "TINY-860136964",
+      "formaEnvioNome": "Amazon DBA",
+      "idAgrupamento": 746503439,
+      "idExpedicao": 749873309,
+      "melhorEtiqueta": {
+        "temEtiqueta": false,
+        "urls": [],
+        "fonte": null,
+        "marketplaceError": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Url das etiquetas não encontrada na Amazon."
+      }
+    },
+    {
+      "pedidoId": 860137587,
+      "erpOrderId": "TINY-860137587",
+      "formaEnvioNome": "Amazon DBA",
+      "idAgrupamento": 746503439,
+      "idExpedicao": 749873328,
+      "melhorEtiqueta": {
+        "temEtiqueta": false,
+        "urls": [],
+        "fonte": null,
+        "marketplaceError": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Url das etiquetas não encontrada na Amazon."
+      }
+    },
+    {
+      "pedidoId": 860137840,
+      "erpOrderId": "TINY-860137840",
+      "formaEnvioNome": "Amazon DBA",
+      "idAgrupamento": 746503439,
+      "idExpedicao": 749873337,
+      "melhorEtiqueta": {
+        "temEtiqueta": false,
+        "urls": [],
+        "fonte": null,
+        "marketplaceError": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Url das etiquetas não encontrada na Amazon."
+      }
+    },
+    {
+      "pedidoId": 860138634,
+      "erpOrderId": "TINY-860138634",
+      "formaEnvioNome": "Amazon DBA",
+      "idAgrupamento": 746503439,
+      "idExpedicao": 749873357,
+      "melhorEtiqueta": {
+        "temEtiqueta": false,
+        "urls": [],
+        "fonte": null,
+        "marketplaceError": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Url das etiquetas não encontrada na Amazon."
+      }
+    },
+    {
+      "pedidoId": 860141307,
+      "erpOrderId": "TINY-860141307",
+      "formaEnvioNome": "Amazon DBA",
+      "idAgrupamento": 746503439,
+      "idExpedicao": 749873393,
+      "melhorEtiqueta": {
+        "temEtiqueta": false,
+        "urls": [],
+        "fonte": null,
+        "marketplaceError": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Url das etiquetas não encontrada na Amazon."
+      }
+    }
+  ],
+  "pedidosSoNoTestePedido": [
+    {
+      "pedidoId": 860184598,
+      "erpOrderId": "TINY-860184598",
+      "formaEnvioNome": null,
+      "expedicaoEncontradaViaPedido": false,
+      "agrupamentosVerificados": null
+    },
+    {
+      "pedidoId": 860345062,
+      "erpOrderId": "TINY-860345062",
+      "formaEnvioNome": "Mercado Envios",
+      "expedicaoEncontradaViaPedido": false,
+      "agrupamentosVerificados": 22
+    },
+    {
+      "pedidoId": 860317509,
+      "erpOrderId": "TINY-860317509",
+      "formaEnvioNome": "Mercado Envios",
+      "expedicaoEncontradaViaPedido": false,
+      "agrupamentosVerificados": 22
+    },
+    {
+      "pedidoId": 860328924,
+      "erpOrderId": "TINY-860328924",
+      "formaEnvioNome": "Shopee Envios",
+      "expedicaoEncontradaViaPedido": false,
+      "agrupamentosVerificados": 20
+    },
+    {
+      "pedidoId": 860325254,
+      "erpOrderId": "TINY-860325254",
+      "formaEnvioNome": "Shopee Envios",
+      "expedicaoEncontradaViaPedido": false,
+      "agrupamentosVerificados": 20
+    },
+    {
+      "pedidoId": 860182596,
+      "erpOrderId": "TINY-860182596",
+      "formaEnvioNome": "Mercado Envios",
+      "expedicaoEncontradaViaPedido": false,
+      "agrupamentosVerificados": 22
+    },
+    {
+      "pedidoId": 860322880,
+      "erpOrderId": "TINY-860322880",
+      "formaEnvioNome": "Shopee Envios",
+      "expedicaoEncontradaViaPedido": false,
+      "agrupamentosVerificados": 20
+    },
+    {
+      "pedidoId": 860333423,
+      "erpOrderId": "TINY-860333423",
+      "formaEnvioNome": "Mercado Envios",
+      "expedicaoEncontradaViaPedido": false,
+      "agrupamentosVerificados": 22
+    },
+    {
+      "pedidoId": 860269050,
+      "erpOrderId": "TINY-860269050",
+      "formaEnvioNome": "Mercado Envios",
+      "expedicaoEncontradaViaPedido": false,
+      "agrupamentosVerificados": 22
+    },
+    {
+      "pedidoId": 860335194,
+      "erpOrderId": "TINY-860335194",
+      "formaEnvioNome": "Mercado Envios",
+      "expedicaoEncontradaViaPedido": false,
+      "agrupamentosVerificados": 22
+    },
+    {
+      "pedidoId": 860336038,
+      "erpOrderId": "TINY-860336038",
+      "formaEnvioNome": "Mercado Envios",
+      "expedicaoEncontradaViaPedido": false,
+      "agrupamentosVerificados": 22
+    },
+    {
+      "pedidoId": 860330524,
+      "erpOrderId": "TINY-860330524",
+      "formaEnvioNome": "Mercado Envios",
+      "expedicaoEncontradaViaPedido": false,
+      "agrupamentosVerificados": 22
+    },
+    {
+      "pedidoId": 860322847,
+      "erpOrderId": "TINY-860322847",
+      "formaEnvioNome": "Mercado Envios",
+      "expedicaoEncontradaViaPedido": false,
+      "agrupamentosVerificados": 22
+    },
+    {
+      "pedidoId": 860325411,
+      "erpOrderId": "TINY-860325411",
+      "formaEnvioNome": "Shopee Envios",
+      "expedicaoEncontradaViaPedido": false,
+      "agrupamentosVerificados": 20
+    },
+    {
+      "pedidoId": 860299396,
+      "erpOrderId": "TINY-860299396",
+      "formaEnvioNome": "Mercado Envios",
+      "expedicaoEncontradaViaPedido": false,
+      "agrupamentosVerificados": 22
+    },
+    {
+      "pedidoId": 860299805,
+      "erpOrderId": "TINY-860299805",
+      "formaEnvioNome": "Mercado Envios",
+      "expedicaoEncontradaViaPedido": false,
+      "agrupamentosVerificados": 22
+    },
+    {
+      "pedidoId": 860329850,
+      "erpOrderId": "TINY-860329850",
+      "formaEnvioNome": "Mercado Envios",
+      "expedicaoEncontradaViaPedido": false,
+      "agrupamentosVerificados": 22
+    },
+    {
+      "pedidoId": 860314867,
+      "erpOrderId": "TINY-860314867",
+      "formaEnvioNome": "Mercado Envios",
+      "expedicaoEncontradaViaPedido": false,
+      "agrupamentosVerificados": 22
+    },
+    {
+      "pedidoId": 860272865,
+      "erpOrderId": "TINY-860272865",
+      "formaEnvioNome": "Mercado Envios",
+      "expedicaoEncontradaViaPedido": false,
+      "agrupamentosVerificados": 22
+    },
+    {
+      "pedidoId": 860148763,
+      "erpOrderId": "TINY-860148763",
+      "formaEnvioNome": "Mercado Envios",
+      "expedicaoEncontradaViaPedido": false,
+      "agrupamentosVerificados": 22
+    },
+    {
+      "pedidoId": 860283857,
+      "erpOrderId": "TINY-860283857",
+      "formaEnvioNome": "Mercado Envios",
+      "expedicaoEncontradaViaPedido": false,
+      "agrupamentosVerificados": 22
+    },
+    {
+      "pedidoId": 860317707,
+      "erpOrderId": "TINY-860317707",
+      "formaEnvioNome": "Mercado Envios",
+      "expedicaoEncontradaViaPedido": false,
+      "agrupamentosVerificados": 22
+    },
+    {
+      "pedidoId": 860327063,
+      "erpOrderId": "TINY-860327063",
+      "formaEnvioNome": "Shopee Envios",
+      "expedicaoEncontradaViaPedido": false,
+      "agrupamentosVerificados": 20
+    },
+    {
+      "pedidoId": 860333909,
+      "erpOrderId": "TINY-860333909",
+      "formaEnvioNome": "Mercado Envios",
+      "expedicaoEncontradaViaPedido": false,
+      "agrupamentosVerificados": 22
+    },
+    {
+      "pedidoId": 860311442,
+      "erpOrderId": "TINY-860311442",
+      "formaEnvioNome": "Mercado Envios",
+      "expedicaoEncontradaViaPedido": false,
+      "agrupamentosVerificados": 22
+    },
+    {
+      "pedidoId": 860343389,
+      "erpOrderId": "TINY-860343389",
+      "formaEnvioNome": "Mercado Envios",
+      "expedicaoEncontradaViaPedido": false,
+      "agrupamentosVerificados": 22
+    },
+    {
+      "pedidoId": 860345168,
+      "erpOrderId": "TINY-860345168",
+      "formaEnvioNome": "Mercado Envios",
+      "expedicaoEncontradaViaPedido": false,
+      "agrupamentosVerificados": 22
+    },
+    {
+      "pedidoId": 860313590,
+      "erpOrderId": "TINY-860313590",
+      "formaEnvioNome": "Mercado Envios",
+      "expedicaoEncontradaViaPedido": false,
+      "agrupamentosVerificados": 22
+    },
+    {
+      "pedidoId": 860322324,
+      "erpOrderId": "TINY-860322324",
+      "formaEnvioNome": "Mercado Envios",
+      "expedicaoEncontradaViaPedido": false,
+      "agrupamentosVerificados": 22
+    },
+    {
+      "pedidoId": 860322793,
+      "erpOrderId": "TINY-860322793",
+      "formaEnvioNome": "Mercado Envios",
+      "expedicaoEncontradaViaPedido": false,
+      "agrupamentosVerificados": 22
+    },
+    {
+      "pedidoId": 860331219,
+      "erpOrderId": "TINY-860331219",
+      "formaEnvioNome": "Mercado Envios",
+      "expedicaoEncontradaViaPedido": false,
+      "agrupamentosVerificados": 22
+    },
+    {
+      "pedidoId": 860323981,
+      "erpOrderId": "TINY-860323981",
+      "formaEnvioNome": "Shopee Envios",
+      "expedicaoEncontradaViaPedido": false,
+      "agrupamentosVerificados": 20
+    },
+    {
+      "pedidoId": 860315804,
+      "erpOrderId": "TINY-860315804",
+      "formaEnvioNome": "Mercado Envios",
+      "expedicaoEncontradaViaPedido": false,
+      "agrupamentosVerificados": 22
+    },
+    {
+      "pedidoId": 860330029,
+      "erpOrderId": "TINY-860330029",
+      "formaEnvioNome": "Shopee Envios",
+      "expedicaoEncontradaViaPedido": false,
+      "agrupamentosVerificados": 20
+    },
+    {
+      "pedidoId": 860327408,
+      "erpOrderId": "TINY-860327408",
+      "formaEnvioNome": "Shopee Envios",
+      "expedicaoEncontradaViaPedido": false,
+      "agrupamentosVerificados": 20
+    },
+    {
+      "pedidoId": 860312418,
+      "erpOrderId": "TINY-860312418",
+      "formaEnvioNome": "Mercado Envios",
+      "expedicaoEncontradaViaPedido": false,
+      "agrupamentosVerificados": 22
+    },
+    {
+      "pedidoId": 860335121,
+      "erpOrderId": "TINY-860335121",
+      "formaEnvioNome": "Shopee Envios",
+      "expedicaoEncontradaViaPedido": false,
+      "agrupamentosVerificados": 20
+    },
+    {
+      "pedidoId": 860330326,
+      "erpOrderId": "TINY-860330326",
+      "formaEnvioNome": "Mercado Envios",
+      "expedicaoEncontradaViaPedido": false,
+      "agrupamentosVerificados": 22
+    },
+    {
+      "pedidoId": 860303978,
+      "erpOrderId": "TINY-860303978",
+      "formaEnvioNome": "Mercado Envios",
+      "expedicaoEncontradaViaPedido": false,
+      "agrupamentosVerificados": 22
+    },
+    {
+      "pedidoId": 860328198,
+      "erpOrderId": "TINY-860328198",
+      "formaEnvioNome": "Mercado Envios",
+      "expedicaoEncontradaViaPedido": false,
+      "agrupamentosVerificados": 22
+    },
+    {
+      "pedidoId": 860321366,
+      "erpOrderId": "TINY-860321366",
+      "formaEnvioNome": "Mercado Envios",
+      "expedicaoEncontradaViaPedido": false,
+      "agrupamentosVerificados": 22
+    },
+    {
+      "pedidoId": 860330547,
+      "erpOrderId": "TINY-860330547",
+      "formaEnvioNome": "Shopee Envios",
+      "expedicaoEncontradaViaPedido": false,
+      "agrupamentosVerificados": 20
+    },
+    {
+      "pedidoId": 860302313,
+      "erpOrderId": "TINY-860302313",
+      "formaEnvioNome": "Mercado Envios",
+      "expedicaoEncontradaViaPedido": false,
+      "agrupamentosVerificados": 22
+    },
+    {
+      "pedidoId": 860326939,
+      "erpOrderId": "TINY-860326939",
+      "formaEnvioNome": "Shopee Envios",
+      "expedicaoEncontradaViaPedido": false,
+      "agrupamentosVerificados": 20
+    },
+    {
+      "pedidoId": 860272638,
+      "erpOrderId": "TINY-860272638",
+      "formaEnvioNome": "Mercado Envios",
+      "expedicaoEncontradaViaPedido": false,
+      "agrupamentosVerificados": 22
+    },
+    {
+      "pedidoId": 860314918,
+      "erpOrderId": "TINY-860314918",
+      "formaEnvioNome": "Mercado Envios",
+      "expedicaoEncontradaViaPedido": false,
+      "agrupamentosVerificados": 22
+    },
+    {
+      "pedidoId": 860313948,
+      "erpOrderId": "TINY-860313948",
+      "formaEnvioNome": "Mercado Envios",
+      "expedicaoEncontradaViaPedido": false,
+      "agrupamentosVerificados": 22
+    },
+    {
+      "pedidoId": 860331928,
+      "erpOrderId": "TINY-860331928",
+      "formaEnvioNome": "Shopee Envios",
+      "expedicaoEncontradaViaPedido": false,
+      "agrupamentosVerificados": 20
+    },
+    {
+      "pedidoId": 860328609,
+      "erpOrderId": "TINY-860328609",
+      "formaEnvioNome": "Shopee Envios",
+      "expedicaoEncontradaViaPedido": false,
+      "agrupamentosVerificados": 20
+    },
+    {
+      "pedidoId": 860330548,
+      "erpOrderId": "TINY-860330548",
+      "formaEnvioNome": "Shopee Envios",
+      "expedicaoEncontradaViaPedido": false,
+      "agrupamentosVerificados": 20
+    },
+    {
+      "pedidoId": 860322434,
+      "erpOrderId": "TINY-860322434",
+      "formaEnvioNome": "Shopee Envios",
+      "expedicaoEncontradaViaPedido": false,
+      "agrupamentosVerificados": 20
+    },
+    {
+      "pedidoId": 860327111,
+      "erpOrderId": "TINY-860327111",
+      "formaEnvioNome": "Shopee Envios",
+      "expedicaoEncontradaViaPedido": false,
+      "agrupamentosVerificados": 20
+    },
+    {
+      "pedidoId": 860329776,
+      "erpOrderId": "TINY-860329776",
+      "formaEnvioNome": "Mercado Envios",
+      "expedicaoEncontradaViaPedido": false,
+      "agrupamentosVerificados": 22
+    },
+    {
+      "pedidoId": 860327069,
+      "erpOrderId": "TINY-860327069",
+      "formaEnvioNome": "Mercado Envios",
+      "expedicaoEncontradaViaPedido": false,
+      "agrupamentosVerificados": 22
+    },
+    {
+      "pedidoId": 860338671,
+      "erpOrderId": "TINY-860338671",
+      "formaEnvioNome": "Shopee Envios",
+      "expedicaoEncontradaViaPedido": false,
+      "agrupamentosVerificados": 20
+    },
+    {
+      "pedidoId": 860325565,
+      "erpOrderId": "TINY-860325565",
+      "formaEnvioNome": "Shopee Envios",
+      "expedicaoEncontradaViaPedido": false,
+      "agrupamentosVerificados": 20
+    },
+    {
+      "pedidoId": 860344752,
+      "erpOrderId": "TINY-860344752",
+      "formaEnvioNome": "Shopee Envios",
+      "expedicaoEncontradaViaPedido": false,
+      "agrupamentosVerificados": 20
+    },
+    {
+      "pedidoId": 860314097,
+      "erpOrderId": "TINY-860314097",
+      "formaEnvioNome": "Mercado Envios",
+      "expedicaoEncontradaViaPedido": false,
+      "agrupamentosVerificados": 22
+    },
+    {
+      "pedidoId": 860319951,
+      "erpOrderId": "TINY-860319951",
+      "formaEnvioNome": "Mercado Envios",
+      "expedicaoEncontradaViaPedido": false,
+      "agrupamentosVerificados": 22
+    },
+    {
+      "pedidoId": 860316697,
+      "erpOrderId": "TINY-860316697",
+      "formaEnvioNome": "Mercado Envios",
+      "expedicaoEncontradaViaPedido": false,
+      "agrupamentosVerificados": 22
+    },
+    {
+      "pedidoId": 860291154,
+      "erpOrderId": "TINY-860291154",
+      "formaEnvioNome": "Mercado Envios",
+      "expedicaoEncontradaViaPedido": false,
+      "agrupamentosVerificados": 22
+    },
+    {
+      "pedidoId": 860319817,
+      "erpOrderId": "TINY-860319817",
+      "formaEnvioNome": "Mercado Envios",
+      "expedicaoEncontradaViaPedido": false,
+      "agrupamentosVerificados": 22
+    },
+    {
+      "pedidoId": 860316073,
+      "erpOrderId": "TINY-860316073",
+      "formaEnvioNome": "Mercado Envios",
+      "expedicaoEncontradaViaPedido": false,
+      "agrupamentosVerificados": 22
+    },
+    {
+      "pedidoId": 860336115,
+      "erpOrderId": "TINY-860336115",
+      "formaEnvioNome": "Shopee Envios",
+      "expedicaoEncontradaViaPedido": false,
+      "agrupamentosVerificados": 20
+    },
+    {
+      "pedidoId": 860325824,
+      "erpOrderId": "TINY-860325824",
+      "formaEnvioNome": "Shopee Envios",
+      "expedicaoEncontradaViaPedido": false,
+      "agrupamentosVerificados": 20
+    },
+    {
+      "pedidoId": 860317328,
+      "erpOrderId": "TINY-860317328",
+      "formaEnvioNome": "Mercado Envios",
+      "expedicaoEncontradaViaPedido": false,
+      "agrupamentosVerificados": 22
+    },
+    {
+      "pedidoId": 860329435,
+      "erpOrderId": "TINY-860329435",
+      "formaEnvioNome": "Shopee Envios",
+      "expedicaoEncontradaViaPedido": false,
+      "agrupamentosVerificados": 20
+    },
+    {
+      "pedidoId": 860322739,
+      "erpOrderId": "TINY-860322739",
+      "formaEnvioNome": "Shopee Envios",
+      "expedicaoEncontradaViaPedido": false,
+      "agrupamentosVerificados": 20
+    },
+    {
+      "pedidoId": 860322789,
+      "erpOrderId": "TINY-860322789",
+      "formaEnvioNome": "Shopee Envios",
+      "expedicaoEncontradaViaPedido": false,
+      "agrupamentosVerificados": 20
+    },
+    {
+      "pedidoId": 860330577,
+      "erpOrderId": "TINY-860330577",
+      "formaEnvioNome": "Shopee Envios",
+      "expedicaoEncontradaViaPedido": false,
+      "agrupamentosVerificados": 20
+    },
+    {
+      "pedidoId": 860314464,
+      "erpOrderId": "TINY-860314464",
+      "formaEnvioNome": "Mercado Envios",
+      "expedicaoEncontradaViaPedido": false,
+      "agrupamentosVerificados": 22
+    },
+    {
+      "pedidoId": 860325019,
+      "erpOrderId": "TINY-860325019",
+      "formaEnvioNome": "Mercado Envios",
+      "expedicaoEncontradaViaPedido": false,
+      "agrupamentosVerificados": 22
+    },
+    {
+      "pedidoId": 860216070,
+      "erpOrderId": "TINY-860216070",
+      "formaEnvioNome": "Mercado Envios",
+      "expedicaoEncontradaViaPedido": false,
+      "agrupamentosVerificados": 22
+    },
+    {
+      "pedidoId": 860326973,
+      "erpOrderId": "TINY-860326973",
+      "formaEnvioNome": "Mercado Envios",
+      "expedicaoEncontradaViaPedido": false,
+      "agrupamentosVerificados": 22
+    },
+    {
+      "pedidoId": 860325373,
+      "erpOrderId": "TINY-860325373",
+      "formaEnvioNome": "Shopee Envios",
+      "expedicaoEncontradaViaPedido": false,
+      "agrupamentosVerificados": 20
+    },
+    {
+      "pedidoId": 860242385,
+      "erpOrderId": "TINY-860242385",
+      "formaEnvioNome": "Mercado Envios",
+      "expedicaoEncontradaViaPedido": false,
+      "agrupamentosVerificados": 22
+    },
+    {
+      "pedidoId": 860324844,
+      "erpOrderId": "TINY-860324844",
+      "formaEnvioNome": "Mercado Envios",
+      "expedicaoEncontradaViaPedido": false,
+      "agrupamentosVerificados": 22
+    },
+    {
+      "pedidoId": 860285305,
+      "erpOrderId": "TINY-860285305",
+      "formaEnvioNome": "Mercado Envios",
+      "expedicaoEncontradaViaPedido": false,
+      "agrupamentosVerificados": 22
+    },
+    {
+      "pedidoId": 860249908,
+      "erpOrderId": "TINY-860249908",
+      "formaEnvioNome": "Mercado Envios",
+      "expedicaoEncontradaViaPedido": false,
+      "agrupamentosVerificados": 22
+    },
+    {
+      "pedidoId": 860326923,
+      "erpOrderId": "TINY-860326923",
+      "formaEnvioNome": "Shopee Envios",
+      "expedicaoEncontradaViaPedido": false,
+      "agrupamentosVerificados": 20
+    },
+    {
+      "pedidoId": 860312364,
+      "erpOrderId": "TINY-860312364",
+      "formaEnvioNome": "Mercado Envios",
+      "expedicaoEncontradaViaPedido": false,
+      "agrupamentosVerificados": 22
+    },
+    {
+      "pedidoId": 860257409,
+      "erpOrderId": "TINY-860257409",
+      "formaEnvioNome": "Mercado Envios",
+      "expedicaoEncontradaViaPedido": false,
+      "agrupamentosVerificados": 22
+    },
+    {
+      "pedidoId": 860337096,
+      "erpOrderId": "TINY-860337096",
+      "formaEnvioNome": "Shopee Envios",
+      "expedicaoEncontradaViaPedido": false,
+      "agrupamentosVerificados": 20
+    },
+    {
+      "pedidoId": 860335917,
+      "erpOrderId": "TINY-860335917",
+      "formaEnvioNome": "Shopee Envios",
+      "expedicaoEncontradaViaPedido": false,
+      "agrupamentosVerificados": 20
+    },
+    {
+      "pedidoId": 860329553,
+      "erpOrderId": "TINY-860329553",
+      "formaEnvioNome": "Shopee Envios",
+      "expedicaoEncontradaViaPedido": false,
+      "agrupamentosVerificados": 20
+    },
+    {
+      "pedidoId": 860312342,
+      "erpOrderId": "TINY-860312342",
+      "formaEnvioNome": "Mercado Envios",
+      "expedicaoEncontradaViaPedido": false,
+      "agrupamentosVerificados": 22
+    },
+    {
+      "pedidoId": 860231946,
+      "erpOrderId": "TINY-860231946",
+      "formaEnvioNome": "Mercado Envios",
+      "expedicaoEncontradaViaPedido": false,
+      "agrupamentosVerificados": 22
+    },
+    {
+      "pedidoId": 860327669,
+      "erpOrderId": "TINY-860327669",
+      "formaEnvioNome": "Shopee Envios",
+      "expedicaoEncontradaViaPedido": false,
+      "agrupamentosVerificados": 20
+    },
+    {
+      "pedidoId": 860168223,
+      "erpOrderId": "TINY-860168223",
+      "formaEnvioNome": "Mercado Envios",
+      "expedicaoEncontradaViaPedido": false,
+      "agrupamentosVerificados": 22
+    },
+    {
+      "pedidoId": 860285920,
+      "erpOrderId": "TINY-860285920",
+      "formaEnvioNome": "Mercado Envios",
+      "expedicaoEncontradaViaPedido": false,
+      "agrupamentosVerificados": 22
+    },
+    {
+      "pedidoId": 860208001,
+      "erpOrderId": "TINY-860208001",
+      "formaEnvioNome": "Mercado Envios",
+      "expedicaoEncontradaViaPedido": false,
+      "agrupamentosVerificados": 22
+    },
+    {
+      "pedidoId": 860234690,
+      "erpOrderId": "TINY-860234690",
+      "formaEnvioNome": "Mercado Envios",
+      "expedicaoEncontradaViaPedido": false,
+      "agrupamentosVerificados": 22
+    },
+    {
+      "pedidoId": 860337794,
+      "erpOrderId": "TINY-860337794",
+      "formaEnvioNome": "Mercado Envios",
+      "expedicaoEncontradaViaPedido": false,
+      "agrupamentosVerificados": 22
+    },
+    {
+      "pedidoId": 860283472,
+      "erpOrderId": "TINY-860283472",
+      "formaEnvioNome": "Mercado Envios",
+      "expedicaoEncontradaViaPedido": false,
+      "agrupamentosVerificados": 22
+    },
+    {
+      "pedidoId": 860334957,
+      "erpOrderId": "TINY-860334957",
+      "formaEnvioNome": "Shopee Envios",
+      "expedicaoEncontradaViaPedido": false,
+      "agrupamentosVerificados": 20
+    },
+    {
+      "pedidoId": 860331244,
+      "erpOrderId": "TINY-860331244",
+      "formaEnvioNome": "Mercado Envios",
+      "expedicaoEncontradaViaPedido": false,
+      "agrupamentosVerificados": 22
+    },
+    {
+      "pedidoId": 860305146,
+      "erpOrderId": "TINY-860305146",
+      "formaEnvioNome": "Mercado Envios",
+      "expedicaoEncontradaViaPedido": false,
+      "agrupamentosVerificados": 22
+    },
+    {
+      "pedidoId": 860309123,
+      "erpOrderId": "TINY-860309123",
+      "formaEnvioNome": "Mercado Envios",
+      "expedicaoEncontradaViaPedido": false,
+      "agrupamentosVerificados": 22
+    },
+    {
+      "pedidoId": 860342278,
+      "erpOrderId": "TINY-860342278",
+      "formaEnvioNome": "Shopee Envios",
+      "expedicaoEncontradaViaPedido": false,
+      "agrupamentosVerificados": 20
+    },
+    {
+      "pedidoId": 860333057,
+      "erpOrderId": "TINY-860333057",
+      "formaEnvioNome": "Shopee Envios",
+      "expedicaoEncontradaViaPedido": false,
+      "agrupamentosVerificados": 20
+    },
+    {
+      "pedidoId": 860167039,
+      "erpOrderId": "TINY-860167039",
+      "formaEnvioNome": "Mercado Envios",
+      "expedicaoEncontradaViaPedido": false,
+      "agrupamentosVerificados": 22
+    }
+  ],
+  "indicePorPedido": {
+    "860128290": {
+      "idAgrupamento": 746503439,
+      "idExpedicao": 749872823,
+      "formaEnvioNome": "Amazon DBA",
+      "temEtiqueta": false,
+      "urls": []
+    },
+    "860128663": {
+      "idAgrupamento": 746503439,
+      "idExpedicao": 749872847,
+      "formaEnvioNome": "Amazon DBA",
+      "temEtiqueta": false,
+      "urls": []
+    },
+    "860130640": {
+      "idAgrupamento": 746503439,
+      "idExpedicao": 749872993,
+      "formaEnvioNome": "Amazon DBA",
+      "temEtiqueta": false,
+      "urls": []
+    },
+    "860132216": {
+      "idAgrupamento": 746503439,
+      "idExpedicao": 749873067,
+      "formaEnvioNome": "Amazon DBA",
+      "temEtiqueta": false,
+      "urls": []
+    },
+    "860132267": {
+      "idAgrupamento": 746503439,
+      "idExpedicao": 749873068,
+      "formaEnvioNome": "Amazon DBA",
+      "temEtiqueta": false,
+      "urls": []
+    },
+    "860132943": {
+      "idAgrupamento": 746503439,
+      "idExpedicao": 749873097,
+      "formaEnvioNome": "Amazon DBA",
+      "temEtiqueta": false,
+      "urls": []
+    },
+    "860133251": {
+      "idAgrupamento": 746503439,
+      "idExpedicao": 749873119,
+      "formaEnvioNome": "Amazon DBA",
+      "temEtiqueta": false,
+      "urls": []
+    },
+    "860133385": {
+      "idAgrupamento": 746503439,
+      "idExpedicao": 749873123,
+      "formaEnvioNome": "Amazon DBA",
+      "temEtiqueta": false,
+      "urls": []
+    },
+    "860135254": {
+      "idAgrupamento": 746503439,
+      "idExpedicao": 749873242,
+      "formaEnvioNome": "Amazon DBA",
+      "temEtiqueta": false,
+      "urls": []
+    },
+    "860135732": {
+      "idAgrupamento": 746503439,
+      "idExpedicao": 749873260,
+      "formaEnvioNome": "Amazon DBA",
+      "temEtiqueta": false,
+      "urls": []
+    },
+    "860136002": {
+      "idAgrupamento": 746503439,
+      "idExpedicao": 749873277,
+      "formaEnvioNome": "Amazon DBA",
+      "temEtiqueta": false,
+      "urls": []
+    },
+    "860136964": {
+      "idAgrupamento": 746503439,
+      "idExpedicao": 749873309,
+      "formaEnvioNome": "Amazon DBA",
+      "temEtiqueta": false,
+      "urls": []
+    },
+    "860137587": {
+      "idAgrupamento": 746503439,
+      "idExpedicao": 749873328,
+      "formaEnvioNome": "Amazon DBA",
+      "temEtiqueta": false,
+      "urls": []
+    },
+    "860137840": {
+      "idAgrupamento": 746503439,
+      "idExpedicao": 749873337,
+      "formaEnvioNome": "Amazon DBA",
+      "temEtiqueta": false,
+      "urls": []
+    },
+    "860138634": {
+      "idAgrupamento": 746503439,
+      "idExpedicao": 749873357,
+      "formaEnvioNome": "Amazon DBA",
+      "temEtiqueta": false,
+      "urls": []
+    },
+    "860141307": {
+      "idAgrupamento": 746503439,
+      "idExpedicao": 749873393,
+      "formaEnvioNome": "Amazon DBA",
+      "temEtiqueta": false,
+      "urls": []
+    },
+    "860148791": {
+      "idAgrupamento": 746503477,
+      "idExpedicao": 749873880,
+      "formaEnvioNome": "Amazon DBA",
+      "temEtiqueta": false,
+      "urls": []
+    },
+    "860149369": {
+      "idAgrupamento": 746503477,
+      "idExpedicao": 749873906,
+      "formaEnvioNome": "Amazon DBA",
+      "temEtiqueta": false,
+      "urls": []
+    },
+    "860149725": {
+      "idAgrupamento": 746503477,
+      "idExpedicao": 749873942,
+      "formaEnvioNome": "Amazon DBA",
+      "temEtiqueta": false,
+      "urls": []
+    },
+    "860160070": {
+      "idAgrupamento": 746503477,
+      "idExpedicao": 749874126,
+      "formaEnvioNome": "Amazon DBA",
+      "temEtiqueta": false,
+      "urls": []
+    },
+    "860165272": {
+      "idAgrupamento": 746503477,
+      "idExpedicao": 749874366,
+      "formaEnvioNome": "Amazon DBA",
+      "temEtiqueta": false,
+      "urls": []
+    },
+    "860165669": {
+      "idAgrupamento": 746503477,
+      "idExpedicao": 749874396,
+      "formaEnvioNome": "Amazon DBA",
+      "temEtiqueta": false,
+      "urls": []
+    },
+    "860168395": {
+      "idAgrupamento": 746503477,
+      "idExpedicao": 749874570,
+      "formaEnvioNome": "Amazon DBA",
+      "temEtiqueta": false,
+      "urls": []
+    },
+    "860169085": {
+      "idAgrupamento": 746503477,
+      "idExpedicao": 749874552,
+      "formaEnvioNome": "Amazon DBA",
+      "temEtiqueta": false,
+      "urls": []
+    },
+    "860169434": {
+      "idAgrupamento": 746503477,
+      "idExpedicao": 749874560,
+      "formaEnvioNome": "Amazon DBA",
+      "temEtiqueta": false,
+      "urls": []
+    },
+    "860169702": {
+      "idAgrupamento": 746503478,
+      "idExpedicao": 749874574,
+      "formaEnvioNome": "Amazon DBA",
+      "temEtiqueta": false,
+      "urls": []
+    },
+    "860171873": {
+      "idAgrupamento": 746503477,
+      "idExpedicao": 749874758,
+      "formaEnvioNome": "Amazon DBA",
+      "temEtiqueta": false,
+      "urls": []
+    },
+    "860172202": {
+      "idAgrupamento": 746503477,
+      "idExpedicao": 749874777,
+      "formaEnvioNome": "Amazon DBA",
+      "temEtiqueta": false,
+      "urls": []
+    },
+    "860174179": {
+      "idAgrupamento": 746503487,
+      "idExpedicao": 749874884,
+      "formaEnvioNome": "Amazon DBA",
+      "temEtiqueta": false,
+      "urls": []
+    },
+    "860184643": {
+      "idAgrupamento": 746503526,
+      "idExpedicao": 749875752,
+      "formaEnvioNome": "Amazon DBA",
+      "temEtiqueta": false,
+      "urls": []
+    },
+    "860186047": {
+      "idAgrupamento": 746503526,
+      "idExpedicao": 749875808,
+      "formaEnvioNome": "Amazon DBA",
+      "temEtiqueta": false,
+      "urls": []
+    },
+    "860186563": {
+      "idAgrupamento": 746503526,
+      "idExpedicao": 749875825,
+      "formaEnvioNome": "Amazon DBA",
+      "temEtiqueta": false,
+      "urls": []
+    },
+    "860188087": {
+      "idAgrupamento": 746503526,
+      "idExpedicao": 749875918,
+      "formaEnvioNome": "Amazon DBA",
+      "temEtiqueta": false,
+      "urls": []
+    },
+    "860188621": {
+      "idAgrupamento": 746503526,
+      "idExpedicao": 749875952,
+      "formaEnvioNome": "Amazon DBA",
+      "temEtiqueta": false,
+      "urls": []
+    },
+    "860190939": {
+      "idAgrupamento": 746503526,
+      "idExpedicao": 749876095,
+      "formaEnvioNome": "Amazon DBA",
+      "temEtiqueta": false,
+      "urls": []
+    },
+    "860191188": {
+      "idAgrupamento": 746503526,
+      "idExpedicao": 749876112,
+      "formaEnvioNome": "Amazon DBA",
+      "temEtiqueta": false,
+      "urls": []
+    },
+    "860193464": {
+      "idAgrupamento": 746503526,
+      "idExpedicao": 749876244,
+      "formaEnvioNome": "Amazon DBA",
+      "temEtiqueta": false,
+      "urls": []
+    },
+    "860194204": {
+      "idAgrupamento": 746503526,
+      "idExpedicao": 749876294,
+      "formaEnvioNome": "Amazon DBA",
+      "temEtiqueta": false,
+      "urls": []
+    },
+    "860194658": {
+      "idAgrupamento": 746503526,
+      "idExpedicao": 749876310,
+      "formaEnvioNome": "Amazon DBA",
+      "temEtiqueta": false,
+      "urls": []
+    },
+    "860198449": {
+      "idAgrupamento": 746503556,
+      "idExpedicao": 749876663,
+      "formaEnvioNome": "Amazon DBA",
+      "temEtiqueta": false,
+      "urls": []
+    },
+    "860198874": {
+      "idAgrupamento": 746503556,
+      "idExpedicao": 749876630,
+      "formaEnvioNome": "Amazon DBA",
+      "temEtiqueta": false,
+      "urls": []
+    },
+    "860200901": {
+      "idAgrupamento": 746503571,
+      "idExpedicao": 749876734,
+      "formaEnvioNome": "Amazon DBA",
+      "temEtiqueta": false,
+      "urls": []
+    },
+    "860201059": {
+      "idAgrupamento": 746503556,
+      "idExpedicao": 749876746,
+      "formaEnvioNome": "Amazon DBA",
+      "temEtiqueta": false,
+      "urls": []
+    },
+    "860201177": {
+      "idAgrupamento": 746503556,
+      "idExpedicao": 749876753,
+      "formaEnvioNome": "Amazon DBA",
+      "temEtiqueta": false,
+      "urls": []
+    },
+    "860202103": {
+      "idAgrupamento": 746503556,
+      "idExpedicao": 749876801,
+      "formaEnvioNome": "Amazon DBA",
+      "temEtiqueta": false,
+      "urls": []
+    },
+    "860202773": {
+      "idAgrupamento": 746503556,
+      "idExpedicao": 749876836,
+      "formaEnvioNome": "Amazon DBA",
+      "temEtiqueta": false,
+      "urls": []
+    },
+    "860203156": {
+      "idAgrupamento": 746503571,
+      "idExpedicao": 749876864,
+      "formaEnvioNome": "Amazon DBA",
+      "temEtiqueta": false,
+      "urls": []
+    },
+    "860203635": {
+      "idAgrupamento": 746503556,
+      "idExpedicao": 749876884,
+      "formaEnvioNome": "Amazon DBA",
+      "temEtiqueta": false,
+      "urls": []
+    },
+    "860204210": {
+      "idAgrupamento": 746503556,
+      "idExpedicao": 749876901,
+      "formaEnvioNome": "Amazon DBA",
+      "temEtiqueta": false,
+      "urls": []
+    },
+    "860204525": {
+      "idAgrupamento": 746503556,
+      "idExpedicao": 749876915,
+      "formaEnvioNome": "Amazon DBA",
+      "temEtiqueta": false,
+      "urls": []
+    },
+    "860207894": {
+      "idAgrupamento": 746503556,
+      "idExpedicao": 749877145,
+      "formaEnvioNome": "Amazon DBA",
+      "temEtiqueta": false,
+      "urls": []
+    },
+    "860208242": {
+      "idAgrupamento": 746503556,
+      "idExpedicao": 749877161,
+      "formaEnvioNome": "Amazon DBA",
+      "temEtiqueta": false,
+      "urls": []
+    },
+    "860208518": {
+      "idAgrupamento": 746503556,
+      "idExpedicao": 749877168,
+      "formaEnvioNome": "Amazon DBA",
+      "temEtiqueta": false,
+      "urls": []
+    },
+    "860209020": {
+      "idAgrupamento": 746503556,
+      "idExpedicao": 749877192,
+      "formaEnvioNome": "Amazon DBA",
+      "temEtiqueta": false,
+      "urls": []
+    },
+    "860210708": {
+      "idAgrupamento": 746503556,
+      "idExpedicao": 749877297,
+      "formaEnvioNome": "Amazon DBA",
+      "temEtiqueta": false,
+      "urls": []
+    },
+    "860211772": {
+      "idAgrupamento": 746503556,
+      "idExpedicao": 749877357,
+      "formaEnvioNome": "Amazon DBA",
+      "temEtiqueta": false,
+      "urls": []
+    },
+    "860211955": {
+      "idAgrupamento": 746503556,
+      "idExpedicao": 749877373,
+      "formaEnvioNome": "Amazon DBA",
+      "temEtiqueta": false,
+      "urls": []
+    },
+    "860212880": {
+      "idAgrupamento": 746503556,
+      "idExpedicao": 749877433,
+      "formaEnvioNome": "Amazon DBA",
+      "temEtiqueta": false,
+      "urls": []
+    },
+    "860213177": {
+      "idAgrupamento": 746503556,
+      "idExpedicao": 749877452,
+      "formaEnvioNome": "Amazon DBA",
+      "temEtiqueta": false,
+      "urls": []
+    },
+    "860214007": {
+      "idAgrupamento": 746503556,
+      "idExpedicao": 749877513,
+      "formaEnvioNome": "Amazon DBA",
+      "temEtiqueta": false,
+      "urls": []
+    },
+    "860214687": {
+      "idAgrupamento": 746503556,
+      "idExpedicao": 749877555,
+      "formaEnvioNome": "Amazon DBA",
+      "temEtiqueta": false,
+      "urls": []
+    },
+    "860215171": {
+      "idAgrupamento": 746503556,
+      "idExpedicao": 749877586,
+      "formaEnvioNome": "Amazon DBA",
+      "temEtiqueta": false,
+      "urls": []
+    },
+    "860215204": {
+      "idAgrupamento": 746503556,
+      "idExpedicao": 749877592,
+      "formaEnvioNome": "Amazon DBA",
+      "temEtiqueta": false,
+      "urls": []
+    },
+    "860215833": {
+      "idAgrupamento": 746503557,
+      "idExpedicao": 749877642,
+      "formaEnvioNome": "Amazon DBA",
+      "temEtiqueta": false,
+      "urls": []
+    },
+    "860216338": {
+      "idAgrupamento": 746503557,
+      "idExpedicao": 749877677,
+      "formaEnvioNome": "Amazon DBA",
+      "temEtiqueta": false,
+      "urls": []
+    },
+    "860218014": {
+      "idAgrupamento": 746503557,
+      "idExpedicao": 749877781,
+      "formaEnvioNome": "Amazon DBA",
+      "temEtiqueta": false,
+      "urls": []
+    },
+    "860218321": {
+      "idAgrupamento": 746503557,
+      "idExpedicao": 749877795,
+      "formaEnvioNome": "Amazon DBA",
+      "temEtiqueta": false,
+      "urls": []
+    },
+    "860222658": {
+      "idAgrupamento": 746503557,
+      "idExpedicao": 749878018,
+      "formaEnvioNome": "Amazon DBA",
+      "temEtiqueta": false,
+      "urls": []
+    },
+    "860225913": {
+      "idAgrupamento": 746503558,
+      "idExpedicao": 749878277,
+      "formaEnvioNome": "Amazon DBA",
+      "temEtiqueta": false,
+      "urls": []
+    },
+    "860228447": {
+      "idAgrupamento": 746503557,
+      "idExpedicao": 749878614,
+      "formaEnvioNome": "Amazon DBA",
+      "temEtiqueta": false,
+      "urls": []
+    },
+    "860232966": {
+      "idAgrupamento": 746503579,
+      "idExpedicao": 749879017,
+      "formaEnvioNome": "Amazon DBA",
+      "temEtiqueta": false,
+      "urls": []
+    },
+    "860236468": {
+      "idAgrupamento": 746503579,
+      "idExpedicao": 749879124,
+      "formaEnvioNome": "Amazon DBA",
+      "temEtiqueta": false,
+      "urls": []
+    },
+    "860239738": {
+      "idAgrupamento": 746503579,
+      "idExpedicao": 749879304,
+      "formaEnvioNome": "Amazon DBA",
+      "temEtiqueta": false,
+      "urls": []
+    },
+    "860242388": {
+      "idAgrupamento": 746503579,
+      "idExpedicao": 749879408,
+      "formaEnvioNome": "Amazon DBA",
+      "temEtiqueta": false,
+      "urls": []
+    },
+    "860245673": {
+      "idAgrupamento": 746503601,
+      "idExpedicao": 749879607,
+      "formaEnvioNome": "Amazon DBA",
+      "temEtiqueta": false,
+      "urls": []
+    },
+    "860247252": {
+      "idAgrupamento": 746503601,
+      "idExpedicao": 749879768,
+      "formaEnvioNome": "Amazon DBA",
+      "temEtiqueta": false,
+      "urls": []
+    },
+    "860247527": {
+      "idAgrupamento": 746503601,
+      "idExpedicao": 749879791,
+      "formaEnvioNome": "Amazon DBA",
+      "temEtiqueta": false,
+      "urls": []
+    },
+    "860247696": {
+      "idAgrupamento": 746503601,
+      "idExpedicao": 749879809,
+      "formaEnvioNome": "Amazon DBA",
+      "temEtiqueta": false,
+      "urls": []
+    },
+    "860249132": {
+      "idAgrupamento": 746503628,
+      "idExpedicao": 749879885,
+      "formaEnvioNome": "Amazon DBA",
+      "temEtiqueta": false,
+      "urls": []
+    },
+    "860249725": {
+      "idAgrupamento": 746503628,
+      "idExpedicao": 749879948,
+      "formaEnvioNome": "Amazon DBA",
+      "temEtiqueta": false,
+      "urls": []
+    },
+    "860251921": {
+      "idAgrupamento": 746503628,
+      "idExpedicao": 749880027,
+      "formaEnvioNome": "Amazon DBA",
+      "temEtiqueta": false,
+      "urls": []
+    },
+    "860252684": {
+      "idAgrupamento": 746503628,
+      "idExpedicao": 749880045,
+      "formaEnvioNome": "Amazon DBA",
+      "temEtiqueta": false,
+      "urls": []
+    },
+    "860254912": {
+      "idAgrupamento": 746503628,
+      "idExpedicao": 749880119,
+      "formaEnvioNome": "Amazon DBA",
+      "temEtiqueta": false,
+      "urls": []
+    },
+    "860258239": {
+      "idAgrupamento": 746503628,
+      "idExpedicao": 749880257,
+      "formaEnvioNome": "Amazon DBA",
+      "temEtiqueta": false,
+      "urls": []
+    },
+    "860261922": {
+      "idAgrupamento": 746503636,
+      "idExpedicao": 749880412,
+      "formaEnvioNome": "Amazon DBA",
+      "temEtiqueta": false,
+      "urls": []
+    },
+    "860266314": {
+      "idAgrupamento": 746503670,
+      "idExpedicao": 749880778,
+      "formaEnvioNome": "Amazon DBA",
+      "temEtiqueta": false,
+      "urls": []
+    },
+    "860268763": {
+      "idAgrupamento": 746503670,
+      "idExpedicao": 749880901,
+      "formaEnvioNome": "Amazon DBA",
+      "temEtiqueta": false,
+      "urls": []
+    },
+    "860272116": {
+      "idAgrupamento": 746503670,
+      "idExpedicao": 749881067,
+      "formaEnvioNome": "Amazon DBA",
+      "temEtiqueta": false,
+      "urls": []
+    },
+    "860276016": {
+      "idAgrupamento": 746503670,
+      "idExpedicao": 749881249,
+      "formaEnvioNome": "Amazon DBA",
+      "temEtiqueta": false,
+      "urls": []
+    },
+    "860280807": {
+      "idAgrupamento": 746503703,
+      "idExpedicao": 749881546,
+      "formaEnvioNome": "Amazon DBA",
+      "temEtiqueta": false,
+      "urls": []
+    },
+    "860284778": {
+      "idAgrupamento": 746503703,
+      "idExpedicao": 749881818,
+      "formaEnvioNome": "Amazon DBA",
+      "temEtiqueta": false,
+      "urls": []
+    },
+    "860286006": {
+      "idAgrupamento": 746503703,
+      "idExpedicao": 749881883,
+      "formaEnvioNome": "Amazon DBA",
+      "temEtiqueta": false,
+      "urls": []
+    },
+    "860286588": {
+      "idAgrupamento": 746503703,
+      "idExpedicao": 749882109,
+      "formaEnvioNome": "Amazon DBA",
+      "temEtiqueta": false,
+      "urls": []
+    },
+    "860301754": {
+      "idAgrupamento": 746503742,
+      "idExpedicao": 749882106,
+      "formaEnvioNome": "Mercado Envios",
+      "temEtiqueta": false,
+      "urls": []
+    },
+    "860303355": {
+      "idAgrupamento": 746503703,
+      "idExpedicao": 749882197,
+      "formaEnvioNome": "Amazon DBA",
+      "temEtiqueta": false,
+      "urls": []
+    },
+    "860303730": {
+      "idAgrupamento": 746503703,
+      "idExpedicao": 749882215,
+      "formaEnvioNome": "Amazon DBA",
+      "temEtiqueta": false,
+      "urls": []
+    },
+    "860304258": {
+      "idAgrupamento": 746503703,
+      "idExpedicao": 749882243,
+      "formaEnvioNome": "Amazon DBA",
+      "temEtiqueta": false,
+      "urls": []
+    },
+    "860304498": {
+      "idAgrupamento": 746503703,
+      "idExpedicao": 749882248,
+      "formaEnvioNome": "Amazon DBA",
+      "temEtiqueta": false,
+      "urls": []
+    },
+    "860308622": {
+      "idAgrupamento": 746503719,
+      "idExpedicao": 749882504,
+      "formaEnvioNome": "Amazon DBA",
+      "temEtiqueta": false,
+      "urls": []
+    },
+    "860309480": {
+      "idAgrupamento": 746503719,
+      "idExpedicao": 749882559,
+      "formaEnvioNome": "Amazon DBA",
+      "temEtiqueta": false,
+      "urls": []
+    },
+    "860312831": {
+      "idAgrupamento": 746503747,
+      "idExpedicao": 749882720,
+      "formaEnvioNome": "Amazon DBA",
+      "temEtiqueta": false,
+      "urls": []
+    },
+    "860313147": {
+      "idAgrupamento": 746503747,
+      "idExpedicao": 749882739,
+      "formaEnvioNome": "Amazon DBA",
+      "temEtiqueta": false,
+      "urls": []
+    },
+    "860313177": {
+      "idAgrupamento": 746503747,
+      "idExpedicao": 749882741,
+      "formaEnvioNome": "Amazon DBA",
+      "temEtiqueta": false,
+      "urls": []
+    },
+    "860313782": {
+      "idAgrupamento": 746503747,
+      "idExpedicao": 749882755,
+      "formaEnvioNome": "Amazon DBA",
+      "temEtiqueta": false,
+      "urls": []
+    },
+    "860317537": {
+      "idAgrupamento": 746503747,
+      "idExpedicao": 749882929,
+      "formaEnvioNome": "Amazon DBA",
+      "temEtiqueta": false,
+      "urls": []
+    },
+    "860321899": {
+      "idAgrupamento": 746503757,
+      "idExpedicao": 749883161,
+      "formaEnvioNome": "Amazon DBA",
+      "temEtiqueta": false,
+      "urls": []
+    },
+    "860322337": {
+      "idAgrupamento": 746503757,
+      "idExpedicao": 749883186,
+      "formaEnvioNome": "Amazon DBA",
+      "temEtiqueta": false,
+      "urls": []
+    },
+    "860324034": {
+      "idAgrupamento": 746503757,
+      "idExpedicao": 749883241,
+      "formaEnvioNome": "Amazon DBA",
+      "temEtiqueta": false,
+      "urls": []
+    },
+    "860324578": {
+      "idAgrupamento": 746503757,
+      "idExpedicao": 749883266,
+      "formaEnvioNome": "Amazon DBA",
+      "temEtiqueta": false,
+      "urls": []
+    },
+    "860324820": {
+      "idAgrupamento": 746503757,
+      "idExpedicao": 749883278,
+      "formaEnvioNome": "Amazon DBA",
+      "temEtiqueta": false,
+      "urls": []
+    },
+    "860324974": {
+      "idAgrupamento": 746503757,
+      "idExpedicao": 749883281,
+      "formaEnvioNome": "Amazon DBA",
+      "temEtiqueta": false,
+      "urls": []
+    },
+    "860326478": {
+      "idAgrupamento": 746503757,
+      "idExpedicao": 749883342,
+      "formaEnvioNome": "Amazon DBA",
+      "temEtiqueta": false,
+      "urls": []
+    },
+    "860329599": {
+      "idAgrupamento": 746503757,
+      "idExpedicao": 749883501,
+      "formaEnvioNome": "Amazon DBA",
+      "temEtiqueta": false,
+      "urls": []
+    },
+    "860330865": {
+      "idAgrupamento": 746503757,
+      "idExpedicao": 749883566,
+      "formaEnvioNome": "Amazon DBA",
+      "temEtiqueta": false,
+      "urls": []
+    },
+    "860333063": {
+      "idAgrupamento": 746503757,
+      "idExpedicao": 749883674,
+      "formaEnvioNome": "Amazon DBA",
+      "temEtiqueta": false,
+      "urls": []
+    },
+    "860333456": {
+      "idAgrupamento": 746503757,
+      "idExpedicao": 749883696,
+      "formaEnvioNome": "Amazon DBA",
+      "temEtiqueta": false,
+      "urls": []
+    },
+    "860334351": {
+      "idAgrupamento": 746503757,
+      "idExpedicao": 749883743,
+      "formaEnvioNome": "Amazon DBA",
+      "temEtiqueta": false,
+      "urls": []
+    },
+    "860334475": {
+      "idAgrupamento": 746503757,
+      "idExpedicao": 749883750,
+      "formaEnvioNome": "Amazon DBA",
+      "temEtiqueta": false,
+      "urls": []
+    },
+    "860334804": {
+      "idAgrupamento": 746503757,
+      "idExpedicao": 749883762,
+      "formaEnvioNome": "Amazon DBA",
+      "temEtiqueta": false,
+      "urls": []
+    },
+    "860334824": {
+      "idAgrupamento": 746503757,
+      "idExpedicao": 749883764,
+      "formaEnvioNome": "Amazon DBA",
+      "temEtiqueta": false,
+      "urls": []
+    },
+    "860342783": {
+      "idAgrupamento": 746503773,
+      "idExpedicao": 749884319,
+      "formaEnvioNome": "Amazon DBA",
+      "temEtiqueta": false,
+      "urls": []
+    },
+    "860344011": {
+      "idAgrupamento": 746503773,
+      "idExpedicao": 749884373,
+      "formaEnvioNome": "Amazon DBA",
+      "temEtiqueta": false,
+      "urls": []
+    }
+  }
+}

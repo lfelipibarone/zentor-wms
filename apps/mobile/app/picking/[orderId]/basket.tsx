@@ -1,6 +1,7 @@
-import { useState } from "react";
-import { router, useLocalSearchParams } from "expo-router";
-import { ActivityIndicator, StyleSheet, Text, View } from "react-native";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { router, useLocalSearchParams, useNavigation } from "expo-router";
+import { ActivityIndicator, Alert, StyleSheet, Text, View } from "react-native";
+import { OrderStatus } from "@wms/shared";
 import { BarcodeScanner } from "@/components/BarcodeScanner";
 import { FactoryButton } from "@/components/FactoryButton";
 import { ProductThumbnail } from "@/components/ProductThumbnail";
@@ -16,16 +17,62 @@ import { theme, spacing, typography } from "@/lib/theme";
 
 export default function BasketScanScreen() {
   const { orderId } = useLocalSearchParams<{ orderId: string }>();
+  const navigation = useNavigation();
   const { data: session, isLoading } = usePickingSession(orderId);
   const attach = useAttachBasket(orderId);
   const releaseAccept = useReleaseOrderAccept(orderId);
   const [scannerOpen, setScannerOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const releasingRef = useRef(false);
 
   const canRelease =
     session &&
     !session.order.basket &&
-    session.items.every((i) => i.quantityPicked === 0);
+    session.items.every((i) => i.quantityPicked === 0) &&
+    session.order.status === OrderStatus.PICKING;
+
+  const handleReleaseAccept = useCallback(async () => {
+    if (releasingRef.current) return false;
+    releasingRef.current = true;
+    try {
+      await releaseAccept.mutateAsync();
+      return true;
+    } catch (e) {
+      showErrorAlert(
+        e instanceof ApiError ? e.message : "Erro ao cancelar aceite",
+      );
+      return false;
+    } finally {
+      releasingRef.current = false;
+    }
+  }, [releaseAccept]);
+
+  useEffect(() => {
+    const unsubscribe = navigation.addListener("beforeRemove", (e) => {
+      if (!canRelease || releasingRef.current) return;
+      e.preventDefault();
+      Alert.alert(
+        "Sair sem cesta?",
+        "O pedido voltará para a fila de separação.",
+        [
+          { text: "Continuar", style: "cancel" },
+          {
+            text: "Voltar à fila",
+            style: "destructive",
+            onPress: () => {
+              void (async () => {
+                const released = await handleReleaseAccept();
+                if (released) {
+                  navigation.dispatch(e.data.action);
+                }
+              })();
+            },
+          },
+        ],
+      );
+    });
+    return unsubscribe;
+  }, [canRelease, handleReleaseAccept, navigation]);
 
   const handleScan = async (barcode: string) => {
     setScannerOpen(false);
@@ -41,14 +88,10 @@ export default function BasketScanScreen() {
     }
   };
 
-  const handleReleaseAccept = async () => {
-    try {
-      await releaseAccept.mutateAsync();
+  const handleReleaseAcceptPress = async () => {
+    const released = await handleReleaseAccept();
+    if (released) {
       router.replace("/picking");
-    } catch (e) {
-      showErrorAlert(
-        e instanceof ApiError ? e.message : "Erro ao cancelar aceite",
-      );
     }
   };
 
@@ -116,7 +159,7 @@ export default function BasketScanScreen() {
         <FactoryButton
           label="Cancelar aceite"
           variant="secondary"
-          onPress={handleReleaseAccept}
+          onPress={handleReleaseAcceptPress}
           loading={releaseAccept.isPending}
         />
       ) : null}

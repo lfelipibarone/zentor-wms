@@ -8,7 +8,7 @@ export default function GestaoBarracaoPage() {
     <div>
       <PageHeader
         title="Layout do galpão"
-        description="Visualize todo o layout do galpão em uma única tela. Use Novo para cadastrar barracão, setor, corredor, fileira, estante, prateleira ou coluna."
+        description="Cadastre e gerencie localizações do galpão (pulmão ou estoque de giro)."
       />
       <WarehouseLayoutEditor />
     </div>

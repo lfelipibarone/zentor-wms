@@ -1,0 +1,23 @@
+{
+  "descricao": "Um arquivo JSON por pedido do teste tiny-etiquetas-situacoes. Abra index.json para a lista ou abra TINY-{id}.json diretamente.",
+  "secoes": [
+    "meta — identificação e diagnóstico",
+    "pedido.rotas — API pedido",
+    "nota.rotas — API nota fiscal (DANFE/link)",
+    "formaEnvio.rotas — forma de envio do pedido",
+    "expedicao.rotas — detalhe do agrupamento",
+    "etiquetas.rotas — tentativas de etiqueta de transporte"
+  ],
+  "arquivos": [
+    "TINY-860301754.json",
+    "TINY-860342783.json",
+    "TINY-860347555.json",
+    "TINY-860354220.json",
+    "TINY-860371275.json",
+    "TINY-860374180.json",
+    "TINY-860385662.json",
+    "TINY-860386179.json",
+    "TINY-860386892.json",
+    "TINY-860387758.json"
+  ]
+}

@@ -1,0 +1,341 @@
+{
+  "meta": {
+    "fetchedAt": "2026-06-17T18:02:29.243Z",
+    "pedidoId": 860385662,
+    "erpOrderId": "TINY-860385662",
+    "numeroPedido": 207738,
+    "situacao": 5,
+    "situacaoLabel": "Enviada",
+    "formaEnvioNome": "Shopee Envios",
+    "diagnostico": "FORA_EXPEDICAO",
+    "resumoTesteAnterior": {
+      "pedidoId": 860385662,
+      "erpOrderId": "TINY-860385662",
+      "numeroPedido": 207738,
+      "situacao": 5,
+      "situacaoLabel": "Enviada",
+      "formaEnvioNome": "Shopee Envios",
+      "codigoRastreamento": null,
+      "idNotaFiscal": 860385665,
+      "naExpedicao": false,
+      "expedicao": null,
+      "etiquetas": {
+        "urls": [],
+        "marketplaceError": null,
+        "diagnostico": "FORA_EXPEDICAO"
+      }
+    }
+  },
+  "pedido": {
+    "rotas": {
+      "GET /pedidos/860385662": {
+        "rota": "GET /pedidos/860385662",
+        "params": {
+          "idPedido": 860385662
+        },
+        "ok": true,
+        "urls": [],
+        "resposta": {
+          "id": 860385662,
+          "numeroPedido": 207738,
+          "idNotaFiscal": 860385665,
+          "dataFaturamento": "2026-06-17",
+          "valorTotalProdutos": 18.51,
+          "valorTotalPedido": 18.51,
+          "listaPreco": {
+            "id": 0,
+            "nome": "Padrão",
+            "acrescimoDesconto": 0
+          },
+          "cliente": {
+            "nome": "Natalia Alves Cavalcante",
+            "codigo": "",
+            "fantasia": "",
+            "tipoPessoa": "F",
+            "cpfCnpj": "618.288.463-09",
+            "inscricaoEstadual": "",
+            "rg": "",
+            "telefone": "",
+            "celular": "",
+            "email": "",
+            "endereco": {
+              "endereco": "Avenida Brasil",
+              "numero": "494",
+              "complemento": "",
+              "bairro": "Centro",
+              "municipio": "Peixoto de Azevedo",
+              "cep": "78.530-000",
+              "uf": "MT",
+              "pais": "Brasil"
+            },
+            "id": 766894906
+          },
+          "enderecoEntrega": null,
+          "ecommerce": {
+            "id": 7129,
+            "nome": "Shopee Loja Carbi",
+            "numeroPedidoEcommerce": "260618BYHNJ8CW",
+            "numeroPedidoCanalVenda": "",
+            "canalVenda": ""
+          },
+          "transportador": {
+            "id": 0,
+            "nome": "",
+            "fretePorConta": "R",
+            "formaEnvio": {
+              "id": 756508453,
+              "nome": "Shopee Envios"
+            },
+            "formaFrete": null,
+            "codigoRastreamento": "",
+            "urlRastreamento": ""
+          },
+          "deposito": null,
+          "vendedor": null,
+          "naturezaOperacao": {
+            "id": 775374075,
+            "nome": "Venda de Mercadorias - Regime normal"
+          },
+          "intermediador": {
+            "id": 382,
+            "nome": "326301515",
+            "cnpj": "35.635.824/0001-12",
+            "cnpjPagamentoInstituicao": ""
+          },
+          "pagamento": null,
+          "itens": [
+            {
+              "produto": {
+                "id": 744037522,
+                "sku": "PUXCONGALES64COF",
+                "descricao": "PUXADOR GALES 64MM - Cobre Fosco",
+                "tipo": "P"
+              },
+              "quantidade": 2,
+              "valorUnitario": 9.255,
+              "infoAdicional": ""
+            }
+          ],
+          "pagamentosIntegrados": [
+            {
+              "valor": 24.81,
+              "tipoPagamento": 3,
+              "cnpjIntermediador": "38372267000182",
+              "codigoAutorizacao": "T84564",
+              "codigoBandeira": 2
+            }
+          ],
+          "situacao": 5,
+          "data": "2026-06-17",
+          "dataEntrega": "",
+          "numeroOrdemCompra": "260618BYHNJ8CW",
+          "valorDesconto": 0,
+          "valorFrete": 0,
+          "valorOutrasDespesas": 0,
+          "dataPrevista": "",
+          "dataEnvio": "2026-06-17 13:55:20",
+          "observacoes": "",
+          "observacoesInternas": "Avenida Brasil, 494, Loja lavini preço único 20e70, Peixoto de Azevedo, Mato Grosso, 78530000",
+          "origemPedido": 0
+        }
+      },
+      "GET /pedidos/860385662/marcadores": {
+        "rota": "GET /pedidos/860385662/marcadores",
+        "params": {
+          "idPedido": 860385662
+        },
+        "ok": true,
+        "urls": [],
+        "resposta": [
+          {
+            "descricao": "1ª venda"
+          }
+        ]
+      }
+    }
+  },
+  "nota": {
+    "idNotaFiscal": 860385665,
+    "rotas": {
+      "GET /notas/860385665": {
+        "rota": "GET /notas/860385665",
+        "params": {
+          "idNota": 860385665
+        },
+        "ok": true,
+        "urls": [],
+        "resposta": {
+          "situacao": "6",
+          "tipo": "S",
+          "numero": "156542",
+          "serie": "5",
+          "chaveAcesso": "35260637919979000106550050001565421603856657",
+          "dataEmissao": "2026-06-17",
+          "dataPrevista": "0000-00-00",
+          "cliente": {
+            "nome": "Natalia Alves Cavalcante",
+            "codigo": null,
+            "fantasia": null,
+            "tipoPessoa": "F",
+            "cpfCnpj": "618.288.463-09",
+            "inscricaoEstadual": "",
+            "rg": null,
+            "telefone": "",
+            "celular": null,
+            "email": "",
+            "endereco": {
+              "endereco": "Avenida Brasil",
+              "numero": "494",
+              "complemento": "",
+              "bairro": "Centro",
+              "municipio": "Peixoto de Azevedo",
+              "cep": "78.530-000",
+              "uf": "MT",
+              "pais": "Brasil"
+            },
+            "id": 766894906
+          },
+          "enderecoEntrega": null,
+          "valor": 18.51,
+          "valorProdutos": 18.51,
+          "valorFrete": 0,
+          "vendedor": null,
+          "idFormaEnvio": 756508453,
+          "idFormaFrete": 0,
+          "codigoRastreamento": "",
+          "urlRastreamento": "",
+          "fretePorConta": "R",
+          "qtdVolumes": 1,
+          "pesoBruto": 0.014,
+          "pesoLiquido": 0.014,
+          "id": 860385665,
+          "finalidade": "1",
+          "regimeTributario": 3,
+          "dataInclusao": "2026-06-17 13:13:34",
+          "baseIcms": 18.51,
+          "valorIcms": 1.3,
+          "baseIcmsSt": 0,
+          "valorIcmsSt": 0,
+          "valorServicos": 0,
+          "valorSeguro": 0,
+          "valorOutras": 0,
+          "valorIpi": 0,
+          "valorIssqn": 0,
+          "valorDesconto": 0,
+          "valorFaturado": 18.51,
+          "idIntermediador": 382,
+          "idNaturezaOperacao": 775374075,
+          "idFormaPagamento": 0,
+          "idMeioPagamento": 0,
+          "observacoes": "OC: 260618BYHNJ8CW\nNº Pedido: 207738\r\nTributos aproximados: R$ 3,07 (Federal) e R$ 3,33 (Estadual). Fonte: IBPT 5F6AA1\n",
+          "condicaoPagamento": "",
+          "valorNotaComImpostos": 18.51,
+          "valorBaseDiferimento": 0,
+          "percentualICMSPartilhaDestino": 100,
+          "valorTotalICMSFCPDestino": 0,
+          "valorIPIDevolvido": 0,
+          "tipoNotaCredito": "",
+          "tipoNotaDebito": "",
+          "valorTotalBCIBSCBS": 14.73,
+          "valorTotalIBSUF": 0.01,
+          "valorTotalCBS": 0.13,
+          "itens": [
+            {
+              "idItem": 780301727,
+              "idProduto": 744037522,
+              "codigo": "PUXCONGALES64COF",
+              "ncm": "3926.30.00",
+              "descricao": "PUXADOR GALES 64MM - Cobre Fosco",
+              "unidade": "UN",
+              "quantidade": 2,
+              "valorUnitario": 9.255,
+              "valorTotal": 18.51,
+              "cfop": "6102",
+              "naturezaOperacao": "Venda de Mercadorias - Regime normal"
+            }
+          ],
+          "parcelas": [],
+          "pagamentosIntegrados": [
+            {
+              "valor": 24.81,
+              "tipoPagamento": 3,
+              "cnpjIntermediador": "38372267000182",
+              "codigoAutorizacao": "T84564",
+              "codigoBandeira": 2
+            }
+          ],
+          "ecommerce": {
+            "id": 7129,
+            "nome": "Shopee Loja Carbi",
+            "numeroPedidoEcommerce": "260618BYHNJ8CW",
+            "numeroPedidoCanalVenda": "",
+            "canalVenda": ""
+          },
+          "marcadores": [],
+          "transportador": {
+            "nome": "",
+            "cpfCnpj": "",
+            "ie": "",
+            "endereco": "",
+            "municipio": null,
+            "uf": ""
+          },
+          "origem": {
+            "id": "860385662",
+            "tipo": "venda"
+          }
+        }
+      },
+      "GET /notas/860385665/link": {
+        "rota": "GET /notas/860385665/link",
+        "params": {
+          "idNota": 860385665
+        },
+        "ok": true,
+        "urls": [],
+        "resposta": {
+          "link": "https://erp.tiny.com.br/doc.view?id=d975355486554981425b22751061ba13"
+        }
+      },
+      "GET /notas/860385665/marcadores": {
+        "rota": "GET /notas/860385665/marcadores",
+        "params": {
+          "idNota": 860385665
+        },
+        "ok": true,
+        "urls": [],
+        "resposta": []
+      }
+    }
+  },
+  "formaEnvio": {
+    "idFormaEnvio": 756508453,
+    "rotas": {
+      "GET /formas-envio/756508453": {
+        "rota": "GET /formas-envio/756508453",
+        "params": {
+          "idFormaEnvio": 756508453
+        },
+        "ok": true,
+        "urls": [],
+        "resposta": {
+          "nome": "Shopee Envios",
+          "tipo": "12",
+          "situacao": "1",
+          "id": 756508453,
+          "gatewayLogistico": null,
+          "formasFrete": []
+        }
+      }
+    }
+  },
+  "expedicao": {
+    "encontrada": false,
+    "match": null,
+    "rotas": {}
+  },
+  "etiquetas": {
+    "urls": [],
+    "rotas": {}
+  }
+}

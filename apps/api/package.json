@@ -4,9 +4,9 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "tsx watch src/index.ts",
+    "dev": "tsx watch --env-file .env src/index.ts",
     "build": "tsc",
-    "start": "node dist/index.js",
+    "start": "node --env-file .env dist/index.js",
     "db:generate": "prisma generate",
     "db:migrate": "prisma migrate dev",
     "db:push": "prisma db push",
@@ -14,10 +14,19 @@
     "preseed": "pnpm --filter @wms/shared build",
     "db:seed": "tsx prisma/seed.ts",
     "typecheck": "tsc --noEmit",
-    "test": "node --import tsx --test src/services/order-proximity.test.ts src/services/pick-wave-partition.test.ts src/services/tiny-order-priority.test.ts src/services/tiny-integration.test.ts src/services/tiny-sales-order-sync.test.ts src/services/tiny-product-sync.test.ts src/services/tiny-sync-checkpoint.test.ts src/services/demo-tenant-cleanup.test.ts src/services/tiny-oauth.test.ts",
+    "test": "node --import tsx --test src/services/order-proximity.test.ts src/services/pick-wave-partition.test.ts src/services/tiny-order-priority.test.ts src/services/tiny-integration.test.ts src/services/tiny-sales-order-sync.test.ts src/services/tiny-product-sync.test.ts src/services/tiny-sync-checkpoint.test.ts src/services/tiny-rate-limit.test.ts src/services/demo-tenant-cleanup.test.ts src/services/tiny-oauth.test.ts",
     "tiny:fetch-products": "tsx scripts/fetch-tiny-products.ts",
     "teste-rotas": "tsx scripts/teste-rotas-tiny.ts",
-    "teste-pedido": "tsx scripts/teste-pedido-tiny.ts"
+    "teste-pedido": "tsx scripts/teste-pedido-tiny.ts",
+    "teste-etiquetas": "tsx scripts/teste-etiquetas-pedido.ts",
+    "teste-etiquetas-lote": "tsx scripts/teste-etiquetas-lote.ts",
+    "teste-etiquetas-expedicao": "tsx scripts/teste-etiquetas-expedicao.ts",
+    "consulta-pedidos-expedicao": "tsx scripts/consulta-pedidos-expedicao.ts",
+    "teste-etiquetas-situacoes": "tsx scripts/teste-etiquetas-situacoes.ts",
+    "export-etiquetas-situacoes-completo": "tsx scripts/export-etiquetas-situacoes-completo.ts",
+    "export-postman-tiny-etiquetas": "tsx scripts/export-postman-tiny-etiquetas.ts",
+    "cruzar-etiquetas": "tsx scripts/cruzar-etiquetas-dados.ts",
+    "seed:warehouse-layout": "tsx --env-file .env scripts/seed-warehouse-layout.ts"
   },
   "dependencies": {
     "@fastify/cors": "^11.0.1",

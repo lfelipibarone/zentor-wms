@@ -1,6 +1,12 @@
 import { OrderStatus } from "@prisma/client";
 import { prisma } from "../lib/prisma.js";
 
+const ACCEPTABLE_STATUSES: OrderStatus[] = [
+  OrderStatus.PENDING,
+  OrderStatus.PACKING_RETURNED_TO_PICKING,
+  OrderStatus.PAUSED_ISSUE,
+];
+
 export class OrderPickingAssignmentError extends Error {
   constructor(
     message: string,
@@ -58,4 +64,76 @@ export async function releaseOrderAccept(
   });
 
   return { released: true, status: OrderStatus.PENDING };
+}
+
+export async function acceptOrderForPicking(
+  tenantId: string,
+  userId: string,
+  orderId: string,
+): Promise<{ id: string; status: OrderStatus; alreadyAccepted: boolean }> {
+  const order = await prisma.order.findFirst({
+    where: { id: orderId, tenantId },
+    include: {
+      waveOrders: { include: { wave: { select: { status: true } } } },
+    },
+  });
+  if (!order) {
+    throw new OrderPickingAssignmentError("Pedido não encontrado", 404);
+  }
+
+  if (
+    order.status === OrderStatus.PICKING &&
+    order.assignedPickerId === userId
+  ) {
+    return { id: orderId, status: order.status, alreadyAccepted: true };
+  }
+
+  if (
+    order.status === OrderStatus.PICKING &&
+    order.assignedPickerId &&
+    order.assignedPickerId !== userId
+  ) {
+    throw new OrderPickingAssignmentError(
+      "Pedido já está em separação por outro operador",
+      409,
+    );
+  }
+
+  if (!ACCEPTABLE_STATUSES.includes(order.status)) {
+    throw new OrderPickingAssignmentError("Pedido não está na fila", 409);
+  }
+
+  const activeWaveLink = order.waveOrders.some(
+    (wo) => wo.wave?.status === "RELEASED",
+  );
+  if (
+    activeWaveLink &&
+    order.status !== OrderStatus.PACKING_RETURNED_TO_PICKING &&
+    order.status !== OrderStatus.PAUSED_ISSUE
+  ) {
+    throw new OrderPickingAssignmentError(
+      "Pedido está em uma onda ativa — use separação em onda",
+      409,
+    );
+  }
+
+  const result = await prisma.order.updateMany({
+    where: {
+      id: orderId,
+      tenantId,
+      status: { in: ACCEPTABLE_STATUSES },
+    },
+    data: {
+      status: OrderStatus.PICKING,
+      assignedPickerId: userId,
+    },
+  });
+  if (result.count === 0) {
+    throw new OrderPickingAssignmentError(
+      "Pedido já aceito ou indisponível na fila",
+      409,
+    );
+  }
+
+  return { id: orderId, status: OrderStatus.PICKING, alreadyAccepted: false };
 }

@@ -141,10 +141,9 @@ model Tenant {
   warehouseBarracoes      WarehouseBarracao[]
   warehouseSetores        WarehouseSetor[]
   warehouseCorredores     WarehouseCorredor[]
-  warehouseFileiras       WarehouseFileira[]
   warehouseEstantes       WarehouseEstante[]
-  warehousePrateleiras    WarehousePrateleira[]
   warehouseColunas        WarehouseColuna[]
+  warehouseLinhas         WarehouseLinha[]
   baskets                 Basket[]
   orders                  Order[]
   pickWaves               PickWave[]
@@ -154,6 +153,7 @@ model Tenant {
   replenishmentAssignments ReplenishmentAssignment[]
   integrationEventLogs    IntegrationEventLog[]
   systemSettings          SystemSetting[]
+  locationProximityReferences LocationProximityReference[]
 
   @@map("tenants")
 }
@@ -288,6 +288,8 @@ model Product {
   supplierName      String?
   /// Saldo no ERP Tiny (estoque.quantidade) — referência, não é estoque WMS
   erpStockQuantity  Decimal? @db.Decimal(12, 4)
+  /// Tipo no Tiny: K|S|V|F|M (Kit, Simples, Variações, Fabricado, Matéria Prima)
+  tinyTipo          String?
   active            Boolean @default(true)
   createdAt         DateTime @default(now())
   updatedAt         DateTime @updatedAt
@@ -343,7 +345,6 @@ model WarehouseSetor {
   tenant     Tenant              @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   barracao   WarehouseBarracao   @relation(fields: [barracaoId], references: [id], onDelete: Cascade)
   corredores WarehouseCorredor[]
-  estantes   WarehouseEstante[]
   locations  Location[]
 
   @@unique([tenantId, barracaoId, code])
@@ -365,8 +366,10 @@ model WarehouseCorredor {
 
   tenant   Tenant            @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   setor    WarehouseSetor    @relation(fields: [setorId], references: [id], onDelete: Cascade)
-  fileiras WarehouseFileira[]
+  estantes WarehouseEstante[]
   locations Location[]
+  proximityLocations Location[] @relation("LocationProximityCorredor")
+  proximityReferenceCorredor LocationProximityReference[] @relation("ProximityRefCorredor")
 
   @@unique([tenantId, setorId, code])
   @@index([tenantId])
@@ -374,7 +377,7 @@ model WarehouseCorredor {
   @@map("warehouse_corredores")
 }
 
-model WarehouseFileira {
+model WarehouseEstante {
   id         String   @id @default(cuid())
   tenantId   String
   corredorId String
@@ -385,39 +388,20 @@ model WarehouseFileira {
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
 
-  tenant   Tenant            @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  corredor WarehouseCorredor @relation(fields: [corredorId], references: [id], onDelete: Cascade)
+  tenant    Tenant              @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  corredor  WarehouseCorredor   @relation(fields: [corredorId], references: [id], onDelete: Cascade)
+  colunas   WarehouseColuna[]
   locations Location[]
+  proximityLocations Location[] @relation("LocationProximityEstante")
+  proximityReferenceEstante LocationProximityReference[] @relation("ProximityRefEstante")
 
   @@unique([tenantId, corredorId, code])
   @@index([tenantId])
   @@index([corredorId])
-  @@map("warehouse_fileiras")
-}
-
-model WarehouseEstante {
-  id       String   @id @default(cuid())
-  tenantId String
-  setorId  String
-  code     String
-  name     String?
-  pickOrder Int     @default(0)
-  active   Boolean  @default(true)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  tenant     Tenant               @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  setor      WarehouseSetor       @relation(fields: [setorId], references: [id], onDelete: Cascade)
-  prateleiras WarehousePrateleira[]
-  locations  Location[]
-
-  @@unique([tenantId, setorId, code])
-  @@index([tenantId])
-  @@index([setorId])
   @@map("warehouse_estantes")
 }
 
-model WarehousePrateleira {
+model WarehouseColuna {
   id        String   @id @default(cuid())
   tenantId  String
   estanteId String
@@ -428,36 +412,38 @@ model WarehousePrateleira {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  tenant   Tenant           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  estante  WarehouseEstante @relation(fields: [estanteId], references: [id], onDelete: Cascade)
-  colunas  WarehouseColuna[]
+  tenant    Tenant           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  estante   WarehouseEstante @relation(fields: [estanteId], references: [id], onDelete: Cascade)
+  linhas    WarehouseLinha[]
   locations Location[]
 
   @@unique([tenantId, estanteId, code])
   @@index([tenantId])
   @@index([estanteId])
-  @@map("warehouse_prateleiras")
+  @@map("warehouse_colunas")
 }
 
-model WarehouseColuna {
-  id           String   @id @default(cuid())
-  tenantId     String
-  prateleiraId String
-  code         String
-  name         String?
-  pickOrder    Int      @default(0)
-  active       Boolean  @default(true)
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+model WarehouseLinha {
+  id        String   @id @default(cuid())
+  tenantId  String
+  colunaId  String
+  code      String
+  name      String?
+  pickOrder Int      @default(0)
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
-  tenant     Tenant              @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  prateleira WarehousePrateleira @relation(fields: [prateleiraId], references: [id], onDelete: Cascade)
-  locations  Location[]
+  tenant    Tenant           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  coluna    WarehouseColuna  @relation(fields: [colunaId], references: [id], onDelete: Cascade)
+  location  Location?
+  proximityReferences Location[] @relation("LocationProximityLinha")
+  proximityReferenceLinha LocationProximityReference[] @relation("ProximityRefLinha")
 
-  @@unique([tenantId, prateleiraId, code])
+  @@unique([tenantId, colunaId, code])
   @@index([tenantId])
-  @@index([prateleiraId])
-  @@map("warehouse_colunas")
+  @@index([colunaId])
+  @@map("warehouse_linhas")
 }
 
 // -----------------------------------------------------------------------------
@@ -469,18 +455,20 @@ model Location {
   tenantId        String
   /// Corredor do galpão (ex: "A", "B", "01")
   corridor        String
-  /// Fileira dentro do corredor (ex: "01", "02")
+  /// Linha dentro do corredor (ex: "01", "02")
   row             String
   /// Código de barras físico da etiqueta da gôndola/pulmão
   barcode         String
   barracaoId      String?
   setorId         String?
   corredorId      String?
-  fileiraId       String?
-  estanteId       String?
-  prateleiraId    String?
-  colunaId        String?
-  type            LocationType
+  estanteId           String?
+  colunaId            String?
+  linhaId             String?      @unique
+  proximityCorredorId String?
+  proximityEstanteId  String?
+  proximityLinhaId    String?
+  type                LocationType
   /// Produto alocado nesta posição (opcional — pulmão pode estar vazio ou em transição)
   productId       String?
   /// Quantidade física atual nesta localização
@@ -498,10 +486,12 @@ model Location {
   barracao   WarehouseBarracao?  @relation(fields: [barracaoId], references: [id], onDelete: SetNull)
   setor      WarehouseSetor?     @relation(fields: [setorId], references: [id], onDelete: SetNull)
   corredor   WarehouseCorredor?  @relation(fields: [corredorId], references: [id], onDelete: SetNull)
-  fileira    WarehouseFileira?   @relation(fields: [fileiraId], references: [id], onDelete: SetNull)
   estante    WarehouseEstante?   @relation(fields: [estanteId], references: [id], onDelete: SetNull)
-  prateleira WarehousePrateleira? @relation(fields: [prateleiraId], references: [id], onDelete: SetNull)
   coluna     WarehouseColuna?    @relation(fields: [colunaId], references: [id], onDelete: SetNull)
+  linha      WarehouseLinha?     @relation(fields: [linhaId], references: [id], onDelete: SetNull)
+  proximityCorredor WarehouseCorredor? @relation("LocationProximityCorredor", fields: [proximityCorredorId], references: [id], onDelete: SetNull)
+  proximityEstante  WarehouseEstante?  @relation("LocationProximityEstante", fields: [proximityEstanteId], references: [id], onDelete: SetNull)
+  proximityLinha      WarehouseLinha?    @relation("LocationProximityLinha", fields: [proximityLinhaId], references: [id], onDelete: SetNull)
 
   /// Itens de pedido com pick sugerido nesta localização
   orderItemsPickFrom OrderItem[] @relation("OrderItemPickLocation")
@@ -518,6 +508,7 @@ model Location {
   cargoTransfersTo   CargoTransfer[] @relation("CargoTransferTo")
   cargoTransfersTarget CargoTransfer[] @relation("CargoTransferTargetFace")
   replenishmentAssignments ReplenishmentAssignment[]
+  proximityReferenceRows LocationProximityReference[]
 
   @@unique([tenantId, barcode])
   @@index([tenantId])
@@ -527,6 +518,28 @@ model Location {
   @@index([barracaoId])
   @@index([setorId])
   @@map("locations")
+}
+
+model LocationProximityReference {
+  id                  String   @id @default(cuid())
+  tenantId            String
+  locationId          String
+  sortOrder           Int      @default(0)
+  proximityCorredorId String?
+  proximityEstanteId  String?
+  proximityLinhaId    String?
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  tenant            Tenant             @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  location          Location           @relation(fields: [locationId], references: [id], onDelete: Cascade)
+  proximityCorredor WarehouseCorredor? @relation("ProximityRefCorredor", fields: [proximityCorredorId], references: [id], onDelete: SetNull)
+  proximityEstante  WarehouseEstante?  @relation("ProximityRefEstante", fields: [proximityEstanteId], references: [id], onDelete: SetNull)
+  proximityLinha    WarehouseLinha?    @relation("ProximityRefLinha", fields: [proximityLinhaId], references: [id], onDelete: SetNull)
+
+  @@index([tenantId])
+  @@index([locationId])
+  @@map("location_proximity_references")
 }
 
 // -----------------------------------------------------------------------------

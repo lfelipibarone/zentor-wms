@@ -3,13 +3,28 @@ import { prisma } from "../lib/prisma.js";
 import { TinyConnectionStatus } from "@prisma/client";
 import { formatOAuthErrorMessage } from "./tiny-oauth-errors.js";
 import { shouldRefreshTinyToken } from "./tiny-oauth-refresh.js";
+import {
+  buildRateLimitMetadata,
+  clearConnectionRateLimit,
+  formatRateLimitWaitMessage,
+  getConnectionRateLimitUntil,
+  markConnectionRateLimited,
+  parseRateLimitResetMs,
+  proactiveRateLimitDelayMs,
+  readRateLimitUntilFromMetadata,
+  reconcileTinyConnectionRateLimit,
+  TINY_MAX_429_RETRIES,
+  getMinRequestIntervalMs,
+  updateConnectionDocumentedLimit,
+  isTinyConnectionUsableStatus,
+} from "./tiny-rate-limit.js";
+
+export { isTinyRateLimitError } from "./tiny-rate-limit.js";
 
 const BASE_URL = "https://api.tiny.com.br/public-api/v3";
 const TOKEN_URL =
   "https://accounts.tiny.com.br/realms/tiny/protocol/openid-connect/token";
 const REQUEST_TIMEOUT_MS = 30_000;
-const MIN_REQUEST_INTERVAL_MS = 1_200;
-const MAX_429_RETRIES = 3;
 
 export class TinyApiError extends Error {
   constructor(
@@ -157,17 +172,50 @@ function sleep(ms: number): Promise<void> {
 }
 
 async function throttleConnection(connectionId: string) {
+  const cooldownUntil = getConnectionRateLimitUntil(connectionId);
+  const now = Date.now();
+  if (cooldownUntil > now) {
+    await sleep(cooldownUntil - now);
+  }
+
+  const minInterval = getMinRequestIntervalMs(connectionId);
   const last = lastRequestAtByConnection.get(connectionId) ?? 0;
   const elapsed = Date.now() - last;
-  if (elapsed < MIN_REQUEST_INTERVAL_MS) {
-    await sleep(MIN_REQUEST_INTERVAL_MS - elapsed);
+  if (elapsed < minInterval) {
+    await sleep(minInterval - elapsed);
   }
   lastRequestAtByConnection.set(connectionId, Date.now());
 }
 
-function parseRateLimitReset(headers: Headers): number {
-  const reset = Number(headers.get("X-RateLimit-Reset") ?? 0);
-  return Number.isFinite(reset) && reset > 0 ? reset * 1000 : 60_000;
+async function recordSuccessfulRateLimitHeaders(
+  connectionId: string,
+  headers: Headers,
+) {
+  updateConnectionDocumentedLimit(connectionId, headers);
+  const extraDelay = proactiveRateLimitDelayMs(headers);
+  if (extraDelay > 0) {
+    markConnectionRateLimited(connectionId, Date.now() + extraDelay);
+  } else {
+    clearConnectionRateLimit(connectionId);
+  }
+}
+
+async function persistRateLimitCooldown(
+  connectionId: string,
+  untilMs: number,
+  message: string,
+) {
+  const conn = await prisma.tinyConnection.findUnique({
+    where: { id: connectionId },
+    select: { metadata: true },
+  });
+  await prisma.tinyConnection.update({
+    where: { id: connectionId },
+    data: {
+      lastError: message,
+      metadata: buildRateLimitMetadata(conn?.metadata, untilMs),
+    },
+  });
 }
 
 export class TinyApiV3Client {
@@ -221,8 +269,14 @@ export class TinyApiV3Client {
         return run(true, retry429Count);
       }
 
-      if (res.status === 429 && retry429Count < MAX_429_RETRIES) {
-        const waitMs = parseRateLimitReset(res.headers);
+      if (res.status === 429 && retry429Count < TINY_MAX_429_RETRIES) {
+        const waitMs = parseRateLimitResetMs(res.headers);
+        const untilMs = markConnectionRateLimited(this.connectionId, Date.now() + waitMs);
+        await persistRateLimitCooldown(
+          this.connectionId,
+          untilMs,
+          formatRateLimitWaitMessage(untilMs),
+        );
         await sleep(waitMs);
         return run(retry401, retry429Count + 1);
       }
@@ -237,22 +291,27 @@ export class TinyApiV3Client {
 
       if (!res.ok) {
         if (res.status === 429) {
-          await prisma.tinyConnection.update({
-            where: { id: this.connectionId },
-            data: {
-              status: TinyConnectionStatus.BLOCKED,
-              lastError: "Rate limit Olist ERP excedido. Aguarde e tente novamente.",
-            },
-          });
+          const waitMs = parseRateLimitResetMs(res.headers);
+          const untilMs = markConnectionRateLimited(this.connectionId, Date.now() + waitMs);
+          await persistRateLimitCooldown(
+            this.connectionId,
+            untilMs,
+            formatRateLimitWaitMessage(untilMs),
+          );
         }
         const rec = asRecord(data);
         const msg =
           str(rec?.mensagem) ??
           str(asRecord(rec?.error)?.message) ??
-          `Erro Tiny HTTP ${res.status}`;
+          (res.status === 429
+            ? formatRateLimitWaitMessage(
+                getConnectionRateLimitUntil(this.connectionId) || Date.now() + 60_000,
+              )
+            : `Erro Tiny HTTP ${res.status}`);
         throw new TinyApiError(msg, res.status, res.status === 429 ? "RATE_LIMIT" : undefined);
       }
 
+      await recordSuccessfulRateLimitHeaders(this.connectionId, res.headers);
       return data as T;
     };
 
@@ -412,7 +471,9 @@ export async function getTinyApiClient(
         userId: resolved.userId,
         deletedAt: null,
         isActive: true,
-        status: TinyConnectionStatus.CONNECTED,
+        status: {
+          in: [TinyConnectionStatus.CONNECTED, TinyConnectionStatus.BLOCKED],
+        },
         accessToken: { not: null },
       },
       orderBy: [{ isDefault: "desc" }, { updatedAt: "desc" }],
@@ -423,7 +484,9 @@ export async function getTinyApiClient(
         tenantId: resolved.tenantId,
         deletedAt: null,
         isActive: true,
-        status: TinyConnectionStatus.CONNECTED,
+        status: {
+          in: [TinyConnectionStatus.CONNECTED, TinyConnectionStatus.BLOCKED],
+        },
         accessToken: { not: null },
       },
       orderBy: [{ isDefault: "desc" }, { updatedAt: "desc" }],
@@ -432,7 +495,7 @@ export async function getTinyApiClient(
 
   if (
     !conn?.accessToken ||
-    conn.status !== TinyConnectionStatus.CONNECTED ||
+    !isTinyConnectionUsableStatus(conn.status) ||
     !conn.isActive ||
     conn.deletedAt
   ) {
@@ -441,6 +504,23 @@ export async function getTinyApiClient(
       503,
       "NOT_CONNECTED",
     );
+  }
+
+  conn = await reconcileTinyConnectionRateLimit(conn);
+
+  const metadataCooldown = readRateLimitUntilFromMetadata(conn.metadata);
+  if (metadataCooldown && metadataCooldown > Date.now()) {
+    markConnectionRateLimited(conn.id, metadataCooldown);
+    const waitMs = metadataCooldown - Date.now();
+    if (waitMs <= 120_000) {
+      await sleep(waitMs);
+    } else {
+      throw new TinyApiError(
+        formatRateLimitWaitMessage(metadataCooldown),
+        429,
+        "RATE_LIMIT",
+      );
+    }
   }
 
   let token: string;

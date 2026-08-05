@@ -109,6 +109,7 @@ type OrderRow = {
   id: string;
   erpOrderId: string;
   customerName: string | null;
+  shippingLabel: string | null;
   status: OrderStatus;
   priority: number;
   collectionDeadline: Date | null;
@@ -210,6 +211,7 @@ async function mapPackingOrder(
     id: order.id,
     erpOrderId: order.erpOrderId,
     customerName: order.customerName,
+    shippingLabel: order.shippingLabel,
     status: order.status,
     priority: order.priority,
     collectionDeadline: order.collectionDeadline?.toISOString() ?? null,
@@ -739,3 +741,5 @@ export async function sortWaveAllocationWeb(
     webPacking: true,
   });
 }
+
+export { fetchShippingLabelsForOrder } from "./tiny-shipping-labels.js";

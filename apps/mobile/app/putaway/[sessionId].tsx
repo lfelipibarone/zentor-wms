@@ -107,7 +107,7 @@ export default function PutawaySessionScreen() {
         <View style={styles.productRow}>
           <ProductThumbnail
             imageUrl={next.imageUrl}
-            label={next.description ?? next.productCode ?? ""}
+            alt={next.description ?? next.productCode ?? ""}
             size={72}
           />
           <View style={styles.productMeta}>

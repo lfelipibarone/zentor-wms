@@ -34,8 +34,8 @@ function formatRouteHint(coords: RouteCoord[], refs: PickLocationRef[]): string 
   const c = corridors.slice(0, 3).join(", ");
   if (corridors.length === 1) {
     return minRow === maxRow
-      ? `Corredor ${corridors[0]} · fileira ${String(minRow).padStart(2, "0")}`
-      : `Corredor ${corridors[0]} · fileiras ${String(minRow).padStart(2, "0")}–${String(maxRow).padStart(2, "0")}`;
+      ? `Corredor ${corridors[0]} · linha ${String(minRow).padStart(2, "0")}`
+      : `Corredor ${corridors[0]} · linhas ${String(minRow).padStart(2, "0")}–${String(maxRow).padStart(2, "0")}`;
   }
   return `Corredores ${c}`;
 }

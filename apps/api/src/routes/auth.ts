@@ -54,8 +54,14 @@ export async function authRoutes(app: FastifyInstance) {
     }
 
     const user = await loadUserForAuth(email);
-    if (!user || !user.active || !verifyPassword(password, user.password)) {
+    if (!user || !verifyPassword(password, user.password)) {
       return reply.status(401).send({ error: "Credenciais inválidas" });
+    }
+
+    if (!user.active) {
+      return reply.status(403).send({
+        error: "Usuário inativo. Solicite reativação ao administrador.",
+      });
     }
 
     if (user.tenantId && !user.tenant?.active) {
@@ -90,8 +96,14 @@ export async function authRoutes(app: FastifyInstance) {
     }
 
     const user = await loadUserForAuth(email);
-    if (!user || !user.active || !verifyPassword(password, user.password)) {
+    if (!user || !verifyPassword(password, user.password)) {
       return reply.status(401).send({ error: "Credenciais inválidas" });
+    }
+
+    if (!user.active) {
+      return reply.status(403).send({
+        error: "Usuário inativo. Solicite reativação ao administrador.",
+      });
     }
 
     if (user.isPlatformAdmin && !user.tenantId) {

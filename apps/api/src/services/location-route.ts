@@ -1,10 +1,13 @@
-/** Coordenada normalizada de corredor/fileira para ordenação de rota. */
+/** Coordenada normalizada de corredor/linha para ordenação de rota. */
 export type RouteCoord = { corridor: number; row: number };
 
 export type LocationLike = {
   corridor: string;
   row: string;
   id?: string;
+  proximityCorredorCode?: string | null;
+  proximityEstanteCode?: string | null;
+  proximityLinhaCode?: string | null;
 };
 
 function parseSegment(value: string): number {
@@ -21,10 +24,16 @@ function parseSegment(value: string): number {
   return hash;
 }
 
+/** Prioridade: proximidade explícita > corridor/row da posição. */
 export function toRouteCoord(loc: LocationLike): RouteCoord {
+  const corridor = loc.proximityCorredorCode?.trim() || loc.corridor;
+  const row =
+    loc.proximityLinhaCode?.trim() ||
+    loc.proximityEstanteCode?.trim() ||
+    loc.row;
   return {
-    corridor: parseSegment(loc.corridor),
-    row: parseSegment(loc.row),
+    corridor: parseSegment(corridor),
+    row: parseSegment(row),
   };
 }
 
@@ -147,4 +156,20 @@ export function sortPendingItemsByRoute<T extends ItemWithPickLocation>(
     if (!ordered.includes(p)) ordered.push(p);
   }
   return [...ordered, ...withoutLoc];
+}
+
+export function mapLocationForRoute(loc: {
+  corridor: string;
+  row: string;
+  proximityCorredor?: { code: string } | null;
+  proximityEstante?: { code: string } | null;
+  proximityLinha?: { code: string } | null;
+}): LocationLike {
+  return {
+    corridor: loc.corridor,
+    row: loc.row,
+    proximityCorredorCode: loc.proximityCorredor?.code ?? null,
+    proximityEstanteCode: loc.proximityEstante?.code ?? null,
+    proximityLinhaCode: loc.proximityLinha?.code ?? null,
+  };
 }

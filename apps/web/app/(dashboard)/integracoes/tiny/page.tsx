@@ -5,10 +5,12 @@ import { Loader2 } from "lucide-react";
 import { PageHeader } from "@/components/ops/page-header";
 import { apiFetch } from "@/lib/api/client";
 import {
+  fetchTinySyncStatus,
   syncTinyProducts,
   syncTinySalesOrders,
   type SyncTinyProductsResult,
   type SyncTinySalesOrdersResult,
+  type TinySyncJobStatus,
 } from "@/lib/api/operations";
 
 interface IntegrationEvent {
@@ -86,6 +88,73 @@ function formatDateTime(iso: string | null | undefined) {
   return new Date(iso).toLocaleString("pt-BR");
 }
 
+function SyncProgressCard({
+  title,
+  job,
+  syncing,
+}: {
+  title: string;
+  job: TinySyncJobStatus | null;
+  syncing: boolean;
+}) {
+  if (!job) return null;
+
+  const active = syncing || job.running;
+  const pct = job.progressPercent ?? 0;
+
+  return (
+    <div className="rounded-lg border border-slate-200 bg-slate-50 p-3 text-sm">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <p className="font-medium text-slate-900">{title}</p>
+        {active ? (
+          <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-900">
+            <Loader2 className="h-3 w-3 animate-spin" aria-hidden />
+            {syncing ? "Sincronizando…" : job.resumable ? "Pausado — retomável" : "Interrompido"}
+          </span>
+        ) : job.lastSyncAt ? (
+          <span className="text-xs text-muted-foreground">
+            Concluído em {formatDateTime(job.lastSyncAt)}
+          </span>
+        ) : null}
+      </div>
+
+      {active ? (
+        <>
+          <div className="mt-2 h-2 overflow-hidden rounded-full bg-slate-200">
+            <div
+              className="h-full rounded-full bg-[#0d9488] transition-all duration-500"
+              style={{ width: `${Math.max(pct, job.offset ? 2 : 0)}%` }}
+            />
+          </div>
+          <p className="mt-2 text-muted-foreground">{job.progressLabel}</p>
+          {job.pauseReason === "rate_limit" ? (
+            <p className="mt-1 text-xs text-amber-800">
+              Pausado por rate limit da API Olist. O scheduler retoma automaticamente
+              ou clique em sincronizar novamente.
+            </p>
+          ) : job.resumable && !syncing ? (
+            <p className="mt-1 text-xs text-muted-foreground">
+              Progresso salvo em {formatDateTime(job.updatedAt)}. Clique em
+              sincronizar para retomar de onde parou.
+            </p>
+          ) : null}
+          {job.stats ? (
+            <p className="mt-1 text-xs text-slate-600">
+              Até agora: {job.stats.created ?? 0} criado(s), {job.stats.updated ?? 0}{" "}
+              atualizado(s), {job.stats.skipped ?? 0} ignorado(s)
+              {(job.stats.skippedExisting ?? 0) > 0
+                ? `, ${job.stats.skippedExisting} já no WMS`
+                : ""}
+            </p>
+          ) : null}
+        </>
+      ) : (
+        <p className="mt-1 text-muted-foreground">{job.progressLabel}</p>
+      )}
+    </div>
+  );
+}
+
 export default function TinyIntegracaoPage() {
   const [events, setEvents] = useState<IntegrationEvent[]>([]);
   const [connection, setConnection] = useState<TinyConnectionStatus | null>(null);
@@ -101,6 +170,10 @@ export default function TinyIntegracaoPage() {
     useState<SyncTinySalesOrdersResult | null>(null);
   const [syncProductsResult, setSyncProductsResult] =
     useState<SyncTinyProductsResult | null>(null);
+  const [syncStatus, setSyncStatus] = useState<{
+    products: TinySyncJobStatus;
+    orders: TinySyncJobStatus;
+  } | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -141,6 +214,15 @@ export default function TinyIntegracaoPage() {
     (Boolean(clientId.trim()) &&
       clientId.trim() !== (connection?.oauthClientId ?? ""));
 
+  const loadSyncStatus = useCallback(async () => {
+    try {
+      const status = await fetchTinySyncStatus(activeConnectionId ?? undefined);
+      setSyncStatus(status);
+    } catch {
+      /* status opcional — não bloqueia a página */
+    }
+  }, [activeConnectionId]);
+
   const load = useCallback(async () => {
     setLoading(true);
     setError(null);
@@ -170,6 +252,33 @@ export default function TinyIntegracaoPage() {
   useEffect(() => {
     load();
   }, [load]);
+
+  useEffect(() => {
+    if (loading || !connection?.connected) return;
+    void loadSyncStatus();
+  }, [loading, connection?.connected, activeConnectionId, loadSyncStatus]);
+
+  useEffect(() => {
+    if (!connection?.connected) return;
+    const shouldPoll =
+      syncingOrders ||
+      syncingProducts ||
+      syncStatus?.products.running ||
+      syncStatus?.orders.running;
+    if (!shouldPoll) return;
+
+    const id = window.setInterval(() => {
+      void loadSyncStatus();
+    }, 4000);
+    return () => window.clearInterval(id);
+  }, [
+    connection?.connected,
+    syncingOrders,
+    syncingProducts,
+    syncStatus?.products.running,
+    syncStatus?.orders.running,
+    loadSyncStatus,
+  ]);
 
   useEffect(() => {
     const onMessage = (event: MessageEvent) => {
@@ -324,28 +433,36 @@ export default function TinyIntegracaoPage() {
         setError(result.warning ?? "Tiny ERP não conectado.");
         return;
       }
-      if (result.warning) {
+      if (result.rateLimited) {
+        setError(
+          result.warning ??
+            "Rate limit Olist: sync pausada. Retomará automaticamente ou clique novamente.",
+        );
+      } else if (result.warning) {
         setError(result.warning);
       }
-      const parts = [
-        `${result.listedFromTiny ?? 0} listado(s) no Tiny`,
-        `${result.created} criado(s)`,
-        `${result.updated} atualizado(s)`,
-        `${result.skipped} ignorado(s)`,
-      ];
-      if (result.ordersRemoved > 0 || result.wavesRemoved > 0) {
-        parts.push(
-          `${result.ordersRemoved} pedido(s) removido(s)`,
-          `${result.wavesRemoved} onda(s) removida(s)`,
-        );
+      if (!result.rateLimited) {
+        const parts = [
+          `${result.listedFromTiny ?? 0} listado(s) no Tiny`,
+          `${result.created} criado(s)`,
+          `${result.updated} atualizado(s)`,
+          `${result.skipped} ignorado(s)`,
+        ];
+        if (result.ordersRemoved > 0 || result.wavesRemoved > 0) {
+          parts.push(
+            `${result.ordersRemoved} pedido(s) removido(s)`,
+            `${result.wavesRemoved} onda(s) removida(s)`,
+          );
+        }
+        if (result.demoRemoved > 0) {
+          parts.push(`${result.demoRemoved} demo removido(s)`);
+        }
+        if (result.cancelledRemoved > 0) {
+          parts.push(`${result.cancelledRemoved} cancelado(s) removido(s)`);
+        }
+        setSuccessMessage(`Pedidos sincronizados: ${parts.join(", ")}.`);
       }
-      if (result.demoRemoved > 0) {
-        parts.push(`${result.demoRemoved} demo removido(s)`);
-      }
-      if (result.cancelledRemoved > 0) {
-        parts.push(`${result.cancelledRemoved} cancelado(s) removido(s)`);
-      }
-      setSuccessMessage(`Pedidos sincronizados: ${parts.join(", ")}.`);
+      await loadSyncStatus();
       await load();
     } catch (e) {
       setError(e instanceof Error ? e.message : "Erro ao sincronizar pedidos");
@@ -373,22 +490,30 @@ export default function TinyIntegracaoPage() {
         setError(result.warning ?? "Tiny ERP não conectado.");
         return;
       }
-      if (result.warning) {
+      if (result.rateLimited) {
+        setError(
+          result.warning ??
+            "Rate limit Olist: sync pausada. Clique em Sincronizar novamente para retomar.",
+        );
+      } else if (result.warning) {
         setError(result.warning);
       }
-      const parts = [
-        result.resumed
-          ? `retomado do offset ${result.fromOffset}`
-          : "concluído",
-        `${result.listedFromTiny} listado(s) no Tiny`,
-        `${result.created} criado(s)`,
-        `${result.updated} atualizado(s)`,
-        `${result.skipped} ignorado(s)`,
-      ];
-      if ((result.skippedExisting ?? 0) > 0) {
-        parts.push(`${result.skippedExisting} já no WMS (sem nova consulta)`);
+      if (!result.rateLimited) {
+        const parts = [
+          result.resumed
+            ? `retomado do offset ${result.fromOffset}`
+            : "concluído",
+          `${result.listedFromTiny} listado(s) no Tiny`,
+          `${result.created} criado(s)`,
+          `${result.updated} atualizado(s)`,
+          `${result.skipped} ignorado(s)`,
+        ];
+        if ((result.skippedExisting ?? 0) > 0) {
+          parts.push(`${result.skippedExisting} já no WMS (sem nova consulta)`);
+        }
+        setSuccessMessage(`Sync de produtos ${parts.join(", ")}.`);
       }
-      setSuccessMessage(`Sync de produtos ${parts.join(", ")}.`);
+      await loadSyncStatus();
       await load();
     } catch (e) {
       setError(
@@ -733,6 +858,11 @@ export default function TinyIntegracaoPage() {
         </p>
         {connection?.connected ? (
           <div className="mt-4 space-y-3">
+            <SyncProgressCard
+              title="Progresso — pedidos"
+              job={syncStatus?.orders ?? null}
+              syncing={syncingOrders}
+            />
             <button
               type="button"
               disabled={syncingOrders}
@@ -773,6 +903,11 @@ export default function TinyIntegracaoPage() {
         </p>
         {connection?.connected ? (
           <div className="mt-4 space-y-3">
+            <SyncProgressCard
+              title="Progresso — produtos"
+              job={syncStatus?.products ?? null}
+              syncing={syncingProducts}
+            />
             <div className="flex flex-wrap gap-2">
               <button
                 type="button"
@@ -801,13 +936,14 @@ export default function TinyIntegracaoPage() {
             {syncingProducts ? (
               <p className="text-sm text-muted-foreground">
                 Importação em andamento. O progresso é salvo a cada página; se o
-                servidor reiniciar, clique em Sincronizar de novo para retomar.
+                servidor reiniciar, o scheduler retoma automaticamente em até 30s.
                 SKUs já no WMS são ignorados (sem nova chamada à API Tiny).
               </p>
             ) : (
               <p className="text-sm text-muted-foreground">
-                Retoma automaticamente um sync interrompido. Use «Recomeçar do
-                zero» apenas para forçar reimportação completa.
+                Retoma automaticamente após queda ou rate limit (scheduler a cada
+                30s). Use «Recomeçar do zero» apenas para forçar reimportação
+                completa.
               </p>
             )}
             {syncProductsResult && syncProductsResult.errors.length > 0 ? (

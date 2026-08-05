@@ -69,27 +69,53 @@ export async function mobileRoutes(app: FastifyInstance) {
 
   app.get("/mobile/orders/queue", async (request) => {
     const tenantId = request.authUser!.tenantId!;
+    const userId = resolveUserId(request);
     const waveOrderIds = await getOrderIdsInActiveWave(tenantId);
-    const rawOrders = await prisma.order.findMany({
-      where: {
-        tenantId,
-        status: {
-          in: [
-            OrderStatus.PENDING,
-            OrderStatus.PACKING_RETURNED_TO_PICKING,
-          ],
+    const waveExclusion =
+      waveOrderIds.length > 0 ? { id: { notIn: waveOrderIds } } : {};
+    const [pendingOrders, inProgressOrders] = await Promise.all([
+      prisma.order.findMany({
+        where: {
+          tenantId,
+          status: {
+            in: [
+              OrderStatus.PENDING,
+              OrderStatus.PACKING_RETURNED_TO_PICKING,
+            ],
+          },
+          ...waveExclusion,
         },
-        ...(waveOrderIds.length > 0 ? { id: { notIn: waveOrderIds } } : {}),
-      },
-      orderBy: [
-        { priority: "desc" },
-        { collectionDeadline: { sort: "asc", nulls: "last" } },
-        { createdAt: "asc" },
-      ],
-      include: {
-        items: true,
-      },
-    });
+        orderBy: [
+          { priority: "desc" },
+          { collectionDeadline: { sort: "asc", nulls: "last" } },
+          { createdAt: "asc" },
+        ],
+        include: {
+          items: true,
+        },
+      }),
+      prisma.order.findMany({
+        where: {
+          tenantId,
+          status: OrderStatus.PICKING,
+          assignedPickerId: userId,
+          basketId: null,
+          ...waveExclusion,
+        },
+        orderBy: [{ updatedAt: "desc" }],
+        include: {
+          items: true,
+        },
+      }),
+    ]);
+
+    const rawOrders = [
+      ...inProgressOrders,
+      ...pendingOrders.filter(
+        (o) => !inProgressOrders.some((active) => active.id === o.id),
+      ),
+    ];
+    const inProgressIds = new Set(inProgressOrders.map((o) => o.id));
 
     const { buildOrderPickProfiles } = await import(
       "../services/pick-wave-order-profile.js"
@@ -153,6 +179,7 @@ export async function mobileRoutes(app: FastifyInstance) {
 
     const queueOrders = orders.map((o) => {
       const returned = o.status === OrderStatus.PACKING_RETURNED_TO_PICKING;
+      const resumingPicking = inProgressIds.has(o.id);
       const profile = profiles.get(o.id);
       return {
         id: o.id,
@@ -165,6 +192,7 @@ export async function mobileRoutes(app: FastifyInstance) {
         itemCount: o.items.length,
         totalUnits: o.items.reduce((s, i) => s + i.quantityOrdered, 0),
         returnedFromPacking: returned,
+        resumingPicking,
         issueSummary: returned
           ? lastIssueByOrder.get(o.id) ?? null
           : null,
@@ -208,54 +236,22 @@ export async function mobileRoutes(app: FastifyInstance) {
     async (request, reply) => {
       const userId = resolveUserId(request);
       const { orderId } = request.params;
-
       const tenantId = request.authUser!.tenantId!;
-      const order = await prisma.order.findFirst({
-        where: { id: orderId, tenantId },
-        include: {
-          waveOrders: { include: { wave: { select: { status: true } } } },
-        },
-      });
-      if (!order) return reply.status(404).send({ error: "Pedido não encontrado" });
-      const acceptableStatuses: OrderStatus[] = [
-        OrderStatus.PENDING,
-        OrderStatus.PACKING_RETURNED_TO_PICKING,
-        OrderStatus.PAUSED_ISSUE,
-      ];
-      if (!acceptableStatuses.includes(order.status)) {
-        return reply.status(409).send({ error: "Pedido não está na fila" });
+      try {
+        const { acceptOrderForPicking } = await import(
+          "../services/order-picking-assignment.js"
+        );
+        const result = await acceptOrderForPicking(tenantId, userId, orderId);
+        return { id: result.id, status: result.status };
+      } catch (e) {
+        if (e instanceof Error && "statusCode" in e) {
+          return reply
+            .status((e as { statusCode: number }).statusCode)
+            .send({ error: e.message });
+        }
+        throw e;
       }
-      const activeWaveLink = order.waveOrders.some(
-        (wo) => wo.wave?.status === "RELEASED",
-      );
-      if (
-        activeWaveLink &&
-        order.status !== OrderStatus.PACKING_RETURNED_TO_PICKING &&
-        order.status !== OrderStatus.PAUSED_ISSUE
-      ) {
-        return reply.status(409).send({
-          error: "Pedido está em uma onda ativa — use separação em onda",
-        });
-      }
-
-      const result = await prisma.order.updateMany({
-        where: {
-          id: orderId,
-          tenantId,
-          status: { in: acceptableStatuses },
-        },
-        data: {
-          status: OrderStatus.PICKING,
-          assignedPickerId: userId,
-        },
-      });
-      if (result.count === 0) {
-        return reply.status(409).send({
-          error: "Pedido já aceito ou indisponível na fila",
-        });
-      }
-      return { id: orderId, status: OrderStatus.PICKING };
-    }
+    },
   );
 
   app.post<{ Body: { orderIds?: string[] } }>(
@@ -309,13 +305,34 @@ export async function mobileRoutes(app: FastifyInstance) {
         return reply.status(400).send({ error: "Código da cesta obrigatório" });
       }
 
+      const tenantId = request.authUser!.tenantId!;
       const basket = await prisma.basket.findFirst({
-        where: { barcode: basketBarcode.trim(), active: true },
+        where: {
+          tenantId,
+          barcode: basketBarcode.trim(),
+          active: true,
+        },
       });
       if (!basket) return reply.status(404).send({ error: "Cesta não encontrada" });
 
-      const order = await prisma.order.findUnique({ where: { id: orderId } });
+      const order = await prisma.order.findFirst({
+        where: { id: orderId, tenantId },
+      });
       if (!order) return reply.status(404).send({ error: "Pedido não encontrado" });
+
+      const { acceptOrderForPicking } = await import(
+        "../services/order-picking-assignment.js"
+      );
+      try {
+        await acceptOrderForPicking(tenantId, userId, orderId);
+      } catch (e) {
+        if (e instanceof Error && "statusCode" in e) {
+          return reply
+            .status((e as { statusCode: number }).statusCode)
+            .send({ error: e.message });
+        }
+        throw e;
+      }
 
       await prisma.$transaction([
         prisma.order.update({
@@ -347,16 +364,21 @@ export async function mobileRoutes(app: FastifyInstance) {
             orderBy: { lineNumber: "asc" },
             include: {
               product: true,
-              pickLocation: true,
+              pickLocation: {
+                include: {
+                  proximityCorredor: { select: { code: true } },
+                  proximityEstante: { select: { code: true } },
+                  proximityLinha: { select: { code: true } },
+                },
+              },
             },
           },
         },
       });
       if (!order) return reply.status(404).send({ error: "Pedido não encontrado" });
 
-      const { pickNextItemByRoute, sortPendingItemsByRoute } = await import(
-        "../services/location-route.js"
-      );
+      const { pickNextItemByRoute, sortPendingItemsByRoute, mapLocationForRoute } =
+        await import("../services/location-route.js");
 
       const isPending = (i: (typeof order.items)[0]) =>
         i.quantityPicked < i.quantityOrdered;
@@ -375,11 +397,31 @@ export async function mobileRoutes(app: FastifyInstance) {
             }
           : null;
 
+      const mapForRoute = (
+        loc: NonNullable<(typeof order.items)[0]["pickLocation"]>,
+      ) => mapLocationForRoute(loc);
+
+      const lastPickedItem = [...order.items]
+        .filter((i) => i.quantityPicked > 0 && i.pickLocation)
+        .sort((a, b) => b.lineNumber - a.lineNumber)[0];
+      const lastLocation = lastPickedItem?.pickLocation
+        ? mapForRoute(lastPickedItem.pickLocation)
+        : null;
+
+      const routeItems = order.items.map((item) => ({
+        ...item,
+        pickLocation: item.pickLocation ? mapForRoute(item.pickLocation) : null,
+      }));
+
       const nextItem =
-        pickNextItemByRoute(order.items, isPending, null) ??
+        pickNextItemByRoute(routeItems, isPending, lastLocation) ??
         order.items.find(isPending);
 
-      const routeQueue = sortPendingItemsByRoute(order.items, isPending, null);
+      const routeQueue = sortPendingItemsByRoute(
+        routeItems,
+        isPending,
+        lastLocation,
+      );
 
       const remaining = nextItem
         ? nextItem.quantityOrdered - nextItem.quantityPicked
@@ -500,17 +542,19 @@ export async function mobileRoutes(app: FastifyInstance) {
               currentQuantity: { decrement: pickedDelta },
             },
           });
-          await tx.inventoryMovement.create({
-            data: {
-              tenantId: item.order.tenantId,
-              type: InventoryMovementType.PICK_ALLOCATION,
-              quantity: pickedDelta,
-              userId,
-              productId: item.productId,
-              fromLocationId: item.pickLocationId,
-              orderId,
-            },
-          });
+          if (item.productId) {
+            await tx.inventoryMovement.create({
+              data: {
+                tenantId: item.order.tenantId,
+                type: InventoryMovementType.PICK_ALLOCATION,
+                quantity: pickedDelta,
+                userId,
+                productId: item.productId,
+                fromLocationId: item.pickLocationId,
+                orderId,
+              },
+            });
+          }
         }
       });
 

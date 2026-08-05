@@ -1,0 +1,63 @@
+{
+  "geradoEm": "2026-07-01T12:59:55.821Z",
+  "aviso": "Hoje/ontem (30/06–01/07) só há Amazon DBA na expedição. ML/Shopee recentes estão como pedidos mas ainda FORA do agrupamento.",
+  "janelaHojeOntem": {},
+  "maisRecenteDisponivel": {
+    "mercado": {
+      "formaEnvioNome": "Mercado Envios",
+      "idAgrupamento": 746504129,
+      "identificacao": "3207",
+      "dataAgrupamento": "2026-06-26",
+      "idExpedicao": 749892686,
+      "pedidoId": 860521519,
+      "idNotaFiscal": 860521522,
+      "etiquetas": {
+        "ok": false,
+        "urls": [],
+        "erro": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Não foi possível obter as etiquetas dos seguintes pedidos: S47385485426"
+      }
+    },
+    "shopee": {
+      "formaEnvioNome": "Shopee Envios",
+      "idAgrupamento": 746503904,
+      "identificacao": "3192",
+      "dataAgrupamento": "2026-06-18",
+      "idExpedicao": 749886942,
+      "pedidoId": 860393976,
+      "idNotaFiscal": 860393977,
+      "etiquetas": {
+        "ok": false,
+        "urls": [],
+        "erro": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Problema nos parâmetros enviados. Wrong parameters, detail: order_list must contain at least 1 item."
+      }
+    }
+  },
+  "pedidosParaAgrupar": {
+    "mercado": [
+      860587506,
+      860587271,
+      860587014
+    ],
+    "shopee": [
+      860586945,
+      860586560,
+      860585537
+    ]
+  },
+  "postmanVars": {
+    "mercadoMaisRecente": {
+      "pedidoMercado": "860521519",
+      "idNotaMercado": "860521522",
+      "idAgrupamentoMercado": "746504129",
+      "idExpedicaoMercado": "749892686",
+      "data": "2026-06-26"
+    },
+    "shopeeMaisRecente": {
+      "pedidoShopee": "860393976",
+      "idNotaShopee": "860393977",
+      "idAgrupamentoShopee": "746503904",
+      "idExpedicaoShopee": "749886942",
+      "data": "2026-06-18"
+    }
+  }
+}

@@ -4,6 +4,10 @@ import { prisma } from "../lib/prisma.js";
 import { decrypt, encrypt } from "../lib/encryption.js";
 import { getTinyApiClient, TinyApiError } from "./tiny-api-v3-client.js";
 import {
+  clearRateLimitMetadata,
+  reconcileTinyConnectionRateLimit,
+} from "./tiny-rate-limit.js";
+import {
   formatOAuthErrorMessage,
   formatTinyApiValidationMessage,
 } from "./tiny-oauth-errors.js";
@@ -82,7 +86,8 @@ export function mapTinyStatusToUi(
     case TinyConnectionStatus.PENDING:
       return "PENDING";
     case TinyConnectionStatus.BLOCKED:
-      return "BLOCKED";
+      // Legado: rate limit temporário — tokens OAuth permanecem válidos.
+      return "VALID";
     case TinyConnectionStatus.ERROR:
       return "INVALID";
     default:
@@ -672,8 +677,9 @@ function formatTinyConnectionStatus(conn: {
   return {
     connected:
       conn.isActive &&
-      conn.status === TinyConnectionStatus.CONNECTED &&
-      Boolean(conn.accessToken),
+      Boolean(conn.accessToken) &&
+      (conn.status === TinyConnectionStatus.CONNECTED ||
+        conn.status === TinyConnectionStatus.BLOCKED),
     status: conn.status,
     uiStatus: mapTinyStatusToUi(conn.status, conn.isActive),
     name: conn.name,
@@ -706,7 +712,10 @@ export async function listUserTinyConnections(scope: TinyConnectionScope) {
     orderBy: [{ isDefault: "desc" }, { updatedAt: "desc" }],
   });
 
-  return connections.map(formatTinyConnectionStatus);
+  const reconciled = await Promise.all(
+    connections.map((conn) => reconcileTinyConnectionRateLimit(conn)),
+  );
+  return reconciled.map(formatTinyConnectionStatus);
 }
 
 export async function getTinyConnectionStatus(
@@ -724,8 +733,10 @@ export async function getTinyConnectionStatus(
     };
   }
 
+  const fresh = await reconcileTinyConnectionRateLimit(conn);
+
   return {
-    ...formatTinyConnectionStatus(conn),
+    ...formatTinyConnectionStatus(fresh),
     connections: await listUserTinyConnections(scope),
   };
 }
@@ -787,7 +798,10 @@ export async function testTinyConnection(
       where: { id: conn.id },
       data: {
         companyName,
-        metadata: metadata as unknown as Prisma.InputJsonValue,
+        metadata: {
+          ...(clearRateLimitMetadata(conn.metadata) ?? {}),
+          ...metadata,
+        } as Prisma.InputJsonValue,
         lastValidatedAt: now,
         lastError: null,
         status: TinyConnectionStatus.CONNECTED,
@@ -811,7 +825,7 @@ export async function testTinyConnection(
 
     const status =
       e instanceof TinyApiError && e.statusCode === 429
-        ? TinyConnectionStatus.BLOCKED
+        ? TinyConnectionStatus.CONNECTED
         : TinyConnectionStatus.ERROR;
     await prisma.tinyConnection.update({
       where: { id: conn.id },

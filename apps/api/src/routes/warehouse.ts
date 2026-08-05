@@ -8,6 +8,16 @@ import {
   getWarehouseTree,
   listWarehouseBarracoes,
 } from "../services/warehouse-tree.js";
+import {
+  createWarehousePosition,
+  updateWarehousePosition,
+} from "../services/warehouse-positions.js";
+import {
+  listWarehouseLayoutRows,
+  listWarehouseProximityOptions,
+} from "../services/warehouse-layout-list.js";
+import { buildWarehouseSegmentSearchWhere } from "../services/warehouse-segment-search.js";
+import { LocationType } from "@prisma/client";
 
 type Guard = (permission: string) => (
   request: FastifyRequest,
@@ -44,7 +54,7 @@ const ENTITIES: EntityDef[] = [
     segment: "setores",
     responseKey: "setores",
     parentField: "barracaoId",
-    listInclude: { barracao: { select: { code: true, name: true } } },
+    listInclude: { barracao: { select: { id: true, code: true, name: true } } },
     delegate: prisma.warehouseSetor as unknown as WarehouseDelegate,
   },
   {
@@ -54,71 +64,110 @@ const ENTITIES: EntityDef[] = [
     listInclude: {
       setor: {
         select: {
+          id: true,
           code: true,
           name: true,
-          barracao: { select: { code: true } },
+          barracaoId: true,
+          barracao: { select: { id: true, code: true } },
         },
       },
     },
     delegate: prisma.warehouseCorredor as unknown as WarehouseDelegate,
   },
   {
-    segment: "fileiras",
-    responseKey: "fileiras",
+    segment: "estantes",
+    responseKey: "estantes",
     parentField: "corredorId",
     listInclude: {
       corredor: {
         select: {
+          id: true,
           code: true,
-          setor: { select: { code: true, barracao: { select: { code: true } } } },
+          setorId: true,
+          setor: {
+            select: {
+              id: true,
+              code: true,
+              barracaoId: true,
+              barracao: { select: { id: true, code: true } },
+            },
+          },
         },
-      },
-    },
-    delegate: prisma.warehouseFileira as unknown as WarehouseDelegate,
-  },
-  {
-    segment: "estantes",
-    responseKey: "estantes",
-    parentField: "setorId",
-    listInclude: {
-      setor: {
-        select: { code: true, barracao: { select: { code: true } } },
       },
     },
     delegate: prisma.warehouseEstante as unknown as WarehouseDelegate,
   },
   {
-    segment: "prateleiras",
-    responseKey: "prateleiras",
+    segment: "colunas",
+    responseKey: "colunas",
     parentField: "estanteId",
     listInclude: {
       estante: {
         select: {
+          id: true,
           code: true,
-          setor: { select: { code: true, barracao: { select: { code: true } } } },
-        },
-      },
-    },
-    delegate: prisma.warehousePrateleira as unknown as WarehouseDelegate,
-  },
-  {
-    segment: "colunas",
-    responseKey: "colunas",
-    parentField: "prateleiraId",
-    listInclude: {
-      prateleira: {
-        select: {
-          code: true,
-          estante: {
+          corredorId: true,
+          corredor: {
             select: {
+              id: true,
               code: true,
-              setor: { select: { code: true, barracao: { select: { code: true } } } },
+              setorId: true,
+              setor: {
+                select: {
+                  id: true,
+                  code: true,
+                  barracaoId: true,
+                  barracao: { select: { id: true, code: true } },
+                },
+              },
             },
           },
         },
       },
     },
     delegate: prisma.warehouseColuna as unknown as WarehouseDelegate,
+  },
+  {
+    segment: "linhas",
+    responseKey: "linhas",
+    parentField: "colunaId",
+    listInclude: {
+      coluna: {
+        select: {
+          id: true,
+          code: true,
+          estanteId: true,
+          estante: {
+            select: {
+              id: true,
+              code: true,
+              corredorId: true,
+              corredor: {
+                select: {
+                  id: true,
+                  code: true,
+                  setorId: true,
+                  setor: {
+                    select: {
+                      id: true,
+                      code: true,
+                      barracaoId: true,
+                      barracao: { select: { id: true, code: true } },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+      location: {
+        include: {
+          product: { select: { sku: true, name: true } },
+        },
+      },
+    },
+    delegate: prisma.warehouseLinha as unknown as WarehouseDelegate,
   },
 ];
 
@@ -165,22 +214,97 @@ export function registerWarehouseRoutes(app: FastifyInstance, guard: Guard) {
     },
   );
 
+  app.get<{
+    Querystring: {
+      barracaoId?: string;
+      q?: string;
+      tipo?: string;
+      page?: string;
+      pageSize?: string;
+    };
+  }>(
+    "/api/warehouse/layout-rows",
+    { preHandler: guard(Permission.REGISTERS_VIEW) },
+    async (request, reply) => {
+      const barracaoId = request.query.barracaoId?.trim();
+      if (!barracaoId) {
+        return reply.status(400).send({ error: "barracaoId obrigatório" });
+      }
+      const { page, pageSize, skip, take } = parsePagination(request.query);
+      const tipoRaw = request.query.tipo?.trim().toLowerCase();
+      let locationType: "PULMAO" | "PICK_FACE" | undefined;
+      if (tipoRaw === "pulmao") locationType = "PULMAO";
+      else if (tipoRaw === "pick_face" || tipoRaw === "estoque-de-giro") {
+        locationType = "PICK_FACE";
+      }
+      const { rows, total } = await listWarehouseLayoutRows(
+        tenantWhere(request).tenantId,
+        {
+          barracaoId,
+          q: request.query.q,
+          locationType,
+          skip,
+          take,
+        },
+      );
+      return {
+        rows,
+        pagination: buildPaginationMeta(total, page, pageSize),
+      };
+    },
+  );
+
+  app.get<{
+    Querystring: { barracaoId?: string; excludeLinhaId?: string };
+  }>(
+    "/api/warehouse/proximity-options",
+    { preHandler: guard(Permission.REGISTERS_VIEW) },
+    async (request, reply) => {
+      const barracaoId = request.query.barracaoId?.trim();
+      if (!barracaoId) {
+        return reply.status(400).send({ error: "barracaoId obrigatório" });
+      }
+      const options = await listWarehouseProximityOptions(
+        tenantWhere(request).tenantId,
+        barracaoId,
+        request.query.excludeLinhaId?.trim() || undefined,
+      );
+      return options;
+    },
+  );
+
   for (const entity of ENTITIES) {
     const base = `/api/warehouse/${entity.segment}`;
 
-    app.get<{ Querystring: { page?: string; pageSize?: string; parentId?: string } }>(
+    app.get<{
+      Querystring: {
+        page?: string;
+        pageSize?: string;
+        parentId?: string;
+        q?: string;
+        availableOnly?: string;
+      };
+    }>(
       base,
       { preHandler: guard(Permission.REGISTERS_VIEW) },
       async (request) => {
         const { page, pageSize, skip, take } = parsePagination(request.query);
         const tw = tenantWhere(request);
         const parentId = request.query.parentId?.trim();
-        const where = {
-          ...tw,
-          ...(entity.parentField && parentId
-            ? { [entity.parentField]: parentId }
-            : {}),
-        };
+        const q = request.query.q?.trim();
+        const availableOnly =
+          entity.segment === "linhas" &&
+          request.query.availableOnly === "true";
+        const where = buildWarehouseSegmentSearchWhere(
+          entity.segment,
+          tw.tenantId,
+          q,
+          {
+            parentId,
+            parentField: entity.parentField,
+            availableOnly,
+          },
+        );
         const [items, total] = await Promise.all([
           entity.delegate.findMany({
             where,
@@ -208,13 +332,25 @@ export function registerWarehouseRoutes(app: FastifyInstance, guard: Guard) {
         setorId?: string;
         corredorId?: string;
         estanteId?: string;
-        prateleiraId?: string;
       };
     }>(
       base,
       { preHandler: guard(Permission.REGISTERS_VIEW) },
       async (request, reply) => {
         const b = request.body ?? {};
+        const blockedStructuralSegments = new Set([
+          "setores",
+          "corredores",
+          "estantes",
+          "colunas",
+          "linhas",
+        ]);
+        if (blockedStructuralSegments.has(entity.segment)) {
+          return reply.status(400).send({
+            error:
+              "Cadastre a estrutura junto com a localização via POST /api/warehouse/positions ou importação.",
+          });
+        }
         if (!b.code?.trim()) {
           return reply.status(400).send({ error: "Código obrigatório" });
         }
@@ -248,6 +384,137 @@ export function registerWarehouseRoutes(app: FastifyInstance, guard: Guard) {
         } catch {
           return reply.status(409).send({ error: "Código já cadastrado neste nível" });
         }
+      },
+    );
+
+    app.post<{
+      Body: {
+        items?: Array<{ code?: string; name?: string; pickOrder?: number }>;
+        pickOrderStart?: number;
+        barracaoId?: string;
+        setorId?: string;
+        corredorId?: string;
+        estanteId?: string;
+      };
+    }>(
+      `${base}/batch`,
+      { preHandler: guard(Permission.REGISTERS_VIEW) },
+      async (request, reply) => {
+        const blockedBatchSegments = new Set([
+          "setores",
+          "corredores",
+          "estantes",
+          "colunas",
+          "linhas",
+        ]);
+        if (blockedBatchSegments.has(entity.segment)) {
+          return reply.status(400).send({
+            error:
+              "Cadastro em lote estrutural desativado. Cadastre localizações via posição ou importação.",
+          });
+        }
+        const b = request.body ?? {};
+        const rawItems = b.items ?? [];
+        if (rawItems.length === 0) {
+          return reply.status(400).send({ error: "Lista de itens obrigatória" });
+        }
+        if (rawItems.length > 500) {
+          return reply.status(400).send({ error: "Máximo de 500 itens por lote" });
+        }
+
+        if (entity.parentField) {
+          const parentVal = (b as Record<string, string | undefined>)[
+            entity.parentField
+          ];
+          if (!parentVal) {
+            return reply.status(400).send({ error: "Vínculo pai obrigatório" });
+          }
+        }
+
+        const tenantId = tenantWhere(request).tenantId;
+        const parentData = entity.parentField
+          ? {
+              [entity.parentField]: (b as Record<string, string>)[
+                entity.parentField
+              ],
+            }
+          : {};
+
+        let nextOrder = b.pickOrderStart ?? 0;
+        const created: unknown[] = [];
+        const errors: Array<{ code: string; message: string }> = [];
+
+        for (const item of rawItems) {
+          if (!item.code?.trim()) {
+            errors.push({ code: "", message: "Código vazio ignorado" });
+            continue;
+          }
+          const pickOrder =
+            item.pickOrder !== undefined ? item.pickOrder : nextOrder++;
+          try {
+            const row = await entity.delegate.create({
+              data: {
+                tenantId,
+                code: normalizeCode(item.code),
+                name: item.name?.trim() || null,
+                pickOrder,
+                active: true,
+                ...parentData,
+              },
+              include: entity.listInclude,
+            });
+            created.push(row);
+          } catch {
+            errors.push({
+              code: item.code,
+              message: "Código já cadastrado neste nível",
+            });
+          }
+        }
+
+        return reply.status(201).send({
+          created: created.length,
+          errors,
+          items: created,
+        });
+      },
+    );
+
+    app.patch<{
+      Body: { items?: Array<{ id?: string; pickOrder?: number }> };
+    }>(
+      `${base}/reorder`,
+      { preHandler: guard(Permission.REGISTERS_VIEW) },
+      async (request, reply) => {
+        const items = request.body?.items ?? [];
+        if (items.length === 0) {
+          return reply.status(400).send({ error: "Lista de itens obrigatória" });
+        }
+        for (const item of items) {
+          if (!item.id || item.pickOrder === undefined || item.pickOrder < 0) {
+            return reply.status(400).send({ error: "id e pickOrder válidos obrigatórios" });
+          }
+        }
+
+        const tenantId = tenantWhere(request).tenantId;
+        const ids = items.map((i) => i.id!);
+        const existing = await entity.delegate.findMany({
+          where: { id: { in: ids }, tenantId },
+        });
+        if (existing.length !== ids.length) {
+          return reply.status(404).send({ error: "Um ou mais registros não encontrados" });
+        }
+
+        await Promise.all(
+          items.map((item) =>
+            entity.delegate.update({
+              where: { id: item.id! },
+              data: { pickOrder: item.pickOrder! },
+            }),
+          ),
+        );
+
+        return { ok: true, updated: items.length };
       },
     );
 
@@ -288,4 +555,117 @@ export function registerWarehouseRoutes(app: FastifyInstance, guard: Guard) {
       },
     );
   }
+
+  app.post<{
+    Body: {
+      colunaId?: string;
+      setorCode?: string;
+      corredorCode?: string;
+      estanteCode?: string;
+      colunaCode?: string;
+      linhaCode?: string;
+      linhaName?: string | null;
+      barcode?: string;
+      type?: LocationType;
+      productId?: string | null;
+      capacity?: number;
+      minThreshold?: number;
+      currentQuantity?: number;
+      active?: boolean;
+      barracaoId?: string | null;
+      setorId?: string | null;
+      corredorId?: string | null;
+      estanteId?: string | null;
+      proximityCorredorId?: string | null;
+      proximityEstanteId?: string | null;
+      proximityLinhaId?: string | null;
+      proximityReferences?: Array<{
+        proximityCorredorId?: string | null;
+        proximityEstanteId?: string | null;
+        proximityLinhaId?: string | null;
+      }>;
+    };
+  }>(
+    "/api/warehouse/positions",
+    { preHandler: guard(Permission.REGISTERS_VIEW) },
+    async (request, reply) => {
+      const b = request.body ?? {};
+      try {
+        const result = await createWarehousePosition(
+          tenantWhere(request).tenantId,
+          {
+            colunaId: b.colunaId,
+            setorCode: b.setorCode,
+            corredorCode: b.corredorCode,
+            estanteCode: b.estanteCode,
+            colunaCode: b.colunaCode,
+            linhaCode: b.linhaCode ?? "",
+            linhaName: b.linhaName,
+            barcode: b.barcode ?? "",
+            type: b.type ?? LocationType.PULMAO,
+            productId: b.productId,
+            capacity: b.capacity ?? 100,
+            minThreshold: b.minThreshold ?? 0,
+            currentQuantity: b.currentQuantity ?? 0,
+            active: b.active,
+            barracaoId: b.barracaoId,
+            setorId: b.setorId,
+            corredorId: b.corredorId,
+            estanteId: b.estanteId,
+            proximityCorredorId: b.proximityCorredorId,
+            proximityEstanteId: b.proximityEstanteId,
+            proximityLinhaId: b.proximityLinhaId,
+            proximityReferences: b.proximityReferences,
+          },
+        );
+        return reply.status(201).send(result);
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : "Erro ao criar posição";
+        return reply.status(400).send({ error: msg });
+      }
+    },
+  );
+
+  app.patch<{
+    Params: { linhaId: string };
+    Body: {
+      linhaCode?: string;
+      linhaName?: string | null;
+      linhaActive?: boolean;
+      barcode?: string;
+      type?: LocationType;
+      productId?: string | null;
+      capacity?: number;
+      minThreshold?: number;
+      currentQuantity?: number;
+      active?: boolean;
+      proximityCorredorId?: string | null;
+      proximityEstanteId?: string | null;
+      proximityLinhaId?: string | null;
+      proximityReferences?: Array<{
+        proximityCorredorId?: string | null;
+        proximityEstanteId?: string | null;
+        proximityLinhaId?: string | null;
+      }>;
+    };
+  }>(
+    "/api/warehouse/positions/:linhaId",
+    { preHandler: guard(Permission.REGISTERS_VIEW) },
+    async (request, reply) => {
+      try {
+        const result = await updateWarehousePosition(
+          tenantWhere(request).tenantId,
+          {
+            linhaId: request.params.linhaId,
+            ...request.body,
+          },
+        );
+        return result;
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : "Erro ao atualizar posição";
+        const status = msg.includes("não encontrad") ? 404 : 400;
+        return reply.status(status).send({ error: msg });
+      }
+    },
+  );
 }

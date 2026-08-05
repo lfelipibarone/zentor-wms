@@ -1,0 +1,279 @@
+{
+  "fetchedAt": "2026-06-17T17:57:38.224Z",
+  "tenant": "Default",
+  "amostraInicial": [
+    {
+      "pedidoId": 860387758,
+      "situacao": 0,
+      "formaEnvioNome": "Mercado Envios"
+    },
+    {
+      "pedidoId": 860386892,
+      "situacao": 0,
+      "formaEnvioNome": "Mercado Envios"
+    },
+    {
+      "pedidoId": 860386179,
+      "situacao": 5,
+      "formaEnvioNome": "Mercado Envios"
+    },
+    {
+      "pedidoId": 860385662,
+      "situacao": 5,
+      "formaEnvioNome": "Shopee Envios"
+    },
+    {
+      "pedidoId": 860354220,
+      "situacao": 6,
+      "formaEnvioNome": "Mercado Envios"
+    },
+    {
+      "pedidoId": 860347555,
+      "situacao": 6,
+      "formaEnvioNome": "Mercado Envios"
+    },
+    {
+      "pedidoId": 860374180,
+      "situacao": 7,
+      "formaEnvioNome": "Mercado Envios"
+    },
+    {
+      "pedidoId": 860371275,
+      "situacao": 7,
+      "formaEnvioNome": "Mercado Envios"
+    }
+  ],
+  "pedidosFixos": [
+    860301754,
+    860342783
+  ],
+  "resumo": {
+    "total": 10,
+    "naExpedicao": 2,
+    "comEtiqueta": 0,
+    "erroMarketplace": 2,
+    "foraExpedicao": 8,
+    "porSituacao": [
+      {
+        "situacao": 0,
+        "situacaoLabel": "Aberta",
+        "total": 2,
+        "naExpedicao": 0,
+        "comEtiqueta": 0,
+        "erroMarketplace": 0,
+        "foraExpedicao": 2
+      },
+      {
+        "situacao": 5,
+        "situacaoLabel": "Enviada",
+        "total": 3,
+        "naExpedicao": 1,
+        "comEtiqueta": 0,
+        "erroMarketplace": 1,
+        "foraExpedicao": 2
+      },
+      {
+        "situacao": 6,
+        "situacaoLabel": "Entregue",
+        "total": 3,
+        "naExpedicao": 1,
+        "comEtiqueta": 0,
+        "erroMarketplace": 1,
+        "foraExpedicao": 2
+      },
+      {
+        "situacao": 7,
+        "situacaoLabel": "Pronto Envio",
+        "total": 2,
+        "naExpedicao": 0,
+        "comEtiqueta": 0,
+        "erroMarketplace": 0,
+        "foraExpedicao": 2
+      }
+    ]
+  },
+  "resultados": [
+    {
+      "pedidoId": 860301754,
+      "erpOrderId": "TINY-860301754",
+      "numeroPedido": 206936,
+      "situacao": 6,
+      "situacaoLabel": "Entregue",
+      "formaEnvioNome": "Mercado Envios",
+      "codigoRastreamento": null,
+      "idNotaFiscal": 860301759,
+      "naExpedicao": true,
+      "expedicao": {
+        "idAgrupamento": 746503742,
+        "idExpedicao": 749882106,
+        "formaEnvioNome": "Mercado Envios",
+        "pedidoId": 860301754,
+        "idNotaFiscal": 860301759
+      },
+      "etiquetas": {
+        "urls": [],
+        "marketplaceError": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Não foi possível obter as etiquetas dos seguintes pedidos: S47281733718",
+        "diagnostico": "ERRO_MARKETPLACE"
+      }
+    },
+    {
+      "pedidoId": 860342783,
+      "erpOrderId": "TINY-860342783",
+      "numeroPedido": 207368,
+      "situacao": 5,
+      "situacaoLabel": "Enviada",
+      "formaEnvioNome": "Amazon DBA",
+      "codigoRastreamento": null,
+      "idNotaFiscal": 860342789,
+      "naExpedicao": true,
+      "expedicao": {
+        "idAgrupamento": 746503773,
+        "idExpedicao": 749884319,
+        "formaEnvioNome": "Amazon DBA",
+        "pedidoId": 860342783,
+        "idNotaFiscal": 860342789
+      },
+      "etiquetas": {
+        "urls": [],
+        "marketplaceError": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Url das etiquetas não encontrada na Amazon.",
+        "diagnostico": "ERRO_MARKETPLACE"
+      }
+    },
+    {
+      "pedidoId": 860347555,
+      "erpOrderId": "TINY-860347555",
+      "numeroPedido": 207410,
+      "situacao": 6,
+      "situacaoLabel": "Entregue",
+      "formaEnvioNome": "Mercado Envios",
+      "codigoRastreamento": null,
+      "idNotaFiscal": 860358830,
+      "naExpedicao": false,
+      "expedicao": null,
+      "etiquetas": {
+        "urls": [],
+        "marketplaceError": null,
+        "diagnostico": "FORA_EXPEDICAO"
+      }
+    },
+    {
+      "pedidoId": 860354220,
+      "erpOrderId": "TINY-860354220",
+      "numeroPedido": 207466,
+      "situacao": 6,
+      "situacaoLabel": "Entregue",
+      "formaEnvioNome": "Mercado Envios",
+      "codigoRastreamento": null,
+      "idNotaFiscal": 860358957,
+      "naExpedicao": false,
+      "expedicao": null,
+      "etiquetas": {
+        "urls": [],
+        "marketplaceError": null,
+        "diagnostico": "FORA_EXPEDICAO"
+      }
+    },
+    {
+      "pedidoId": 860371275,
+      "erpOrderId": "TINY-860371275",
+      "numeroPedido": 207605,
+      "situacao": 7,
+      "situacaoLabel": "Pronto Envio",
+      "formaEnvioNome": "Mercado Envios",
+      "codigoRastreamento": null,
+      "idNotaFiscal": 860371276,
+      "naExpedicao": false,
+      "expedicao": null,
+      "etiquetas": {
+        "urls": [],
+        "marketplaceError": null,
+        "diagnostico": "FORA_EXPEDICAO"
+      }
+    },
+    {
+      "pedidoId": 860374180,
+      "erpOrderId": "TINY-860374180",
+      "numeroPedido": 207644,
+      "situacao": 7,
+      "situacaoLabel": "Pronto Envio",
+      "formaEnvioNome": "Mercado Envios",
+      "codigoRastreamento": null,
+      "idNotaFiscal": 860374182,
+      "naExpedicao": false,
+      "expedicao": null,
+      "etiquetas": {
+        "urls": [],
+        "marketplaceError": null,
+        "diagnostico": "FORA_EXPEDICAO"
+      }
+    },
+    {
+      "pedidoId": 860385662,
+      "erpOrderId": "TINY-860385662",
+      "numeroPedido": 207738,
+      "situacao": 5,
+      "situacaoLabel": "Enviada",
+      "formaEnvioNome": "Shopee Envios",
+      "codigoRastreamento": null,
+      "idNotaFiscal": 860385665,
+      "naExpedicao": false,
+      "expedicao": null,
+      "etiquetas": {
+        "urls": [],
+        "marketplaceError": null,
+        "diagnostico": "FORA_EXPEDICAO"
+      }
+    },
+    {
+      "pedidoId": 860386179,
+      "erpOrderId": "TINY-860386179",
+      "numeroPedido": 207743,
+      "situacao": 5,
+      "situacaoLabel": "Enviada",
+      "formaEnvioNome": "Mercado Envios",
+      "codigoRastreamento": null,
+      "idNotaFiscal": null,
+      "naExpedicao": false,
+      "expedicao": null,
+      "etiquetas": {
+        "urls": [],
+        "marketplaceError": null,
+        "diagnostico": "FORA_EXPEDICAO"
+      }
+    },
+    {
+      "pedidoId": 860386892,
+      "erpOrderId": "TINY-860386892",
+      "numeroPedido": 207751,
+      "situacao": 0,
+      "situacaoLabel": "Aberta",
+      "formaEnvioNome": "Mercado Envios",
+      "codigoRastreamento": null,
+      "idNotaFiscal": null,
+      "naExpedicao": false,
+      "expedicao": null,
+      "etiquetas": {
+        "urls": [],
+        "marketplaceError": null,
+        "diagnostico": "FORA_EXPEDICAO"
+      }
+    },
+    {
+      "pedidoId": 860387758,
+      "erpOrderId": "TINY-860387758",
+      "numeroPedido": 207755,
+      "situacao": 0,
+      "situacaoLabel": "Aberta",
+      "formaEnvioNome": "Mercado Envios",
+      "codigoRastreamento": null,
+      "idNotaFiscal": null,
+      "naExpedicao": false,
+      "expedicao": null,
+      "etiquetas": {
+        "urls": [],
+        "marketplaceError": null,
+        "diagnostico": "FORA_EXPEDICAO"
+      }
+    }
+  ]
+}

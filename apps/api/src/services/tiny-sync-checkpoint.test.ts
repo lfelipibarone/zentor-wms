@@ -1,6 +1,8 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import {
+  computeTinySyncProgressPercent,
+  buildTinySyncProgressLabel,
   isTinySyncCheckpointResumable,
   parseTinySyncCheckpoint,
 } from "./tiny-sync-checkpoint.js";
@@ -49,11 +51,48 @@ describe("tiny-sync-checkpoint", () => {
     );
   });
 
-  it("não retoma checkpoint expirado", () => {
+  it("não retoma checkpoint expirado (>7 dias)", () => {
     const stale = {
       ...base,
-      updatedAt: new Date(Date.now() - 25 * 60 * 60 * 1000).toISOString(),
+      updatedAt: new Date(Date.now() - 8 * 24 * 60 * 60 * 1000).toISOString(),
     };
     assert.equal(isTinySyncCheckpointResumable(stale), false);
+  });
+
+  it("parseia checkpoint de pedidos", () => {
+    const cp = parseTinySyncCheckpoint(
+      JSON.stringify({
+        ...base,
+        kind: "orders",
+        situacaoIndex: 2,
+        situacao: 3,
+        phase: "syncable",
+        days: 30,
+      }),
+    );
+    assert.equal(cp?.kind, "orders");
+    assert.equal(cp?.situacaoIndex, 2);
+    assert.equal(cp?.phase, "syncable");
+  });
+
+  it("calcula progresso de produtos", () => {
+    assert.equal(computeTinySyncProgressPercent(base), 13);
+    assert.match(buildTinySyncProgressLabel(base), /offset 200/);
+  });
+
+  it("calcula progresso de pedidos por fase", () => {
+    const ordersCp = {
+      ...base,
+      kind: "orders" as const,
+      offset: 100,
+      total: 400,
+      situacaoIndex: 1,
+      situacao: 1,
+      phase: "syncable" as const,
+      days: 30,
+    };
+    const pct = computeTinySyncProgressPercent(ordersCp);
+    assert.ok(pct !== null && pct > 0 && pct < 100);
+    assert.match(buildTinySyncProgressLabel(ordersCp), /Faturada/);
   });
 });

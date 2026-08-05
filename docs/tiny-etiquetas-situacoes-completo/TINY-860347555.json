@@ -1,0 +1,471 @@
+{
+  "meta": {
+    "fetchedAt": "2026-06-17T18:02:15.310Z",
+    "pedidoId": 860347555,
+    "erpOrderId": "TINY-860347555",
+    "numeroPedido": 207410,
+    "situacao": 6,
+    "situacaoLabel": "Entregue",
+    "formaEnvioNome": "Mercado Envios",
+    "diagnostico": "FORA_EXPEDICAO",
+    "resumoTesteAnterior": {
+      "pedidoId": 860347555,
+      "erpOrderId": "TINY-860347555",
+      "numeroPedido": 207410,
+      "situacao": 6,
+      "situacaoLabel": "Entregue",
+      "formaEnvioNome": "Mercado Envios",
+      "codigoRastreamento": null,
+      "idNotaFiscal": 860358830,
+      "naExpedicao": false,
+      "expedicao": null,
+      "etiquetas": {
+        "urls": [],
+        "marketplaceError": null,
+        "diagnostico": "FORA_EXPEDICAO"
+      }
+    }
+  },
+  "pedido": {
+    "rotas": {
+      "GET /pedidos/860347555": {
+        "rota": "GET /pedidos/860347555",
+        "params": {
+          "idPedido": 860347555
+        },
+        "ok": true,
+        "urls": [],
+        "resposta": {
+          "id": 860347555,
+          "numeroPedido": 207410,
+          "idNotaFiscal": 860358830,
+          "dataFaturamento": "2026-06-16",
+          "valorTotalProdutos": 51.21,
+          "valorTotalPedido": 51.21,
+          "listaPreco": {
+            "id": 0,
+            "nome": "Padrão",
+            "acrescimoDesconto": 0
+          },
+          "cliente": {
+            "nome": "Magali de Fatima da Silva Benedito",
+            "codigo": "",
+            "fantasia": "",
+            "tipoPessoa": "F",
+            "cpfCnpj": "150.657.938-83",
+            "inscricaoEstadual": "",
+            "rg": "",
+            "telefone": "",
+            "celular": "",
+            "email": "",
+            "endereco": {
+              "endereco": "Avenida Octavio Golfeto",
+              "numero": "256",
+              "complemento": "Referencia: Entrega ate 18:00 Ou pode entregar no 254 , caso",
+              "bairro": "Jardim Jose Sampaio Junior",
+              "municipio": "Ribeirão Preto",
+              "cep": "14.065-310",
+              "uf": "SP",
+              "pais": "Brasil"
+            },
+            "id": 766890217
+          },
+          "enderecoEntrega": null,
+          "ecommerce": {
+            "id": 7272,
+            "nome": "Mercado Livre Full Mamute",
+            "numeroPedidoEcommerce": "2000016949684220",
+            "numeroPedidoCanalVenda": "",
+            "canalVenda": ""
+          },
+          "transportador": {
+            "id": 0,
+            "nome": "",
+            "fretePorConta": "R",
+            "formaEnvio": {
+              "id": 744061814,
+              "nome": "Mercado Envios"
+            },
+            "formaFrete": null,
+            "codigoRastreamento": "",
+            "urlRastreamento": ""
+          },
+          "deposito": {
+            "id": 744051267,
+            "nome": "Fullfilment"
+          },
+          "vendedor": null,
+          "naturezaOperacao": {
+            "id": 775374075,
+            "nome": "Venda de Mercadorias - Regime normal"
+          },
+          "intermediador": {
+            "id": 381,
+            "nome": "624895842",
+            "cnpj": "03.007.331/0001-41",
+            "cnpjPagamentoInstituicao": ""
+          },
+          "pagamento": null,
+          "itens": [
+            {
+              "produto": {
+                "id": 744045266,
+                "sku": "PUXSPA256OU",
+                "descricao": "PUXADOR ALUMINIO SPACE 256MM - Ouro",
+                "tipo": "P"
+              },
+              "quantidade": 4,
+              "valorUnitario": 12.8025,
+              "infoAdicional": ""
+            }
+          ],
+          "pagamentosIntegrados": [
+            {
+              "valor": 61.2,
+              "tipoPagamento": 99,
+              "cnpjIntermediador": "03007331000141",
+              "codigoAutorizacao": "",
+              "codigoBandeira": 99
+            }
+          ],
+          "situacao": 6,
+          "data": "2026-06-15",
+          "dataEntrega": "2026-06-17",
+          "numeroOrdemCompra": "2000016949684220",
+          "valorDesconto": 0,
+          "valorFrete": 0,
+          "valorOutrasDespesas": 0,
+          "dataPrevista": "2026-06-17",
+          "dataEnvio": "",
+          "observacoes": "Endereço:  Entrega até 1800Ou pode entregar no 254 , caso eu não estiver.Obrigada",
+          "observacoesInternas": "",
+          "origemPedido": 0
+        }
+      },
+      "GET /pedidos/860347555/marcadores": {
+        "rota": "GET /pedidos/860347555/marcadores",
+        "params": {
+          "idPedido": 860347555
+        },
+        "ok": true,
+        "urls": [],
+        "resposta": [
+          {
+            "descricao": "Fulfillment"
+          },
+          {
+            "descricao": "1ª venda"
+          }
+        ]
+      }
+    }
+  },
+  "nota": {
+    "idNotaFiscal": 860358830,
+    "rotas": {
+      "GET /notas/860358830": {
+        "rota": "GET /notas/860358830",
+        "params": {
+          "idNota": 860358830
+        },
+        "ok": true,
+        "urls": [],
+        "resposta": {
+          "situacao": "6",
+          "tipo": "S",
+          "numero": "230478",
+          "serie": "2",
+          "chaveAcesso": "35260637919979000106550020002304781870757746",
+          "dataEmissao": "2026-06-16",
+          "dataPrevista": "",
+          "cliente": {
+            "nome": "Magali de Fatima da Silva Benedito",
+            "codigo": null,
+            "fantasia": null,
+            "tipoPessoa": "F",
+            "cpfCnpj": "150.657.938-83",
+            "inscricaoEstadual": "",
+            "rg": null,
+            "telefone": "",
+            "celular": null,
+            "email": "",
+            "endereco": {
+              "endereco": "Avenida Octavio Golfeto",
+              "numero": "256",
+              "complemento": "Referencia: Entrega ate 18:00 Ou pode entregar no 254 , caso",
+              "bairro": "Jardim Jose Sampaio Junior",
+              "municipio": "Ribeirão Preto",
+              "cep": "14.065-310",
+              "uf": "SP",
+              "pais": "Brasil"
+            },
+            "id": 766890217
+          },
+          "enderecoEntrega": null,
+          "valor": 51.21,
+          "valorProdutos": 51.21,
+          "valorFrete": 0,
+          "vendedor": null,
+          "idFormaEnvio": 743997873,
+          "idFormaFrete": 0,
+          "codigoRastreamento": "",
+          "urlRastreamento": "",
+          "fretePorConta": "T",
+          "qtdVolumes": 1,
+          "pesoBruto": 0.15,
+          "pesoLiquido": 0.15,
+          "id": 860358830,
+          "finalidade": "1",
+          "regimeTributario": 3,
+          "dataInclusao": "2026-06-16 00:21:21",
+          "baseIcms": 51.21,
+          "valorIcms": 9.22,
+          "baseIcmsSt": 0,
+          "valorIcmsSt": 0,
+          "valorServicos": 0,
+          "valorSeguro": 0,
+          "valorOutras": 0,
+          "valorIpi": 0,
+          "valorIssqn": 0,
+          "valorDesconto": 0,
+          "valorFaturado": 51.21,
+          "idIntermediador": 381,
+          "idNaturezaOperacao": 743997760,
+          "idFormaPagamento": 0,
+          "idMeioPagamento": 0,
+          "observacoes": "Enviado diretamente do deposito temporario - operador logistico: EBAZAR.COM.BR LTDA, Cnpj: 03007331007405, Inscricao Estadual: 241174886113 saindo do endereco: Av. Antonio Candido Machado, Numero: 3100, Complemento: , Bairro: Empresarial Paineira (Jordanesia), Cidade: Cajamar, Cep: 07776037, Estado: SP, Pais: BR. Nota fiscal de retorno simbolico n 230477, emitida em 16/06/2026, serie 2, nos termos da Portaria CAT 31/2019 Valor aproximado dos tributos (IBPT) R$20,76. Valores totais do ICMS Interestadual: DIFAL da UF destino R$0,00 + FCP R$0,00; DIFAL da UF Origem R$0,00.\r\nEnviado diretamente do deposito temporario - operador logistico: EBAZAR.COM.BR LTDA, Cnpj: 03007331007405, Inscricao Estadual: 241174886113 saindo do endereco: Av. Antonio Candido Machado, Numero: 3100, Complemento: , Bairro: Empresarial Paineira (Jordanesia), Cidade: Cajamar, Cep: 07776037, Estado: SP, Pais: BR. Nota fiscal de retorno simbolico n 230477, emitida em 16/06/2026, serie 2, nos termos da Portaria CAT 31/2019 Valor aproximado dos tributos (IBPT) R$20,76. Valores totais do ICMS Interestadual: DIFAL da UF destino R$0,00 + FCP R$0,00; DIFAL da UF Origem R$0,00.",
+          "condicaoPagamento": "0",
+          "valorNotaComImpostos": 0,
+          "valorBaseDiferimento": 0,
+          "percentualICMSPartilhaDestino": 0,
+          "valorTotalICMSFCPDestino": 0,
+          "valorIPIDevolvido": 0,
+          "tipoNotaCredito": "",
+          "tipoNotaDebito": "",
+          "valorTotalBCIBSCBS": 40.46,
+          "valorTotalIBSUF": 0.04,
+          "valorTotalCBS": 0.36,
+          "itens": [
+            {
+              "idItem": 780297767,
+              "idProduto": 744045266,
+              "codigo": "PUXSPA256OU",
+              "ncm": "8302.42.00",
+              "descricao": "PUXADOR ALUMINIO SPACE 256MM",
+              "unidade": "UN",
+              "quantidade": 4,
+              "valorUnitario": 12.8025,
+              "valorTotal": 51.21,
+              "cfop": "5106",
+              "naturezaOperacao": "Venda de mercadorias"
+            }
+          ],
+          "parcelas": [
+            {
+              "dias": 0,
+              "data": "2026-06-16",
+              "valor": 51.21,
+              "observacoes": "",
+              "idFormaPagamento": "9",
+              "idMeioPagamento": "0"
+            }
+          ],
+          "pagamentosIntegrados": [
+            {
+              "valor": 51.21,
+              "tipoPagamento": 18,
+              "cnpjIntermediador": "",
+              "codigoAutorizacao": "",
+              "codigoBandeira": 0
+            }
+          ],
+          "ecommerce": {
+            "id": 7272,
+            "nome": "Mercado Livre Full Mamute",
+            "numeroPedidoEcommerce": "2000016949684220",
+            "numeroPedidoCanalVenda": "",
+            "canalVenda": ""
+          },
+          "marcadores": [
+            {
+              "descricao": "Fulfillment",
+              "cor": "#808080"
+            }
+          ],
+          "transportador": {
+            "nome": "EBAZAR.COM.BR LTDA",
+            "cpfCnpj": "03007331012239",
+            "ie": "120519234116",
+            "endereco": "AVENIDA DAS NACOES UNIDAS 3000 3003",
+            "municipio": null,
+            "uf": "SP"
+          },
+          "origem": {
+            "id": "860347555",
+            "tipo": "venda"
+          }
+        }
+      },
+      "GET /notas/860358830/link": {
+        "rota": "GET /notas/860358830/link",
+        "params": {
+          "idNota": 860358830
+        },
+        "ok": true,
+        "urls": [],
+        "resposta": {
+          "link": "https://erp.tiny.com.br/doc.view?id=3105625c494f903438f799bb86609052"
+        }
+      },
+      "GET /notas/860358830/marcadores": {
+        "rota": "GET /notas/860358830/marcadores",
+        "params": {
+          "idNota": 860358830
+        },
+        "ok": true,
+        "urls": [],
+        "resposta": [
+          {
+            "descricao": "Fulfillment"
+          }
+        ]
+      }
+    }
+  },
+  "formaEnvio": {
+    "idFormaEnvio": 744061814,
+    "rotas": {
+      "GET /formas-envio/744061814": {
+        "rota": "GET /formas-envio/744061814",
+        "params": {
+          "idFormaEnvio": 744061814
+        },
+        "ok": true,
+        "urls": [],
+        "resposta": {
+          "nome": "Mercado Envios",
+          "tipo": "3",
+          "situacao": "1",
+          "id": 744061814,
+          "gatewayLogistico": null,
+          "formasFrete": [
+            {
+              "id": 760093007,
+              "nome": "Coleta Normal",
+              "codigo": "101",
+              "codigoExterno": "",
+              "tipoEntrega": "0"
+            },
+            {
+              "id": 760093008,
+              "nome": "Coleta Express",
+              "codigo": "102",
+              "codigoExterno": "",
+              "tipoEntrega": "0"
+            },
+            {
+              "id": 760093009,
+              "nome": "Coleta Express",
+              "codigo": "103",
+              "codigoExterno": "",
+              "tipoEntrega": "0"
+            },
+            {
+              "id": 760093010,
+              "nome": "Coleta Correios PAC Agência",
+              "codigo": "1051",
+              "codigoExterno": "",
+              "tipoEntrega": "0"
+            },
+            {
+              "id": 760093011,
+              "nome": "Coleta Correios Sedex Agência",
+              "codigo": "1061",
+              "codigoExterno": "",
+              "tipoEntrega": "0"
+            },
+            {
+              "id": 760093012,
+              "nome": "Shipping Network Fast",
+              "codigo": "155413",
+              "codigoExterno": "",
+              "tipoEntrega": "0"
+            },
+            {
+              "id": 760093013,
+              "nome": "Shipping Network Fast",
+              "codigo": "165366",
+              "codigoExterno": "",
+              "tipoEntrega": "0"
+            },
+            {
+              "id": 760093014,
+              "nome": "Coleta Normal",
+              "codigo": "101",
+              "codigoExterno": "",
+              "tipoEntrega": "0"
+            },
+            {
+              "id": 760093015,
+              "nome": "Coleta Express",
+              "codigo": "102",
+              "codigoExterno": "",
+              "tipoEntrega": "0"
+            },
+            {
+              "id": 760093016,
+              "nome": "Coleta Express",
+              "codigo": "103",
+              "codigoExterno": "",
+              "tipoEntrega": "0"
+            },
+            {
+              "id": 760093017,
+              "nome": "Coleta Correios PAC Agência",
+              "codigo": "1051",
+              "codigoExterno": "",
+              "tipoEntrega": "0"
+            },
+            {
+              "id": 760093018,
+              "nome": "Coleta Correios Sedex Agência",
+              "codigo": "1061",
+              "codigoExterno": "",
+              "tipoEntrega": "0"
+            },
+            {
+              "id": 760093020,
+              "nome": "Shipping Network Fast",
+              "codigo": "155413",
+              "codigoExterno": "",
+              "tipoEntrega": "0"
+            },
+            {
+              "id": 760093021,
+              "nome": "Shipping Network Fast",
+              "codigo": "165366",
+              "codigoExterno": "",
+              "tipoEntrega": "0"
+            },
+            {
+              "id": 760093022,
+              "nome": "Mercadoenvios Next Day",
+              "codigo": "991",
+              "codigoExterno": "",
+              "tipoEntrega": "0"
+            }
+          ]
+        }
+      }
+    }
+  },
+  "expedicao": {
+    "encontrada": false,
+    "match": null,
+    "rotas": {}
+  },
+  "etiquetas": {
+    "urls": [],
+    "rotas": {}
+  }
+}

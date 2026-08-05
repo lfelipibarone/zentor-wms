@@ -1,0 +1,3228 @@
+{
+  "geradoEm": "2026-07-01T19:32:22.145Z",
+  "tenant": "Default",
+  "dataInicial": "2026-06-24",
+  "dataFinal": "2026-07-01",
+  "dias": 7,
+  "nota": "temEtiqueta = urls de lote OU individual (buscarEtiquetasExpedicao, igual WMS)",
+  "resumo": {
+    "totalAgrupamentos": 15,
+    "amazon": 12,
+    "shopee": 0,
+    "mercado_livre": 3,
+    "outros": 0,
+    "expedicoesTestadas": 51,
+    "agrupamentosComEtiqueta": 0,
+    "expedicoesComEtiqueta": 0,
+    "agrupamentosSoErroLoteMasIndividualOk": 0
+  },
+  "expedicoesComEtiqueta": [],
+  "agrupamentos": [
+    {
+      "idAgrupamento": 746504224,
+      "identificacao": "3213",
+      "data": "2026-07-01",
+      "quantidadeObjetos": null,
+      "formaEnvio": {
+        "id": 758095424,
+        "nome": "Amazon DBA"
+      },
+      "categoria": "amazon",
+      "etiquetasLote": {
+        "ok": false,
+        "urls": [],
+        "erro": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Url das etiquetas não encontrada na Amazon.",
+        "resposta": {
+          "erro": true,
+          "mensagem": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Url das etiquetas não encontrada na Amazon.",
+          "statusCode": 400
+        }
+      },
+      "urlsConsolidadas": [],
+      "temEtiqueta": false,
+      "expedicoes": [
+        {
+          "idExpedicao": 749895383,
+          "pedidoId": 860578256,
+          "numeroPedido": 209552,
+          "idNotaFiscal": 860578265,
+          "numeroNota": 795,
+          "situacao": "1",
+          "destinatario": "Tainan",
+          "etiquetas": {
+            "ok": false,
+            "urls": [],
+            "marketplaceError": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Url das etiquetas não encontrada na Amazon.",
+            "rotaLote": {
+              "erro": true,
+              "mensagem": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Url das etiquetas não encontrada na Amazon.",
+              "statusCode": 400
+            },
+            "rotaIndividual": {
+              "erro": true,
+              "mensagem": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Url das etiquetas não encontrada na Amazon.",
+              "statusCode": 400
+            }
+          }
+        },
+        {
+          "idExpedicao": 749895422,
+          "pedidoId": 860579384,
+          "numeroPedido": 209567,
+          "idNotaFiscal": 860579405,
+          "numeroNota": 808,
+          "situacao": "1",
+          "destinatario": "Sabrina pereira de souza",
+          "etiquetas": {
+            "ok": false,
+            "urls": [],
+            "marketplaceError": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Url das etiquetas não encontrada na Amazon.",
+            "rotaLote": {
+              "erro": true,
+              "mensagem": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Url das etiquetas não encontrada na Amazon.",
+              "statusCode": 400
+            },
+            "rotaIndividual": {
+              "erro": true,
+              "mensagem": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Url das etiquetas não encontrada na Amazon.",
+              "statusCode": 400
+            }
+          }
+        },
+        {
+          "idExpedicao": 749895464,
+          "pedidoId": 860580372,
+          "numeroPedido": 209579,
+          "idNotaFiscal": 860580392,
+          "numeroNota": 817,
+          "situacao": "1",
+          "destinatario": "Sabryna Kellen Souza do Nascimento",
+          "etiquetas": {
+            "ok": false,
+            "urls": [],
+            "marketplaceError": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Url das etiquetas não encontrada na Amazon.",
+            "rotaLote": {
+              "erro": true,
+              "mensagem": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Url das etiquetas não encontrada na Amazon.",
+              "statusCode": 400
+            },
+            "rotaIndividual": {
+              "erro": true,
+              "mensagem": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Url das etiquetas não encontrada na Amazon.",
+              "statusCode": 400
+            }
+          }
+        },
+        {
+          "idExpedicao": 749895469,
+          "pedidoId": 860580463,
+          "numeroPedido": 209581,
+          "idNotaFiscal": 860580477,
+          "numeroNota": 820,
+          "situacao": "1",
+          "destinatario": "SUELY VIEIRA DE ARAUJO",
+          "etiquetas": {
+            "ok": false,
+            "urls": [],
+            "marketplaceError": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Url das etiquetas não encontrada na Amazon.",
+            "rotaLote": {
+              "erro": true,
+              "mensagem": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Url das etiquetas não encontrada na Amazon.",
+              "statusCode": 400
+            },
+            "rotaIndividual": {
+              "erro": true,
+              "mensagem": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Url das etiquetas não encontrada na Amazon.",
+              "statusCode": 400
+            }
+          }
+        }
+      ]
+    },
+    {
+      "idAgrupamento": 746504222,
+      "identificacao": "3212",
+      "data": "2026-06-30",
+      "quantidadeObjetos": null,
+      "formaEnvio": {
+        "id": 758095424,
+        "nome": "Amazon DBA"
+      },
+      "categoria": "amazon",
+      "etiquetasLote": {
+        "ok": false,
+        "urls": [],
+        "erro": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Url das etiquetas não encontrada na Amazon.",
+        "resposta": {
+          "erro": true,
+          "mensagem": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Url das etiquetas não encontrada na Amazon.",
+          "statusCode": 400
+        }
+      },
+      "urlsConsolidadas": [],
+      "temEtiqueta": false,
+      "expedicoes": [
+        {
+          "idExpedicao": 749895256,
+          "pedidoId": 860574685,
+          "numeroPedido": 209517,
+          "idNotaFiscal": 860574881,
+          "numeroNota": 704,
+          "situacao": "1",
+          "destinatario": "maessa barros",
+          "etiquetas": {
+            "ok": false,
+            "urls": [],
+            "marketplaceError": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Url das etiquetas não encontrada na Amazon.",
+            "rotaLote": {
+              "erro": true,
+              "mensagem": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Url das etiquetas não encontrada na Amazon.",
+              "statusCode": 400
+            },
+            "rotaIndividual": {
+              "erro": true,
+              "mensagem": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Url das etiquetas não encontrada na Amazon.",
+              "statusCode": 400
+            }
+          }
+        },
+        {
+          "idExpedicao": 749895340,
+          "pedidoId": 860576646,
+          "numeroPedido": 209525,
+          "idNotaFiscal": 860576787,
+          "numeroNota": 773,
+          "situacao": "1",
+          "destinatario": "Nycolas davi",
+          "etiquetas": {
+            "ok": false,
+            "urls": [],
+            "marketplaceError": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Url das etiquetas não encontrada na Amazon.",
+            "rotaLote": {
+              "erro": true,
+              "mensagem": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Url das etiquetas não encontrada na Amazon.",
+              "statusCode": 400
+            },
+            "rotaIndividual": {
+              "erro": true,
+              "mensagem": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Url das etiquetas não encontrada na Amazon.",
+              "statusCode": 400
+            }
+          }
+        }
+      ]
+    },
+    {
+      "idAgrupamento": 746504219,
+      "identificacao": "3211",
+      "data": "2026-06-30",
+      "quantidadeObjetos": null,
+      "formaEnvio": {
+        "id": 758095424,
+        "nome": "Amazon DBA"
+      },
+      "categoria": "amazon",
+      "etiquetasLote": {
+        "ok": false,
+        "urls": [],
+        "erro": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Url das etiquetas não encontrada na Amazon.",
+        "resposta": {
+          "erro": true,
+          "mensagem": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Url das etiquetas não encontrada na Amazon.",
+          "statusCode": 400
+        }
+      },
+      "urlsConsolidadas": [],
+      "temEtiqueta": false,
+      "expedicoes": [
+        {
+          "idExpedicao": 749895221,
+          "pedidoId": 860572749,
+          "numeroPedido": 209501,
+          "idNotaFiscal": 860572760,
+          "numeroNota": 690,
+          "situacao": "1",
+          "destinatario": "LAIZ DO CARMO HENRIQUE",
+          "etiquetas": {
+            "ok": false,
+            "urls": [],
+            "marketplaceError": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Url das etiquetas não encontrada na Amazon.",
+            "rotaLote": {
+              "erro": true,
+              "mensagem": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Url das etiquetas não encontrada na Amazon.",
+              "statusCode": 400
+            },
+            "rotaIndividual": {
+              "erro": true,
+              "mensagem": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Url das etiquetas não encontrada na Amazon.",
+              "statusCode": 400
+            }
+          }
+        },
+        {
+          "idExpedicao": 749895237,
+          "pedidoId": 860573713,
+          "numeroPedido": 209508,
+          "idNotaFiscal": 860573801,
+          "numeroNota": 696,
+          "situacao": "1",
+          "destinatario": "Lilian Spiller",
+          "etiquetas": {
+            "ok": false,
+            "urls": [],
+            "marketplaceError": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Url das etiquetas não encontrada na Amazon.",
+            "rotaLote": {
+              "erro": true,
+              "mensagem": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Url das etiquetas não encontrada na Amazon.",
+              "statusCode": 400
+            },
+            "rotaIndividual": {
+              "erro": true,
+              "mensagem": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Url das etiquetas não encontrada na Amazon.",
+              "statusCode": 400
+            }
+          }
+        }
+      ]
+    },
+    {
+      "idAgrupamento": 746504206,
+      "identificacao": "3210",
+      "data": "2026-06-30",
+      "quantidadeObjetos": null,
+      "formaEnvio": {
+        "id": 758095424,
+        "nome": "Amazon DBA"
+      },
+      "categoria": "amazon",
+      "etiquetasLote": {
+        "ok": false,
+        "urls": [],
+        "erro": "Agrupamento ainda não foi concluído",
+        "resposta": {
+          "erro": true,
+          "mensagem": "Agrupamento ainda não foi concluído",
+          "statusCode": 400
+        }
+      },
+      "urlsConsolidadas": [],
+      "temEtiqueta": false,
+      "expedicoes": [
+        {
+          "idExpedicao": 749876734,
+          "pedidoId": 860200901,
+          "numeroPedido": 206044,
+          "idNotaFiscal": 860200916,
+          "numeroNota": 155132,
+          "situacao": "1",
+          "destinatario": "Paulo",
+          "etiquetas": {
+            "ok": false,
+            "urls": [],
+            "marketplaceError": "Agrupamento ainda não foi concluído",
+            "rotaLote": {
+              "erro": true,
+              "mensagem": "Agrupamento ainda não foi concluído",
+              "statusCode": 400
+            },
+            "rotaIndividual": {
+              "erro": true,
+              "mensagem": "Agrupamento ainda não foi concluído",
+              "statusCode": 400
+            }
+          }
+        },
+        {
+          "idExpedicao": 749876864,
+          "pedidoId": 860203156,
+          "numeroPedido": 206072,
+          "idNotaFiscal": 860203254,
+          "numeroNota": 155147,
+          "situacao": "1",
+          "destinatario": "Karin",
+          "etiquetas": {
+            "ok": false,
+            "urls": [],
+            "marketplaceError": "Agrupamento ainda não foi concluído",
+            "rotaLote": {
+              "erro": true,
+              "mensagem": "Agrupamento ainda não foi concluído",
+              "statusCode": 400
+            },
+            "rotaIndividual": {
+              "erro": true,
+              "mensagem": "Agrupamento ainda não foi concluído",
+              "statusCode": 400
+            }
+          }
+        }
+      ]
+    },
+    {
+      "idAgrupamento": 746504189,
+      "identificacao": "3209",
+      "data": "2026-06-30",
+      "quantidadeObjetos": null,
+      "formaEnvio": {
+        "id": 758095424,
+        "nome": "Amazon DBA"
+      },
+      "categoria": "amazon",
+      "etiquetasLote": {
+        "ok": false,
+        "urls": [],
+        "erro": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Url das etiquetas não encontrada na Amazon.",
+        "resposta": {
+          "erro": true,
+          "mensagem": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Url das etiquetas não encontrada na Amazon.",
+          "statusCode": 400
+        }
+      },
+      "urlsConsolidadas": [],
+      "temEtiqueta": false,
+      "expedicoes": [
+        {
+          "idExpedicao": 749894398,
+          "pedidoId": 860556034,
+          "numeroPedido": 209312,
+          "idNotaFiscal": 860556091,
+          "numeroNota": 508,
+          "situacao": "1",
+          "destinatario": "Samantha",
+          "etiquetas": {
+            "ok": false,
+            "urls": [],
+            "marketplaceError": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Url das etiquetas não encontrada na Amazon.",
+            "rotaLote": {
+              "erro": true,
+              "mensagem": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Url das etiquetas não encontrada na Amazon.",
+              "statusCode": 400
+            },
+            "rotaIndividual": {
+              "erro": true,
+              "mensagem": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Url das etiquetas não encontrada na Amazon.",
+              "statusCode": 400
+            }
+          }
+        },
+        {
+          "idExpedicao": 749894409,
+          "pedidoId": 860556420,
+          "numeroPedido": 209315,
+          "idNotaFiscal": 860556435,
+          "numeroNota": 511,
+          "situacao": "1",
+          "destinatario": "Patrícia Mocellin",
+          "etiquetas": {
+            "ok": false,
+            "urls": [],
+            "marketplaceError": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Url das etiquetas não encontrada na Amazon.",
+            "rotaLote": {
+              "erro": true,
+              "mensagem": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Url das etiquetas não encontrada na Amazon.",
+              "statusCode": 400
+            },
+            "rotaIndividual": {
+              "erro": true,
+              "mensagem": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Url das etiquetas não encontrada na Amazon.",
+              "statusCode": 400
+            }
+          }
+        },
+        {
+          "idExpedicao": 749894481,
+          "pedidoId": 860558647,
+          "numeroPedido": 209359,
+          "idNotaFiscal": 860558662,
+          "numeroNota": 541,
+          "situacao": "1",
+          "destinatario": "Laura Luz",
+          "etiquetas": {
+            "ok": false,
+            "urls": [],
+            "marketplaceError": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Url das etiquetas não encontrada na Amazon.",
+            "rotaLote": {
+              "erro": true,
+              "mensagem": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Url das etiquetas não encontrada na Amazon.",
+              "statusCode": 400
+            },
+            "rotaIndividual": {
+              "erro": true,
+              "mensagem": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Url das etiquetas não encontrada na Amazon.",
+              "statusCode": 400
+            }
+          }
+        },
+        {
+          "idExpedicao": 749894530,
+          "pedidoId": 860559776,
+          "numeroPedido": 209382,
+          "idNotaFiscal": 860559811,
+          "numeroNota": 558,
+          "situacao": "1",
+          "destinatario": "Allan Carlos",
+          "etiquetas": {
+            "ok": false,
+            "urls": [],
+            "marketplaceError": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Url das etiquetas não encontrada na Amazon.",
+            "rotaLote": {
+              "erro": true,
+              "mensagem": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Url das etiquetas não encontrada na Amazon.",
+              "statusCode": 400
+            },
+            "rotaIndividual": {
+              "erro": true,
+              "mensagem": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Url das etiquetas não encontrada na Amazon.",
+              "statusCode": 400
+            }
+          }
+        },
+        {
+          "idExpedicao": 749894641,
+          "pedidoId": 860561395,
+          "numeroPedido": 209404,
+          "idNotaFiscal": 860561437,
+          "numeroNota": 647,
+          "situacao": "1",
+          "destinatario": "Renata",
+          "etiquetas": {
+            "ok": false,
+            "urls": [],
+            "marketplaceError": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Url das etiquetas não encontrada na Amazon.",
+            "rotaLote": {
+              "erro": true,
+              "mensagem": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Url das etiquetas não encontrada na Amazon.",
+              "statusCode": 400
+            },
+            "rotaIndividual": {
+              "erro": true,
+              "mensagem": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Url das etiquetas não encontrada na Amazon.",
+              "statusCode": 400
+            }
+          }
+        }
+      ]
+    },
+    {
+      "idAgrupamento": 746504153,
+      "identificacao": "3208",
+      "data": "2026-06-29",
+      "quantidadeObjetos": null,
+      "formaEnvio": {
+        "id": 758095424,
+        "nome": "Amazon DBA"
+      },
+      "categoria": "amazon",
+      "etiquetasLote": {
+        "ok": false,
+        "urls": [],
+        "erro": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Url das etiquetas não encontrada na Amazon.",
+        "resposta": {
+          "erro": true,
+          "mensagem": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Url das etiquetas não encontrada na Amazon.",
+          "statusCode": 400
+        }
+      },
+      "urlsConsolidadas": [],
+      "temEtiqueta": false,
+      "expedicoes": [
+        {
+          "idExpedicao": 749892880,
+          "pedidoId": 860523817,
+          "numeroPedido": 208974,
+          "idNotaFiscal": 860523818,
+          "numeroNota": 262,
+          "situacao": "1",
+          "destinatario": "Wylker Porto",
+          "etiquetas": {
+            "ok": false,
+            "urls": [],
+            "marketplaceError": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Url das etiquetas não encontrada na Amazon.",
+            "rotaLote": {
+              "erro": true,
+              "mensagem": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Url das etiquetas não encontrada na Amazon.",
+              "statusCode": 400
+            },
+            "rotaIndividual": {
+              "erro": true,
+              "mensagem": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Url das etiquetas não encontrada na Amazon.",
+              "statusCode": 400
+            }
+          }
+        },
+        {
+          "idExpedicao": 749893262,
+          "pedidoId": 860535060,
+          "numeroPedido": 209070,
+          "idNotaFiscal": 860535069,
+          "numeroNota": 396,
+          "situacao": "1",
+          "destinatario": "Fabio Vicente Oliveira",
+          "etiquetas": {
+            "ok": false,
+            "urls": [],
+            "marketplaceError": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Url das etiquetas não encontrada na Amazon.",
+            "rotaLote": {
+              "erro": true,
+              "mensagem": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Url das etiquetas não encontrada na Amazon.",
+              "statusCode": 400
+            },
+            "rotaIndividual": {
+              "erro": true,
+              "mensagem": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Url das etiquetas não encontrada na Amazon.",
+              "statusCode": 400
+            }
+          }
+        },
+        {
+          "idExpedicao": 749893336,
+          "pedidoId": 860537059,
+          "numeroPedido": 209103,
+          "idNotaFiscal": 860537094,
+          "numeroNota": 406,
+          "situacao": "1",
+          "destinatario": "Eduardo",
+          "etiquetas": {
+            "ok": false,
+            "urls": [],
+            "marketplaceError": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Url das etiquetas não encontrada na Amazon.",
+            "rotaLote": {
+              "erro": true,
+              "mensagem": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Url das etiquetas não encontrada na Amazon.",
+              "statusCode": 400
+            },
+            "rotaIndividual": {
+              "erro": true,
+              "mensagem": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Url das etiquetas não encontrada na Amazon.",
+              "statusCode": 400
+            }
+          }
+        },
+        {
+          "idExpedicao": 749893338,
+          "pedidoId": 860537140,
+          "numeroPedido": 209104,
+          "idNotaFiscal": 860537149,
+          "numeroNota": 407,
+          "situacao": "1",
+          "destinatario": "Giselda",
+          "etiquetas": {
+            "ok": false,
+            "urls": [],
+            "marketplaceError": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Url das etiquetas não encontrada na Amazon.",
+            "rotaLote": {
+              "erro": true,
+              "mensagem": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Url das etiquetas não encontrada na Amazon.",
+              "statusCode": 400
+            },
+            "rotaIndividual": {
+              "erro": true,
+              "mensagem": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Url das etiquetas não encontrada na Amazon.",
+              "statusCode": 400
+            }
+          }
+        },
+        {
+          "idExpedicao": 749893398,
+          "pedidoId": 860539106,
+          "numeroPedido": 209135,
+          "idNotaFiscal": 860539127,
+          "numeroNota": 418,
+          "situacao": "1",
+          "destinatario": "Charles Jennings",
+          "etiquetas": {
+            "ok": false,
+            "urls": [],
+            "marketplaceError": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Url das etiquetas não encontrada na Amazon.",
+            "rotaLote": {
+              "erro": true,
+              "mensagem": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Url das etiquetas não encontrada na Amazon.",
+              "statusCode": 400
+            },
+            "rotaIndividual": {
+              "erro": true,
+              "mensagem": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Url das etiquetas não encontrada na Amazon.",
+              "statusCode": 400
+            }
+          }
+        },
+        {
+          "idExpedicao": 749893439,
+          "pedidoId": 860540288,
+          "numeroPedido": 209154,
+          "idNotaFiscal": 860540318,
+          "numeroNota": 426,
+          "situacao": "1",
+          "destinatario": "Marina Paz",
+          "etiquetas": {
+            "ok": false,
+            "urls": [],
+            "marketplaceError": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Url das etiquetas não encontrada na Amazon.",
+            "rotaLote": {
+              "erro": true,
+              "mensagem": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Url das etiquetas não encontrada na Amazon.",
+              "statusCode": 400
+            },
+            "rotaIndividual": {
+              "erro": true,
+              "mensagem": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Url das etiquetas não encontrada na Amazon.",
+              "statusCode": 400
+            }
+          }
+        },
+        {
+          "idExpedicao": 749893522,
+          "pedidoId": 860542631,
+          "numeroPedido": 209187,
+          "idNotaFiscal": 860542674,
+          "numeroNota": 437,
+          "situacao": "1",
+          "destinatario": "Ronaldo Rigo de Matos",
+          "etiquetas": {
+            "ok": false,
+            "urls": [],
+            "marketplaceError": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Url das etiquetas não encontrada na Amazon.",
+            "rotaLote": {
+              "erro": true,
+              "mensagem": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Url das etiquetas não encontrada na Amazon.",
+              "statusCode": 400
+            },
+            "rotaIndividual": {
+              "erro": true,
+              "mensagem": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Url das etiquetas não encontrada na Amazon.",
+              "statusCode": 400
+            }
+          }
+        },
+        {
+          "idExpedicao": 749893612,
+          "pedidoId": 860544913,
+          "numeroPedido": 209231,
+          "idNotaFiscal": 860544917,
+          "numeroNota": 456,
+          "situacao": "1",
+          "destinatario": "Ealine",
+          "etiquetas": {
+            "ok": false,
+            "urls": [],
+            "marketplaceError": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Url das etiquetas não encontrada na Amazon.",
+            "rotaLote": {
+              "erro": true,
+              "mensagem": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Url das etiquetas não encontrada na Amazon.",
+              "statusCode": 400
+            },
+            "rotaIndividual": {
+              "erro": true,
+              "mensagem": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Erro ao obter etiquetas na Amazon.",
+              "statusCode": 400
+            }
+          }
+        },
+        {
+          "idExpedicao": 749893661,
+          "pedidoId": 860545975,
+          "numeroPedido": 209255,
+          "idNotaFiscal": 860546006,
+          "numeroNota": 466,
+          "situacao": "1",
+          "destinatario": "Silvia Judice",
+          "etiquetas": {
+            "ok": false,
+            "urls": [],
+            "marketplaceError": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Erro ao obter etiquetas na Amazon.",
+            "rotaLote": {
+              "erro": true,
+              "mensagem": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Erro ao obter etiquetas na Amazon.",
+              "statusCode": 400
+            },
+            "rotaIndividual": {
+              "erro": true,
+              "mensagem": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Url das etiquetas não encontrada na Amazon.",
+              "statusCode": 400
+            }
+          }
+        }
+      ]
+    },
+    {
+      "idAgrupamento": 746504129,
+      "identificacao": "3207",
+      "data": "2026-06-26",
+      "quantidadeObjetos": null,
+      "formaEnvio": {
+        "id": 744061814,
+        "nome": "Mercado Envios"
+      },
+      "categoria": "mercado_livre",
+      "etiquetasLote": {
+        "ok": false,
+        "urls": [],
+        "erro": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Não foi possível obter as etiquetas dos seguintes pedidos: S47385485426",
+        "resposta": {
+          "erro": true,
+          "mensagem": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Não foi possível obter as etiquetas dos seguintes pedidos: S47385485426",
+          "statusCode": 400
+        }
+      },
+      "urlsConsolidadas": [],
+      "temEtiqueta": false,
+      "expedicoes": [
+        {
+          "idExpedicao": 749892686,
+          "pedidoId": 860521519,
+          "numeroPedido": 208959,
+          "idNotaFiscal": 860521522,
+          "numeroNota": 249,
+          "situacao": "1",
+          "destinatario": "Rodolfo Alex da Silva Paes",
+          "etiquetas": {
+            "ok": false,
+            "urls": [],
+            "marketplaceError": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Não foi possível obter as etiquetas dos seguintes pedidos: S47385485426",
+            "rotaLote": {
+              "erro": true,
+              "mensagem": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Não foi possível obter as etiquetas dos seguintes pedidos: S47385485426",
+              "statusCode": 400
+            },
+            "rotaIndividual": {
+              "erro": true,
+              "mensagem": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Não foi possível obter as etiquetas dos seguintes pedidos: S47385485426",
+              "statusCode": 400
+            }
+          }
+        }
+      ]
+    },
+    {
+      "idAgrupamento": 746504128,
+      "identificacao": "3206",
+      "data": "2026-06-26",
+      "quantidadeObjetos": null,
+      "formaEnvio": {
+        "id": 744061814,
+        "nome": "Mercado Envios"
+      },
+      "categoria": "mercado_livre",
+      "etiquetasLote": {
+        "ok": false,
+        "urls": [],
+        "erro": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Não foi possível obter as etiquetas dos seguintes pedidos: S47335139039",
+        "resposta": {
+          "erro": true,
+          "mensagem": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Não foi possível obter as etiquetas dos seguintes pedidos: S47335139039",
+          "statusCode": 400
+        }
+      },
+      "urlsConsolidadas": [],
+      "temEtiqueta": false,
+      "expedicoes": [
+        {
+          "idExpedicao": 749892334,
+          "pedidoId": 860418694,
+          "numeroPedido": 208013,
+          "idNotaFiscal": 860513694,
+          "numeroNota": 188,
+          "situacao": "1",
+          "destinatario": "Frederico Willian Sardela Santos",
+          "etiquetas": {
+            "ok": false,
+            "urls": [],
+            "marketplaceError": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Não foi possível obter as etiquetas dos seguintes pedidos: S47335139039",
+            "rotaLote": {
+              "erro": true,
+              "mensagem": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Não foi possível obter as etiquetas dos seguintes pedidos: S47335139039",
+              "statusCode": 400
+            },
+            "rotaIndividual": {
+              "erro": true,
+              "mensagem": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Não foi possível obter as etiquetas dos seguintes pedidos: S47335139039",
+              "statusCode": 400
+            }
+          }
+        }
+      ]
+    },
+    {
+      "idAgrupamento": 746504126,
+      "identificacao": "3205",
+      "data": "2026-06-26",
+      "quantidadeObjetos": null,
+      "formaEnvio": {
+        "id": 744061814,
+        "nome": "Mercado Envios"
+      },
+      "categoria": "mercado_livre",
+      "etiquetasLote": {
+        "ok": false,
+        "urls": [],
+        "erro": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Não foi possível obter as etiquetas dos seguintes pedidos: S47385071219",
+        "resposta": {
+          "erro": true,
+          "mensagem": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Não foi possível obter as etiquetas dos seguintes pedidos: S47385071219",
+          "statusCode": 400
+        }
+      },
+      "urlsConsolidadas": [],
+      "temEtiqueta": false,
+      "expedicoes": [
+        {
+          "idExpedicao": 749892650,
+          "pedidoId": 860521125,
+          "numeroPedido": 208954,
+          "idNotaFiscal": 860521131,
+          "numeroNota": 245,
+          "situacao": "1",
+          "destinatario": "Tiago Augusto Floriano",
+          "etiquetas": {
+            "ok": false,
+            "urls": [],
+            "marketplaceError": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Não foi possível obter as etiquetas dos seguintes pedidos: S47385071219",
+            "rotaLote": {
+              "erro": true,
+              "mensagem": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Não foi possível obter as etiquetas dos seguintes pedidos: S47385071219",
+              "statusCode": 400
+            },
+            "rotaIndividual": {
+              "erro": true,
+              "mensagem": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Não foi possível obter as etiquetas dos seguintes pedidos: S47385071219",
+              "statusCode": 400
+            }
+          }
+        }
+      ]
+    },
+    {
+      "idAgrupamento": 746504118,
+      "identificacao": "3204",
+      "data": "2026-06-26",
+      "quantidadeObjetos": null,
+      "formaEnvio": {
+        "id": 758095424,
+        "nome": "Amazon DBA"
+      },
+      "categoria": "amazon",
+      "etiquetasLote": {
+        "ok": false,
+        "urls": [],
+        "erro": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Url das etiquetas não encontrada na Amazon.",
+        "resposta": {
+          "erro": true,
+          "mensagem": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Url das etiquetas não encontrada na Amazon.",
+          "statusCode": 400
+        }
+      },
+      "urlsConsolidadas": [],
+      "temEtiqueta": false,
+      "expedicoes": [
+        {
+          "idExpedicao": 749892739,
+          "pedidoId": 860521886,
+          "numeroPedido": 208961,
+          "idNotaFiscal": 860521925,
+          "numeroNota": 251,
+          "situacao": "1",
+          "destinatario": "Renan",
+          "etiquetas": {
+            "ok": false,
+            "urls": [],
+            "marketplaceError": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Url das etiquetas não encontrada na Amazon.",
+            "rotaLote": {
+              "erro": true,
+              "mensagem": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Url das etiquetas não encontrada na Amazon.",
+              "statusCode": 400
+            },
+            "rotaIndividual": {
+              "erro": true,
+              "mensagem": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Url das etiquetas não encontrada na Amazon.",
+              "statusCode": 400
+            }
+          }
+        },
+        {
+          "idExpedicao": 749892812,
+          "pedidoId": 860522421,
+          "numeroPedido": 208963,
+          "idNotaFiscal": 860522540,
+          "numeroNota": 253,
+          "situacao": "1",
+          "destinatario": "Wagner",
+          "etiquetas": {
+            "ok": false,
+            "urls": [],
+            "marketplaceError": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Url das etiquetas não encontrada na Amazon.",
+            "rotaLote": {
+              "erro": true,
+              "mensagem": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Url das etiquetas não encontrada na Amazon.",
+              "statusCode": 400
+            },
+            "rotaIndividual": {
+              "erro": true,
+              "mensagem": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Url das etiquetas não encontrada na Amazon.",
+              "statusCode": 400
+            }
+          }
+        }
+      ]
+    },
+    {
+      "idAgrupamento": 746504097,
+      "identificacao": "3203",
+      "data": "2026-06-26",
+      "quantidadeObjetos": null,
+      "formaEnvio": {
+        "id": 758095424,
+        "nome": "Amazon DBA"
+      },
+      "categoria": "amazon",
+      "etiquetasLote": {
+        "ok": false,
+        "urls": [],
+        "erro": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Url das etiquetas não encontrada na Amazon.",
+        "resposta": {
+          "erro": true,
+          "mensagem": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Url das etiquetas não encontrada na Amazon.",
+          "statusCode": 400
+        }
+      },
+      "urlsConsolidadas": [],
+      "temEtiqueta": false,
+      "expedicoes": [
+        {
+          "idExpedicao": 749892244,
+          "pedidoId": 860511501,
+          "numeroPedido": 208872,
+          "idNotaFiscal": 860511532,
+          "numeroNota": 127,
+          "situacao": "1",
+          "destinatario": "Meire Martins de Figueiredo",
+          "etiquetas": {
+            "ok": false,
+            "urls": [],
+            "marketplaceError": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Url das etiquetas não encontrada na Amazon.",
+            "rotaLote": {
+              "erro": true,
+              "mensagem": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Url das etiquetas não encontrada na Amazon.",
+              "statusCode": 400
+            },
+            "rotaIndividual": {
+              "erro": true,
+              "mensagem": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Url das etiquetas não encontrada na Amazon.",
+              "statusCode": 400
+            }
+          }
+        },
+        {
+          "idExpedicao": 749892423,
+          "pedidoId": 860516511,
+          "numeroPedido": 208919,
+          "idNotaFiscal": 860516544,
+          "numeroNota": 224,
+          "situacao": "1",
+          "destinatario": "Lívia Albuquerque",
+          "etiquetas": {
+            "ok": false,
+            "urls": [],
+            "marketplaceError": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Url das etiquetas não encontrada na Amazon.",
+            "rotaLote": {
+              "erro": true,
+              "mensagem": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Url das etiquetas não encontrada na Amazon.",
+              "statusCode": 400
+            },
+            "rotaIndividual": {
+              "erro": true,
+              "mensagem": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Url das etiquetas não encontrada na Amazon.",
+              "statusCode": 400
+            }
+          }
+        },
+        {
+          "idExpedicao": 749892473,
+          "pedidoId": 860517604,
+          "numeroPedido": 208937,
+          "idNotaFiscal": 860517612,
+          "numeroNota": 234,
+          "situacao": "1",
+          "destinatario": "Sandra Cravo",
+          "etiquetas": {
+            "ok": false,
+            "urls": [],
+            "marketplaceError": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Url das etiquetas não encontrada na Amazon.",
+            "rotaLote": {
+              "erro": true,
+              "mensagem": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Url das etiquetas não encontrada na Amazon.",
+              "statusCode": 400
+            },
+            "rotaIndividual": {
+              "erro": true,
+              "mensagem": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Url das etiquetas não encontrada na Amazon.",
+              "statusCode": 400
+            }
+          }
+        }
+      ]
+    },
+    {
+      "idAgrupamento": 746504082,
+      "identificacao": "3202",
+      "data": "2026-06-25",
+      "quantidadeObjetos": null,
+      "formaEnvio": {
+        "id": 758095424,
+        "nome": "Amazon DBA"
+      },
+      "categoria": "amazon",
+      "etiquetasLote": {
+        "ok": false,
+        "urls": [],
+        "erro": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Url das etiquetas não encontrada na Amazon.",
+        "resposta": {
+          "erro": true,
+          "mensagem": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Url das etiquetas não encontrada na Amazon.",
+          "statusCode": 400
+        }
+      },
+      "urlsConsolidadas": [],
+      "temEtiqueta": false,
+      "expedicoes": [
+        {
+          "idExpedicao": 749892155,
+          "pedidoId": 860509066,
+          "numeroPedido": 208845,
+          "idNotaFiscal": 860509118,
+          "numeroNota": 117,
+          "situacao": "1",
+          "destinatario": "TAIS",
+          "etiquetas": {
+            "ok": false,
+            "urls": [],
+            "marketplaceError": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Url das etiquetas não encontrada na Amazon.",
+            "rotaLote": {
+              "erro": true,
+              "mensagem": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Url das etiquetas não encontrada na Amazon.",
+              "statusCode": 400
+            },
+            "rotaIndividual": {
+              "erro": true,
+              "mensagem": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Url das etiquetas não encontrada na Amazon.",
+              "statusCode": 400
+            }
+          }
+        }
+      ]
+    },
+    {
+      "idAgrupamento": 746504058,
+      "identificacao": "3201",
+      "data": "2026-06-25",
+      "quantidadeObjetos": null,
+      "formaEnvio": {
+        "id": 758095424,
+        "nome": "Amazon DBA"
+      },
+      "categoria": "amazon",
+      "etiquetasLote": {
+        "ok": false,
+        "urls": [],
+        "erro": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Url das etiquetas não encontrada na Amazon.",
+        "resposta": {
+          "erro": true,
+          "mensagem": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Url das etiquetas não encontrada na Amazon.",
+          "statusCode": 400
+        }
+      },
+      "urlsConsolidadas": [],
+      "temEtiqueta": false,
+      "expedicoes": [
+        {
+          "idExpedicao": 749891841,
+          "pedidoId": 860503199,
+          "numeroPedido": 208811,
+          "idNotaFiscal": 860503243,
+          "numeroNota": 104,
+          "situacao": "1",
+          "destinatario": "Nicole Facchini",
+          "etiquetas": {
+            "ok": false,
+            "urls": [],
+            "marketplaceError": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Url das etiquetas não encontrada na Amazon.",
+            "rotaLote": {
+              "erro": true,
+              "mensagem": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Url das etiquetas não encontrada na Amazon.",
+              "statusCode": 400
+            },
+            "rotaIndividual": {
+              "erro": true,
+              "mensagem": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Url das etiquetas não encontrada na Amazon.",
+              "statusCode": 400
+            }
+          }
+        }
+      ]
+    },
+    {
+      "idAgrupamento": 746504057,
+      "identificacao": "3200",
+      "data": "2026-06-24",
+      "quantidadeObjetos": null,
+      "formaEnvio": {
+        "id": 758095424,
+        "nome": "Amazon DBA"
+      },
+      "categoria": "amazon",
+      "etiquetasLote": {
+        "ok": false,
+        "urls": [],
+        "erro": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Url das etiquetas não encontrada na Amazon.",
+        "resposta": {
+          "erro": true,
+          "mensagem": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Url das etiquetas não encontrada na Amazon.",
+          "statusCode": 400
+        }
+      },
+      "urlsConsolidadas": [],
+      "temEtiqueta": false,
+      "expedicoes": [
+        {
+          "idExpedicao": 749891571,
+          "pedidoId": 860494965,
+          "numeroPedido": 208737,
+          "idNotaFiscal": 860494982,
+          "numeroNota": 157521,
+          "situacao": "1",
+          "destinatario": "Bab",
+          "etiquetas": {
+            "ok": false,
+            "urls": [],
+            "marketplaceError": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Url das etiquetas não encontrada na Amazon.",
+            "rotaLote": {
+              "erro": true,
+              "mensagem": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Url das etiquetas não encontrada na Amazon.",
+              "statusCode": 400
+            },
+            "rotaIndividual": {
+              "erro": true,
+              "mensagem": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Url das etiquetas não encontrada na Amazon.",
+              "statusCode": 400
+            }
+          }
+        },
+        {
+          "idExpedicao": 749891608,
+          "pedidoId": 860494767,
+          "numeroPedido": 208735,
+          "idNotaFiscal": 860496324,
+          "numeroNota": 1,
+          "situacao": "1",
+          "destinatario": "Ana Maria Penha Teixeira",
+          "etiquetas": {
+            "ok": false,
+            "urls": [],
+            "marketplaceError": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Url das etiquetas não encontrada na Amazon.",
+            "rotaLote": {
+              "erro": true,
+              "mensagem": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Url das etiquetas não encontrada na Amazon.",
+              "statusCode": 400
+            },
+            "rotaIndividual": {
+              "erro": true,
+              "mensagem": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Url das etiquetas não encontrada na Amazon.",
+              "statusCode": 400
+            }
+          }
+        },
+        {
+          "idExpedicao": 749891753,
+          "pedidoId": 860500595,
+          "numeroPedido": 208777,
+          "idNotaFiscal": 860500614,
+          "numeroNota": 85,
+          "situacao": "1",
+          "destinatario": "oseas",
+          "etiquetas": {
+            "ok": false,
+            "urls": [],
+            "marketplaceError": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Erro ao obter etiquetas na Amazon.",
+            "rotaLote": {
+              "erro": true,
+              "mensagem": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Erro ao obter etiquetas na Amazon.",
+              "statusCode": 400
+            },
+            "rotaIndividual": {
+              "erro": true,
+              "mensagem": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Url das etiquetas não encontrada na Amazon.",
+              "statusCode": 400
+            }
+          }
+        },
+        {
+          "idExpedicao": 749891825,
+          "pedidoId": 860502672,
+          "numeroPedido": 208803,
+          "idNotaFiscal": 860502774,
+          "numeroNota": 102,
+          "situacao": "1",
+          "destinatario": "Luana Daros",
+          "etiquetas": {
+            "ok": false,
+            "urls": [],
+            "marketplaceError": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Url das etiquetas não encontrada na Amazon.",
+            "rotaLote": {
+              "erro": true,
+              "mensagem": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Url das etiquetas não encontrada na Amazon.",
+              "statusCode": 400
+            },
+            "rotaIndividual": {
+              "erro": true,
+              "mensagem": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Erro ao obter etiquetas na Amazon.",
+              "statusCode": 400
+            }
+          }
+        }
+      ]
+    },
+    {
+      "idAgrupamento": 746504027,
+      "identificacao": "3199",
+      "data": "2026-06-24",
+      "quantidadeObjetos": null,
+      "formaEnvio": {
+        "id": 758095424,
+        "nome": "Amazon DBA"
+      },
+      "categoria": "amazon",
+      "etiquetasLote": {
+        "ok": false,
+        "urls": [],
+        "erro": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Url das etiquetas não encontrada na Amazon.",
+        "resposta": {
+          "erro": true,
+          "mensagem": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Url das etiquetas não encontrada na Amazon.",
+          "statusCode": 400
+        }
+      },
+      "urlsConsolidadas": [],
+      "temEtiqueta": false,
+      "expedicoes": [
+        {
+          "idExpedicao": 749890780,
+          "pedidoId": 860478022,
+          "numeroPedido": 208583,
+          "idNotaFiscal": 860478041,
+          "numeroNota": 157393,
+          "situacao": "1",
+          "destinatario": "Adriana",
+          "etiquetas": {
+            "ok": false,
+            "urls": [],
+            "marketplaceError": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Url das etiquetas não encontrada na Amazon.",
+            "rotaLote": {
+              "erro": true,
+              "mensagem": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Url das etiquetas não encontrada na Amazon.",
+              "statusCode": 400
+            },
+            "rotaIndividual": {
+              "erro": true,
+              "mensagem": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Url das etiquetas não encontrada na Amazon.",
+              "statusCode": 400
+            }
+          }
+        },
+        {
+          "idExpedicao": 749890798,
+          "pedidoId": 860478968,
+          "numeroPedido": 208591,
+          "idNotaFiscal": 860478973,
+          "numeroNota": 157403,
+          "situacao": "1",
+          "destinatario": "Wellington Dias Duarte",
+          "etiquetas": {
+            "ok": false,
+            "urls": [],
+            "marketplaceError": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Url das etiquetas não encontrada na Amazon.",
+            "rotaLote": {
+              "erro": true,
+              "mensagem": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Url das etiquetas não encontrada na Amazon.",
+              "statusCode": 400
+            },
+            "rotaIndividual": {
+              "erro": true,
+              "mensagem": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Erro ao obter etiquetas na Amazon.",
+              "statusCode": 400
+            }
+          }
+        },
+        {
+          "idExpedicao": 749890800,
+          "pedidoId": 860478953,
+          "numeroPedido": 208590,
+          "idNotaFiscal": 860479096,
+          "numeroNota": 157404,
+          "situacao": "1",
+          "destinatario": "Rafael Barros",
+          "etiquetas": {
+            "ok": false,
+            "urls": [],
+            "marketplaceError": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Url das etiquetas não encontrada na Amazon.",
+            "rotaLote": {
+              "erro": true,
+              "mensagem": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Url das etiquetas não encontrada na Amazon.",
+              "statusCode": 400
+            },
+            "rotaIndividual": {
+              "erro": true,
+              "mensagem": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Url das etiquetas não encontrada na Amazon.",
+              "statusCode": 400
+            }
+          }
+        },
+        {
+          "idExpedicao": 749890827,
+          "pedidoId": 860479510,
+          "numeroPedido": 208599,
+          "idNotaFiscal": 860479541,
+          "numeroNota": 157407,
+          "situacao": "1",
+          "destinatario": "Cris Jovelli",
+          "etiquetas": {
+            "ok": false,
+            "urls": [],
+            "marketplaceError": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Url das etiquetas não encontrada na Amazon.",
+            "rotaLote": {
+              "erro": true,
+              "mensagem": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Url das etiquetas não encontrada na Amazon.",
+              "statusCode": 400
+            },
+            "rotaIndividual": {
+              "erro": true,
+              "mensagem": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Erro ao obter etiquetas na Amazon.",
+              "statusCode": 400
+            }
+          }
+        },
+        {
+          "idExpedicao": 749890838,
+          "pedidoId": 860479705,
+          "numeroPedido": 208603,
+          "idNotaFiscal": 860479707,
+          "numeroNota": 157410,
+          "situacao": "1",
+          "destinatario": "Lívia A. C. Pereira",
+          "etiquetas": {
+            "ok": false,
+            "urls": [],
+            "marketplaceError": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Erro ao obter etiquetas na Amazon.",
+            "rotaLote": {
+              "erro": true,
+              "mensagem": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Erro ao obter etiquetas na Amazon.",
+              "statusCode": 400
+            },
+            "rotaIndividual": {
+              "erro": true,
+              "mensagem": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Erro ao obter etiquetas na Amazon.",
+              "statusCode": 400
+            }
+          }
+        },
+        {
+          "idExpedicao": 749890853,
+          "pedidoId": 860480182,
+          "numeroPedido": 208609,
+          "idNotaFiscal": 860480192,
+          "numeroNota": 157415,
+          "situacao": "1",
+          "destinatario": "Larissa Naomi",
+          "etiquetas": {
+            "ok": false,
+            "urls": [],
+            "marketplaceError": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Erro ao obter etiquetas na Amazon.",
+            "rotaLote": {
+              "erro": true,
+              "mensagem": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Erro ao obter etiquetas na Amazon.",
+              "statusCode": 400
+            },
+            "rotaIndividual": {
+              "erro": true,
+              "mensagem": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Url das etiquetas não encontrada na Amazon.",
+              "statusCode": 400
+            }
+          }
+        },
+        {
+          "idExpedicao": 749890873,
+          "pedidoId": 860480975,
+          "numeroPedido": 208622,
+          "idNotaFiscal": 860481032,
+          "numeroNota": 157423,
+          "situacao": "1",
+          "destinatario": "Helder",
+          "etiquetas": {
+            "ok": false,
+            "urls": [],
+            "marketplaceError": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Url das etiquetas não encontrada na Amazon.",
+            "rotaLote": {
+              "erro": true,
+              "mensagem": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Url das etiquetas não encontrada na Amazon.",
+              "statusCode": 400
+            },
+            "rotaIndividual": {
+              "erro": true,
+              "mensagem": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Url das etiquetas não encontrada na Amazon.",
+              "statusCode": 400
+            }
+          }
+        },
+        {
+          "idExpedicao": 749890934,
+          "pedidoId": 860484227,
+          "numeroPedido": 208639,
+          "idNotaFiscal": 860484260,
+          "numeroNota": 157446,
+          "situacao": "1",
+          "destinatario": "Rodrigo",
+          "etiquetas": {
+            "ok": false,
+            "urls": [],
+            "marketplaceError": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Erro ao obter etiquetas na Amazon.",
+            "rotaLote": {
+              "erro": true,
+              "mensagem": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Erro ao obter etiquetas na Amazon.",
+              "statusCode": 400
+            },
+            "rotaIndividual": {
+              "erro": true,
+              "mensagem": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Erro ao obter etiquetas na Amazon.",
+              "statusCode": 400
+            }
+          }
+        },
+        {
+          "idExpedicao": 749890951,
+          "pedidoId": 860484314,
+          "numeroPedido": 208640,
+          "idNotaFiscal": 860484461,
+          "numeroNota": 157460,
+          "situacao": "1",
+          "destinatario": "Tavilene",
+          "etiquetas": {
+            "ok": false,
+            "urls": [],
+            "marketplaceError": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Url das etiquetas não encontrada na Amazon.",
+            "rotaLote": {
+              "erro": true,
+              "mensagem": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Url das etiquetas não encontrada na Amazon.",
+              "statusCode": 400
+            },
+            "rotaIndividual": {
+              "erro": true,
+              "mensagem": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Url das etiquetas não encontrada na Amazon.",
+              "statusCode": 400
+            }
+          }
+        },
+        {
+          "idExpedicao": 749890963,
+          "pedidoId": 860484534,
+          "numeroPedido": 208644,
+          "idNotaFiscal": 860484605,
+          "numeroNota": 157470,
+          "situacao": "1",
+          "destinatario": "Antonio pinto",
+          "etiquetas": {
+            "ok": false,
+            "urls": [],
+            "marketplaceError": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Url das etiquetas não encontrada na Amazon.",
+            "rotaLote": {
+              "erro": true,
+              "mensagem": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Url das etiquetas não encontrada na Amazon.",
+              "statusCode": 400
+            },
+            "rotaIndividual": {
+              "erro": true,
+              "mensagem": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Url das etiquetas não encontrada na Amazon.",
+              "statusCode": 400
+            }
+          }
+        },
+        {
+          "idExpedicao": 749891068,
+          "pedidoId": 860486971,
+          "numeroPedido": 208673,
+          "idNotaFiscal": 860486977,
+          "numeroNota": 157482,
+          "situacao": "1",
+          "destinatario": "Sandra Bergamini",
+          "etiquetas": {
+            "ok": false,
+            "urls": [],
+            "marketplaceError": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Url das etiquetas não encontrada na Amazon.",
+            "rotaLote": {
+              "erro": true,
+              "mensagem": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Url das etiquetas não encontrada na Amazon.",
+              "statusCode": 400
+            },
+            "rotaIndividual": {
+              "erro": true,
+              "mensagem": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Url das etiquetas não encontrada na Amazon.",
+              "statusCode": 400
+            }
+          }
+        },
+        {
+          "idExpedicao": 749891081,
+          "pedidoId": 860487196,
+          "numeroPedido": 208679,
+          "idNotaFiscal": 860487201,
+          "numeroNota": 157485,
+          "situacao": "1",
+          "destinatario": "Driele Sanches Ferreira",
+          "etiquetas": {
+            "ok": false,
+            "urls": [],
+            "marketplaceError": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Erro ao obter etiquetas na Amazon.",
+            "rotaLote": {
+              "erro": true,
+              "mensagem": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Erro ao obter etiquetas na Amazon.",
+              "statusCode": 400
+            },
+            "rotaIndividual": {
+              "erro": true,
+              "mensagem": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Erro ao obter etiquetas na Amazon.",
+              "statusCode": 400
+            }
+          }
+        },
+        {
+          "idExpedicao": 749891115,
+          "pedidoId": 860487939,
+          "numeroPedido": 208692,
+          "idNotaFiscal": 860487942,
+          "numeroNota": 157495,
+          "situacao": "1",
+          "destinatario": "Rodrigo Müller",
+          "etiquetas": {
+            "ok": false,
+            "urls": [],
+            "marketplaceError": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Erro ao obter etiquetas na Amazon.",
+            "rotaLote": {
+              "erro": true,
+              "mensagem": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Erro ao obter etiquetas na Amazon.",
+              "statusCode": 400
+            },
+            "rotaIndividual": {
+              "erro": true,
+              "mensagem": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Url das etiquetas não encontrada na Amazon.",
+              "statusCode": 400
+            }
+          }
+        }
+      ]
+    }
+  ],
+  "porCategoria": {
+    "amazon": [
+      {
+        "idAgrupamento": 746504224,
+        "identificacao": "3213",
+        "data": "2026-07-01",
+        "quantidadeObjetos": null,
+        "formaEnvio": {
+          "id": 758095424,
+          "nome": "Amazon DBA"
+        },
+        "categoria": "amazon",
+        "etiquetasLote": {
+          "ok": false,
+          "urls": [],
+          "erro": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Url das etiquetas não encontrada na Amazon.",
+          "resposta": {
+            "erro": true,
+            "mensagem": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Url das etiquetas não encontrada na Amazon.",
+            "statusCode": 400
+          }
+        },
+        "urlsConsolidadas": [],
+        "temEtiqueta": false,
+        "expedicoes": [
+          {
+            "idExpedicao": 749895383,
+            "pedidoId": 860578256,
+            "numeroPedido": 209552,
+            "idNotaFiscal": 860578265,
+            "numeroNota": 795,
+            "situacao": "1",
+            "destinatario": "Tainan",
+            "etiquetas": {
+              "ok": false,
+              "urls": [],
+              "marketplaceError": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Url das etiquetas não encontrada na Amazon.",
+              "rotaLote": {
+                "erro": true,
+                "mensagem": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Url das etiquetas não encontrada na Amazon.",
+                "statusCode": 400
+              },
+              "rotaIndividual": {
+                "erro": true,
+                "mensagem": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Url das etiquetas não encontrada na Amazon.",
+                "statusCode": 400
+              }
+            }
+          },
+          {
+            "idExpedicao": 749895422,
+            "pedidoId": 860579384,
+            "numeroPedido": 209567,
+            "idNotaFiscal": 860579405,
+            "numeroNota": 808,
+            "situacao": "1",
+            "destinatario": "Sabrina pereira de souza",
+            "etiquetas": {
+              "ok": false,
+              "urls": [],
+              "marketplaceError": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Url das etiquetas não encontrada na Amazon.",
+              "rotaLote": {
+                "erro": true,
+                "mensagem": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Url das etiquetas não encontrada na Amazon.",
+                "statusCode": 400
+              },
+              "rotaIndividual": {
+                "erro": true,
+                "mensagem": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Url das etiquetas não encontrada na Amazon.",
+                "statusCode": 400
+              }
+            }
+          },
+          {
+            "idExpedicao": 749895464,
+            "pedidoId": 860580372,
+            "numeroPedido": 209579,
+            "idNotaFiscal": 860580392,
+            "numeroNota": 817,
+            "situacao": "1",
+            "destinatario": "Sabryna Kellen Souza do Nascimento",
+            "etiquetas": {
+              "ok": false,
+              "urls": [],
+              "marketplaceError": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Url das etiquetas não encontrada na Amazon.",
+              "rotaLote": {
+                "erro": true,
+                "mensagem": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Url das etiquetas não encontrada na Amazon.",
+                "statusCode": 400
+              },
+              "rotaIndividual": {
+                "erro": true,
+                "mensagem": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Url das etiquetas não encontrada na Amazon.",
+                "statusCode": 400
+              }
+            }
+          },
+          {
+            "idExpedicao": 749895469,
+            "pedidoId": 860580463,
+            "numeroPedido": 209581,
+            "idNotaFiscal": 860580477,
+            "numeroNota": 820,
+            "situacao": "1",
+            "destinatario": "SUELY VIEIRA DE ARAUJO",
+            "etiquetas": {
+              "ok": false,
+              "urls": [],
+              "marketplaceError": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Url das etiquetas não encontrada na Amazon.",
+              "rotaLote": {
+                "erro": true,
+                "mensagem": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Url das etiquetas não encontrada na Amazon.",
+                "statusCode": 400
+              },
+              "rotaIndividual": {
+                "erro": true,
+                "mensagem": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Url das etiquetas não encontrada na Amazon.",
+                "statusCode": 400
+              }
+            }
+          }
+        ]
+      },
+      {
+        "idAgrupamento": 746504222,
+        "identificacao": "3212",
+        "data": "2026-06-30",
+        "quantidadeObjetos": null,
+        "formaEnvio": {
+          "id": 758095424,
+          "nome": "Amazon DBA"
+        },
+        "categoria": "amazon",
+        "etiquetasLote": {
+          "ok": false,
+          "urls": [],
+          "erro": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Url das etiquetas não encontrada na Amazon.",
+          "resposta": {
+            "erro": true,
+            "mensagem": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Url das etiquetas não encontrada na Amazon.",
+            "statusCode": 400
+          }
+        },
+        "urlsConsolidadas": [],
+        "temEtiqueta": false,
+        "expedicoes": [
+          {
+            "idExpedicao": 749895256,
+            "pedidoId": 860574685,
+            "numeroPedido": 209517,
+            "idNotaFiscal": 860574881,
+            "numeroNota": 704,
+            "situacao": "1",
+            "destinatario": "maessa barros",
+            "etiquetas": {
+              "ok": false,
+              "urls": [],
+              "marketplaceError": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Url das etiquetas não encontrada na Amazon.",
+              "rotaLote": {
+                "erro": true,
+                "mensagem": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Url das etiquetas não encontrada na Amazon.",
+                "statusCode": 400
+              },
+              "rotaIndividual": {
+                "erro": true,
+                "mensagem": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Url das etiquetas não encontrada na Amazon.",
+                "statusCode": 400
+              }
+            }
+          },
+          {
+            "idExpedicao": 749895340,
+            "pedidoId": 860576646,
+            "numeroPedido": 209525,
+            "idNotaFiscal": 860576787,
+            "numeroNota": 773,
+            "situacao": "1",
+            "destinatario": "Nycolas davi",
+            "etiquetas": {
+              "ok": false,
+              "urls": [],
+              "marketplaceError": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Url das etiquetas não encontrada na Amazon.",
+              "rotaLote": {
+                "erro": true,
+                "mensagem": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Url das etiquetas não encontrada na Amazon.",
+                "statusCode": 400
+              },
+              "rotaIndividual": {
+                "erro": true,
+                "mensagem": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Url das etiquetas não encontrada na Amazon.",
+                "statusCode": 400
+              }
+            }
+          }
+        ]
+      },
+      {
+        "idAgrupamento": 746504219,
+        "identificacao": "3211",
+        "data": "2026-06-30",
+        "quantidadeObjetos": null,
+        "formaEnvio": {
+          "id": 758095424,
+          "nome": "Amazon DBA"
+        },
+        "categoria": "amazon",
+        "etiquetasLote": {
+          "ok": false,
+          "urls": [],
+          "erro": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Url das etiquetas não encontrada na Amazon.",
+          "resposta": {
+            "erro": true,
+            "mensagem": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Url das etiquetas não encontrada na Amazon.",
+            "statusCode": 400
+          }
+        },
+        "urlsConsolidadas": [],
+        "temEtiqueta": false,
+        "expedicoes": [
+          {
+            "idExpedicao": 749895221,
+            "pedidoId": 860572749,
+            "numeroPedido": 209501,
+            "idNotaFiscal": 860572760,
+            "numeroNota": 690,
+            "situacao": "1",
+            "destinatario": "LAIZ DO CARMO HENRIQUE",
+            "etiquetas": {
+              "ok": false,
+              "urls": [],
+              "marketplaceError": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Url das etiquetas não encontrada na Amazon.",
+              "rotaLote": {
+                "erro": true,
+                "mensagem": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Url das etiquetas não encontrada na Amazon.",
+                "statusCode": 400
+              },
+              "rotaIndividual": {
+                "erro": true,
+                "mensagem": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Url das etiquetas não encontrada na Amazon.",
+                "statusCode": 400
+              }
+            }
+          },
+          {
+            "idExpedicao": 749895237,
+            "pedidoId": 860573713,
+            "numeroPedido": 209508,
+            "idNotaFiscal": 860573801,
+            "numeroNota": 696,
+            "situacao": "1",
+            "destinatario": "Lilian Spiller",
+            "etiquetas": {
+              "ok": false,
+              "urls": [],
+              "marketplaceError": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Url das etiquetas não encontrada na Amazon.",
+              "rotaLote": {
+                "erro": true,
+                "mensagem": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Url das etiquetas não encontrada na Amazon.",
+                "statusCode": 400
+              },
+              "rotaIndividual": {
+                "erro": true,
+                "mensagem": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Url das etiquetas não encontrada na Amazon.",
+                "statusCode": 400
+              }
+            }
+          }
+        ]
+      },
+      {
+        "idAgrupamento": 746504206,
+        "identificacao": "3210",
+        "data": "2026-06-30",
+        "quantidadeObjetos": null,
+        "formaEnvio": {
+          "id": 758095424,
+          "nome": "Amazon DBA"
+        },
+        "categoria": "amazon",
+        "etiquetasLote": {
+          "ok": false,
+          "urls": [],
+          "erro": "Agrupamento ainda não foi concluído",
+          "resposta": {
+            "erro": true,
+            "mensagem": "Agrupamento ainda não foi concluído",
+            "statusCode": 400
+          }
+        },
+        "urlsConsolidadas": [],
+        "temEtiqueta": false,
+        "expedicoes": [
+          {
+            "idExpedicao": 749876734,
+            "pedidoId": 860200901,
+            "numeroPedido": 206044,
+            "idNotaFiscal": 860200916,
+            "numeroNota": 155132,
+            "situacao": "1",
+            "destinatario": "Paulo",
+            "etiquetas": {
+              "ok": false,
+              "urls": [],
+              "marketplaceError": "Agrupamento ainda não foi concluído",
+              "rotaLote": {
+                "erro": true,
+                "mensagem": "Agrupamento ainda não foi concluído",
+                "statusCode": 400
+              },
+              "rotaIndividual": {
+                "erro": true,
+                "mensagem": "Agrupamento ainda não foi concluído",
+                "statusCode": 400
+              }
+            }
+          },
+          {
+            "idExpedicao": 749876864,
+            "pedidoId": 860203156,
+            "numeroPedido": 206072,
+            "idNotaFiscal": 860203254,
+            "numeroNota": 155147,
+            "situacao": "1",
+            "destinatario": "Karin",
+            "etiquetas": {
+              "ok": false,
+              "urls": [],
+              "marketplaceError": "Agrupamento ainda não foi concluído",
+              "rotaLote": {
+                "erro": true,
+                "mensagem": "Agrupamento ainda não foi concluído",
+                "statusCode": 400
+              },
+              "rotaIndividual": {
+                "erro": true,
+                "mensagem": "Agrupamento ainda não foi concluído",
+                "statusCode": 400
+              }
+            }
+          }
+        ]
+      },
+      {
+        "idAgrupamento": 746504189,
+        "identificacao": "3209",
+        "data": "2026-06-30",
+        "quantidadeObjetos": null,
+        "formaEnvio": {
+          "id": 758095424,
+          "nome": "Amazon DBA"
+        },
+        "categoria": "amazon",
+        "etiquetasLote": {
+          "ok": false,
+          "urls": [],
+          "erro": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Url das etiquetas não encontrada na Amazon.",
+          "resposta": {
+            "erro": true,
+            "mensagem": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Url das etiquetas não encontrada na Amazon.",
+            "statusCode": 400
+          }
+        },
+        "urlsConsolidadas": [],
+        "temEtiqueta": false,
+        "expedicoes": [
+          {
+            "idExpedicao": 749894398,
+            "pedidoId": 860556034,
+            "numeroPedido": 209312,
+            "idNotaFiscal": 860556091,
+            "numeroNota": 508,
+            "situacao": "1",
+            "destinatario": "Samantha",
+            "etiquetas": {
+              "ok": false,
+              "urls": [],
+              "marketplaceError": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Url das etiquetas não encontrada na Amazon.",
+              "rotaLote": {
+                "erro": true,
+                "mensagem": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Url das etiquetas não encontrada na Amazon.",
+                "statusCode": 400
+              },
+              "rotaIndividual": {
+                "erro": true,
+                "mensagem": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Url das etiquetas não encontrada na Amazon.",
+                "statusCode": 400
+              }
+            }
+          },
+          {
+            "idExpedicao": 749894409,
+            "pedidoId": 860556420,
+            "numeroPedido": 209315,
+            "idNotaFiscal": 860556435,
+            "numeroNota": 511,
+            "situacao": "1",
+            "destinatario": "Patrícia Mocellin",
+            "etiquetas": {
+              "ok": false,
+              "urls": [],
+              "marketplaceError": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Url das etiquetas não encontrada na Amazon.",
+              "rotaLote": {
+                "erro": true,
+                "mensagem": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Url das etiquetas não encontrada na Amazon.",
+                "statusCode": 400
+              },
+              "rotaIndividual": {
+                "erro": true,
+                "mensagem": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Url das etiquetas não encontrada na Amazon.",
+                "statusCode": 400
+              }
+            }
+          },
+          {
+            "idExpedicao": 749894481,
+            "pedidoId": 860558647,
+            "numeroPedido": 209359,
+            "idNotaFiscal": 860558662,
+            "numeroNota": 541,
+            "situacao": "1",
+            "destinatario": "Laura Luz",
+            "etiquetas": {
+              "ok": false,
+              "urls": [],
+              "marketplaceError": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Url das etiquetas não encontrada na Amazon.",
+              "rotaLote": {
+                "erro": true,
+                "mensagem": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Url das etiquetas não encontrada na Amazon.",
+                "statusCode": 400
+              },
+              "rotaIndividual": {
+                "erro": true,
+                "mensagem": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Url das etiquetas não encontrada na Amazon.",
+                "statusCode": 400
+              }
+            }
+          },
+          {
+            "idExpedicao": 749894530,
+            "pedidoId": 860559776,
+            "numeroPedido": 209382,
+            "idNotaFiscal": 860559811,
+            "numeroNota": 558,
+            "situacao": "1",
+            "destinatario": "Allan Carlos",
+            "etiquetas": {
+              "ok": false,
+              "urls": [],
+              "marketplaceError": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Url das etiquetas não encontrada na Amazon.",
+              "rotaLote": {
+                "erro": true,
+                "mensagem": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Url das etiquetas não encontrada na Amazon.",
+                "statusCode": 400
+              },
+              "rotaIndividual": {
+                "erro": true,
+                "mensagem": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Url das etiquetas não encontrada na Amazon.",
+                "statusCode": 400
+              }
+            }
+          },
+          {
+            "idExpedicao": 749894641,
+            "pedidoId": 860561395,
+            "numeroPedido": 209404,
+            "idNotaFiscal": 860561437,
+            "numeroNota": 647,
+            "situacao": "1",
+            "destinatario": "Renata",
+            "etiquetas": {
+              "ok": false,
+              "urls": [],
+              "marketplaceError": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Url das etiquetas não encontrada na Amazon.",
+              "rotaLote": {
+                "erro": true,
+                "mensagem": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Url das etiquetas não encontrada na Amazon.",
+                "statusCode": 400
+              },
+              "rotaIndividual": {
+                "erro": true,
+                "mensagem": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Url das etiquetas não encontrada na Amazon.",
+                "statusCode": 400
+              }
+            }
+          }
+        ]
+      },
+      {
+        "idAgrupamento": 746504153,
+        "identificacao": "3208",
+        "data": "2026-06-29",
+        "quantidadeObjetos": null,
+        "formaEnvio": {
+          "id": 758095424,
+          "nome": "Amazon DBA"
+        },
+        "categoria": "amazon",
+        "etiquetasLote": {
+          "ok": false,
+          "urls": [],
+          "erro": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Url das etiquetas não encontrada na Amazon.",
+          "resposta": {
+            "erro": true,
+            "mensagem": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Url das etiquetas não encontrada na Amazon.",
+            "statusCode": 400
+          }
+        },
+        "urlsConsolidadas": [],
+        "temEtiqueta": false,
+        "expedicoes": [
+          {
+            "idExpedicao": 749892880,
+            "pedidoId": 860523817,
+            "numeroPedido": 208974,
+            "idNotaFiscal": 860523818,
+            "numeroNota": 262,
+            "situacao": "1",
+            "destinatario": "Wylker Porto",
+            "etiquetas": {
+              "ok": false,
+              "urls": [],
+              "marketplaceError": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Url das etiquetas não encontrada na Amazon.",
+              "rotaLote": {
+                "erro": true,
+                "mensagem": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Url das etiquetas não encontrada na Amazon.",
+                "statusCode": 400
+              },
+              "rotaIndividual": {
+                "erro": true,
+                "mensagem": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Url das etiquetas não encontrada na Amazon.",
+                "statusCode": 400
+              }
+            }
+          },
+          {
+            "idExpedicao": 749893262,
+            "pedidoId": 860535060,
+            "numeroPedido": 209070,
+            "idNotaFiscal": 860535069,
+            "numeroNota": 396,
+            "situacao": "1",
+            "destinatario": "Fabio Vicente Oliveira",
+            "etiquetas": {
+              "ok": false,
+              "urls": [],
+              "marketplaceError": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Url das etiquetas não encontrada na Amazon.",
+              "rotaLote": {
+                "erro": true,
+                "mensagem": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Url das etiquetas não encontrada na Amazon.",
+                "statusCode": 400
+              },
+              "rotaIndividual": {
+                "erro": true,
+                "mensagem": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Url das etiquetas não encontrada na Amazon.",
+                "statusCode": 400
+              }
+            }
+          },
+          {
+            "idExpedicao": 749893336,
+            "pedidoId": 860537059,
+            "numeroPedido": 209103,
+            "idNotaFiscal": 860537094,
+            "numeroNota": 406,
+            "situacao": "1",
+            "destinatario": "Eduardo",
+            "etiquetas": {
+              "ok": false,
+              "urls": [],
+              "marketplaceError": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Url das etiquetas não encontrada na Amazon.",
+              "rotaLote": {
+                "erro": true,
+                "mensagem": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Url das etiquetas não encontrada na Amazon.",
+                "statusCode": 400
+              },
+              "rotaIndividual": {
+                "erro": true,
+                "mensagem": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Url das etiquetas não encontrada na Amazon.",
+                "statusCode": 400
+              }
+            }
+          },
+          {
+            "idExpedicao": 749893338,
+            "pedidoId": 860537140,
+            "numeroPedido": 209104,
+            "idNotaFiscal": 860537149,
+            "numeroNota": 407,
+            "situacao": "1",
+            "destinatario": "Giselda",
+            "etiquetas": {
+              "ok": false,
+              "urls": [],
+              "marketplaceError": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Url das etiquetas não encontrada na Amazon.",
+              "rotaLote": {
+                "erro": true,
+                "mensagem": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Url das etiquetas não encontrada na Amazon.",
+                "statusCode": 400
+              },
+              "rotaIndividual": {
+                "erro": true,
+                "mensagem": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Url das etiquetas não encontrada na Amazon.",
+                "statusCode": 400
+              }
+            }
+          },
+          {
+            "idExpedicao": 749893398,
+            "pedidoId": 860539106,
+            "numeroPedido": 209135,
+            "idNotaFiscal": 860539127,
+            "numeroNota": 418,
+            "situacao": "1",
+            "destinatario": "Charles Jennings",
+            "etiquetas": {
+              "ok": false,
+              "urls": [],
+              "marketplaceError": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Url das etiquetas não encontrada na Amazon.",
+              "rotaLote": {
+                "erro": true,
+                "mensagem": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Url das etiquetas não encontrada na Amazon.",
+                "statusCode": 400
+              },
+              "rotaIndividual": {
+                "erro": true,
+                "mensagem": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Url das etiquetas não encontrada na Amazon.",
+                "statusCode": 400
+              }
+            }
+          },
+          {
+            "idExpedicao": 749893439,
+            "pedidoId": 860540288,
+            "numeroPedido": 209154,
+            "idNotaFiscal": 860540318,
+            "numeroNota": 426,
+            "situacao": "1",
+            "destinatario": "Marina Paz",
+            "etiquetas": {
+              "ok": false,
+              "urls": [],
+              "marketplaceError": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Url das etiquetas não encontrada na Amazon.",
+              "rotaLote": {
+                "erro": true,
+                "mensagem": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Url das etiquetas não encontrada na Amazon.",
+                "statusCode": 400
+              },
+              "rotaIndividual": {
+                "erro": true,
+                "mensagem": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Url das etiquetas não encontrada na Amazon.",
+                "statusCode": 400
+              }
+            }
+          },
+          {
+            "idExpedicao": 749893522,
+            "pedidoId": 860542631,
+            "numeroPedido": 209187,
+            "idNotaFiscal": 860542674,
+            "numeroNota": 437,
+            "situacao": "1",
+            "destinatario": "Ronaldo Rigo de Matos",
+            "etiquetas": {
+              "ok": false,
+              "urls": [],
+              "marketplaceError": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Url das etiquetas não encontrada na Amazon.",
+              "rotaLote": {
+                "erro": true,
+                "mensagem": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Url das etiquetas não encontrada na Amazon.",
+                "statusCode": 400
+              },
+              "rotaIndividual": {
+                "erro": true,
+                "mensagem": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Url das etiquetas não encontrada na Amazon.",
+                "statusCode": 400
+              }
+            }
+          },
+          {
+            "idExpedicao": 749893612,
+            "pedidoId": 860544913,
+            "numeroPedido": 209231,
+            "idNotaFiscal": 860544917,
+            "numeroNota": 456,
+            "situacao": "1",
+            "destinatario": "Ealine",
+            "etiquetas": {
+              "ok": false,
+              "urls": [],
+              "marketplaceError": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Url das etiquetas não encontrada na Amazon.",
+              "rotaLote": {
+                "erro": true,
+                "mensagem": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Url das etiquetas não encontrada na Amazon.",
+                "statusCode": 400
+              },
+              "rotaIndividual": {
+                "erro": true,
+                "mensagem": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Erro ao obter etiquetas na Amazon.",
+                "statusCode": 400
+              }
+            }
+          },
+          {
+            "idExpedicao": 749893661,
+            "pedidoId": 860545975,
+            "numeroPedido": 209255,
+            "idNotaFiscal": 860546006,
+            "numeroNota": 466,
+            "situacao": "1",
+            "destinatario": "Silvia Judice",
+            "etiquetas": {
+              "ok": false,
+              "urls": [],
+              "marketplaceError": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Erro ao obter etiquetas na Amazon.",
+              "rotaLote": {
+                "erro": true,
+                "mensagem": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Erro ao obter etiquetas na Amazon.",
+                "statusCode": 400
+              },
+              "rotaIndividual": {
+                "erro": true,
+                "mensagem": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Url das etiquetas não encontrada na Amazon.",
+                "statusCode": 400
+              }
+            }
+          }
+        ]
+      },
+      {
+        "idAgrupamento": 746504118,
+        "identificacao": "3204",
+        "data": "2026-06-26",
+        "quantidadeObjetos": null,
+        "formaEnvio": {
+          "id": 758095424,
+          "nome": "Amazon DBA"
+        },
+        "categoria": "amazon",
+        "etiquetasLote": {
+          "ok": false,
+          "urls": [],
+          "erro": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Url das etiquetas não encontrada na Amazon.",
+          "resposta": {
+            "erro": true,
+            "mensagem": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Url das etiquetas não encontrada na Amazon.",
+            "statusCode": 400
+          }
+        },
+        "urlsConsolidadas": [],
+        "temEtiqueta": false,
+        "expedicoes": [
+          {
+            "idExpedicao": 749892739,
+            "pedidoId": 860521886,
+            "numeroPedido": 208961,
+            "idNotaFiscal": 860521925,
+            "numeroNota": 251,
+            "situacao": "1",
+            "destinatario": "Renan",
+            "etiquetas": {
+              "ok": false,
+              "urls": [],
+              "marketplaceError": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Url das etiquetas não encontrada na Amazon.",
+              "rotaLote": {
+                "erro": true,
+                "mensagem": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Url das etiquetas não encontrada na Amazon.",
+                "statusCode": 400
+              },
+              "rotaIndividual": {
+                "erro": true,
+                "mensagem": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Url das etiquetas não encontrada na Amazon.",
+                "statusCode": 400
+              }
+            }
+          },
+          {
+            "idExpedicao": 749892812,
+            "pedidoId": 860522421,
+            "numeroPedido": 208963,
+            "idNotaFiscal": 860522540,
+            "numeroNota": 253,
+            "situacao": "1",
+            "destinatario": "Wagner",
+            "etiquetas": {
+              "ok": false,
+              "urls": [],
+              "marketplaceError": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Url das etiquetas não encontrada na Amazon.",
+              "rotaLote": {
+                "erro": true,
+                "mensagem": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Url das etiquetas não encontrada na Amazon.",
+                "statusCode": 400
+              },
+              "rotaIndividual": {
+                "erro": true,
+                "mensagem": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Url das etiquetas não encontrada na Amazon.",
+                "statusCode": 400
+              }
+            }
+          }
+        ]
+      },
+      {
+        "idAgrupamento": 746504097,
+        "identificacao": "3203",
+        "data": "2026-06-26",
+        "quantidadeObjetos": null,
+        "formaEnvio": {
+          "id": 758095424,
+          "nome": "Amazon DBA"
+        },
+        "categoria": "amazon",
+        "etiquetasLote": {
+          "ok": false,
+          "urls": [],
+          "erro": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Url das etiquetas não encontrada na Amazon.",
+          "resposta": {
+            "erro": true,
+            "mensagem": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Url das etiquetas não encontrada na Amazon.",
+            "statusCode": 400
+          }
+        },
+        "urlsConsolidadas": [],
+        "temEtiqueta": false,
+        "expedicoes": [
+          {
+            "idExpedicao": 749892244,
+            "pedidoId": 860511501,
+            "numeroPedido": 208872,
+            "idNotaFiscal": 860511532,
+            "numeroNota": 127,
+            "situacao": "1",
+            "destinatario": "Meire Martins de Figueiredo",
+            "etiquetas": {
+              "ok": false,
+              "urls": [],
+              "marketplaceError": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Url das etiquetas não encontrada na Amazon.",
+              "rotaLote": {
+                "erro": true,
+                "mensagem": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Url das etiquetas não encontrada na Amazon.",
+                "statusCode": 400
+              },
+              "rotaIndividual": {
+                "erro": true,
+                "mensagem": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Url das etiquetas não encontrada na Amazon.",
+                "statusCode": 400
+              }
+            }
+          },
+          {
+            "idExpedicao": 749892423,
+            "pedidoId": 860516511,
+            "numeroPedido": 208919,
+            "idNotaFiscal": 860516544,
+            "numeroNota": 224,
+            "situacao": "1",
+            "destinatario": "Lívia Albuquerque",
+            "etiquetas": {
+              "ok": false,
+              "urls": [],
+              "marketplaceError": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Url das etiquetas não encontrada na Amazon.",
+              "rotaLote": {
+                "erro": true,
+                "mensagem": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Url das etiquetas não encontrada na Amazon.",
+                "statusCode": 400
+              },
+              "rotaIndividual": {
+                "erro": true,
+                "mensagem": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Url das etiquetas não encontrada na Amazon.",
+                "statusCode": 400
+              }
+            }
+          },
+          {
+            "idExpedicao": 749892473,
+            "pedidoId": 860517604,
+            "numeroPedido": 208937,
+            "idNotaFiscal": 860517612,
+            "numeroNota": 234,
+            "situacao": "1",
+            "destinatario": "Sandra Cravo",
+            "etiquetas": {
+              "ok": false,
+              "urls": [],
+              "marketplaceError": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Url das etiquetas não encontrada na Amazon.",
+              "rotaLote": {
+                "erro": true,
+                "mensagem": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Url das etiquetas não encontrada na Amazon.",
+                "statusCode": 400
+              },
+              "rotaIndividual": {
+                "erro": true,
+                "mensagem": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Url das etiquetas não encontrada na Amazon.",
+                "statusCode": 400
+              }
+            }
+          }
+        ]
+      },
+      {
+        "idAgrupamento": 746504082,
+        "identificacao": "3202",
+        "data": "2026-06-25",
+        "quantidadeObjetos": null,
+        "formaEnvio": {
+          "id": 758095424,
+          "nome": "Amazon DBA"
+        },
+        "categoria": "amazon",
+        "etiquetasLote": {
+          "ok": false,
+          "urls": [],
+          "erro": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Url das etiquetas não encontrada na Amazon.",
+          "resposta": {
+            "erro": true,
+            "mensagem": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Url das etiquetas não encontrada na Amazon.",
+            "statusCode": 400
+          }
+        },
+        "urlsConsolidadas": [],
+        "temEtiqueta": false,
+        "expedicoes": [
+          {
+            "idExpedicao": 749892155,
+            "pedidoId": 860509066,
+            "numeroPedido": 208845,
+            "idNotaFiscal": 860509118,
+            "numeroNota": 117,
+            "situacao": "1",
+            "destinatario": "TAIS",
+            "etiquetas": {
+              "ok": false,
+              "urls": [],
+              "marketplaceError": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Url das etiquetas não encontrada na Amazon.",
+              "rotaLote": {
+                "erro": true,
+                "mensagem": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Url das etiquetas não encontrada na Amazon.",
+                "statusCode": 400
+              },
+              "rotaIndividual": {
+                "erro": true,
+                "mensagem": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Url das etiquetas não encontrada na Amazon.",
+                "statusCode": 400
+              }
+            }
+          }
+        ]
+      },
+      {
+        "idAgrupamento": 746504058,
+        "identificacao": "3201",
+        "data": "2026-06-25",
+        "quantidadeObjetos": null,
+        "formaEnvio": {
+          "id": 758095424,
+          "nome": "Amazon DBA"
+        },
+        "categoria": "amazon",
+        "etiquetasLote": {
+          "ok": false,
+          "urls": [],
+          "erro": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Url das etiquetas não encontrada na Amazon.",
+          "resposta": {
+            "erro": true,
+            "mensagem": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Url das etiquetas não encontrada na Amazon.",
+            "statusCode": 400
+          }
+        },
+        "urlsConsolidadas": [],
+        "temEtiqueta": false,
+        "expedicoes": [
+          {
+            "idExpedicao": 749891841,
+            "pedidoId": 860503199,
+            "numeroPedido": 208811,
+            "idNotaFiscal": 860503243,
+            "numeroNota": 104,
+            "situacao": "1",
+            "destinatario": "Nicole Facchini",
+            "etiquetas": {
+              "ok": false,
+              "urls": [],
+              "marketplaceError": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Url das etiquetas não encontrada na Amazon.",
+              "rotaLote": {
+                "erro": true,
+                "mensagem": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Url das etiquetas não encontrada na Amazon.",
+                "statusCode": 400
+              },
+              "rotaIndividual": {
+                "erro": true,
+                "mensagem": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Url das etiquetas não encontrada na Amazon.",
+                "statusCode": 400
+              }
+            }
+          }
+        ]
+      },
+      {
+        "idAgrupamento": 746504057,
+        "identificacao": "3200",
+        "data": "2026-06-24",
+        "quantidadeObjetos": null,
+        "formaEnvio": {
+          "id": 758095424,
+          "nome": "Amazon DBA"
+        },
+        "categoria": "amazon",
+        "etiquetasLote": {
+          "ok": false,
+          "urls": [],
+          "erro": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Url das etiquetas não encontrada na Amazon.",
+          "resposta": {
+            "erro": true,
+            "mensagem": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Url das etiquetas não encontrada na Amazon.",
+            "statusCode": 400
+          }
+        },
+        "urlsConsolidadas": [],
+        "temEtiqueta": false,
+        "expedicoes": [
+          {
+            "idExpedicao": 749891571,
+            "pedidoId": 860494965,
+            "numeroPedido": 208737,
+            "idNotaFiscal": 860494982,
+            "numeroNota": 157521,
+            "situacao": "1",
+            "destinatario": "Bab",
+            "etiquetas": {
+              "ok": false,
+              "urls": [],
+              "marketplaceError": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Url das etiquetas não encontrada na Amazon.",
+              "rotaLote": {
+                "erro": true,
+                "mensagem": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Url das etiquetas não encontrada na Amazon.",
+                "statusCode": 400
+              },
+              "rotaIndividual": {
+                "erro": true,
+                "mensagem": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Url das etiquetas não encontrada na Amazon.",
+                "statusCode": 400
+              }
+            }
+          },
+          {
+            "idExpedicao": 749891608,
+            "pedidoId": 860494767,
+            "numeroPedido": 208735,
+            "idNotaFiscal": 860496324,
+            "numeroNota": 1,
+            "situacao": "1",
+            "destinatario": "Ana Maria Penha Teixeira",
+            "etiquetas": {
+              "ok": false,
+              "urls": [],
+              "marketplaceError": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Url das etiquetas não encontrada na Amazon.",
+              "rotaLote": {
+                "erro": true,
+                "mensagem": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Url das etiquetas não encontrada na Amazon.",
+                "statusCode": 400
+              },
+              "rotaIndividual": {
+                "erro": true,
+                "mensagem": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Url das etiquetas não encontrada na Amazon.",
+                "statusCode": 400
+              }
+            }
+          },
+          {
+            "idExpedicao": 749891753,
+            "pedidoId": 860500595,
+            "numeroPedido": 208777,
+            "idNotaFiscal": 860500614,
+            "numeroNota": 85,
+            "situacao": "1",
+            "destinatario": "oseas",
+            "etiquetas": {
+              "ok": false,
+              "urls": [],
+              "marketplaceError": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Erro ao obter etiquetas na Amazon.",
+              "rotaLote": {
+                "erro": true,
+                "mensagem": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Erro ao obter etiquetas na Amazon.",
+                "statusCode": 400
+              },
+              "rotaIndividual": {
+                "erro": true,
+                "mensagem": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Url das etiquetas não encontrada na Amazon.",
+                "statusCode": 400
+              }
+            }
+          },
+          {
+            "idExpedicao": 749891825,
+            "pedidoId": 860502672,
+            "numeroPedido": 208803,
+            "idNotaFiscal": 860502774,
+            "numeroNota": 102,
+            "situacao": "1",
+            "destinatario": "Luana Daros",
+            "etiquetas": {
+              "ok": false,
+              "urls": [],
+              "marketplaceError": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Url das etiquetas não encontrada na Amazon.",
+              "rotaLote": {
+                "erro": true,
+                "mensagem": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Url das etiquetas não encontrada na Amazon.",
+                "statusCode": 400
+              },
+              "rotaIndividual": {
+                "erro": true,
+                "mensagem": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Erro ao obter etiquetas na Amazon.",
+                "statusCode": 400
+              }
+            }
+          }
+        ]
+      },
+      {
+        "idAgrupamento": 746504027,
+        "identificacao": "3199",
+        "data": "2026-06-24",
+        "quantidadeObjetos": null,
+        "formaEnvio": {
+          "id": 758095424,
+          "nome": "Amazon DBA"
+        },
+        "categoria": "amazon",
+        "etiquetasLote": {
+          "ok": false,
+          "urls": [],
+          "erro": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Url das etiquetas não encontrada na Amazon.",
+          "resposta": {
+            "erro": true,
+            "mensagem": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Url das etiquetas não encontrada na Amazon.",
+            "statusCode": 400
+          }
+        },
+        "urlsConsolidadas": [],
+        "temEtiqueta": false,
+        "expedicoes": [
+          {
+            "idExpedicao": 749890780,
+            "pedidoId": 860478022,
+            "numeroPedido": 208583,
+            "idNotaFiscal": 860478041,
+            "numeroNota": 157393,
+            "situacao": "1",
+            "destinatario": "Adriana",
+            "etiquetas": {
+              "ok": false,
+              "urls": [],
+              "marketplaceError": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Url das etiquetas não encontrada na Amazon.",
+              "rotaLote": {
+                "erro": true,
+                "mensagem": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Url das etiquetas não encontrada na Amazon.",
+                "statusCode": 400
+              },
+              "rotaIndividual": {
+                "erro": true,
+                "mensagem": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Url das etiquetas não encontrada na Amazon.",
+                "statusCode": 400
+              }
+            }
+          },
+          {
+            "idExpedicao": 749890798,
+            "pedidoId": 860478968,
+            "numeroPedido": 208591,
+            "idNotaFiscal": 860478973,
+            "numeroNota": 157403,
+            "situacao": "1",
+            "destinatario": "Wellington Dias Duarte",
+            "etiquetas": {
+              "ok": false,
+              "urls": [],
+              "marketplaceError": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Url das etiquetas não encontrada na Amazon.",
+              "rotaLote": {
+                "erro": true,
+                "mensagem": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Url das etiquetas não encontrada na Amazon.",
+                "statusCode": 400
+              },
+              "rotaIndividual": {
+                "erro": true,
+                "mensagem": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Erro ao obter etiquetas na Amazon.",
+                "statusCode": 400
+              }
+            }
+          },
+          {
+            "idExpedicao": 749890800,
+            "pedidoId": 860478953,
+            "numeroPedido": 208590,
+            "idNotaFiscal": 860479096,
+            "numeroNota": 157404,
+            "situacao": "1",
+            "destinatario": "Rafael Barros",
+            "etiquetas": {
+              "ok": false,
+              "urls": [],
+              "marketplaceError": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Url das etiquetas não encontrada na Amazon.",
+              "rotaLote": {
+                "erro": true,
+                "mensagem": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Url das etiquetas não encontrada na Amazon.",
+                "statusCode": 400
+              },
+              "rotaIndividual": {
+                "erro": true,
+                "mensagem": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Url das etiquetas não encontrada na Amazon.",
+                "statusCode": 400
+              }
+            }
+          },
+          {
+            "idExpedicao": 749890827,
+            "pedidoId": 860479510,
+            "numeroPedido": 208599,
+            "idNotaFiscal": 860479541,
+            "numeroNota": 157407,
+            "situacao": "1",
+            "destinatario": "Cris Jovelli",
+            "etiquetas": {
+              "ok": false,
+              "urls": [],
+              "marketplaceError": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Url das etiquetas não encontrada na Amazon.",
+              "rotaLote": {
+                "erro": true,
+                "mensagem": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Url das etiquetas não encontrada na Amazon.",
+                "statusCode": 400
+              },
+              "rotaIndividual": {
+                "erro": true,
+                "mensagem": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Erro ao obter etiquetas na Amazon.",
+                "statusCode": 400
+              }
+            }
+          },
+          {
+            "idExpedicao": 749890838,
+            "pedidoId": 860479705,
+            "numeroPedido": 208603,
+            "idNotaFiscal": 860479707,
+            "numeroNota": 157410,
+            "situacao": "1",
+            "destinatario": "Lívia A. C. Pereira",
+            "etiquetas": {
+              "ok": false,
+              "urls": [],
+              "marketplaceError": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Erro ao obter etiquetas na Amazon.",
+              "rotaLote": {
+                "erro": true,
+                "mensagem": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Erro ao obter etiquetas na Amazon.",
+                "statusCode": 400
+              },
+              "rotaIndividual": {
+                "erro": true,
+                "mensagem": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Erro ao obter etiquetas na Amazon.",
+                "statusCode": 400
+              }
+            }
+          },
+          {
+            "idExpedicao": 749890853,
+            "pedidoId": 860480182,
+            "numeroPedido": 208609,
+            "idNotaFiscal": 860480192,
+            "numeroNota": 157415,
+            "situacao": "1",
+            "destinatario": "Larissa Naomi",
+            "etiquetas": {
+              "ok": false,
+              "urls": [],
+              "marketplaceError": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Erro ao obter etiquetas na Amazon.",
+              "rotaLote": {
+                "erro": true,
+                "mensagem": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Erro ao obter etiquetas na Amazon.",
+                "statusCode": 400
+              },
+              "rotaIndividual": {
+                "erro": true,
+                "mensagem": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Url das etiquetas não encontrada na Amazon.",
+                "statusCode": 400
+              }
+            }
+          },
+          {
+            "idExpedicao": 749890873,
+            "pedidoId": 860480975,
+            "numeroPedido": 208622,
+            "idNotaFiscal": 860481032,
+            "numeroNota": 157423,
+            "situacao": "1",
+            "destinatario": "Helder",
+            "etiquetas": {
+              "ok": false,
+              "urls": [],
+              "marketplaceError": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Url das etiquetas não encontrada na Amazon.",
+              "rotaLote": {
+                "erro": true,
+                "mensagem": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Url das etiquetas não encontrada na Amazon.",
+                "statusCode": 400
+              },
+              "rotaIndividual": {
+                "erro": true,
+                "mensagem": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Url das etiquetas não encontrada na Amazon.",
+                "statusCode": 400
+              }
+            }
+          },
+          {
+            "idExpedicao": 749890934,
+            "pedidoId": 860484227,
+            "numeroPedido": 208639,
+            "idNotaFiscal": 860484260,
+            "numeroNota": 157446,
+            "situacao": "1",
+            "destinatario": "Rodrigo",
+            "etiquetas": {
+              "ok": false,
+              "urls": [],
+              "marketplaceError": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Erro ao obter etiquetas na Amazon.",
+              "rotaLote": {
+                "erro": true,
+                "mensagem": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Erro ao obter etiquetas na Amazon.",
+                "statusCode": 400
+              },
+              "rotaIndividual": {
+                "erro": true,
+                "mensagem": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Erro ao obter etiquetas na Amazon.",
+                "statusCode": 400
+              }
+            }
+          },
+          {
+            "idExpedicao": 749890951,
+            "pedidoId": 860484314,
+            "numeroPedido": 208640,
+            "idNotaFiscal": 860484461,
+            "numeroNota": 157460,
+            "situacao": "1",
+            "destinatario": "Tavilene",
+            "etiquetas": {
+              "ok": false,
+              "urls": [],
+              "marketplaceError": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Url das etiquetas não encontrada na Amazon.",
+              "rotaLote": {
+                "erro": true,
+                "mensagem": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Url das etiquetas não encontrada na Amazon.",
+                "statusCode": 400
+              },
+              "rotaIndividual": {
+                "erro": true,
+                "mensagem": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Url das etiquetas não encontrada na Amazon.",
+                "statusCode": 400
+              }
+            }
+          },
+          {
+            "idExpedicao": 749890963,
+            "pedidoId": 860484534,
+            "numeroPedido": 208644,
+            "idNotaFiscal": 860484605,
+            "numeroNota": 157470,
+            "situacao": "1",
+            "destinatario": "Antonio pinto",
+            "etiquetas": {
+              "ok": false,
+              "urls": [],
+              "marketplaceError": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Url das etiquetas não encontrada na Amazon.",
+              "rotaLote": {
+                "erro": true,
+                "mensagem": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Url das etiquetas não encontrada na Amazon.",
+                "statusCode": 400
+              },
+              "rotaIndividual": {
+                "erro": true,
+                "mensagem": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Url das etiquetas não encontrada na Amazon.",
+                "statusCode": 400
+              }
+            }
+          },
+          {
+            "idExpedicao": 749891068,
+            "pedidoId": 860486971,
+            "numeroPedido": 208673,
+            "idNotaFiscal": 860486977,
+            "numeroNota": 157482,
+            "situacao": "1",
+            "destinatario": "Sandra Bergamini",
+            "etiquetas": {
+              "ok": false,
+              "urls": [],
+              "marketplaceError": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Url das etiquetas não encontrada na Amazon.",
+              "rotaLote": {
+                "erro": true,
+                "mensagem": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Url das etiquetas não encontrada na Amazon.",
+                "statusCode": 400
+              },
+              "rotaIndividual": {
+                "erro": true,
+                "mensagem": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Url das etiquetas não encontrada na Amazon.",
+                "statusCode": 400
+              }
+            }
+          },
+          {
+            "idExpedicao": 749891081,
+            "pedidoId": 860487196,
+            "numeroPedido": 208679,
+            "idNotaFiscal": 860487201,
+            "numeroNota": 157485,
+            "situacao": "1",
+            "destinatario": "Driele Sanches Ferreira",
+            "etiquetas": {
+              "ok": false,
+              "urls": [],
+              "marketplaceError": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Erro ao obter etiquetas na Amazon.",
+              "rotaLote": {
+                "erro": true,
+                "mensagem": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Erro ao obter etiquetas na Amazon.",
+                "statusCode": 400
+              },
+              "rotaIndividual": {
+                "erro": true,
+                "mensagem": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Erro ao obter etiquetas na Amazon.",
+                "statusCode": 400
+              }
+            }
+          },
+          {
+            "idExpedicao": 749891115,
+            "pedidoId": 860487939,
+            "numeroPedido": 208692,
+            "idNotaFiscal": 860487942,
+            "numeroNota": 157495,
+            "situacao": "1",
+            "destinatario": "Rodrigo Müller",
+            "etiquetas": {
+              "ok": false,
+              "urls": [],
+              "marketplaceError": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Erro ao obter etiquetas na Amazon.",
+              "rotaLote": {
+                "erro": true,
+                "mensagem": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Erro ao obter etiquetas na Amazon.",
+                "statusCode": 400
+              },
+              "rotaIndividual": {
+                "erro": true,
+                "mensagem": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Url das etiquetas não encontrada na Amazon.",
+                "statusCode": 400
+              }
+            }
+          }
+        ]
+      }
+    ],
+    "shopee": [],
+    "mercado_livre": [
+      {
+        "idAgrupamento": 746504129,
+        "identificacao": "3207",
+        "data": "2026-06-26",
+        "quantidadeObjetos": null,
+        "formaEnvio": {
+          "id": 744061814,
+          "nome": "Mercado Envios"
+        },
+        "categoria": "mercado_livre",
+        "etiquetasLote": {
+          "ok": false,
+          "urls": [],
+          "erro": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Não foi possível obter as etiquetas dos seguintes pedidos: S47385485426",
+          "resposta": {
+            "erro": true,
+            "mensagem": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Não foi possível obter as etiquetas dos seguintes pedidos: S47385485426",
+            "statusCode": 400
+          }
+        },
+        "urlsConsolidadas": [],
+        "temEtiqueta": false,
+        "expedicoes": [
+          {
+            "idExpedicao": 749892686,
+            "pedidoId": 860521519,
+            "numeroPedido": 208959,
+            "idNotaFiscal": 860521522,
+            "numeroNota": 249,
+            "situacao": "1",
+            "destinatario": "Rodolfo Alex da Silva Paes",
+            "etiquetas": {
+              "ok": false,
+              "urls": [],
+              "marketplaceError": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Não foi possível obter as etiquetas dos seguintes pedidos: S47385485426",
+              "rotaLote": {
+                "erro": true,
+                "mensagem": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Não foi possível obter as etiquetas dos seguintes pedidos: S47385485426",
+                "statusCode": 400
+              },
+              "rotaIndividual": {
+                "erro": true,
+                "mensagem": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Não foi possível obter as etiquetas dos seguintes pedidos: S47385485426",
+                "statusCode": 400
+              }
+            }
+          }
+        ]
+      },
+      {
+        "idAgrupamento": 746504128,
+        "identificacao": "3206",
+        "data": "2026-06-26",
+        "quantidadeObjetos": null,
+        "formaEnvio": {
+          "id": 744061814,
+          "nome": "Mercado Envios"
+        },
+        "categoria": "mercado_livre",
+        "etiquetasLote": {
+          "ok": false,
+          "urls": [],
+          "erro": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Não foi possível obter as etiquetas dos seguintes pedidos: S47335139039",
+          "resposta": {
+            "erro": true,
+            "mensagem": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Não foi possível obter as etiquetas dos seguintes pedidos: S47335139039",
+            "statusCode": 400
+          }
+        },
+        "urlsConsolidadas": [],
+        "temEtiqueta": false,
+        "expedicoes": [
+          {
+            "idExpedicao": 749892334,
+            "pedidoId": 860418694,
+            "numeroPedido": 208013,
+            "idNotaFiscal": 860513694,
+            "numeroNota": 188,
+            "situacao": "1",
+            "destinatario": "Frederico Willian Sardela Santos",
+            "etiquetas": {
+              "ok": false,
+              "urls": [],
+              "marketplaceError": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Não foi possível obter as etiquetas dos seguintes pedidos: S47335139039",
+              "rotaLote": {
+                "erro": true,
+                "mensagem": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Não foi possível obter as etiquetas dos seguintes pedidos: S47335139039",
+                "statusCode": 400
+              },
+              "rotaIndividual": {
+                "erro": true,
+                "mensagem": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Não foi possível obter as etiquetas dos seguintes pedidos: S47335139039",
+                "statusCode": 400
+              }
+            }
+          }
+        ]
+      },
+      {
+        "idAgrupamento": 746504126,
+        "identificacao": "3205",
+        "data": "2026-06-26",
+        "quantidadeObjetos": null,
+        "formaEnvio": {
+          "id": 744061814,
+          "nome": "Mercado Envios"
+        },
+        "categoria": "mercado_livre",
+        "etiquetasLote": {
+          "ok": false,
+          "urls": [],
+          "erro": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Não foi possível obter as etiquetas dos seguintes pedidos: S47385071219",
+          "resposta": {
+            "erro": true,
+            "mensagem": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Não foi possível obter as etiquetas dos seguintes pedidos: S47385071219",
+            "statusCode": 400
+          }
+        },
+        "urlsConsolidadas": [],
+        "temEtiqueta": false,
+        "expedicoes": [
+          {
+            "idExpedicao": 749892650,
+            "pedidoId": 860521125,
+            "numeroPedido": 208954,
+            "idNotaFiscal": 860521131,
+            "numeroNota": 245,
+            "situacao": "1",
+            "destinatario": "Tiago Augusto Floriano",
+            "etiquetas": {
+              "ok": false,
+              "urls": [],
+              "marketplaceError": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Não foi possível obter as etiquetas dos seguintes pedidos: S47385071219",
+              "rotaLote": {
+                "erro": true,
+                "mensagem": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Não foi possível obter as etiquetas dos seguintes pedidos: S47385071219",
+                "statusCode": 400
+              },
+              "rotaIndividual": {
+                "erro": true,
+                "mensagem": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Não foi possível obter as etiquetas dos seguintes pedidos: S47385071219",
+                "statusCode": 400
+              }
+            }
+          }
+        ]
+      }
+    ],
+    "outros": []
+  }
+}

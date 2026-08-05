@@ -8,10 +8,10 @@ import { webRoutes } from "./routes/web.js";
 import { notificationRoutes } from "./routes/notifications.js";
 import { integrationRoutes } from "./routes/integrations.js";
 import { tinyRoutes } from "./routes/tiny.js";
-import { cleanupSeedDemoTenantData } from "./services/demo-tenant-cleanup.js";
 import { startWaveScheduler } from "./services/wave-scheduler.js";
 import { startTinyOAuthRefreshWorker } from "./services/tiny-oauth-refresh-worker.js";
 import { startTinyOrderSyncScheduler } from "./services/tiny-order-sync-scheduler.js";
+import { recoverStaleTinyBlockedConnections } from "./services/tiny-rate-limit.js";
 
 const PORT = Number(process.env.PORT ?? 3333);
 const HOST = process.env.HOST ?? "0.0.0.0";
@@ -38,7 +38,9 @@ async function main() {
   await app.register(integrationRoutes);
   await app.register(tinyRoutes);
 
-  await cleanupSeedDemoTenantData();
+  void recoverStaleTinyBlockedConnections().then((n) => {
+    if (n > 0) console.log(`[api] ${n} conexão(ões) Tiny recuperada(s) de BLOCKED`);
+  });
   startWaveScheduler();
   startTinyOAuthRefreshWorker();
   startTinyOrderSyncScheduler();

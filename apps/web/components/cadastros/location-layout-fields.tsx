@@ -10,20 +10,18 @@ export interface LocationLayoutValue {
   barracaoId: string;
   setorId: string;
   corredorId: string;
-  fileiraId: string;
   estanteId: string;
-  prateleiraId: string;
   colunaId: string;
+  linhaId: string;
 }
 
 const emptyLayout: LocationLayoutValue = {
   barracaoId: "",
   setorId: "",
   corredorId: "",
-  fileiraId: "",
   estanteId: "",
-  prateleiraId: "",
   colunaId: "",
+  linhaId: "",
 };
 
 export function LocationLayoutFields({
@@ -36,10 +34,9 @@ export function LocationLayoutFields({
   const [barracoes, setBarracoes] = useState<WarehouseItem[]>([]);
   const [setores, setSetores] = useState<WarehouseItem[]>([]);
   const [corredores, setCorredores] = useState<WarehouseItem[]>([]);
-  const [fileiras, setFileiras] = useState<WarehouseItem[]>([]);
   const [estantes, setEstantes] = useState<WarehouseItem[]>([]);
-  const [prateleiras, setPrateleiras] = useState<WarehouseItem[]>([]);
   const [colunas, setColunas] = useState<WarehouseItem[]>([]);
+  const [linhas, setLinhas] = useState<WarehouseItem[]>([]);
 
   useEffect(() => {
     fetchWarehouseItems("barracoes", { pageSize: 500 })
@@ -60,85 +57,75 @@ export function LocationLayoutFields({
   useEffect(() => {
     if (!value.setorId) {
       setCorredores([]);
-      setEstantes([]);
       return;
     }
-    Promise.all([
-      fetchWarehouseItems("corredores", { parentId: value.setorId, pageSize: 500 }),
-      fetchWarehouseItems("estantes", { parentId: value.setorId, pageSize: 500 }),
-    ])
-      .then(([c, e]) => {
-        setCorredores(c.corredores ?? []);
-        setEstantes(e.estantes ?? []);
-      })
-      .catch(() => {
-        setCorredores([]);
-        setEstantes([]);
-      });
+    fetchWarehouseItems("corredores", { parentId: value.setorId, pageSize: 500 })
+      .then((r) => setCorredores(r.corredores ?? []))
+      .catch(() => setCorredores([]));
   }, [value.setorId]);
 
   useEffect(() => {
     if (!value.corredorId) {
-      setFileiras([]);
+      setEstantes([]);
       return;
     }
-    fetchWarehouseItems("fileiras", { parentId: value.corredorId, pageSize: 500 })
-      .then((r) => setFileiras(r.fileiras ?? []))
-      .catch(() => setFileiras([]));
+    fetchWarehouseItems("estantes", { parentId: value.corredorId, pageSize: 500 })
+      .then((r) => setEstantes(r.estantes ?? []))
+      .catch(() => setEstantes([]));
   }, [value.corredorId]);
 
   useEffect(() => {
     if (!value.estanteId) {
-      setPrateleiras([]);
-      return;
-    }
-    fetchWarehouseItems("prateleiras", { parentId: value.estanteId, pageSize: 500 })
-      .then((r) => setPrateleiras(r.prateleiras ?? []))
-      .catch(() => setPrateleiras([]));
-  }, [value.estanteId]);
-
-  useEffect(() => {
-    if (!value.prateleiraId) {
       setColunas([]);
       return;
     }
-    fetchWarehouseItems("colunas", { parentId: value.prateleiraId, pageSize: 500 })
+    fetchWarehouseItems("colunas", { parentId: value.estanteId, pageSize: 500 })
       .then((r) => setColunas(r.colunas ?? []))
       .catch(() => setColunas([]));
-  }, [value.prateleiraId]);
+  }, [value.estanteId]);
+
+  useEffect(() => {
+    if (!value.colunaId) {
+      setLinhas([]);
+      return;
+    }
+    fetchWarehouseItems("linhas", { parentId: value.colunaId, pageSize: 500 })
+      .then((r) => setLinhas(r.linhas ?? []))
+      .catch(() => setLinhas([]));
+  }, [value.colunaId]);
 
   const patch = (partial: Partial<LocationLayoutValue>) => {
     const next = { ...value, ...partial };
     if (partial.barracaoId !== undefined) {
       next.setorId = "";
       next.corredorId = "";
-      next.fileiraId = "";
       next.estanteId = "";
-      next.prateleiraId = "";
       next.colunaId = "";
+      next.linhaId = "";
     }
     if (partial.setorId !== undefined) {
       next.corredorId = "";
-      next.fileiraId = "";
       next.estanteId = "";
-      next.prateleiraId = "";
       next.colunaId = "";
+      next.linhaId = "";
     }
     if (partial.corredorId !== undefined) {
-      next.fileiraId = "";
+      next.estanteId = "";
+      next.colunaId = "";
+      next.linhaId = "";
     }
     if (partial.estanteId !== undefined) {
-      next.prateleiraId = "";
       next.colunaId = "";
+      next.linhaId = "";
     }
-    if (partial.prateleiraId !== undefined) {
-      next.colunaId = "";
+    if (partial.colunaId !== undefined) {
+      next.linhaId = "";
     }
     onChange(next);
   };
 
   return (
-    <div className="grid gap-3 sm:col-span-2 sm:grid-cols-2">
+    <div className="grid gap-2.5 sm:col-span-2 sm:grid-cols-2">
       <SelectField
         label="Barracão"
         value={value.barracaoId}
@@ -160,40 +147,32 @@ export function LocationLayoutFields({
         onChange={(v) => patch({ corredorId: v })}
       />
       <SelectField
-        label="Fileira"
-        value={value.fileiraId}
-        options={fileiras}
-        disabled={!value.corredorId}
-        onChange={(v) => patch({ fileiraId: v })}
-      />
-      <SelectField
         label="Estante"
         value={value.estanteId}
         options={estantes}
-        disabled={!value.setorId}
+        disabled={!value.corredorId}
         onChange={(v) => patch({ estanteId: v })}
-      />
-      <SelectField
-        label="Prateleira"
-        value={value.prateleiraId}
-        options={prateleiras}
-        disabled={!value.estanteId}
-        onChange={(v) => patch({ prateleiraId: v })}
       />
       <SelectField
         label="Coluna"
         value={value.colunaId}
         options={colunas}
-        disabled={!value.prateleiraId}
+        disabled={!value.estanteId}
         onChange={(v) => patch({ colunaId: v })}
-        className="sm:col-span-2"
+      />
+      <SelectField
+        label="Linha"
+        value={value.linhaId}
+        options={linhas}
+        disabled={!value.colunaId}
+        onChange={(v) => patch({ linhaId: v })}
       />
       <p className="text-xs text-slate-500 sm:col-span-2">
-        Cadastre a estrutura em{" "}
+        Preencha barracão, setor, corredor, estante, coluna e linha. Cadastre posições em{" "}
         <a href="/gestao-barracao" className="text-[#0d9488] underline">
           Layout do galpão
-        </a>{" "}
-        antes de vincular localizações.
+        </a>
+        .
       </p>
     </div>
   );

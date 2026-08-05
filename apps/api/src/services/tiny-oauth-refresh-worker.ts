@@ -1,5 +1,6 @@
 import { refreshTinyAccessTokenLocked } from "./tiny-api-v3-client.js";
 import { listConnectionsForRefresh } from "./tiny-oauth.js";
+import { recoverStaleTinyBlockedConnections } from "./tiny-rate-limit.js";
 import {
   OAUTH_REFRESH_WORKER_INTERVAL_MS,
   shouldRefreshTinyToken,
@@ -14,6 +15,13 @@ export function startTinyOAuthRefreshWorker() {
 
   const tick = async () => {
     try {
+      const recovered = await recoverStaleTinyBlockedConnections();
+      if (recovered > 0) {
+        console.log(
+          `[tiny-oauth-worker] ${recovered} conexão(ões) Tiny recuperada(s) de BLOCKED (rate limit)`,
+        );
+      }
+
       const connections = await listConnectionsForRefresh();
       const now = Date.now();
 

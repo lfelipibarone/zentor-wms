@@ -115,6 +115,25 @@ function mapOrderIssueFields(issue: IssueDetail | undefined) {
   };
 }
 
+function buildIntegrationIssueSummary(
+  items: Array<{
+    productId: string | null;
+    erpSku: string | null;
+    product: { sku: string } | null;
+  }>,
+): string | null {
+  const missingSkus = items
+    .filter((i) => !i.productId)
+    .map((i) => i.erpSku ?? "SKU desconhecido");
+  if (missingSkus.length > 0) {
+    const preview = missingSkus.slice(0, 3).join(", ");
+    const suffix =
+      missingSkus.length > 3 ? ` (+${missingSkus.length - 3})` : "";
+    return `Produto não cadastrado: ${preview}${suffix}`;
+  }
+  return "Sem gôndola (pick face) cadastrada para o SKU";
+}
+
 export async function listProblemOrders(tenantId: string) {
   const orders = await prisma.order.findMany({
     where: { tenantId, status: { in: PROBLEM_STATUSES } },
@@ -136,6 +155,10 @@ export async function listProblemOrders(tenantId: string) {
   return {
     orders: orders.map((o) => {
       const issue = issueMap.get(o.id);
+      const integrationSummary =
+        o.status === OrderStatus.PAUSED_ISSUE && !issue
+          ? buildIntegrationIssueSummary(o.items)
+          : null;
       const activeWave = o.waveOrders.find(
         (wo) => wo.wave.status === PickWaveStatus.RELEASED,
       );
@@ -152,6 +175,7 @@ export async function listProblemOrders(tenantId: string) {
           o.status === OrderStatus.PACKING_RETURNED_TO_PICKING,
         pausedIssue: o.status === OrderStatus.PAUSED_ISSUE,
         ...mapOrderIssueFields(issue),
+        issueSummary: issue?.summary ?? integrationSummary,
         waveId: activeWave?.wave.id ?? null,
         waveName: activeWave?.wave.name ?? null,
         itemCount: o.items.length,
@@ -159,8 +183,8 @@ export async function listProblemOrders(tenantId: string) {
         qtyPicked: o.items.reduce((s, i) => s + i.quantityPicked, 0),
         items: o.items.map((i) => ({
           id: i.id,
-          sku: i.product.sku,
-          name: i.product.name,
+          sku: i.product?.sku ?? i.erpSku ?? "SKU pendente",
+          name: i.product?.name ?? i.erpDescription ?? null,
           quantityOrdered: i.quantityOrdered,
           quantityPicked: i.quantityPicked,
           remaining: Math.max(0, i.quantityOrdered - i.quantityPicked),

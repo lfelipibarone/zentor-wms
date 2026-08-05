@@ -4,7 +4,7 @@ import {
   Prisma,
 } from "@prisma/client";
 import { prisma } from "../lib/prisma.js";
-import { getTinyApiClient, TinyApiError } from "./tiny-api-v3-client.js";
+import { getTinyApiClient, TinyApiError, isTinyRateLimitError } from "./tiny-api-v3-client.js";
 import { isTinyConnectedError } from "./tiny-purchase-receipt.js";
 
 function asRecord(v: unknown): Record<string, unknown> | null {

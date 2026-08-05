@@ -68,6 +68,7 @@ export interface QueueOrder {
   itemCount: number;
   totalUnits: number;
   returnedFromPacking?: boolean;
+  resumingPicking?: boolean;
   issueSummary?: string | null;
   routeHint?: string | null;
   proximityNeighborCount?: number;

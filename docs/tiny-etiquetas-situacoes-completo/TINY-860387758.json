@@ -1,0 +1,314 @@
+{
+  "meta": {
+    "fetchedAt": "2026-06-17T18:02:34.450Z",
+    "pedidoId": 860387758,
+    "erpOrderId": "TINY-860387758",
+    "numeroPedido": 207755,
+    "situacao": 0,
+    "situacaoLabel": "Aberta",
+    "formaEnvioNome": "Mercado Envios",
+    "diagnostico": "FORA_EXPEDICAO",
+    "resumoTesteAnterior": {
+      "pedidoId": 860387758,
+      "erpOrderId": "TINY-860387758",
+      "numeroPedido": 207755,
+      "situacao": 0,
+      "situacaoLabel": "Aberta",
+      "formaEnvioNome": "Mercado Envios",
+      "codigoRastreamento": null,
+      "idNotaFiscal": null,
+      "naExpedicao": false,
+      "expedicao": null,
+      "etiquetas": {
+        "urls": [],
+        "marketplaceError": null,
+        "diagnostico": "FORA_EXPEDICAO"
+      }
+    }
+  },
+  "pedido": {
+    "rotas": {
+      "GET /pedidos/860387758": {
+        "rota": "GET /pedidos/860387758",
+        "params": {
+          "idPedido": 860387758
+        },
+        "ok": true,
+        "urls": [],
+        "resposta": {
+          "id": 860387758,
+          "numeroPedido": 207755,
+          "idNotaFiscal": 0,
+          "dataFaturamento": "",
+          "valorTotalProdutos": 50.91,
+          "valorTotalPedido": 50.91,
+          "listaPreco": {
+            "id": 0,
+            "nome": "Padrão",
+            "acrescimoDesconto": 0
+          },
+          "cliente": {
+            "nome": "Carlos Alberto Progianti",
+            "codigo": "",
+            "fantasia": "",
+            "tipoPessoa": "F",
+            "cpfCnpj": "055.576.488-52",
+            "inscricaoEstadual": "",
+            "rg": "",
+            "telefone": "",
+            "celular": "",
+            "email": "",
+            "endereco": {
+              "endereco": "Rua Navona",
+              "numero": "SN",
+              "complemento": "conhecido como condomínio Azzure",
+              "bairro": "Residencial Vila Verde",
+              "municipio": "Itupeva",
+              "cep": "13.296-638",
+              "uf": "SP",
+              "pais": "Brasil"
+            },
+            "id": 766610643
+          },
+          "enderecoEntrega": {
+            "endereco": "Rua Navona",
+            "numero": "SN",
+            "complemento": "quadra C , lote oito Referencia: conhecido como condominio Azzure",
+            "bairro": "Residencial Vila Verde",
+            "municipio": "Itupeva",
+            "cep": "13.296-638",
+            "uf": "SP",
+            "pais": "Brasil",
+            "nomeDestinatario": "Carlos Alberto Progianti",
+            "cpfCnpj": "055.576.488-52",
+            "tipoPessoa": "F",
+            "telefone": "",
+            "inscricaoEstadual": ""
+          },
+          "ecommerce": {
+            "id": 4751,
+            "nome": "Mercado Livre Mamute",
+            "numeroPedidoEcommerce": "2000016987881278",
+            "numeroPedidoCanalVenda": "",
+            "canalVenda": ""
+          },
+          "transportador": {
+            "id": 0,
+            "nome": "",
+            "fretePorConta": "R",
+            "formaEnvio": {
+              "id": 744061814,
+              "nome": "Mercado Envios"
+            },
+            "formaFrete": null,
+            "codigoRastreamento": "",
+            "urlRastreamento": ""
+          },
+          "deposito": null,
+          "vendedor": null,
+          "naturezaOperacao": {
+            "id": 775374075,
+            "nome": "Venda de Mercadorias - Regime normal"
+          },
+          "intermediador": {
+            "id": 381,
+            "nome": "624895842",
+            "cnpj": "03.007.331/0001-41",
+            "cnpjPagamentoInstituicao": ""
+          },
+          "pagamento": null,
+          "itens": [
+            {
+              "produto": {
+                "id": 744037712,
+                "sku": "PUXPON2035ROMA35PRF",
+                "descricao": "PUXADOR PZ 2035 ROMA 35MM - Preto Fosco",
+                "tipo": "P"
+              },
+              "quantidade": 5,
+              "valorUnitario": 10.182,
+              "infoAdicional": ""
+            }
+          ],
+          "pagamentosIntegrados": [
+            {
+              "valor": 50.91,
+              "tipoPagamento": 99,
+              "cnpjIntermediador": "03007331000141",
+              "codigoAutorizacao": "PIXE18236120202606171752s064b1f82e4",
+              "codigoBandeira": 99
+            }
+          ],
+          "situacao": 0,
+          "data": "2026-06-17",
+          "dataEntrega": "",
+          "numeroOrdemCompra": "2000016987881278",
+          "valorDesconto": 0,
+          "valorFrete": 0,
+          "valorOutrasDespesas": 0,
+          "dataPrevista": "2026-06-20",
+          "dataEnvio": "",
+          "observacoes": "Endereço:  conhecido como condomínio Azzure",
+          "observacoesInternas": "",
+          "origemPedido": 0
+        }
+      },
+      "GET /pedidos/860387758/marcadores": {
+        "rota": "GET /pedidos/860387758/marcadores",
+        "params": {
+          "idPedido": 860387758
+        },
+        "ok": true,
+        "urls": [],
+        "resposta": [
+          {
+            "descricao": "MercadoEnvios Coleta"
+          },
+          {
+            "descricao": "Etiqueta com data programada"
+          }
+        ]
+      }
+    }
+  },
+  "nota": {
+    "idNotaFiscal": null,
+    "rotas": {}
+  },
+  "formaEnvio": {
+    "idFormaEnvio": 744061814,
+    "rotas": {
+      "GET /formas-envio/744061814": {
+        "rota": "GET /formas-envio/744061814",
+        "params": {
+          "idFormaEnvio": 744061814
+        },
+        "ok": true,
+        "urls": [],
+        "resposta": {
+          "nome": "Mercado Envios",
+          "tipo": "3",
+          "situacao": "1",
+          "id": 744061814,
+          "gatewayLogistico": null,
+          "formasFrete": [
+            {
+              "id": 760093007,
+              "nome": "Coleta Normal",
+              "codigo": "101",
+              "codigoExterno": "",
+              "tipoEntrega": "0"
+            },
+            {
+              "id": 760093008,
+              "nome": "Coleta Express",
+              "codigo": "102",
+              "codigoExterno": "",
+              "tipoEntrega": "0"
+            },
+            {
+              "id": 760093009,
+              "nome": "Coleta Express",
+              "codigo": "103",
+              "codigoExterno": "",
+              "tipoEntrega": "0"
+            },
+            {
+              "id": 760093010,
+              "nome": "Coleta Correios PAC Agência",
+              "codigo": "1051",
+              "codigoExterno": "",
+              "tipoEntrega": "0"
+            },
+            {
+              "id": 760093011,
+              "nome": "Coleta Correios Sedex Agência",
+              "codigo": "1061",
+              "codigoExterno": "",
+              "tipoEntrega": "0"
+            },
+            {
+              "id": 760093012,
+              "nome": "Shipping Network Fast",
+              "codigo": "155413",
+              "codigoExterno": "",
+              "tipoEntrega": "0"
+            },
+            {
+              "id": 760093013,
+              "nome": "Shipping Network Fast",
+              "codigo": "165366",
+              "codigoExterno": "",
+              "tipoEntrega": "0"
+            },
+            {
+              "id": 760093014,
+              "nome": "Coleta Normal",
+              "codigo": "101",
+              "codigoExterno": "",
+              "tipoEntrega": "0"
+            },
+            {
+              "id": 760093015,
+              "nome": "Coleta Express",
+              "codigo": "102",
+              "codigoExterno": "",
+              "tipoEntrega": "0"
+            },
+            {
+              "id": 760093016,
+              "nome": "Coleta Express",
+              "codigo": "103",
+              "codigoExterno": "",
+              "tipoEntrega": "0"
+            },
+            {
+              "id": 760093017,
+              "nome": "Coleta Correios PAC Agência",
+              "codigo": "1051",
+              "codigoExterno": "",
+              "tipoEntrega": "0"
+            },
+            {
+              "id": 760093018,
+              "nome": "Coleta Correios Sedex Agência",
+              "codigo": "1061",
+              "codigoExterno": "",
+              "tipoEntrega": "0"
+            },
+            {
+              "id": 760093020,
+              "nome": "Shipping Network Fast",
+              "codigo": "155413",
+              "codigoExterno": "",
+              "tipoEntrega": "0"
+            },
+            {
+              "id": 760093021,
+              "nome": "Shipping Network Fast",
+              "codigo": "165366",
+              "codigoExterno": "",
+              "tipoEntrega": "0"
+            },
+            {
+              "id": 760093022,
+              "nome": "Mercadoenvios Next Day",
+              "codigo": "991",
+              "codigoExterno": "",
+              "tipoEntrega": "0"
+            }
+          ]
+        }
+      }
+    }
+  },
+  "expedicao": {
+    "encontrada": false,
+    "match": null,
+    "rotas": {}
+  },
+  "etiquetas": {
+    "urls": [],
+    "rotas": {}
+  }
+}

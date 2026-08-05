@@ -1,0 +1,523 @@
+{
+  "fetchedAt": "2026-06-23T16:10:21.975Z",
+  "tenant": "Default",
+  "pedidos": [
+    {
+      "pedidoId": 860301754,
+      "erpOrderId": "TINY-860301754",
+      "GET /pedidos/{id}": {
+        "resposta": {
+          "id": 860301754,
+          "numeroPedido": 206936,
+          "idNotaFiscal": 860301759,
+          "dataFaturamento": "2026-06-11",
+          "valorTotalProdutos": 40.25,
+          "valorTotalPedido": 40.25,
+          "listaPreco": {
+            "id": 0,
+            "nome": "Padrão",
+            "acrescimoDesconto": 0
+          },
+          "cliente": {
+            "nome": "Jaqueline Mello Sampaio",
+            "codigo": "",
+            "fantasia": "",
+            "tipoPessoa": "F",
+            "cpfCnpj": "019.317.357-35",
+            "inscricaoEstadual": "",
+            "rg": "",
+            "telefone": "",
+            "celular": "",
+            "email": "",
+            "endereco": {
+              "endereco": "Rua Mirataia",
+              "numero": "245",
+              "complemento": "Condomínio Reserva Mirataia I",
+              "bairro": "Pechincha",
+              "municipio": "Rio de Janeiro",
+              "cep": "22.770-190",
+              "uf": "RJ",
+              "pais": "Brasil"
+            },
+            "id": 766882840
+          },
+          "enderecoEntrega": {
+            "endereco": "Rua Mirataia",
+            "numero": "245",
+            "complemento": "Bloco 3 Apt 612 Referencia: Condomínio Reserva Mirataia I",
+            "bairro": "Pechincha",
+            "municipio": "Rio de Janeiro",
+            "cep": "22.770-190",
+            "uf": "RJ",
+            "pais": "Brasil",
+            "nomeDestinatario": "Jackie Sampaio",
+            "cpfCnpj": "019.317.357-35",
+            "tipoPessoa": "F",
+            "telefone": "",
+            "inscricaoEstadual": ""
+          },
+          "ecommerce": {
+            "id": 4751,
+            "nome": "Mercado Livre Mamute",
+            "numeroPedidoEcommerce": "2000013475962589",
+            "numeroPedidoCanalVenda": "",
+            "canalVenda": ""
+          },
+          "transportador": {
+            "id": 0,
+            "nome": "",
+            "fretePorConta": "R",
+            "formaEnvio": {
+              "id": 744061814,
+              "nome": "Mercado Envios"
+            },
+            "formaFrete": null,
+            "codigoRastreamento": "",
+            "urlRastreamento": ""
+          },
+          "deposito": null,
+          "vendedor": null,
+          "naturezaOperacao": {
+            "id": 775374075,
+            "nome": "Venda de Mercadorias - Regime normal"
+          },
+          "intermediador": {
+            "id": 381,
+            "nome": "624895842",
+            "cnpj": "03.007.331/0001-41",
+            "cnpjPagamentoInstituicao": ""
+          },
+          "pagamento": null,
+          "itens": [
+            {
+              "produto": {
+                "id": 744040747,
+                "sku": "PUXFRA160CRF",
+                "descricao": "PUXADOR ALUMINIO FRAME 160MM - Cromado Fosco",
+                "tipo": "P"
+              },
+              "quantidade": 5,
+              "valorUnitario": 8.05,
+              "infoAdicional": ""
+            }
+          ],
+          "pagamentosIntegrados": [
+            {
+              "valor": 40.25,
+              "tipoPagamento": 99,
+              "cnpjIntermediador": "03007331000141",
+              "codigoAutorizacao": "",
+              "codigoBandeira": 99
+            }
+          ],
+          "situacao": 6,
+          "data": "2026-06-11",
+          "dataEntrega": "2026-06-14",
+          "numeroOrdemCompra": "2000013475962589",
+          "valorDesconto": 0,
+          "valorFrete": 0,
+          "valorOutrasDespesas": 0,
+          "dataPrevista": "2026-06-14",
+          "dataEnvio": "2026-06-13 03:33:57",
+          "observacoes": "Endereço:  Condomínio Reserva Mirataia I",
+          "observacoesInternas": "",
+          "origemPedido": 0
+        }
+      },
+      "expedicao": {
+        "idAgrupamento": 746503742,
+        "idExpedicao": 749882106,
+        "formaEnvioNome": "Mercado Envios",
+        "pedidoId": 860301754,
+        "idNotaFiscal": 860301759
+      },
+      "GET /expedicao/{idAgrupamento}": {
+        "resposta": {
+          "id": 746503742,
+          "identificacao": "3182",
+          "data": "2026-06-12",
+          "formaEnvio": {
+            "id": 744061814,
+            "nome": "Mercado Envios"
+          },
+          "expedicoes": [
+            {
+              "id": 749882106,
+              "data": "2026-06-11",
+              "situacao": "1",
+              "tipoObjeto": "notafiscal",
+              "idObjeto": 860301759,
+              "dataEmissao": "2026-06-11",
+              "venda": {
+                "id": 860301754,
+                "numero": 206936,
+                "data": "2026-06-11",
+                "situacao": 6
+              },
+              "notaFiscal": {
+                "id": 860301759,
+                "numero": 155886,
+                "data": "2026-06-11",
+                "situacao": 6
+              },
+              "destinatario": {
+                "nome": "Jaqueline Mello Sampaio",
+                "codigo": "",
+                "fantasia": "",
+                "tipoPessoa": "F",
+                "cpfCnpj": "019.317.357-35",
+                "inscricaoEstadual": "",
+                "rg": "",
+                "telefone": "",
+                "celular": "",
+                "email": "",
+                "endereco": {
+                  "endereco": "Rua Mirataia",
+                  "numero": "245",
+                  "complemento": "Condomínio Reserva Mirataia I",
+                  "bairro": "Pechincha",
+                  "municipio": "Rio de Janeiro",
+                  "cep": "22.770-190",
+                  "uf": "RJ",
+                  "pais": "Brasil"
+                },
+                "id": 766882840
+              },
+              "volume": {
+                "embalagem": {
+                  "id": 718341450,
+                  "tipo": 2,
+                  "descricao": "Embalagem Loja Integrada"
+                },
+                "largura": 16.3,
+                "altura": 7,
+                "comprimento": 19,
+                "diametro": 0,
+                "pesoBruto": 0.19,
+                "quantidadeVolumes": 1
+              },
+              "logistica": {
+                "codigoRastreio": "",
+                "urlRastreio": "",
+                "possuiValorDeclarado": true,
+                "valorDeclarado": 0,
+                "possuiAvisoRecebimento": true,
+                "formaFrete": null,
+                "transportador": null
+              }
+            }
+          ]
+        }
+      },
+      "etiquetas": {
+        "GET /expedicao/{idAgrupamento}/etiquetas": {
+          "resposta": {
+            "erro": true,
+            "mensagem": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Não foi possível obter as etiquetas dos seguintes pedidos: S47281733718",
+            "statusCode": 400
+          }
+        },
+        "GET /expedicao/{idAgrupamento}/expedicao/{idExpedicao}/etiquetas": {
+          "resposta": {
+            "erro": true,
+            "mensagem": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Não foi possível obter as etiquetas dos seguintes pedidos: S47281733718",
+            "statusCode": 400
+          }
+        },
+        "urls": [],
+        "marketplaceError": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Não foi possível obter as etiquetas dos seguintes pedidos: S47281733718"
+      }
+    },
+    {
+      "pedidoId": 860342783,
+      "erpOrderId": "TINY-860342783",
+      "GET /pedidos/{id}": {
+        "resposta": {
+          "id": 860342783,
+          "numeroPedido": 207368,
+          "idNotaFiscal": 860342789,
+          "dataFaturamento": "2026-06-15",
+          "valorTotalProdutos": 95.6,
+          "valorTotalPedido": 95.6,
+          "listaPreco": {
+            "id": 0,
+            "nome": "Padrão",
+            "acrescimoDesconto": 0
+          },
+          "cliente": {
+            "nome": "Rafael de Souza Ferragut",
+            "codigo": "",
+            "fantasia": "",
+            "tipoPessoa": "F",
+            "cpfCnpj": "298.984.068-01",
+            "inscricaoEstadual": "",
+            "rg": "",
+            "telefone": "",
+            "celular": "",
+            "email": "",
+            "endereco": {
+              "endereco": "Rua Nair Prado da costa",
+              "numero": "20",
+              "complemento": "Swiss Park",
+              "bairro": "Swiss Park",
+              "municipio": "Campinas",
+              "cep": "13.049-586",
+              "uf": "SP",
+              "pais": "Brasil"
+            },
+            "id": 766886338
+          },
+          "enderecoEntrega": {
+            "endereco": "Rua Nair Prado da Costa- LUZERN",
+            "numero": "20",
+            "complemento": "Swiss Park",
+            "bairro": "Swiss Park",
+            "municipio": "Campinas",
+            "cep": "13.049-586",
+            "uf": "SP",
+            "pais": "Brasil",
+            "nomeDestinatario": "Rafael Ferragut",
+            "cpfCnpj": "298.984.068-01",
+            "tipoPessoa": "F",
+            "telefone": "(11) 7532-6106",
+            "inscricaoEstadual": ""
+          },
+          "ecommerce": {
+            "id": 7237,
+            "nome": "Amazon",
+            "numeroPedidoEcommerce": "702-1074609-6390604",
+            "numeroPedidoCanalVenda": "",
+            "canalVenda": ""
+          },
+          "transportador": {
+            "id": 0,
+            "nome": "",
+            "fretePorConta": "R",
+            "formaEnvio": {
+              "id": 758095424,
+              "nome": "Amazon DBA"
+            },
+            "formaFrete": null,
+            "codigoRastreamento": "",
+            "urlRastreamento": ""
+          },
+          "deposito": null,
+          "vendedor": null,
+          "naturezaOperacao": {
+            "id": 775374075,
+            "nome": "Venda de Mercadorias - Regime normal"
+          },
+          "intermediador": {
+            "id": 385,
+            "nome": "Loja Carbi oficial",
+            "cnpj": "15.436.940/0001-03",
+            "cnpjPagamentoInstituicao": ""
+          },
+          "pagamento": null,
+          "itens": [
+            {
+              "produto": {
+                "id": 744041743,
+                "sku": "PUXFLY256CRF",
+                "descricao": "PUXADOR ALUMINIO FLY 256MM - Cromado Fosco",
+                "tipo": "P"
+              },
+              "quantidade": 4,
+              "valorUnitario": 23.9,
+              "infoAdicional": ""
+            }
+          ],
+          "pagamentosIntegrados": [
+            {
+              "valor": 95.6,
+              "tipoPagamento": 99,
+              "cnpjIntermediador": "15436940000103",
+              "codigoAutorizacao": "",
+              "codigoBandeira": 99
+            }
+          ],
+          "situacao": 5,
+          "data": "2026-06-15",
+          "dataEntrega": "",
+          "numeroOrdemCompra": "702-1074609-6390604",
+          "valorDesconto": 0,
+          "valorFrete": 0,
+          "valorOutrasDespesas": 0,
+          "dataPrevista": "2026-06-18",
+          "dataEnvio": "2026-06-15 10:44:27",
+          "observacoes": "",
+          "observacoesInternas": "",
+          "origemPedido": 0
+        }
+      },
+      "expedicao": {
+        "idAgrupamento": 746503773,
+        "idExpedicao": 749884319,
+        "formaEnvioNome": "Amazon DBA",
+        "pedidoId": 860342783,
+        "idNotaFiscal": 860342789
+      },
+      "GET /expedicao/{idAgrupamento}": {
+        "resposta": {
+          "id": 746503773,
+          "identificacao": "3185",
+          "data": "2026-06-15",
+          "formaEnvio": {
+            "id": 758095424,
+            "nome": "Amazon DBA"
+          },
+          "expedicoes": [
+            {
+              "id": 749884319,
+              "data": "2026-06-15",
+              "situacao": "1",
+              "tipoObjeto": "notafiscal",
+              "idObjeto": 860342789,
+              "dataEmissao": "2026-06-15",
+              "venda": {
+                "id": 860342783,
+                "numero": 207368,
+                "data": "2026-06-15",
+                "situacao": 5
+              },
+              "notaFiscal": {
+                "id": 860342789,
+                "numero": 156180,
+                "data": "2026-06-15",
+                "situacao": 7
+              },
+              "destinatario": {
+                "nome": "Rafael de Souza Ferragut",
+                "codigo": "",
+                "fantasia": "",
+                "tipoPessoa": "F",
+                "cpfCnpj": "298.984.068-01",
+                "inscricaoEstadual": "",
+                "rg": "",
+                "telefone": "",
+                "celular": "",
+                "email": "",
+                "endereco": {
+                  "endereco": "Rua Nair Prado da costa",
+                  "numero": "20",
+                  "complemento": "Swiss Park",
+                  "bairro": "Swiss Park",
+                  "municipio": "Campinas",
+                  "cep": "13.049-586",
+                  "uf": "SP",
+                  "pais": "Brasil"
+                },
+                "id": 766886338
+              },
+              "volume": {
+                "embalagem": {
+                  "id": 718341450,
+                  "tipo": 2,
+                  "descricao": "Embalagem Loja Integrada"
+                },
+                "largura": 16.3,
+                "altura": 7,
+                "comprimento": 19,
+                "diametro": 0,
+                "pesoBruto": 0.164,
+                "quantidadeVolumes": 1
+              },
+              "logistica": {
+                "codigoRastreio": "",
+                "urlRastreio": "",
+                "possuiValorDeclarado": true,
+                "valorDeclarado": 0,
+                "possuiAvisoRecebimento": true,
+                "formaFrete": null,
+                "transportador": null
+              }
+            },
+            {
+              "id": 749884373,
+              "data": "2026-06-15",
+              "situacao": "1",
+              "tipoObjeto": "notafiscal",
+              "idObjeto": 860344031,
+              "dataEmissao": "2026-06-15",
+              "venda": {
+                "id": 860344011,
+                "numero": 207373,
+                "data": "2026-06-15",
+                "situacao": 5
+              },
+              "notaFiscal": {
+                "id": 860344031,
+                "numero": 156182,
+                "data": "2026-06-15",
+                "situacao": 7
+              },
+              "destinatario": {
+                "nome": "Erivelto Paulo dos Santos",
+                "codigo": "",
+                "fantasia": "",
+                "tipoPessoa": "F",
+                "cpfCnpj": "138.195.648-37",
+                "inscricaoEstadual": "",
+                "rg": "",
+                "telefone": "(19) 99797-2434",
+                "celular": "",
+                "email": "65kybk4clht8xsw@marketplace.amazon.com.br",
+                "endereco": {
+                  "endereco": "Rua Cardeal Arcoverde",
+                  "numero": "188",
+                  "complemento": "Casa",
+                  "bairro": "Caminhos de San Conrado (Sousa",
+                  "municipio": "Campinas",
+                  "cep": "13.104-072",
+                  "uf": "SP",
+                  "pais": "Brasil"
+                },
+                "id": 766889803
+              },
+              "volume": {
+                "embalagem": {
+                  "id": 718341450,
+                  "tipo": 2,
+                  "descricao": "Embalagem Loja Integrada"
+                },
+                "largura": 16.3,
+                "altura": 7,
+                "comprimento": 19,
+                "diametro": 0,
+                "pesoBruto": 0.08,
+                "quantidadeVolumes": 1
+              },
+              "logistica": {
+                "codigoRastreio": "",
+                "urlRastreio": "",
+                "possuiValorDeclarado": true,
+                "valorDeclarado": 0,
+                "possuiAvisoRecebimento": true,
+                "formaFrete": null,
+                "transportador": null
+              }
+            }
+          ]
+        }
+      },
+      "etiquetas": {
+        "GET /expedicao/{idAgrupamento}/etiquetas": {
+          "resposta": {
+            "erro": true,
+            "mensagem": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Url das etiquetas não encontrada na Amazon.",
+            "statusCode": 400
+          }
+        },
+        "GET /expedicao/{idAgrupamento}/expedicao/{idExpedicao}/etiquetas": {
+          "resposta": {
+            "erro": true,
+            "mensagem": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Url das etiquetas não encontrada na Amazon.",
+            "statusCode": 400
+          }
+        },
+        "urls": [],
+        "marketplaceError": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Url das etiquetas não encontrada na Amazon."
+      }
+    }
+  ]
+}

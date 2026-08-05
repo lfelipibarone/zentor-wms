@@ -8,6 +8,8 @@ dist
 .env
 .env.*
 !.env.example
+docs/postman/*.local.postman_environment.json
+docs/postman/*.pronto.postman_collection.json
 coverage
 .DS_Store
 Thumbs.db

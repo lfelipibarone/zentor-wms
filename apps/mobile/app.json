@@ -17,7 +17,9 @@
       "adaptiveIcon": {
         "backgroundColor": "#0B0F14"
       },
-      "permissions": ["android.permission.CAMERA"]
+      "permissions": [
+        "android.permission.CAMERA"
+      ]
     },
     "plugins": [
       "expo-router",
@@ -26,7 +28,8 @@
         {
           "cameraPermission": "Permitir acesso à câmera para leitura de códigos de barras."
         }
-      ]
+      ],
+      "expo-secure-store"
     ],
     "experiments": {
       "typedRoutes": true

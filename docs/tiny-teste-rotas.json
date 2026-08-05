@@ -1,6 +1,6 @@
 {
-  "fetchedAt": "2026-06-12T15:20:43.479Z",
-  "tenantId": "cmpyd0fs10000uvq47gv8e9fz",
+  "fetchedAt": "2026-06-12T20:19:17.510Z",
+  "tenantId": "cmqbcvpxj0000uy586ja1m5mz",
   "limite": 4,
   "rotas": {
     "GET /formas-envio": {
@@ -37,7 +37,7 @@
       "paginacao": {
         "limit": 4,
         "offset": 0,
-        "total": 16
+        "total": 18
       }
     },
     "GET /formas-envio/{idFormaEnvio}": [
@@ -223,13 +223,13 @@
     "GET /expedicao": {
       "itens": [
         {
-          "id": 746503719,
-          "identificacao": "3181",
+          "id": 746503742,
+          "identificacao": "3182",
           "data": "2026-06-12",
           "quantidadeObjetos": 0,
           "formaEnvio": {
-            "id": 758095424,
-            "nome": "Amazon DBA"
+            "id": 744061814,
+            "nome": "Mercado Envios"
           }
         },
         {
@@ -243,8 +243,8 @@
           }
         },
         {
-          "id": 746503703,
-          "identificacao": "3180",
+          "id": 746503719,
+          "identificacao": "3181",
           "data": "2026-06-12",
           "quantidadeObjetos": 0,
           "formaEnvio": {
@@ -266,380 +266,72 @@
       "paginacao": {
         "limit": 4,
         "offset": 0,
-        "total": 2987
+        "total": 2988
       }
     },
     "GET /expedicao/{idAgrupamento}": [
       {
-        "id": 746503719,
+        "id": 746503742,
         "listagem": {
-          "id": 746503719,
-          "identificacao": "3181",
+          "id": 746503742,
+          "identificacao": "3182",
           "data": "2026-06-12",
           "quantidadeObjetos": 0,
           "formaEnvio": {
-            "id": 758095424,
-            "nome": "Amazon DBA"
+            "id": 744061814,
+            "nome": "Mercado Envios"
           }
         },
         "resposta": {
-          "id": 746503719,
-          "identificacao": "3181",
+          "id": 746503742,
+          "identificacao": "3182",
           "data": "2026-06-12",
           "formaEnvio": {
-            "id": 758095424,
-            "nome": "Amazon DBA"
+            "id": 744061814,
+            "nome": "Mercado Envios"
           },
           "expedicoes": [
             {
-              "id": 749882504,
-              "data": "2026-06-12",
-              "situacao": "1",
-              "tipoObjeto": "notafiscal",
-              "idObjeto": 860308654,
-              "dataEmissao": "2026-06-12",
-              "venda": {
-                "id": 860308622,
-                "numero": 206989,
-                "data": "2026-06-12",
-                "situacao": 5
-              },
-              "notaFiscal": {
-                "id": 860308654,
-                "numero": 155924,
-                "data": "2026-06-12",
-                "situacao": 7
-              },
-              "destinatario": {
-                "nome": "Josiel Rodrigues Martins Neto",
-                "codigo": "",
-                "fantasia": "",
-                "tipoPessoa": "F",
-                "cpfCnpj": "003.650.672-96",
-                "inscricaoEstadual": "",
-                "rg": "",
-                "telefone": "(91) 98408-3065",
-                "celular": "",
-                "email": "3s782xbl2lsgjy5@marketplace.amazon.com.br",
-                "endereco": {
-                  "endereco": "Travessa Apinagés",
-                  "numero": "708",
-                  "complemento": "Felicita, 2401",
-                  "bairro": "Batista Campos",
-                  "municipio": "Belém",
-                  "cep": "66.033-264",
-                  "uf": "PA",
-                  "pais": "Brasil"
-                },
-                "id": 766883824
-              },
-              "volume": {
-                "embalagem": {
-                  "id": 718341450,
-                  "tipo": 2,
-                  "descricao": "Embalagem Loja Integrada"
-                },
-                "largura": 16.3,
-                "altura": 7,
-                "comprimento": 19,
-                "diametro": 0,
-                "pesoBruto": 0.216,
-                "quantidadeVolumes": 1
-              },
-              "logistica": {
-                "codigoRastreio": "",
-                "urlRastreio": "",
-                "possuiValorDeclarado": true,
-                "valorDeclarado": 0,
-                "possuiAvisoRecebimento": true,
-                "formaFrete": null,
-                "transportador": null
-              }
-            },
-            {
-              "id": 749882559,
-              "data": "2026-06-12",
-              "situacao": "1",
-              "tipoObjeto": "notafiscal",
-              "idObjeto": 860309505,
-              "dataEmissao": "2026-06-12",
-              "venda": {
-                "id": 860309480,
-                "numero": 206997,
-                "data": "2026-06-12",
-                "situacao": 5
-              },
-              "notaFiscal": {
-                "id": 860309505,
-                "numero": 155927,
-                "data": "2026-06-12",
-                "situacao": 7
-              },
-              "destinatario": {
-                "nome": "Fabiana",
-                "codigo": "",
-                "fantasia": "",
-                "tipoPessoa": "F",
-                "cpfCnpj": "281.827.188-64",
-                "inscricaoEstadual": "",
-                "rg": "",
-                "telefone": "(11) 2345-6362",
-                "celular": "",
-                "email": "23nmmwgdtq6q66p@marketplace.amazon.com.br",
-                "endereco": {
-                  "endereco": "Rua Pedro de Godói",
-                  "numero": "269",
-                  "complemento": "Apto174 d",
-                  "bairro": "Parque da Vila Prudente",
-                  "municipio": "São Paulo",
-                  "cep": "03.138-010",
-                  "uf": "SP",
-                  "pais": "Brasil"
-                },
-                "id": 766883890
-              },
-              "volume": {
-                "embalagem": {
-                  "id": 718341450,
-                  "tipo": 2,
-                  "descricao": "Embalagem Loja Integrada"
-                },
-                "largura": 16.3,
-                "altura": 7,
-                "comprimento": 19,
-                "diametro": 0,
-                "pesoBruto": 0.148,
-                "quantidadeVolumes": 1
-              },
-              "logistica": {
-                "codigoRastreio": "",
-                "urlRastreio": "",
-                "possuiValorDeclarado": true,
-                "valorDeclarado": 0,
-                "possuiAvisoRecebimento": true,
-                "formaFrete": null,
-                "transportador": null
-              }
-            }
-          ]
-        }
-      },
-      {
-        "id": 746503719,
-        "listagem": {
-          "id": 746503719,
-          "identificacao": "3181",
-          "data": "2026-06-12",
-          "quantidadeObjetos": 0,
-          "formaEnvio": {
-            "id": 758095424,
-            "nome": "Amazon DBA"
-          }
-        },
-        "resposta": {
-          "id": 746503719,
-          "identificacao": "3181",
-          "data": "2026-06-12",
-          "formaEnvio": {
-            "id": 758095424,
-            "nome": "Amazon DBA"
-          },
-          "expedicoes": [
-            {
-              "id": 749882504,
-              "data": "2026-06-12",
-              "situacao": "1",
-              "tipoObjeto": "notafiscal",
-              "idObjeto": 860308654,
-              "dataEmissao": "2026-06-12",
-              "venda": {
-                "id": 860308622,
-                "numero": 206989,
-                "data": "2026-06-12",
-                "situacao": 5
-              },
-              "notaFiscal": {
-                "id": 860308654,
-                "numero": 155924,
-                "data": "2026-06-12",
-                "situacao": 7
-              },
-              "destinatario": {
-                "nome": "Josiel Rodrigues Martins Neto",
-                "codigo": "",
-                "fantasia": "",
-                "tipoPessoa": "F",
-                "cpfCnpj": "003.650.672-96",
-                "inscricaoEstadual": "",
-                "rg": "",
-                "telefone": "(91) 98408-3065",
-                "celular": "",
-                "email": "3s782xbl2lsgjy5@marketplace.amazon.com.br",
-                "endereco": {
-                  "endereco": "Travessa Apinagés",
-                  "numero": "708",
-                  "complemento": "Felicita, 2401",
-                  "bairro": "Batista Campos",
-                  "municipio": "Belém",
-                  "cep": "66.033-264",
-                  "uf": "PA",
-                  "pais": "Brasil"
-                },
-                "id": 766883824
-              },
-              "volume": {
-                "embalagem": {
-                  "id": 718341450,
-                  "tipo": 2,
-                  "descricao": "Embalagem Loja Integrada"
-                },
-                "largura": 16.3,
-                "altura": 7,
-                "comprimento": 19,
-                "diametro": 0,
-                "pesoBruto": 0.216,
-                "quantidadeVolumes": 1
-              },
-              "logistica": {
-                "codigoRastreio": "",
-                "urlRastreio": "",
-                "possuiValorDeclarado": true,
-                "valorDeclarado": 0,
-                "possuiAvisoRecebimento": true,
-                "formaFrete": null,
-                "transportador": null
-              }
-            },
-            {
-              "id": 749882559,
-              "data": "2026-06-12",
-              "situacao": "1",
-              "tipoObjeto": "notafiscal",
-              "idObjeto": 860309505,
-              "dataEmissao": "2026-06-12",
-              "venda": {
-                "id": 860309480,
-                "numero": 206997,
-                "data": "2026-06-12",
-                "situacao": 5
-              },
-              "notaFiscal": {
-                "id": 860309505,
-                "numero": 155927,
-                "data": "2026-06-12",
-                "situacao": 7
-              },
-              "destinatario": {
-                "nome": "Fabiana",
-                "codigo": "",
-                "fantasia": "",
-                "tipoPessoa": "F",
-                "cpfCnpj": "281.827.188-64",
-                "inscricaoEstadual": "",
-                "rg": "",
-                "telefone": "(11) 2345-6362",
-                "celular": "",
-                "email": "23nmmwgdtq6q66p@marketplace.amazon.com.br",
-                "endereco": {
-                  "endereco": "Rua Pedro de Godói",
-                  "numero": "269",
-                  "complemento": "Apto174 d",
-                  "bairro": "Parque da Vila Prudente",
-                  "municipio": "São Paulo",
-                  "cep": "03.138-010",
-                  "uf": "SP",
-                  "pais": "Brasil"
-                },
-                "id": 766883890
-              },
-              "volume": {
-                "embalagem": {
-                  "id": 718341450,
-                  "tipo": 2,
-                  "descricao": "Embalagem Loja Integrada"
-                },
-                "largura": 16.3,
-                "altura": 7,
-                "comprimento": 19,
-                "diametro": 0,
-                "pesoBruto": 0.148,
-                "quantidadeVolumes": 1
-              },
-              "logistica": {
-                "codigoRastreio": "",
-                "urlRastreio": "",
-                "possuiValorDeclarado": true,
-                "valorDeclarado": 0,
-                "possuiAvisoRecebimento": true,
-                "formaFrete": null,
-                "transportador": null
-              }
-            }
-          ]
-        }
-      },
-      {
-        "id": 746503703,
-        "listagem": {
-          "id": 746503703,
-          "identificacao": "3180",
-          "data": "2026-06-12",
-          "quantidadeObjetos": 0,
-          "formaEnvio": {
-            "id": 758095424,
-            "nome": "Amazon DBA"
-          }
-        },
-        "resposta": {
-          "id": 746503703,
-          "identificacao": "3180",
-          "data": "2026-06-12",
-          "formaEnvio": {
-            "id": 758095424,
-            "nome": "Amazon DBA"
-          },
-          "expedicoes": [
-            {
-              "id": 749881546,
+              "id": 749882106,
               "data": "2026-06-11",
               "situacao": "1",
               "tipoObjeto": "notafiscal",
-              "idObjeto": 860280851,
+              "idObjeto": 860301759,
               "dataEmissao": "2026-06-11",
               "venda": {
-                "id": 860280807,
-                "numero": 206838,
-                "data": "2026-06-11",
-                "situacao": 5
-              },
-              "notaFiscal": {
-                "id": 860280851,
-                "numero": 155742,
+                "id": 860301754,
+                "numero": 206936,
                 "data": "2026-06-11",
                 "situacao": 7
               },
+              "notaFiscal": {
+                "id": 860301759,
+                "numero": 155886,
+                "data": "2026-06-11",
+                "situacao": 6
+              },
               "destinatario": {
-                "nome": "Vanessa Maia Rangel",
+                "nome": "Jaqueline Mello Sampaio",
                 "codigo": "",
                 "fantasia": "",
                 "tipoPessoa": "F",
-                "cpfCnpj": "014.294.837-33",
+                "cpfCnpj": "019.317.357-35",
                 "inscricaoEstadual": "",
                 "rg": "",
-                "telefone": "(21) 99999-7190",
+                "telefone": "",
                 "celular": "",
-                "email": "fpl4r8xjs2wfbps@marketplace.amazon.com.br",
+                "email": "",
                 "endereco": {
-                  "endereco": "Rua Riodades",
-                  "numero": "145",
-                  "complemento": "Bloco 2/408",
-                  "bairro": "Fonseca",
-                  "municipio": "Niterói",
-                  "cep": "24.130-247",
+                  "endereco": "Rua Mirataia",
+                  "numero": "245",
+                  "complemento": "Condomínio Reserva Mirataia I",
+                  "bairro": "Pechincha",
+                  "municipio": "Rio de Janeiro",
+                  "cep": "22.770-190",
                   "uf": "RJ",
                   "pais": "Brasil"
                 },
-                "id": 766881333
+                "id": 766882840
               },
               "volume": {
                 "embalagem": {
@@ -651,7 +343,7 @@
                 "altura": 7,
                 "comprimento": 19,
                 "diametro": 0,
-                "pesoBruto": 0.021,
+                "pesoBruto": 0.19,
                 "quantidadeVolumes": 1
               },
               "logistica": {
@@ -663,385 +355,84 @@
                 "formaFrete": null,
                 "transportador": null
               }
-            },
+            }
+          ]
+        }
+      },
+      {
+        "id": 746503719,
+        "listagem": {
+          "id": 746503719,
+          "identificacao": "3181",
+          "data": "2026-06-12",
+          "quantidadeObjetos": 0,
+          "formaEnvio": {
+            "id": 758095424,
+            "nome": "Amazon DBA"
+          }
+        },
+        "resposta": {
+          "id": 746503719,
+          "identificacao": "3181",
+          "data": "2026-06-12",
+          "formaEnvio": {
+            "id": 758095424,
+            "nome": "Amazon DBA"
+          },
+          "expedicoes": [
             {
-              "id": 749881818,
-              "data": "2026-06-11",
-              "situacao": "1",
-              "tipoObjeto": "notafiscal",
-              "idObjeto": 860284827,
-              "dataEmissao": "2026-06-11",
-              "venda": {
-                "id": 860284778,
-                "numero": 206877,
-                "data": "2026-06-11",
-                "situacao": 5
-              },
-              "notaFiscal": {
-                "id": 860284827,
-                "numero": 155764,
-                "data": "2026-06-11",
-                "situacao": 7
-              },
-              "destinatario": {
-                "nome": "Norival Costa Filho",
-                "codigo": "",
-                "fantasia": "",
-                "tipoPessoa": "F",
-                "cpfCnpj": "226.396.830-04",
-                "inscricaoEstadual": "",
-                "rg": "",
-                "telefone": "(53) 98147-8316",
-                "celular": "",
-                "email": "y10wqyt47p592mg@marketplace.amazon.com.br",
-                "endereco": {
-                  "endereco": "Avenida Tupy Silveira",
-                  "numero": "1752",
-                  "complemento": "Casa",
-                  "bairro": "Centro",
-                  "municipio": "Bagé",
-                  "cep": "96.400-110",
-                  "uf": "RS",
-                  "pais": "Brasil"
-                },
-                "id": 766881988
-              },
-              "volume": {
-                "embalagem": {
-                  "id": 718341450,
-                  "tipo": 2,
-                  "descricao": "Embalagem Loja Integrada"
-                },
-                "largura": 16.3,
-                "altura": 7,
-                "comprimento": 19,
-                "diametro": 0,
-                "pesoBruto": 0.081,
-                "quantidadeVolumes": 1
-              },
-              "logistica": {
-                "codigoRastreio": "",
-                "urlRastreio": "",
-                "possuiValorDeclarado": true,
-                "valorDeclarado": 0,
-                "possuiAvisoRecebimento": true,
-                "formaFrete": null,
-                "transportador": null
-              }
-            },
-            {
-              "id": 749881883,
-              "data": "2026-06-11",
-              "situacao": "1",
-              "tipoObjeto": "notafiscal",
-              "idObjeto": 860286039,
-              "dataEmissao": "2026-06-11",
-              "venda": {
-                "id": 860286006,
-                "numero": 206889,
-                "data": "2026-06-11",
-                "situacao": 5
-              },
-              "notaFiscal": {
-                "id": 860286039,
-                "numero": 155773,
-                "data": "2026-06-11",
-                "situacao": 7
-              },
-              "destinatario": {
-                "nome": "Anderson Trindade da Silva",
-                "codigo": "",
-                "fantasia": "",
-                "tipoPessoa": "F",
-                "cpfCnpj": "385.909.258-89",
-                "inscricaoEstadual": "",
-                "rg": "",
-                "telefone": "(11) 98018-0703",
-                "celular": "",
-                "email": "m3tyd4yxpg3vyz7@marketplace.amazon.com.br",
-                "endereco": {
-                  "endereco": "Rua Jean Borlin",
-                  "numero": "55",
-                  "complemento": "",
-                  "bairro": "Jardim São Roque",
-                  "municipio": "São Paulo",
-                  "cep": "05.736-140",
-                  "uf": "SP",
-                  "pais": "Brasil"
-                },
-                "id": 766882220
-              },
-              "volume": {
-                "embalagem": {
-                  "id": 718341450,
-                  "tipo": 2,
-                  "descricao": "Embalagem Loja Integrada"
-                },
-                "largura": 16.3,
-                "altura": 7,
-                "comprimento": 19,
-                "diametro": 0,
-                "pesoBruto": 0.064,
-                "quantidadeVolumes": 1
-              },
-              "logistica": {
-                "codigoRastreio": "",
-                "urlRastreio": "",
-                "possuiValorDeclarado": true,
-                "valorDeclarado": 0,
-                "possuiAvisoRecebimento": true,
-                "formaFrete": null,
-                "transportador": null
-              }
-            },
-            {
-              "id": 749882109,
-              "data": "2026-06-11",
-              "situacao": "1",
-              "tipoObjeto": "notafiscal",
-              "idObjeto": 860301788,
-              "dataEmissao": "2026-06-11",
-              "venda": {
-                "id": 860286588,
-                "numero": 206892,
-                "data": "2026-06-11",
-                "situacao": 5
-              },
-              "notaFiscal": {
-                "id": 860301788,
-                "numero": 155887,
-                "data": "2026-06-11",
-                "situacao": 7
-              },
-              "destinatario": {
-                "nome": "Guilherme De Melo Faustino",
-                "codigo": "",
-                "fantasia": "",
-                "tipoPessoa": "F",
-                "cpfCnpj": "109.221.526-32",
-                "inscricaoEstadual": "",
-                "rg": "",
-                "telefone": "(31) 97575-0995",
-                "celular": "",
-                "email": "xln5bpr995hl4j0@marketplace.amazon.com.br",
-                "endereco": {
-                  "endereco": "Rua Caiçara",
-                  "numero": "143",
-                  "complemento": "Vila Cristina",
-                  "bairro": "Vila Cristina",
-                  "municipio": "Betim",
-                  "cep": "32.675-880",
-                  "uf": "MG",
-                  "pais": "Brasil"
-                },
-                "id": 766811164
-              },
-              "volume": {
-                "embalagem": {
-                  "id": 718341450,
-                  "tipo": 2,
-                  "descricao": "Embalagem Loja Integrada"
-                },
-                "largura": 16.3,
-                "altura": 7,
-                "comprimento": 19,
-                "diametro": 0,
-                "pesoBruto": 0.512,
-                "quantidadeVolumes": 1
-              },
-              "logistica": {
-                "codigoRastreio": "",
-                "urlRastreio": "",
-                "possuiValorDeclarado": true,
-                "valorDeclarado": 0,
-                "possuiAvisoRecebimento": true,
-                "formaFrete": null,
-                "transportador": null
-              }
-            },
-            {
-              "id": 749882197,
-              "data": "2026-06-11",
-              "situacao": "1",
-              "tipoObjeto": "notafiscal",
-              "idObjeto": 860303368,
-              "dataEmissao": "2026-06-11",
-              "venda": {
-                "id": 860303355,
-                "numero": 206960,
-                "data": "2026-06-11",
-                "situacao": 5
-              },
-              "notaFiscal": {
-                "id": 860303368,
-                "numero": 155903,
-                "data": "2026-06-11",
-                "situacao": 7
-              },
-              "destinatario": {
-                "nome": "Giovanna",
-                "codigo": "",
-                "fantasia": "",
-                "tipoPessoa": "F",
-                "cpfCnpj": "432.920.508-47",
-                "inscricaoEstadual": "",
-                "rg": "",
-                "telefone": "(11) 99260-6085",
-                "celular": "",
-                "email": "63x50k3rbvkbrt3@marketplace.amazon.com.br",
-                "endereco": {
-                  "endereco": "Rua Joaquim Antunes",
-                  "numero": "810",
-                  "complemento": "APT 102",
-                  "bairro": "Pinheiros",
-                  "municipio": "São Paulo",
-                  "cep": "05.415-001",
-                  "uf": "SP",
-                  "pais": "Brasil"
-                },
-                "id": 766883241
-              },
-              "volume": {
-                "embalagem": {
-                  "id": 718341450,
-                  "tipo": 2,
-                  "descricao": "Embalagem Loja Integrada"
-                },
-                "largura": 16.3,
-                "altura": 7,
-                "comprimento": 19,
-                "diametro": 0,
-                "pesoBruto": 0.16,
-                "quantidadeVolumes": 1
-              },
-              "logistica": {
-                "codigoRastreio": "",
-                "urlRastreio": "",
-                "possuiValorDeclarado": true,
-                "valorDeclarado": 0,
-                "possuiAvisoRecebimento": true,
-                "formaFrete": null,
-                "transportador": null
-              }
-            },
-            {
-              "id": 749882215,
-              "data": "2026-06-11",
-              "situacao": "1",
-              "tipoObjeto": "notafiscal",
-              "idObjeto": 860303740,
-              "dataEmissao": "2026-06-11",
-              "venda": {
-                "id": 860303730,
-                "numero": 206967,
-                "data": "2026-06-11",
-                "situacao": 5
-              },
-              "notaFiscal": {
-                "id": 860303740,
-                "numero": 155910,
-                "data": "2026-06-11",
-                "situacao": 7
-              },
-              "destinatario": {
-                "nome": "Maria Guarienti",
-                "codigo": "",
-                "fantasia": "",
-                "tipoPessoa": "F",
-                "cpfCnpj": "011.760.570-06",
-                "inscricaoEstadual": "",
-                "rg": "",
-                "telefone": "(55) 99999-4966",
-                "celular": "",
-                "email": "1k5rmg2cy9y49ny@marketplace.amazon.com.br",
-                "endereco": {
-                  "endereco": "AV VENÂNCIO AIRES",
-                  "numero": "2203",
-                  "complemento": "",
-                  "bairro": "Centro",
-                  "municipio": "Santo Ângelo",
-                  "cep": "98.803-000",
-                  "uf": "RS",
-                  "pais": "Brasil"
-                },
-                "id": 766883333
-              },
-              "volume": {
-                "embalagem": {
-                  "id": 718341450,
-                  "tipo": 2,
-                  "descricao": "Embalagem Loja Integrada"
-                },
-                "largura": 16.3,
-                "altura": 7,
-                "comprimento": 19,
-                "diametro": 0,
-                "pesoBruto": 0.204,
-                "quantidadeVolumes": 1
-              },
-              "logistica": {
-                "codigoRastreio": "",
-                "urlRastreio": "",
-                "possuiValorDeclarado": true,
-                "valorDeclarado": 0,
-                "possuiAvisoRecebimento": true,
-                "formaFrete": null,
-                "transportador": null
-              }
-            },
-            {
-              "id": 749882243,
+              "id": 749882504,
               "data": "2026-06-12",
               "situacao": "1",
               "tipoObjeto": "notafiscal",
-              "idObjeto": 860304297,
+              "idObjeto": 860308654,
               "dataEmissao": "2026-06-12",
               "venda": {
-                "id": 860304258,
-                "numero": 206972,
+                "id": 860308622,
+                "numero": 206989,
                 "data": "2026-06-12",
                 "situacao": 5
               },
               "notaFiscal": {
-                "id": 860304297,
-                "numero": 155912,
+                "id": 860308654,
+                "numero": 155924,
                 "data": "2026-06-12",
                 "situacao": 7
               },
               "destinatario": {
-                "nome": "Marcelo Lacerda",
+                "nome": "Josiel Rodrigues Martins Neto",
                 "codigo": "",
                 "fantasia": "",
                 "tipoPessoa": "F",
-                "cpfCnpj": "064.439.063-81",
+                "cpfCnpj": "003.650.672-96",
                 "inscricaoEstadual": "",
                 "rg": "",
-                "telefone": "(88) 98854-1349",
+                "telefone": "(91) 98408-3065",
                 "celular": "",
-                "email": "hn5vzm24cjt8lch@marketplace.amazon.com.br",
+                "email": "3s782xbl2lsgjy5@marketplace.amazon.com.br",
                 "endereco": {
-                  "endereco": "Rua Raimundo Machado da Silva",
-                  "numero": "60",
-                  "complemento": "Trade-S 1606",
-                  "bairro": "Triângulo",
-                  "municipio": "Juazeiro do Norte",
-                  "cep": "63.041-187",
-                  "uf": "CE",
+                  "endereco": "Travessa Apinagés",
+                  "numero": "708",
+                  "complemento": "Felicita, 2401",
+                  "bairro": "Batista Campos",
+                  "municipio": "Belém",
+                  "cep": "66.033-264",
+                  "uf": "PA",
                   "pais": "Brasil"
                 },
-                "id": 766883474
+                "id": 766883824
               },
               "volume": {
                 "embalagem": {
-                  "id": 0,
+                  "id": 718341450,
                   "tipo": 2,
-                  "descricao": ""
+                  "descricao": "Embalagem Loja Integrada"
                 },
-                "largura": 5,
-                "altura": 5,
-                "comprimento": 5,
-                "diametro": 5,
-                "pesoBruto": 0.032,
+                "largura": 16.3,
+                "altura": 7,
+                "comprimento": 19,
+                "diametro": 0,
+                "pesoBruto": 0.216,
                 "quantidadeVolumes": 1
               },
               "logistica": {
@@ -1055,46 +446,46 @@
               }
             },
             {
-              "id": 749882248,
+              "id": 749882559,
               "data": "2026-06-12",
               "situacao": "1",
               "tipoObjeto": "notafiscal",
-              "idObjeto": 860304506,
+              "idObjeto": 860309505,
               "dataEmissao": "2026-06-12",
               "venda": {
-                "id": 860304498,
-                "numero": 206973,
+                "id": 860309480,
+                "numero": 206997,
                 "data": "2026-06-12",
                 "situacao": 5
               },
               "notaFiscal": {
-                "id": 860304506,
-                "numero": 155913,
+                "id": 860309505,
+                "numero": 155927,
                 "data": "2026-06-12",
                 "situacao": 7
               },
               "destinatario": {
-                "nome": "Telma Bueno",
+                "nome": "Fabiana",
                 "codigo": "",
                 "fantasia": "",
                 "tipoPessoa": "F",
-                "cpfCnpj": "255.758.198-41",
+                "cpfCnpj": "281.827.188-64",
                 "inscricaoEstadual": "",
                 "rg": "",
-                "telefone": "(11) 4562-9511",
+                "telefone": "(11) 2345-6362",
                 "celular": "",
-                "email": "2gcmntqyqmmt7t5@marketplace.amazon.com.br",
+                "email": "23nmmwgdtq6q66p@marketplace.amazon.com.br",
                 "endereco": {
-                  "endereco": "rua Visconde de Ouro Preto",
-                  "numero": "51",
-                  "complemento": "ap 113",
-                  "bairro": "Consolação",
+                  "endereco": "Rua Pedro de Godói",
+                  "numero": "269",
+                  "complemento": "Apto174 d",
+                  "bairro": "Parque da Vila Prudente",
                   "municipio": "São Paulo",
-                  "cep": "01.303-060",
+                  "cep": "03.138-010",
                   "uf": "SP",
                   "pais": "Brasil"
                 },
-                "id": 766883493
+                "id": 766883890
               },
               "volume": {
                 "embalagem": {
@@ -1106,7 +497,161 @@
                 "altura": 7,
                 "comprimento": 19,
                 "diametro": 0,
-                "pesoBruto": 0.64,
+                "pesoBruto": 0.148,
+                "quantidadeVolumes": 1
+              },
+              "logistica": {
+                "codigoRastreio": "",
+                "urlRastreio": "",
+                "possuiValorDeclarado": true,
+                "valorDeclarado": 0,
+                "possuiAvisoRecebimento": true,
+                "formaFrete": null,
+                "transportador": null
+              }
+            }
+          ]
+        }
+      },
+      {
+        "id": 746503719,
+        "listagem": {
+          "id": 746503719,
+          "identificacao": "3181",
+          "data": "2026-06-12",
+          "quantidadeObjetos": 0,
+          "formaEnvio": {
+            "id": 758095424,
+            "nome": "Amazon DBA"
+          }
+        },
+        "resposta": {
+          "id": 746503719,
+          "identificacao": "3181",
+          "data": "2026-06-12",
+          "formaEnvio": {
+            "id": 758095424,
+            "nome": "Amazon DBA"
+          },
+          "expedicoes": [
+            {
+              "id": 749882504,
+              "data": "2026-06-12",
+              "situacao": "1",
+              "tipoObjeto": "notafiscal",
+              "idObjeto": 860308654,
+              "dataEmissao": "2026-06-12",
+              "venda": {
+                "id": 860308622,
+                "numero": 206989,
+                "data": "2026-06-12",
+                "situacao": 5
+              },
+              "notaFiscal": {
+                "id": 860308654,
+                "numero": 155924,
+                "data": "2026-06-12",
+                "situacao": 7
+              },
+              "destinatario": {
+                "nome": "Josiel Rodrigues Martins Neto",
+                "codigo": "",
+                "fantasia": "",
+                "tipoPessoa": "F",
+                "cpfCnpj": "003.650.672-96",
+                "inscricaoEstadual": "",
+                "rg": "",
+                "telefone": "(91) 98408-3065",
+                "celular": "",
+                "email": "3s782xbl2lsgjy5@marketplace.amazon.com.br",
+                "endereco": {
+                  "endereco": "Travessa Apinagés",
+                  "numero": "708",
+                  "complemento": "Felicita, 2401",
+                  "bairro": "Batista Campos",
+                  "municipio": "Belém",
+                  "cep": "66.033-264",
+                  "uf": "PA",
+                  "pais": "Brasil"
+                },
+                "id": 766883824
+              },
+              "volume": {
+                "embalagem": {
+                  "id": 718341450,
+                  "tipo": 2,
+                  "descricao": "Embalagem Loja Integrada"
+                },
+                "largura": 16.3,
+                "altura": 7,
+                "comprimento": 19,
+                "diametro": 0,
+                "pesoBruto": 0.216,
+                "quantidadeVolumes": 1
+              },
+              "logistica": {
+                "codigoRastreio": "",
+                "urlRastreio": "",
+                "possuiValorDeclarado": true,
+                "valorDeclarado": 0,
+                "possuiAvisoRecebimento": true,
+                "formaFrete": null,
+                "transportador": null
+              }
+            },
+            {
+              "id": 749882559,
+              "data": "2026-06-12",
+              "situacao": "1",
+              "tipoObjeto": "notafiscal",
+              "idObjeto": 860309505,
+              "dataEmissao": "2026-06-12",
+              "venda": {
+                "id": 860309480,
+                "numero": 206997,
+                "data": "2026-06-12",
+                "situacao": 5
+              },
+              "notaFiscal": {
+                "id": 860309505,
+                "numero": 155927,
+                "data": "2026-06-12",
+                "situacao": 7
+              },
+              "destinatario": {
+                "nome": "Fabiana",
+                "codigo": "",
+                "fantasia": "",
+                "tipoPessoa": "F",
+                "cpfCnpj": "281.827.188-64",
+                "inscricaoEstadual": "",
+                "rg": "",
+                "telefone": "(11) 2345-6362",
+                "celular": "",
+                "email": "23nmmwgdtq6q66p@marketplace.amazon.com.br",
+                "endereco": {
+                  "endereco": "Rua Pedro de Godói",
+                  "numero": "269",
+                  "complemento": "Apto174 d",
+                  "bairro": "Parque da Vila Prudente",
+                  "municipio": "São Paulo",
+                  "cep": "03.138-010",
+                  "uf": "SP",
+                  "pais": "Brasil"
+                },
+                "id": 766883890
+              },
+              "volume": {
+                "embalagem": {
+                  "id": 718341450,
+                  "tipo": 2,
+                  "descricao": "Embalagem Loja Integrada"
+                },
+                "largura": 16.3,
+                "altura": 7,
+                "comprimento": 19,
+                "diametro": 0,
+                "pesoBruto": 0.148,
                 "quantidadeVolumes": 1
               },
               "logistica": {
@@ -1669,212 +1214,185 @@
     ],
     "GET /expedicao/{idAgrupamento}/etiquetas": [
       {
-        "id": 746503719,
+        "id": 746503742,
         "resposta": {
-          "urls": [
-            "https://s3.amazonaws.com/tiny-tmp-us/erp/NzQ1NTM0MzQ3/api/etiquetas/8ac489541877998d6106c97ffb0ef732.zpl"
-          ]
+          "erro": true,
+          "mensagem": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Erro ao obter o link da etiqueta do Mercado Livre. Shipment Id 47281733718: Shipment 47281733718 status is picked_up.",
+          "statusCode": 400
         }
       },
       {
         "id": 746503719,
         "resposta": {
-          "urls": [
-            "https://s3.amazonaws.com/tiny-tmp-us/erp/NzQ1NTM0MzQ3/api/etiquetas/8b1aa8c41776f461215a2c6da9b30573.zpl"
-          ]
+          "erro": true,
+          "mensagem": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Url das etiquetas não encontrada na Amazon.",
+          "statusCode": 400
+        }
+      },
+      {
+        "id": 746503719,
+        "resposta": {
+          "erro": true,
+          "mensagem": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Url das etiquetas não encontrada na Amazon.",
+          "statusCode": 400
         }
       },
       {
         "id": 746503703,
         "resposta": {
-          "urls": [
-            "https://s3.amazonaws.com/tiny-tmp-us/erp/NzQ1NTM0MzQ3/api/etiquetas/386e745acaaefe30fbe0cffb59174fbd.zpl"
-          ]
-        }
-      },
-      {
-        "id": 746503703,
-        "resposta": {
-          "urls": [
-            "https://s3.amazonaws.com/tiny-tmp-us/erp/NzQ1NTM0MzQ3/api/etiquetas/3e4bb79912d7e5c838cd919a789855d2.zpl"
-          ]
+          "erro": true,
+          "mensagem": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Url das etiquetas não encontrada na Amazon.",
+          "statusCode": 400
         }
       }
     ],
     "GET /expedicao/{idAgrupamento}/expedicao/{idExpedicao}/etiquetas": [
       {
-        "idAgrupamento": 746503719,
-        "idExpedicao": 749882504,
+        "idAgrupamento": 746503742,
+        "idExpedicao": 749882106,
         "resposta": {
-          "urls": [
-            "https://s3.amazonaws.com/tiny-tmp-us/erp/NzQ1NTM0MzQ3/api/etiquetas/f7d2bc63c0f0aac1d18bd22efae7c523.zpl"
-          ]
-        }
-      },
-      {
-        "idAgrupamento": 746503719,
-        "idExpedicao": 749882559,
-        "resposta": {
-          "urls": [
-            "https://s3.amazonaws.com/tiny-tmp-us/erp/NzQ1NTM0MzQ3/api/etiquetas/d81db4fb0ca7e8860d2ded0b74f0794e.zpl"
-          ]
+          "erro": true,
+          "mensagem": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Erro ao obter o link da etiqueta do Mercado Livre. Shipment Id 47281733718: Shipment 47281733718 status is picked_up.",
+          "statusCode": 400
         }
       },
       {
         "idAgrupamento": 746503719,
         "idExpedicao": 749882504,
         "resposta": {
-          "urls": [
-            "https://s3.amazonaws.com/tiny-tmp-us/erp/NzQ1NTM0MzQ3/api/etiquetas/989223be3e62e0432ccff8cd07dd8d0c.zpl"
-          ]
+          "erro": true,
+          "mensagem": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Url das etiquetas não encontrada na Amazon.",
+          "statusCode": 400
         }
       },
       {
         "idAgrupamento": 746503719,
         "idExpedicao": 749882559,
         "resposta": {
-          "urls": [
-            "https://s3.amazonaws.com/tiny-tmp-us/erp/NzQ1NTM0MzQ3/api/etiquetas/8122363b0726a6d62f8f50f1cac5649a.zpl"
-          ]
+          "erro": true,
+          "mensagem": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Url das etiquetas não encontrada na Amazon.",
+          "statusCode": 400
+        }
+      },
+      {
+        "idAgrupamento": 746503719,
+        "idExpedicao": 749882504,
+        "resposta": {
+          "erro": true,
+          "mensagem": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Url das etiquetas não encontrada na Amazon.",
+          "statusCode": 400
+        }
+      },
+      {
+        "idAgrupamento": 746503719,
+        "idExpedicao": 749882559,
+        "resposta": {
+          "erro": true,
+          "mensagem": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Url das etiquetas não encontrada na Amazon.",
+          "statusCode": 400
         }
       },
       {
         "idAgrupamento": 746503703,
         "idExpedicao": 749881546,
         "resposta": {
-          "urls": [
-            "https://s3.amazonaws.com/tiny-tmp-us/erp/NzQ1NTM0MzQ3/api/etiquetas/3539779783a864947ac46b9fb2632141.zpl"
-          ]
+          "erro": true,
+          "mensagem": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Url das etiquetas não encontrada na Amazon.",
+          "statusCode": 400
         }
       },
       {
         "idAgrupamento": 746503703,
         "idExpedicao": 749881818,
         "resposta": {
-          "urls": [
-            "https://s3.amazonaws.com/tiny-tmp-us/erp/NzQ1NTM0MzQ3/api/etiquetas/95ae6f2c576b0954d2177c48d9a363e9.zpl"
-          ]
+          "erro": true,
+          "mensagem": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Url das etiquetas não encontrada na Amazon.",
+          "statusCode": 400
         }
       },
       {
         "idAgrupamento": 746503703,
         "idExpedicao": 749881883,
         "resposta": {
-          "urls": [
-            "https://s3.amazonaws.com/tiny-tmp-us/erp/NzQ1NTM0MzQ3/api/etiquetas/2f6e8054ebc8673b44efd37ab3b041bc.zpl"
-          ]
+          "erro": true,
+          "mensagem": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Url das etiquetas não encontrada na Amazon.",
+          "statusCode": 400
         }
       },
       {
         "idAgrupamento": 746503703,
         "idExpedicao": 749882109,
         "resposta": {
-          "urls": [
-            "https://s3.amazonaws.com/tiny-tmp-us/erp/NzQ1NTM0MzQ3/api/etiquetas/e8c9d49f6e8d3c783e73ecc1a72f2492.zpl"
-          ]
-        }
-      },
-      {
-        "idAgrupamento": 746503703,
-        "idExpedicao": 749881546,
-        "resposta": {
-          "urls": [
-            "https://s3.amazonaws.com/tiny-tmp-us/erp/NzQ1NTM0MzQ3/api/etiquetas/ba1e85f1f0268315fdeb599b40836021.zpl"
-          ]
-        }
-      },
-      {
-        "idAgrupamento": 746503703,
-        "idExpedicao": 749881818,
-        "resposta": {
-          "urls": [
-            "https://s3.amazonaws.com/tiny-tmp-us/erp/NzQ1NTM0MzQ3/api/etiquetas/d6fb78c13459266d9e9d6f71610147d9.zpl"
-          ]
-        }
-      },
-      {
-        "idAgrupamento": 746503703,
-        "idExpedicao": 749881883,
-        "resposta": {
-          "urls": [
-            "https://s3.amazonaws.com/tiny-tmp-us/erp/NzQ1NTM0MzQ3/api/etiquetas/47b81034919b37b5abb795a6788bc1a8.zpl"
-          ]
-        }
-      },
-      {
-        "idAgrupamento": 746503703,
-        "idExpedicao": 749882109,
-        "resposta": {
-          "urls": [
-            "https://s3.amazonaws.com/tiny-tmp-us/erp/NzQ1NTM0MzQ3/api/etiquetas/95c677de8924821a3160707b1d3f9e27.zpl"
-          ]
+          "erro": true,
+          "mensagem": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Url das etiquetas não encontrada na Amazon.",
+          "statusCode": 400
         }
       }
     ]
   },
   "agrupamentos": [
     {
-      "id": 746503719,
+      "id": 746503742,
       "listagem": {
-        "id": 746503719,
-        "identificacao": "3181",
+        "id": 746503742,
+        "identificacao": "3182",
         "data": "2026-06-12",
         "quantidadeObjetos": 0,
         "formaEnvio": {
-          "id": 758095424,
-          "nome": "Amazon DBA"
+          "id": 744061814,
+          "nome": "Mercado Envios"
         }
       },
       "detalhe": {
-        "id": 746503719,
-        "identificacao": "3181",
+        "id": 746503742,
+        "identificacao": "3182",
         "data": "2026-06-12",
         "formaEnvio": {
-          "id": 758095424,
-          "nome": "Amazon DBA"
+          "id": 744061814,
+          "nome": "Mercado Envios"
         },
         "expedicoes": [
           {
-            "id": 749882504,
-            "data": "2026-06-12",
+            "id": 749882106,
+            "data": "2026-06-11",
             "situacao": "1",
             "tipoObjeto": "notafiscal",
-            "idObjeto": 860308654,
-            "dataEmissao": "2026-06-12",
+            "idObjeto": 860301759,
+            "dataEmissao": "2026-06-11",
             "venda": {
-              "id": 860308622,
-              "numero": 206989,
-              "data": "2026-06-12",
-              "situacao": 5
-            },
-            "notaFiscal": {
-              "id": 860308654,
-              "numero": 155924,
-              "data": "2026-06-12",
+              "id": 860301754,
+              "numero": 206936,
+              "data": "2026-06-11",
               "situacao": 7
             },
+            "notaFiscal": {
+              "id": 860301759,
+              "numero": 155886,
+              "data": "2026-06-11",
+              "situacao": 6
+            },
             "destinatario": {
-              "nome": "Josiel Rodrigues Martins Neto",
+              "nome": "Jaqueline Mello Sampaio",
               "codigo": "",
               "fantasia": "",
               "tipoPessoa": "F",
-              "cpfCnpj": "003.650.672-96",
+              "cpfCnpj": "019.317.357-35",
               "inscricaoEstadual": "",
               "rg": "",
-              "telefone": "(91) 98408-3065",
+              "telefone": "",
               "celular": "",
-              "email": "3s782xbl2lsgjy5@marketplace.amazon.com.br",
+              "email": "",
               "endereco": {
-                "endereco": "Travessa Apinagés",
-                "numero": "708",
-                "complemento": "Felicita, 2401",
-                "bairro": "Batista Campos",
-                "municipio": "Belém",
-                "cep": "66.033-264",
-                "uf": "PA",
+                "endereco": "Rua Mirataia",
+                "numero": "245",
+                "complemento": "Condomínio Reserva Mirataia I",
+                "bairro": "Pechincha",
+                "municipio": "Rio de Janeiro",
+                "cep": "22.770-190",
+                "uf": "RJ",
                 "pais": "Brasil"
               },
-              "id": 766883824
+              "id": 766882840
             },
             "volume": {
               "embalagem": {
@@ -1886,72 +1404,7 @@
               "altura": 7,
               "comprimento": 19,
               "diametro": 0,
-              "pesoBruto": 0.216,
-              "quantidadeVolumes": 1
-            },
-            "logistica": {
-              "codigoRastreio": "",
-              "urlRastreio": "",
-              "possuiValorDeclarado": true,
-              "valorDeclarado": 0,
-              "possuiAvisoRecebimento": true,
-              "formaFrete": null,
-              "transportador": null
-            }
-          },
-          {
-            "id": 749882559,
-            "data": "2026-06-12",
-            "situacao": "1",
-            "tipoObjeto": "notafiscal",
-            "idObjeto": 860309505,
-            "dataEmissao": "2026-06-12",
-            "venda": {
-              "id": 860309480,
-              "numero": 206997,
-              "data": "2026-06-12",
-              "situacao": 5
-            },
-            "notaFiscal": {
-              "id": 860309505,
-              "numero": 155927,
-              "data": "2026-06-12",
-              "situacao": 7
-            },
-            "destinatario": {
-              "nome": "Fabiana",
-              "codigo": "",
-              "fantasia": "",
-              "tipoPessoa": "F",
-              "cpfCnpj": "281.827.188-64",
-              "inscricaoEstadual": "",
-              "rg": "",
-              "telefone": "(11) 2345-6362",
-              "celular": "",
-              "email": "23nmmwgdtq6q66p@marketplace.amazon.com.br",
-              "endereco": {
-                "endereco": "Rua Pedro de Godói",
-                "numero": "269",
-                "complemento": "Apto174 d",
-                "bairro": "Parque da Vila Prudente",
-                "municipio": "São Paulo",
-                "cep": "03.138-010",
-                "uf": "SP",
-                "pais": "Brasil"
-              },
-              "id": 766883890
-            },
-            "volume": {
-              "embalagem": {
-                "id": 718341450,
-                "tipo": 2,
-                "descricao": "Embalagem Loja Integrada"
-              },
-              "largura": 16.3,
-              "altura": 7,
-              "comprimento": 19,
-              "diametro": 0,
-              "pesoBruto": 0.148,
+              "pesoBruto": 0.19,
               "quantidadeVolumes": 1
             },
             "logistica": {
@@ -1967,54 +1420,54 @@
         ]
       },
       "etiquetasAgrupamento": {
-        "urls": [
-          "https://s3.amazonaws.com/tiny-tmp-us/erp/NzQ1NTM0MzQ3/api/etiquetas/8ac489541877998d6106c97ffb0ef732.zpl"
-        ]
+        "erro": true,
+        "mensagem": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Erro ao obter o link da etiqueta do Mercado Livre. Shipment Id 47281733718: Shipment 47281733718 status is picked_up.",
+        "statusCode": 400
       },
       "expedicoes": [
         {
-          "id": 749882504,
+          "id": 749882106,
           "resumo": {
-            "id": 749882504,
-            "data": "2026-06-12",
+            "id": 749882106,
+            "data": "2026-06-11",
             "situacao": "1",
             "tipoObjeto": "notafiscal",
-            "idObjeto": 860308654,
-            "dataEmissao": "2026-06-12",
+            "idObjeto": 860301759,
+            "dataEmissao": "2026-06-11",
             "venda": {
-              "id": 860308622,
-              "numero": 206989,
-              "data": "2026-06-12",
-              "situacao": 5
-            },
-            "notaFiscal": {
-              "id": 860308654,
-              "numero": 155924,
-              "data": "2026-06-12",
+              "id": 860301754,
+              "numero": 206936,
+              "data": "2026-06-11",
               "situacao": 7
             },
+            "notaFiscal": {
+              "id": 860301759,
+              "numero": 155886,
+              "data": "2026-06-11",
+              "situacao": 6
+            },
             "destinatario": {
-              "nome": "Josiel Rodrigues Martins Neto",
+              "nome": "Jaqueline Mello Sampaio",
               "codigo": "",
               "fantasia": "",
               "tipoPessoa": "F",
-              "cpfCnpj": "003.650.672-96",
+              "cpfCnpj": "019.317.357-35",
               "inscricaoEstadual": "",
               "rg": "",
-              "telefone": "(91) 98408-3065",
+              "telefone": "",
               "celular": "",
-              "email": "3s782xbl2lsgjy5@marketplace.amazon.com.br",
+              "email": "",
               "endereco": {
-                "endereco": "Travessa Apinagés",
-                "numero": "708",
-                "complemento": "Felicita, 2401",
-                "bairro": "Batista Campos",
-                "municipio": "Belém",
-                "cep": "66.033-264",
-                "uf": "PA",
+                "endereco": "Rua Mirataia",
+                "numero": "245",
+                "complemento": "Condomínio Reserva Mirataia I",
+                "bairro": "Pechincha",
+                "municipio": "Rio de Janeiro",
+                "cep": "22.770-190",
+                "uf": "RJ",
                 "pais": "Brasil"
               },
-              "id": 766883824
+              "id": 766882840
             },
             "volume": {
               "embalagem": {
@@ -2026,7 +1479,7 @@
               "altura": 7,
               "comprimento": 19,
               "diametro": 0,
-              "pesoBruto": 0.216,
+              "pesoBruto": 0.19,
               "quantidadeVolumes": 1
             },
             "logistica": {
@@ -2040,82 +1493,9 @@
             }
           },
           "etiquetas": {
-            "urls": [
-              "https://s3.amazonaws.com/tiny-tmp-us/erp/NzQ1NTM0MzQ3/api/etiquetas/f7d2bc63c0f0aac1d18bd22efae7c523.zpl"
-            ]
-          }
-        },
-        {
-          "id": 749882559,
-          "resumo": {
-            "id": 749882559,
-            "data": "2026-06-12",
-            "situacao": "1",
-            "tipoObjeto": "notafiscal",
-            "idObjeto": 860309505,
-            "dataEmissao": "2026-06-12",
-            "venda": {
-              "id": 860309480,
-              "numero": 206997,
-              "data": "2026-06-12",
-              "situacao": 5
-            },
-            "notaFiscal": {
-              "id": 860309505,
-              "numero": 155927,
-              "data": "2026-06-12",
-              "situacao": 7
-            },
-            "destinatario": {
-              "nome": "Fabiana",
-              "codigo": "",
-              "fantasia": "",
-              "tipoPessoa": "F",
-              "cpfCnpj": "281.827.188-64",
-              "inscricaoEstadual": "",
-              "rg": "",
-              "telefone": "(11) 2345-6362",
-              "celular": "",
-              "email": "23nmmwgdtq6q66p@marketplace.amazon.com.br",
-              "endereco": {
-                "endereco": "Rua Pedro de Godói",
-                "numero": "269",
-                "complemento": "Apto174 d",
-                "bairro": "Parque da Vila Prudente",
-                "municipio": "São Paulo",
-                "cep": "03.138-010",
-                "uf": "SP",
-                "pais": "Brasil"
-              },
-              "id": 766883890
-            },
-            "volume": {
-              "embalagem": {
-                "id": 718341450,
-                "tipo": 2,
-                "descricao": "Embalagem Loja Integrada"
-              },
-              "largura": 16.3,
-              "altura": 7,
-              "comprimento": 19,
-              "diametro": 0,
-              "pesoBruto": 0.148,
-              "quantidadeVolumes": 1
-            },
-            "logistica": {
-              "codigoRastreio": "",
-              "urlRastreio": "",
-              "possuiValorDeclarado": true,
-              "valorDeclarado": 0,
-              "possuiAvisoRecebimento": true,
-              "formaFrete": null,
-              "transportador": null
-            }
-          },
-          "etiquetas": {
-            "urls": [
-              "https://s3.amazonaws.com/tiny-tmp-us/erp/NzQ1NTM0MzQ3/api/etiquetas/d81db4fb0ca7e8860d2ded0b74f0794e.zpl"
-            ]
+            "erro": true,
+            "mensagem": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Erro ao obter o link da etiqueta do Mercado Livre. Shipment Id 47281733718: Shipment 47281733718 status is picked_up.",
+            "statusCode": 400
           }
         }
       ]
@@ -2274,9 +1654,9 @@
         ]
       },
       "etiquetasAgrupamento": {
-        "urls": [
-          "https://s3.amazonaws.com/tiny-tmp-us/erp/NzQ1NTM0MzQ3/api/etiquetas/8b1aa8c41776f461215a2c6da9b30573.zpl"
-        ]
+        "erro": true,
+        "mensagem": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Url das etiquetas não encontrada na Amazon.",
+        "statusCode": 400
       },
       "expedicoes": [
         {
@@ -2347,9 +1727,9 @@
             }
           },
           "etiquetas": {
-            "urls": [
-              "https://s3.amazonaws.com/tiny-tmp-us/erp/NzQ1NTM0MzQ3/api/etiquetas/989223be3e62e0432ccff8cd07dd8d0c.zpl"
-            ]
+            "erro": true,
+            "mensagem": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Url das etiquetas não encontrada na Amazon.",
+            "statusCode": 400
           }
         },
         {
@@ -2420,9 +1800,316 @@
             }
           },
           "etiquetas": {
-            "urls": [
-              "https://s3.amazonaws.com/tiny-tmp-us/erp/NzQ1NTM0MzQ3/api/etiquetas/8122363b0726a6d62f8f50f1cac5649a.zpl"
-            ]
+            "erro": true,
+            "mensagem": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Url das etiquetas não encontrada na Amazon.",
+            "statusCode": 400
+          }
+        }
+      ]
+    },
+    {
+      "id": 746503719,
+      "listagem": {
+        "id": 746503719,
+        "identificacao": "3181",
+        "data": "2026-06-12",
+        "quantidadeObjetos": 0,
+        "formaEnvio": {
+          "id": 758095424,
+          "nome": "Amazon DBA"
+        }
+      },
+      "detalhe": {
+        "id": 746503719,
+        "identificacao": "3181",
+        "data": "2026-06-12",
+        "formaEnvio": {
+          "id": 758095424,
+          "nome": "Amazon DBA"
+        },
+        "expedicoes": [
+          {
+            "id": 749882504,
+            "data": "2026-06-12",
+            "situacao": "1",
+            "tipoObjeto": "notafiscal",
+            "idObjeto": 860308654,
+            "dataEmissao": "2026-06-12",
+            "venda": {
+              "id": 860308622,
+              "numero": 206989,
+              "data": "2026-06-12",
+              "situacao": 5
+            },
+            "notaFiscal": {
+              "id": 860308654,
+              "numero": 155924,
+              "data": "2026-06-12",
+              "situacao": 7
+            },
+            "destinatario": {
+              "nome": "Josiel Rodrigues Martins Neto",
+              "codigo": "",
+              "fantasia": "",
+              "tipoPessoa": "F",
+              "cpfCnpj": "003.650.672-96",
+              "inscricaoEstadual": "",
+              "rg": "",
+              "telefone": "(91) 98408-3065",
+              "celular": "",
+              "email": "3s782xbl2lsgjy5@marketplace.amazon.com.br",
+              "endereco": {
+                "endereco": "Travessa Apinagés",
+                "numero": "708",
+                "complemento": "Felicita, 2401",
+                "bairro": "Batista Campos",
+                "municipio": "Belém",
+                "cep": "66.033-264",
+                "uf": "PA",
+                "pais": "Brasil"
+              },
+              "id": 766883824
+            },
+            "volume": {
+              "embalagem": {
+                "id": 718341450,
+                "tipo": 2,
+                "descricao": "Embalagem Loja Integrada"
+              },
+              "largura": 16.3,
+              "altura": 7,
+              "comprimento": 19,
+              "diametro": 0,
+              "pesoBruto": 0.216,
+              "quantidadeVolumes": 1
+            },
+            "logistica": {
+              "codigoRastreio": "",
+              "urlRastreio": "",
+              "possuiValorDeclarado": true,
+              "valorDeclarado": 0,
+              "possuiAvisoRecebimento": true,
+              "formaFrete": null,
+              "transportador": null
+            }
+          },
+          {
+            "id": 749882559,
+            "data": "2026-06-12",
+            "situacao": "1",
+            "tipoObjeto": "notafiscal",
+            "idObjeto": 860309505,
+            "dataEmissao": "2026-06-12",
+            "venda": {
+              "id": 860309480,
+              "numero": 206997,
+              "data": "2026-06-12",
+              "situacao": 5
+            },
+            "notaFiscal": {
+              "id": 860309505,
+              "numero": 155927,
+              "data": "2026-06-12",
+              "situacao": 7
+            },
+            "destinatario": {
+              "nome": "Fabiana",
+              "codigo": "",
+              "fantasia": "",
+              "tipoPessoa": "F",
+              "cpfCnpj": "281.827.188-64",
+              "inscricaoEstadual": "",
+              "rg": "",
+              "telefone": "(11) 2345-6362",
+              "celular": "",
+              "email": "23nmmwgdtq6q66p@marketplace.amazon.com.br",
+              "endereco": {
+                "endereco": "Rua Pedro de Godói",
+                "numero": "269",
+                "complemento": "Apto174 d",
+                "bairro": "Parque da Vila Prudente",
+                "municipio": "São Paulo",
+                "cep": "03.138-010",
+                "uf": "SP",
+                "pais": "Brasil"
+              },
+              "id": 766883890
+            },
+            "volume": {
+              "embalagem": {
+                "id": 718341450,
+                "tipo": 2,
+                "descricao": "Embalagem Loja Integrada"
+              },
+              "largura": 16.3,
+              "altura": 7,
+              "comprimento": 19,
+              "diametro": 0,
+              "pesoBruto": 0.148,
+              "quantidadeVolumes": 1
+            },
+            "logistica": {
+              "codigoRastreio": "",
+              "urlRastreio": "",
+              "possuiValorDeclarado": true,
+              "valorDeclarado": 0,
+              "possuiAvisoRecebimento": true,
+              "formaFrete": null,
+              "transportador": null
+            }
+          }
+        ]
+      },
+      "etiquetasAgrupamento": {
+        "erro": true,
+        "mensagem": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Url das etiquetas não encontrada na Amazon.",
+        "statusCode": 400
+      },
+      "expedicoes": [
+        {
+          "id": 749882504,
+          "resumo": {
+            "id": 749882504,
+            "data": "2026-06-12",
+            "situacao": "1",
+            "tipoObjeto": "notafiscal",
+            "idObjeto": 860308654,
+            "dataEmissao": "2026-06-12",
+            "venda": {
+              "id": 860308622,
+              "numero": 206989,
+              "data": "2026-06-12",
+              "situacao": 5
+            },
+            "notaFiscal": {
+              "id": 860308654,
+              "numero": 155924,
+              "data": "2026-06-12",
+              "situacao": 7
+            },
+            "destinatario": {
+              "nome": "Josiel Rodrigues Martins Neto",
+              "codigo": "",
+              "fantasia": "",
+              "tipoPessoa": "F",
+              "cpfCnpj": "003.650.672-96",
+              "inscricaoEstadual": "",
+              "rg": "",
+              "telefone": "(91) 98408-3065",
+              "celular": "",
+              "email": "3s782xbl2lsgjy5@marketplace.amazon.com.br",
+              "endereco": {
+                "endereco": "Travessa Apinagés",
+                "numero": "708",
+                "complemento": "Felicita, 2401",
+                "bairro": "Batista Campos",
+                "municipio": "Belém",
+                "cep": "66.033-264",
+                "uf": "PA",
+                "pais": "Brasil"
+              },
+              "id": 766883824
+            },
+            "volume": {
+              "embalagem": {
+                "id": 718341450,
+                "tipo": 2,
+                "descricao": "Embalagem Loja Integrada"
+              },
+              "largura": 16.3,
+              "altura": 7,
+              "comprimento": 19,
+              "diametro": 0,
+              "pesoBruto": 0.216,
+              "quantidadeVolumes": 1
+            },
+            "logistica": {
+              "codigoRastreio": "",
+              "urlRastreio": "",
+              "possuiValorDeclarado": true,
+              "valorDeclarado": 0,
+              "possuiAvisoRecebimento": true,
+              "formaFrete": null,
+              "transportador": null
+            }
+          },
+          "etiquetas": {
+            "erro": true,
+            "mensagem": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Url das etiquetas não encontrada na Amazon.",
+            "statusCode": 400
+          }
+        },
+        {
+          "id": 749882559,
+          "resumo": {
+            "id": 749882559,
+            "data": "2026-06-12",
+            "situacao": "1",
+            "tipoObjeto": "notafiscal",
+            "idObjeto": 860309505,
+            "dataEmissao": "2026-06-12",
+            "venda": {
+              "id": 860309480,
+              "numero": 206997,
+              "data": "2026-06-12",
+              "situacao": 5
+            },
+            "notaFiscal": {
+              "id": 860309505,
+              "numero": 155927,
+              "data": "2026-06-12",
+              "situacao": 7
+            },
+            "destinatario": {
+              "nome": "Fabiana",
+              "codigo": "",
+              "fantasia": "",
+              "tipoPessoa": "F",
+              "cpfCnpj": "281.827.188-64",
+              "inscricaoEstadual": "",
+              "rg": "",
+              "telefone": "(11) 2345-6362",
+              "celular": "",
+              "email": "23nmmwgdtq6q66p@marketplace.amazon.com.br",
+              "endereco": {
+                "endereco": "Rua Pedro de Godói",
+                "numero": "269",
+                "complemento": "Apto174 d",
+                "bairro": "Parque da Vila Prudente",
+                "municipio": "São Paulo",
+                "cep": "03.138-010",
+                "uf": "SP",
+                "pais": "Brasil"
+              },
+              "id": 766883890
+            },
+            "volume": {
+              "embalagem": {
+                "id": 718341450,
+                "tipo": 2,
+                "descricao": "Embalagem Loja Integrada"
+              },
+              "largura": 16.3,
+              "altura": 7,
+              "comprimento": 19,
+              "diametro": 0,
+              "pesoBruto": 0.148,
+              "quantidadeVolumes": 1
+            },
+            "logistica": {
+              "codigoRastreio": "",
+              "urlRastreio": "",
+              "possuiValorDeclarado": true,
+              "valorDeclarado": 0,
+              "possuiAvisoRecebimento": true,
+              "formaFrete": null,
+              "transportador": null
+            }
+          },
+          "etiquetas": {
+            "erro": true,
+            "mensagem": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Url das etiquetas não encontrada na Amazon.",
+            "statusCode": 400
           }
         }
       ]
@@ -2971,9 +2658,9 @@
         ]
       },
       "etiquetasAgrupamento": {
-        "urls": [
-          "https://s3.amazonaws.com/tiny-tmp-us/erp/NzQ1NTM0MzQ3/api/etiquetas/386e745acaaefe30fbe0cffb59174fbd.zpl"
-        ]
+        "erro": true,
+        "mensagem": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Url das etiquetas não encontrada na Amazon.",
+        "statusCode": 400
       },
       "expedicoes": [
         {
@@ -3044,9 +2731,9 @@
             }
           },
           "etiquetas": {
-            "urls": [
-              "https://s3.amazonaws.com/tiny-tmp-us/erp/NzQ1NTM0MzQ3/api/etiquetas/3539779783a864947ac46b9fb2632141.zpl"
-            ]
+            "erro": true,
+            "mensagem": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Url das etiquetas não encontrada na Amazon.",
+            "statusCode": 400
           }
         },
         {
@@ -3117,9 +2804,9 @@
             }
           },
           "etiquetas": {
-            "urls": [
-              "https://s3.amazonaws.com/tiny-tmp-us/erp/NzQ1NTM0MzQ3/api/etiquetas/95ae6f2c576b0954d2177c48d9a363e9.zpl"
-            ]
+            "erro": true,
+            "mensagem": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Url das etiquetas não encontrada na Amazon.",
+            "statusCode": 400
           }
         },
         {
@@ -3190,9 +2877,9 @@
             }
           },
           "etiquetas": {
-            "urls": [
-              "https://s3.amazonaws.com/tiny-tmp-us/erp/NzQ1NTM0MzQ3/api/etiquetas/2f6e8054ebc8673b44efd37ab3b041bc.zpl"
-            ]
+            "erro": true,
+            "mensagem": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Url das etiquetas não encontrada na Amazon.",
+            "statusCode": 400
           }
         },
         {
@@ -3263,852 +2950,9 @@
             }
           },
           "etiquetas": {
-            "urls": [
-              "https://s3.amazonaws.com/tiny-tmp-us/erp/NzQ1NTM0MzQ3/api/etiquetas/e8c9d49f6e8d3c783e73ecc1a72f2492.zpl"
-            ]
-          }
-        }
-      ]
-    },
-    {
-      "id": 746503703,
-      "listagem": {
-        "id": 746503703,
-        "identificacao": "3180",
-        "data": "2026-06-12",
-        "quantidadeObjetos": 0,
-        "formaEnvio": {
-          "id": 758095424,
-          "nome": "Amazon DBA"
-        }
-      },
-      "detalhe": {
-        "id": 746503703,
-        "identificacao": "3180",
-        "data": "2026-06-12",
-        "formaEnvio": {
-          "id": 758095424,
-          "nome": "Amazon DBA"
-        },
-        "expedicoes": [
-          {
-            "id": 749881546,
-            "data": "2026-06-11",
-            "situacao": "1",
-            "tipoObjeto": "notafiscal",
-            "idObjeto": 860280851,
-            "dataEmissao": "2026-06-11",
-            "venda": {
-              "id": 860280807,
-              "numero": 206838,
-              "data": "2026-06-11",
-              "situacao": 5
-            },
-            "notaFiscal": {
-              "id": 860280851,
-              "numero": 155742,
-              "data": "2026-06-11",
-              "situacao": 7
-            },
-            "destinatario": {
-              "nome": "Vanessa Maia Rangel",
-              "codigo": "",
-              "fantasia": "",
-              "tipoPessoa": "F",
-              "cpfCnpj": "014.294.837-33",
-              "inscricaoEstadual": "",
-              "rg": "",
-              "telefone": "(21) 99999-7190",
-              "celular": "",
-              "email": "fpl4r8xjs2wfbps@marketplace.amazon.com.br",
-              "endereco": {
-                "endereco": "Rua Riodades",
-                "numero": "145",
-                "complemento": "Bloco 2/408",
-                "bairro": "Fonseca",
-                "municipio": "Niterói",
-                "cep": "24.130-247",
-                "uf": "RJ",
-                "pais": "Brasil"
-              },
-              "id": 766881333
-            },
-            "volume": {
-              "embalagem": {
-                "id": 718341450,
-                "tipo": 2,
-                "descricao": "Embalagem Loja Integrada"
-              },
-              "largura": 16.3,
-              "altura": 7,
-              "comprimento": 19,
-              "diametro": 0,
-              "pesoBruto": 0.021,
-              "quantidadeVolumes": 1
-            },
-            "logistica": {
-              "codigoRastreio": "",
-              "urlRastreio": "",
-              "possuiValorDeclarado": true,
-              "valorDeclarado": 0,
-              "possuiAvisoRecebimento": true,
-              "formaFrete": null,
-              "transportador": null
-            }
-          },
-          {
-            "id": 749881818,
-            "data": "2026-06-11",
-            "situacao": "1",
-            "tipoObjeto": "notafiscal",
-            "idObjeto": 860284827,
-            "dataEmissao": "2026-06-11",
-            "venda": {
-              "id": 860284778,
-              "numero": 206877,
-              "data": "2026-06-11",
-              "situacao": 5
-            },
-            "notaFiscal": {
-              "id": 860284827,
-              "numero": 155764,
-              "data": "2026-06-11",
-              "situacao": 7
-            },
-            "destinatario": {
-              "nome": "Norival Costa Filho",
-              "codigo": "",
-              "fantasia": "",
-              "tipoPessoa": "F",
-              "cpfCnpj": "226.396.830-04",
-              "inscricaoEstadual": "",
-              "rg": "",
-              "telefone": "(53) 98147-8316",
-              "celular": "",
-              "email": "y10wqyt47p592mg@marketplace.amazon.com.br",
-              "endereco": {
-                "endereco": "Avenida Tupy Silveira",
-                "numero": "1752",
-                "complemento": "Casa",
-                "bairro": "Centro",
-                "municipio": "Bagé",
-                "cep": "96.400-110",
-                "uf": "RS",
-                "pais": "Brasil"
-              },
-              "id": 766881988
-            },
-            "volume": {
-              "embalagem": {
-                "id": 718341450,
-                "tipo": 2,
-                "descricao": "Embalagem Loja Integrada"
-              },
-              "largura": 16.3,
-              "altura": 7,
-              "comprimento": 19,
-              "diametro": 0,
-              "pesoBruto": 0.081,
-              "quantidadeVolumes": 1
-            },
-            "logistica": {
-              "codigoRastreio": "",
-              "urlRastreio": "",
-              "possuiValorDeclarado": true,
-              "valorDeclarado": 0,
-              "possuiAvisoRecebimento": true,
-              "formaFrete": null,
-              "transportador": null
-            }
-          },
-          {
-            "id": 749881883,
-            "data": "2026-06-11",
-            "situacao": "1",
-            "tipoObjeto": "notafiscal",
-            "idObjeto": 860286039,
-            "dataEmissao": "2026-06-11",
-            "venda": {
-              "id": 860286006,
-              "numero": 206889,
-              "data": "2026-06-11",
-              "situacao": 5
-            },
-            "notaFiscal": {
-              "id": 860286039,
-              "numero": 155773,
-              "data": "2026-06-11",
-              "situacao": 7
-            },
-            "destinatario": {
-              "nome": "Anderson Trindade da Silva",
-              "codigo": "",
-              "fantasia": "",
-              "tipoPessoa": "F",
-              "cpfCnpj": "385.909.258-89",
-              "inscricaoEstadual": "",
-              "rg": "",
-              "telefone": "(11) 98018-0703",
-              "celular": "",
-              "email": "m3tyd4yxpg3vyz7@marketplace.amazon.com.br",
-              "endereco": {
-                "endereco": "Rua Jean Borlin",
-                "numero": "55",
-                "complemento": "",
-                "bairro": "Jardim São Roque",
-                "municipio": "São Paulo",
-                "cep": "05.736-140",
-                "uf": "SP",
-                "pais": "Brasil"
-              },
-              "id": 766882220
-            },
-            "volume": {
-              "embalagem": {
-                "id": 718341450,
-                "tipo": 2,
-                "descricao": "Embalagem Loja Integrada"
-              },
-              "largura": 16.3,
-              "altura": 7,
-              "comprimento": 19,
-              "diametro": 0,
-              "pesoBruto": 0.064,
-              "quantidadeVolumes": 1
-            },
-            "logistica": {
-              "codigoRastreio": "",
-              "urlRastreio": "",
-              "possuiValorDeclarado": true,
-              "valorDeclarado": 0,
-              "possuiAvisoRecebimento": true,
-              "formaFrete": null,
-              "transportador": null
-            }
-          },
-          {
-            "id": 749882109,
-            "data": "2026-06-11",
-            "situacao": "1",
-            "tipoObjeto": "notafiscal",
-            "idObjeto": 860301788,
-            "dataEmissao": "2026-06-11",
-            "venda": {
-              "id": 860286588,
-              "numero": 206892,
-              "data": "2026-06-11",
-              "situacao": 5
-            },
-            "notaFiscal": {
-              "id": 860301788,
-              "numero": 155887,
-              "data": "2026-06-11",
-              "situacao": 7
-            },
-            "destinatario": {
-              "nome": "Guilherme De Melo Faustino",
-              "codigo": "",
-              "fantasia": "",
-              "tipoPessoa": "F",
-              "cpfCnpj": "109.221.526-32",
-              "inscricaoEstadual": "",
-              "rg": "",
-              "telefone": "(31) 97575-0995",
-              "celular": "",
-              "email": "xln5bpr995hl4j0@marketplace.amazon.com.br",
-              "endereco": {
-                "endereco": "Rua Caiçara",
-                "numero": "143",
-                "complemento": "Vila Cristina",
-                "bairro": "Vila Cristina",
-                "municipio": "Betim",
-                "cep": "32.675-880",
-                "uf": "MG",
-                "pais": "Brasil"
-              },
-              "id": 766811164
-            },
-            "volume": {
-              "embalagem": {
-                "id": 718341450,
-                "tipo": 2,
-                "descricao": "Embalagem Loja Integrada"
-              },
-              "largura": 16.3,
-              "altura": 7,
-              "comprimento": 19,
-              "diametro": 0,
-              "pesoBruto": 0.512,
-              "quantidadeVolumes": 1
-            },
-            "logistica": {
-              "codigoRastreio": "",
-              "urlRastreio": "",
-              "possuiValorDeclarado": true,
-              "valorDeclarado": 0,
-              "possuiAvisoRecebimento": true,
-              "formaFrete": null,
-              "transportador": null
-            }
-          },
-          {
-            "id": 749882197,
-            "data": "2026-06-11",
-            "situacao": "1",
-            "tipoObjeto": "notafiscal",
-            "idObjeto": 860303368,
-            "dataEmissao": "2026-06-11",
-            "venda": {
-              "id": 860303355,
-              "numero": 206960,
-              "data": "2026-06-11",
-              "situacao": 5
-            },
-            "notaFiscal": {
-              "id": 860303368,
-              "numero": 155903,
-              "data": "2026-06-11",
-              "situacao": 7
-            },
-            "destinatario": {
-              "nome": "Giovanna",
-              "codigo": "",
-              "fantasia": "",
-              "tipoPessoa": "F",
-              "cpfCnpj": "432.920.508-47",
-              "inscricaoEstadual": "",
-              "rg": "",
-              "telefone": "(11) 99260-6085",
-              "celular": "",
-              "email": "63x50k3rbvkbrt3@marketplace.amazon.com.br",
-              "endereco": {
-                "endereco": "Rua Joaquim Antunes",
-                "numero": "810",
-                "complemento": "APT 102",
-                "bairro": "Pinheiros",
-                "municipio": "São Paulo",
-                "cep": "05.415-001",
-                "uf": "SP",
-                "pais": "Brasil"
-              },
-              "id": 766883241
-            },
-            "volume": {
-              "embalagem": {
-                "id": 718341450,
-                "tipo": 2,
-                "descricao": "Embalagem Loja Integrada"
-              },
-              "largura": 16.3,
-              "altura": 7,
-              "comprimento": 19,
-              "diametro": 0,
-              "pesoBruto": 0.16,
-              "quantidadeVolumes": 1
-            },
-            "logistica": {
-              "codigoRastreio": "",
-              "urlRastreio": "",
-              "possuiValorDeclarado": true,
-              "valorDeclarado": 0,
-              "possuiAvisoRecebimento": true,
-              "formaFrete": null,
-              "transportador": null
-            }
-          },
-          {
-            "id": 749882215,
-            "data": "2026-06-11",
-            "situacao": "1",
-            "tipoObjeto": "notafiscal",
-            "idObjeto": 860303740,
-            "dataEmissao": "2026-06-11",
-            "venda": {
-              "id": 860303730,
-              "numero": 206967,
-              "data": "2026-06-11",
-              "situacao": 5
-            },
-            "notaFiscal": {
-              "id": 860303740,
-              "numero": 155910,
-              "data": "2026-06-11",
-              "situacao": 7
-            },
-            "destinatario": {
-              "nome": "Maria Guarienti",
-              "codigo": "",
-              "fantasia": "",
-              "tipoPessoa": "F",
-              "cpfCnpj": "011.760.570-06",
-              "inscricaoEstadual": "",
-              "rg": "",
-              "telefone": "(55) 99999-4966",
-              "celular": "",
-              "email": "1k5rmg2cy9y49ny@marketplace.amazon.com.br",
-              "endereco": {
-                "endereco": "AV VENÂNCIO AIRES",
-                "numero": "2203",
-                "complemento": "",
-                "bairro": "Centro",
-                "municipio": "Santo Ângelo",
-                "cep": "98.803-000",
-                "uf": "RS",
-                "pais": "Brasil"
-              },
-              "id": 766883333
-            },
-            "volume": {
-              "embalagem": {
-                "id": 718341450,
-                "tipo": 2,
-                "descricao": "Embalagem Loja Integrada"
-              },
-              "largura": 16.3,
-              "altura": 7,
-              "comprimento": 19,
-              "diametro": 0,
-              "pesoBruto": 0.204,
-              "quantidadeVolumes": 1
-            },
-            "logistica": {
-              "codigoRastreio": "",
-              "urlRastreio": "",
-              "possuiValorDeclarado": true,
-              "valorDeclarado": 0,
-              "possuiAvisoRecebimento": true,
-              "formaFrete": null,
-              "transportador": null
-            }
-          },
-          {
-            "id": 749882243,
-            "data": "2026-06-12",
-            "situacao": "1",
-            "tipoObjeto": "notafiscal",
-            "idObjeto": 860304297,
-            "dataEmissao": "2026-06-12",
-            "venda": {
-              "id": 860304258,
-              "numero": 206972,
-              "data": "2026-06-12",
-              "situacao": 5
-            },
-            "notaFiscal": {
-              "id": 860304297,
-              "numero": 155912,
-              "data": "2026-06-12",
-              "situacao": 7
-            },
-            "destinatario": {
-              "nome": "Marcelo Lacerda",
-              "codigo": "",
-              "fantasia": "",
-              "tipoPessoa": "F",
-              "cpfCnpj": "064.439.063-81",
-              "inscricaoEstadual": "",
-              "rg": "",
-              "telefone": "(88) 98854-1349",
-              "celular": "",
-              "email": "hn5vzm24cjt8lch@marketplace.amazon.com.br",
-              "endereco": {
-                "endereco": "Rua Raimundo Machado da Silva",
-                "numero": "60",
-                "complemento": "Trade-S 1606",
-                "bairro": "Triângulo",
-                "municipio": "Juazeiro do Norte",
-                "cep": "63.041-187",
-                "uf": "CE",
-                "pais": "Brasil"
-              },
-              "id": 766883474
-            },
-            "volume": {
-              "embalagem": {
-                "id": 0,
-                "tipo": 2,
-                "descricao": ""
-              },
-              "largura": 5,
-              "altura": 5,
-              "comprimento": 5,
-              "diametro": 5,
-              "pesoBruto": 0.032,
-              "quantidadeVolumes": 1
-            },
-            "logistica": {
-              "codigoRastreio": "",
-              "urlRastreio": "",
-              "possuiValorDeclarado": true,
-              "valorDeclarado": 0,
-              "possuiAvisoRecebimento": true,
-              "formaFrete": null,
-              "transportador": null
-            }
-          },
-          {
-            "id": 749882248,
-            "data": "2026-06-12",
-            "situacao": "1",
-            "tipoObjeto": "notafiscal",
-            "idObjeto": 860304506,
-            "dataEmissao": "2026-06-12",
-            "venda": {
-              "id": 860304498,
-              "numero": 206973,
-              "data": "2026-06-12",
-              "situacao": 5
-            },
-            "notaFiscal": {
-              "id": 860304506,
-              "numero": 155913,
-              "data": "2026-06-12",
-              "situacao": 7
-            },
-            "destinatario": {
-              "nome": "Telma Bueno",
-              "codigo": "",
-              "fantasia": "",
-              "tipoPessoa": "F",
-              "cpfCnpj": "255.758.198-41",
-              "inscricaoEstadual": "",
-              "rg": "",
-              "telefone": "(11) 4562-9511",
-              "celular": "",
-              "email": "2gcmntqyqmmt7t5@marketplace.amazon.com.br",
-              "endereco": {
-                "endereco": "rua Visconde de Ouro Preto",
-                "numero": "51",
-                "complemento": "ap 113",
-                "bairro": "Consolação",
-                "municipio": "São Paulo",
-                "cep": "01.303-060",
-                "uf": "SP",
-                "pais": "Brasil"
-              },
-              "id": 766883493
-            },
-            "volume": {
-              "embalagem": {
-                "id": 718341450,
-                "tipo": 2,
-                "descricao": "Embalagem Loja Integrada"
-              },
-              "largura": 16.3,
-              "altura": 7,
-              "comprimento": 19,
-              "diametro": 0,
-              "pesoBruto": 0.64,
-              "quantidadeVolumes": 1
-            },
-            "logistica": {
-              "codigoRastreio": "",
-              "urlRastreio": "",
-              "possuiValorDeclarado": true,
-              "valorDeclarado": 0,
-              "possuiAvisoRecebimento": true,
-              "formaFrete": null,
-              "transportador": null
-            }
-          }
-        ]
-      },
-      "etiquetasAgrupamento": {
-        "urls": [
-          "https://s3.amazonaws.com/tiny-tmp-us/erp/NzQ1NTM0MzQ3/api/etiquetas/3e4bb79912d7e5c838cd919a789855d2.zpl"
-        ]
-      },
-      "expedicoes": [
-        {
-          "id": 749881546,
-          "resumo": {
-            "id": 749881546,
-            "data": "2026-06-11",
-            "situacao": "1",
-            "tipoObjeto": "notafiscal",
-            "idObjeto": 860280851,
-            "dataEmissao": "2026-06-11",
-            "venda": {
-              "id": 860280807,
-              "numero": 206838,
-              "data": "2026-06-11",
-              "situacao": 5
-            },
-            "notaFiscal": {
-              "id": 860280851,
-              "numero": 155742,
-              "data": "2026-06-11",
-              "situacao": 7
-            },
-            "destinatario": {
-              "nome": "Vanessa Maia Rangel",
-              "codigo": "",
-              "fantasia": "",
-              "tipoPessoa": "F",
-              "cpfCnpj": "014.294.837-33",
-              "inscricaoEstadual": "",
-              "rg": "",
-              "telefone": "(21) 99999-7190",
-              "celular": "",
-              "email": "fpl4r8xjs2wfbps@marketplace.amazon.com.br",
-              "endereco": {
-                "endereco": "Rua Riodades",
-                "numero": "145",
-                "complemento": "Bloco 2/408",
-                "bairro": "Fonseca",
-                "municipio": "Niterói",
-                "cep": "24.130-247",
-                "uf": "RJ",
-                "pais": "Brasil"
-              },
-              "id": 766881333
-            },
-            "volume": {
-              "embalagem": {
-                "id": 718341450,
-                "tipo": 2,
-                "descricao": "Embalagem Loja Integrada"
-              },
-              "largura": 16.3,
-              "altura": 7,
-              "comprimento": 19,
-              "diametro": 0,
-              "pesoBruto": 0.021,
-              "quantidadeVolumes": 1
-            },
-            "logistica": {
-              "codigoRastreio": "",
-              "urlRastreio": "",
-              "possuiValorDeclarado": true,
-              "valorDeclarado": 0,
-              "possuiAvisoRecebimento": true,
-              "formaFrete": null,
-              "transportador": null
-            }
-          },
-          "etiquetas": {
-            "urls": [
-              "https://s3.amazonaws.com/tiny-tmp-us/erp/NzQ1NTM0MzQ3/api/etiquetas/ba1e85f1f0268315fdeb599b40836021.zpl"
-            ]
-          }
-        },
-        {
-          "id": 749881818,
-          "resumo": {
-            "id": 749881818,
-            "data": "2026-06-11",
-            "situacao": "1",
-            "tipoObjeto": "notafiscal",
-            "idObjeto": 860284827,
-            "dataEmissao": "2026-06-11",
-            "venda": {
-              "id": 860284778,
-              "numero": 206877,
-              "data": "2026-06-11",
-              "situacao": 5
-            },
-            "notaFiscal": {
-              "id": 860284827,
-              "numero": 155764,
-              "data": "2026-06-11",
-              "situacao": 7
-            },
-            "destinatario": {
-              "nome": "Norival Costa Filho",
-              "codigo": "",
-              "fantasia": "",
-              "tipoPessoa": "F",
-              "cpfCnpj": "226.396.830-04",
-              "inscricaoEstadual": "",
-              "rg": "",
-              "telefone": "(53) 98147-8316",
-              "celular": "",
-              "email": "y10wqyt47p592mg@marketplace.amazon.com.br",
-              "endereco": {
-                "endereco": "Avenida Tupy Silveira",
-                "numero": "1752",
-                "complemento": "Casa",
-                "bairro": "Centro",
-                "municipio": "Bagé",
-                "cep": "96.400-110",
-                "uf": "RS",
-                "pais": "Brasil"
-              },
-              "id": 766881988
-            },
-            "volume": {
-              "embalagem": {
-                "id": 718341450,
-                "tipo": 2,
-                "descricao": "Embalagem Loja Integrada"
-              },
-              "largura": 16.3,
-              "altura": 7,
-              "comprimento": 19,
-              "diametro": 0,
-              "pesoBruto": 0.081,
-              "quantidadeVolumes": 1
-            },
-            "logistica": {
-              "codigoRastreio": "",
-              "urlRastreio": "",
-              "possuiValorDeclarado": true,
-              "valorDeclarado": 0,
-              "possuiAvisoRecebimento": true,
-              "formaFrete": null,
-              "transportador": null
-            }
-          },
-          "etiquetas": {
-            "urls": [
-              "https://s3.amazonaws.com/tiny-tmp-us/erp/NzQ1NTM0MzQ3/api/etiquetas/d6fb78c13459266d9e9d6f71610147d9.zpl"
-            ]
-          }
-        },
-        {
-          "id": 749881883,
-          "resumo": {
-            "id": 749881883,
-            "data": "2026-06-11",
-            "situacao": "1",
-            "tipoObjeto": "notafiscal",
-            "idObjeto": 860286039,
-            "dataEmissao": "2026-06-11",
-            "venda": {
-              "id": 860286006,
-              "numero": 206889,
-              "data": "2026-06-11",
-              "situacao": 5
-            },
-            "notaFiscal": {
-              "id": 860286039,
-              "numero": 155773,
-              "data": "2026-06-11",
-              "situacao": 7
-            },
-            "destinatario": {
-              "nome": "Anderson Trindade da Silva",
-              "codigo": "",
-              "fantasia": "",
-              "tipoPessoa": "F",
-              "cpfCnpj": "385.909.258-89",
-              "inscricaoEstadual": "",
-              "rg": "",
-              "telefone": "(11) 98018-0703",
-              "celular": "",
-              "email": "m3tyd4yxpg3vyz7@marketplace.amazon.com.br",
-              "endereco": {
-                "endereco": "Rua Jean Borlin",
-                "numero": "55",
-                "complemento": "",
-                "bairro": "Jardim São Roque",
-                "municipio": "São Paulo",
-                "cep": "05.736-140",
-                "uf": "SP",
-                "pais": "Brasil"
-              },
-              "id": 766882220
-            },
-            "volume": {
-              "embalagem": {
-                "id": 718341450,
-                "tipo": 2,
-                "descricao": "Embalagem Loja Integrada"
-              },
-              "largura": 16.3,
-              "altura": 7,
-              "comprimento": 19,
-              "diametro": 0,
-              "pesoBruto": 0.064,
-              "quantidadeVolumes": 1
-            },
-            "logistica": {
-              "codigoRastreio": "",
-              "urlRastreio": "",
-              "possuiValorDeclarado": true,
-              "valorDeclarado": 0,
-              "possuiAvisoRecebimento": true,
-              "formaFrete": null,
-              "transportador": null
-            }
-          },
-          "etiquetas": {
-            "urls": [
-              "https://s3.amazonaws.com/tiny-tmp-us/erp/NzQ1NTM0MzQ3/api/etiquetas/47b81034919b37b5abb795a6788bc1a8.zpl"
-            ]
-          }
-        },
-        {
-          "id": 749882109,
-          "resumo": {
-            "id": 749882109,
-            "data": "2026-06-11",
-            "situacao": "1",
-            "tipoObjeto": "notafiscal",
-            "idObjeto": 860301788,
-            "dataEmissao": "2026-06-11",
-            "venda": {
-              "id": 860286588,
-              "numero": 206892,
-              "data": "2026-06-11",
-              "situacao": 5
-            },
-            "notaFiscal": {
-              "id": 860301788,
-              "numero": 155887,
-              "data": "2026-06-11",
-              "situacao": 7
-            },
-            "destinatario": {
-              "nome": "Guilherme De Melo Faustino",
-              "codigo": "",
-              "fantasia": "",
-              "tipoPessoa": "F",
-              "cpfCnpj": "109.221.526-32",
-              "inscricaoEstadual": "",
-              "rg": "",
-              "telefone": "(31) 97575-0995",
-              "celular": "",
-              "email": "xln5bpr995hl4j0@marketplace.amazon.com.br",
-              "endereco": {
-                "endereco": "Rua Caiçara",
-                "numero": "143",
-                "complemento": "Vila Cristina",
-                "bairro": "Vila Cristina",
-                "municipio": "Betim",
-                "cep": "32.675-880",
-                "uf": "MG",
-                "pais": "Brasil"
-              },
-              "id": 766811164
-            },
-            "volume": {
-              "embalagem": {
-                "id": 718341450,
-                "tipo": 2,
-                "descricao": "Embalagem Loja Integrada"
-              },
-              "largura": 16.3,
-              "altura": 7,
-              "comprimento": 19,
-              "diametro": 0,
-              "pesoBruto": 0.512,
-              "quantidadeVolumes": 1
-            },
-            "logistica": {
-              "codigoRastreio": "",
-              "urlRastreio": "",
-              "possuiValorDeclarado": true,
-              "valorDeclarado": 0,
-              "possuiAvisoRecebimento": true,
-              "formaFrete": null,
-              "transportador": null
-            }
-          },
-          "etiquetas": {
-            "urls": [
-              "https://s3.amazonaws.com/tiny-tmp-us/erp/NzQ1NTM0MzQ3/api/etiquetas/95c677de8924821a3160707b1d3f9e27.zpl"
-            ]
+            "erro": true,
+            "mensagem": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Url das etiquetas não encontrada na Amazon.",
+            "statusCode": 400
           }
         }
       ]

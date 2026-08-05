@@ -1,0 +1,475 @@
+{
+  "meta": {
+    "fetchedAt": "2026-06-17T18:02:25.747Z",
+    "pedidoId": 860374180,
+    "erpOrderId": "TINY-860374180",
+    "numeroPedido": 207644,
+    "situacao": 7,
+    "situacaoLabel": "Pronto Envio",
+    "formaEnvioNome": "Mercado Envios",
+    "diagnostico": "FORA_EXPEDICAO",
+    "resumoTesteAnterior": {
+      "pedidoId": 860374180,
+      "erpOrderId": "TINY-860374180",
+      "numeroPedido": 207644,
+      "situacao": 7,
+      "situacaoLabel": "Pronto Envio",
+      "formaEnvioNome": "Mercado Envios",
+      "codigoRastreamento": null,
+      "idNotaFiscal": 860374182,
+      "naExpedicao": false,
+      "expedicao": null,
+      "etiquetas": {
+        "urls": [],
+        "marketplaceError": null,
+        "diagnostico": "FORA_EXPEDICAO"
+      }
+    }
+  },
+  "pedido": {
+    "rotas": {
+      "GET /pedidos/860374180": {
+        "rota": "GET /pedidos/860374180",
+        "params": {
+          "idPedido": 860374180
+        },
+        "ok": true,
+        "urls": [],
+        "resposta": {
+          "id": 860374180,
+          "numeroPedido": 207644,
+          "idNotaFiscal": 860374182,
+          "dataFaturamento": "2026-06-16",
+          "valorTotalProdutos": 139.92,
+          "valorTotalPedido": 134.92,
+          "listaPreco": {
+            "id": 0,
+            "nome": "Padrão",
+            "acrescimoDesconto": 0
+          },
+          "cliente": {
+            "nome": "Paulo Sergio Marques Ferreira",
+            "codigo": "",
+            "fantasia": "",
+            "tipoPessoa": "F",
+            "cpfCnpj": "130.827.998-17",
+            "inscricaoEstadual": "",
+            "rg": "",
+            "telefone": "",
+            "celular": "",
+            "email": "",
+            "endereco": {
+              "endereco": "Rua Orozimbo Florêncio Figueredo",
+              "numero": "2 115",
+              "complemento": "",
+              "bairro": "Jardim Chapadão",
+              "municipio": "Bauru",
+              "cep": "17.026-793",
+              "uf": "SP",
+              "pais": "Brasil"
+            },
+            "id": 766182658
+          },
+          "enderecoEntrega": {
+            "endereco": "Rua Orozimbo Florêncio Figueredo",
+            "numero": "2 115",
+            "complemento": "",
+            "bairro": "Jardim Chapadão",
+            "municipio": "Bauru",
+            "cep": "17.026-793",
+            "uf": "SP",
+            "pais": "Brasil",
+            "nomeDestinatario": "Paulo Sérgio",
+            "cpfCnpj": "130.827.998-17",
+            "tipoPessoa": "F",
+            "telefone": "",
+            "inscricaoEstadual": ""
+          },
+          "ecommerce": {
+            "id": 4751,
+            "nome": "Mercado Livre Mamute",
+            "numeroPedidoEcommerce": "2000016975415714",
+            "numeroPedidoCanalVenda": "",
+            "canalVenda": ""
+          },
+          "transportador": {
+            "id": 0,
+            "nome": "",
+            "fretePorConta": "R",
+            "formaEnvio": {
+              "id": 744061814,
+              "nome": "Mercado Envios"
+            },
+            "formaFrete": null,
+            "codigoRastreamento": "",
+            "urlRastreamento": ""
+          },
+          "deposito": null,
+          "vendedor": null,
+          "naturezaOperacao": {
+            "id": 775374075,
+            "nome": "Venda de Mercadorias - Regime normal"
+          },
+          "intermediador": {
+            "id": 381,
+            "nome": "624895842",
+            "cnpj": "03.007.331/0001-41",
+            "cnpjPagamentoInstituicao": ""
+          },
+          "pagamento": null,
+          "itens": [
+            {
+              "produto": {
+                "id": 744041332,
+                "sku": "PUXARQ96PR",
+                "descricao": "PUXARQ96PR - PUXADOR ALCA 96MM PRETO (ARQUIVO)",
+                "tipo": "P"
+              },
+              "quantidade": 100,
+              "valorUnitario": 1.3992,
+              "infoAdicional": ""
+            }
+          ],
+          "pagamentosIntegrados": [
+            {
+              "valor": 134.92,
+              "tipoPagamento": 99,
+              "cnpjIntermediador": "03007331000141",
+              "codigoAutorizacao": "PIXE60701190202606162311DY5PYHHMNHR",
+              "codigoBandeira": 99
+            }
+          ],
+          "situacao": 7,
+          "data": "2026-06-16",
+          "dataEntrega": "",
+          "numeroOrdemCompra": "2000016975415714",
+          "valorDesconto": 5,
+          "valorFrete": 0,
+          "valorOutrasDespesas": 0,
+          "dataPrevista": "2026-06-22",
+          "dataEnvio": "",
+          "observacoes": "Endereço:  ",
+          "observacoesInternas": "",
+          "origemPedido": 0
+        }
+      },
+      "GET /pedidos/860374180/marcadores": {
+        "rota": "GET /pedidos/860374180/marcadores",
+        "params": {
+          "idPedido": 860374180
+        },
+        "ok": true,
+        "urls": [],
+        "resposta": [
+          {
+            "descricao": "MercadoEnvios Coleta"
+          }
+        ]
+      }
+    }
+  },
+  "nota": {
+    "idNotaFiscal": 860374182,
+    "rotas": {
+      "GET /notas/860374182": {
+        "rota": "GET /notas/860374182",
+        "params": {
+          "idNota": 860374182
+        },
+        "ok": true,
+        "urls": [],
+        "resposta": {
+          "situacao": "6",
+          "tipo": "S",
+          "numero": "156509",
+          "serie": "5",
+          "chaveAcesso": "35260637919979000106550050001565091603741820",
+          "dataEmissao": "2026-06-16",
+          "dataPrevista": "2026-06-22",
+          "cliente": {
+            "nome": "Paulo Sergio Marques Ferreira",
+            "codigo": null,
+            "fantasia": null,
+            "tipoPessoa": "F",
+            "cpfCnpj": "130.827.998-17",
+            "inscricaoEstadual": "",
+            "rg": null,
+            "telefone": "",
+            "celular": null,
+            "email": "",
+            "endereco": {
+              "endereco": "Rua Orozimbo Florêncio Figueredo",
+              "numero": "2 115",
+              "complemento": "",
+              "bairro": "Jardim Chapadão",
+              "municipio": "Bauru",
+              "cep": "17.026-793",
+              "uf": "SP",
+              "pais": "Brasil"
+            },
+            "id": 766182658
+          },
+          "enderecoEntrega": {
+            "endereco": "Rua Orozimbo Florêncio Figueredo",
+            "numero": "2 115",
+            "complemento": "",
+            "bairro": "Jardim Chapadão",
+            "municipio": "Bauru",
+            "cep": "17.026-793",
+            "uf": "SP",
+            "pais": "Brasil",
+            "nomeDestinatario": "Paulo Sérgio",
+            "cpfCnpj": "130.827.998-17",
+            "tipoPessoa": "F",
+            "telefone": "",
+            "inscricaoEstadual": null
+          },
+          "valor": 134.92,
+          "valorProdutos": 139.92,
+          "valorFrete": 0,
+          "vendedor": null,
+          "idFormaEnvio": 744061814,
+          "idFormaFrete": 0,
+          "codigoRastreamento": "",
+          "urlRastreamento": "",
+          "fretePorConta": "R",
+          "qtdVolumes": 1,
+          "pesoBruto": 1,
+          "pesoLiquido": 1,
+          "id": 860374182,
+          "finalidade": "1",
+          "regimeTributario": 3,
+          "dataInclusao": "2026-06-16 20:15:07",
+          "baseIcms": 134.92,
+          "valorIcms": 24.29,
+          "baseIcmsSt": 0,
+          "valorIcmsSt": 0,
+          "valorServicos": 0,
+          "valorSeguro": 0,
+          "valorOutras": 0,
+          "valorIpi": 0,
+          "valorIssqn": 0,
+          "valorDesconto": 5,
+          "valorFaturado": 134.92,
+          "idIntermediador": 381,
+          "idNaturezaOperacao": 775374075,
+          "idFormaPagamento": 0,
+          "idMeioPagamento": 0,
+          "observacoes": "Endereço:\nOC: 2000016975415714\nNº Pedido: 207644\r\nTributos aproximados: R$ 23,23 (Federal) e R$ 25,19 (Estadual). Fonte: IBPT 5F6AA1\n",
+          "condicaoPagamento": "",
+          "valorNotaComImpostos": 134.92,
+          "valorBaseDiferimento": 0,
+          "percentualICMSPartilhaDestino": 100,
+          "valorTotalICMSFCPDestino": 0,
+          "valorIPIDevolvido": 0,
+          "tipoNotaCredito": "",
+          "tipoNotaDebito": "",
+          "valorTotalBCIBSCBS": 106.59,
+          "valorTotalIBSUF": 0.11,
+          "valorTotalCBS": 0.96,
+          "itens": [
+            {
+              "idItem": 780299973,
+              "idProduto": 744041332,
+              "codigo": "PUXARQ96PR",
+              "ncm": "3926.30.00",
+              "descricao": "PUXARQ96PR - PUXADOR ALCA 96MM PRETO (ARQUIVO)",
+              "unidade": "UN",
+              "quantidade": 100,
+              "valorUnitario": 1.3992,
+              "valorTotal": 139.92,
+              "cfop": "5102",
+              "naturezaOperacao": "Venda de Mercadorias - Regime normal"
+            }
+          ],
+          "parcelas": [],
+          "pagamentosIntegrados": [
+            {
+              "valor": 134.92,
+              "tipoPagamento": 99,
+              "cnpjIntermediador": "03007331000141",
+              "codigoAutorizacao": "PIXE60701190202606162311DY5PYHHMNHR",
+              "codigoBandeira": 99
+            }
+          ],
+          "ecommerce": {
+            "id": 4751,
+            "nome": "Mercado Livre Mamute",
+            "numeroPedidoEcommerce": "2000016975415714",
+            "numeroPedidoCanalVenda": "",
+            "canalVenda": ""
+          },
+          "marcadores": [],
+          "transportador": {
+            "nome": "",
+            "cpfCnpj": "",
+            "ie": "",
+            "endereco": "",
+            "municipio": null,
+            "uf": ""
+          },
+          "origem": {
+            "id": "860374180",
+            "tipo": "venda"
+          }
+        }
+      },
+      "GET /notas/860374182/link": {
+        "rota": "GET /notas/860374182/link",
+        "params": {
+          "idNota": 860374182
+        },
+        "ok": true,
+        "urls": [],
+        "resposta": {
+          "link": "https://erp.tiny.com.br/doc.view?id=6a21e11a31797136b9118a2229006973"
+        }
+      },
+      "GET /notas/860374182/marcadores": {
+        "rota": "GET /notas/860374182/marcadores",
+        "params": {
+          "idNota": 860374182
+        },
+        "ok": true,
+        "urls": [],
+        "resposta": []
+      }
+    }
+  },
+  "formaEnvio": {
+    "idFormaEnvio": 744061814,
+    "rotas": {
+      "GET /formas-envio/744061814": {
+        "rota": "GET /formas-envio/744061814",
+        "params": {
+          "idFormaEnvio": 744061814
+        },
+        "ok": true,
+        "urls": [],
+        "resposta": {
+          "nome": "Mercado Envios",
+          "tipo": "3",
+          "situacao": "1",
+          "id": 744061814,
+          "gatewayLogistico": null,
+          "formasFrete": [
+            {
+              "id": 760093007,
+              "nome": "Coleta Normal",
+              "codigo": "101",
+              "codigoExterno": "",
+              "tipoEntrega": "0"
+            },
+            {
+              "id": 760093008,
+              "nome": "Coleta Express",
+              "codigo": "102",
+              "codigoExterno": "",
+              "tipoEntrega": "0"
+            },
+            {
+              "id": 760093009,
+              "nome": "Coleta Express",
+              "codigo": "103",
+              "codigoExterno": "",
+              "tipoEntrega": "0"
+            },
+            {
+              "id": 760093010,
+              "nome": "Coleta Correios PAC Agência",
+              "codigo": "1051",
+              "codigoExterno": "",
+              "tipoEntrega": "0"
+            },
+            {
+              "id": 760093011,
+              "nome": "Coleta Correios Sedex Agência",
+              "codigo": "1061",
+              "codigoExterno": "",
+              "tipoEntrega": "0"
+            },
+            {
+              "id": 760093012,
+              "nome": "Shipping Network Fast",
+              "codigo": "155413",
+              "codigoExterno": "",
+              "tipoEntrega": "0"
+            },
+            {
+              "id": 760093013,
+              "nome": "Shipping Network Fast",
+              "codigo": "165366",
+              "codigoExterno": "",
+              "tipoEntrega": "0"
+            },
+            {
+              "id": 760093014,
+              "nome": "Coleta Normal",
+              "codigo": "101",
+              "codigoExterno": "",
+              "tipoEntrega": "0"
+            },
+            {
+              "id": 760093015,
+              "nome": "Coleta Express",
+              "codigo": "102",
+              "codigoExterno": "",
+              "tipoEntrega": "0"
+            },
+            {
+              "id": 760093016,
+              "nome": "Coleta Express",
+              "codigo": "103",
+              "codigoExterno": "",
+              "tipoEntrega": "0"
+            },
+            {
+              "id": 760093017,
+              "nome": "Coleta Correios PAC Agência",
+              "codigo": "1051",
+              "codigoExterno": "",
+              "tipoEntrega": "0"
+            },
+            {
+              "id": 760093018,
+              "nome": "Coleta Correios Sedex Agência",
+              "codigo": "1061",
+              "codigoExterno": "",
+              "tipoEntrega": "0"
+            },
+            {
+              "id": 760093020,
+              "nome": "Shipping Network Fast",
+              "codigo": "155413",
+              "codigoExterno": "",
+              "tipoEntrega": "0"
+            },
+            {
+              "id": 760093021,
+              "nome": "Shipping Network Fast",
+              "codigo": "165366",
+              "codigoExterno": "",
+              "tipoEntrega": "0"
+            },
+            {
+              "id": 760093022,
+              "nome": "Mercadoenvios Next Day",
+              "codigo": "991",
+              "codigoExterno": "",
+              "tipoEntrega": "0"
+            }
+          ]
+        }
+      }
+    }
+  },
+  "expedicao": {
+    "encontrada": false,
+    "match": null,
+    "rotas": {}
+  },
+  "etiquetas": {
+    "urls": [],
+    "rotas": {}
+  }
+}

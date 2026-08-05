@@ -8,6 +8,7 @@
     "dev:api": "pnpm --filter @wms/api dev",
     "dev:web": "pnpm --filter @wms/web dev",
     "dev:mobile": "pnpm --filter @wms/mobile dev",
+    "dev:mobile:go": "pnpm --filter @wms/mobile dev:go",
     "build": "pnpm -r build",
     "db:generate": "pnpm --filter @wms/api db:generate",
     "db:migrate": "pnpm --filter @wms/api db:migrate",
@@ -15,7 +16,9 @@
     "db:seed": "pnpm --filter @wms/api db:seed",
     "db:studio": "pnpm --filter @wms/api db:studio",
     "lint": "pnpm -r lint",
-    "typecheck": "pnpm -r typecheck"
+    "typecheck": "pnpm -r typecheck",
+    "teste-etiquetas-expedicao": "pnpm --filter @wms/api teste-etiquetas-expedicao",
+    "cruzar-etiquetas": "pnpm --filter @wms/api cruzar-etiquetas"
   },
   "engines": {
     "node": ">=20.0.0",

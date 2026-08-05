@@ -1,0 +1,228 @@
+{
+  "fetchedAt": "2026-06-23T16:31:06.779Z",
+  "tenant": "Default",
+  "baseUrl": "https://api.tiny.com.br/public-api/v3",
+  "mercadoLivre": [
+    {
+      "marketplace": "Mercado Livre",
+      "pedidoId": 860464286,
+      "erpOrderId": "TINY-860464286",
+      "numeroPedido": 208481,
+      "situacao": 7,
+      "situacaoLabel": "Pronto Envio",
+      "formaEnvioNome": "Mercado Envios",
+      "idNotaFiscal": null,
+      "codigoRastreamento": null,
+      "pedidoEcommerce": "2000017062261930",
+      "naExpedicao": false,
+      "idAgrupamento": null,
+      "idExpedicao": null,
+      "postman": {
+        "passo3": "GET /pedidos/860464286",
+        "passo2": null,
+        "passo5": null,
+        "passo6": null
+      }
+    },
+    {
+      "marketplace": "Mercado Livre",
+      "pedidoId": 860464223,
+      "erpOrderId": "TINY-860464223",
+      "numeroPedido": 208480,
+      "situacao": 7,
+      "situacaoLabel": "Pronto Envio",
+      "formaEnvioNome": "Mercado Envios",
+      "idNotaFiscal": null,
+      "codigoRastreamento": null,
+      "pedidoEcommerce": "2000017062226684",
+      "naExpedicao": false,
+      "idAgrupamento": null,
+      "idExpedicao": null,
+      "postman": {
+        "passo3": "GET /pedidos/860464223",
+        "passo2": null,
+        "passo5": null,
+        "passo6": null
+      }
+    },
+    {
+      "marketplace": "Mercado Livre",
+      "pedidoId": 860464194,
+      "erpOrderId": "TINY-860464194",
+      "numeroPedido": 208479,
+      "situacao": 7,
+      "situacaoLabel": "Pronto Envio",
+      "formaEnvioNome": "Mercado Envios",
+      "idNotaFiscal": null,
+      "codigoRastreamento": null,
+      "pedidoEcommerce": "2000017062178316",
+      "naExpedicao": false,
+      "idAgrupamento": null,
+      "idExpedicao": null,
+      "postman": {
+        "passo3": "GET /pedidos/860464194",
+        "passo2": null,
+        "passo5": null,
+        "passo6": null
+      }
+    },
+    {
+      "marketplace": "Mercado Livre",
+      "pedidoId": 860463967,
+      "erpOrderId": "TINY-860463967",
+      "numeroPedido": 208476,
+      "situacao": 7,
+      "situacaoLabel": "Pronto Envio",
+      "formaEnvioNome": "Mercado Envios",
+      "idNotaFiscal": null,
+      "codigoRastreamento": null,
+      "pedidoEcommerce": "2000017061824804",
+      "naExpedicao": false,
+      "idAgrupamento": null,
+      "idExpedicao": null,
+      "postman": {
+        "passo3": "GET /pedidos/860463967",
+        "passo2": null,
+        "passo5": null,
+        "passo6": null
+      }
+    },
+    {
+      "marketplace": "Mercado Livre",
+      "pedidoId": 860463935,
+      "erpOrderId": "TINY-860463935",
+      "numeroPedido": 208474,
+      "situacao": 7,
+      "situacaoLabel": "Pronto Envio",
+      "formaEnvioNome": "Mercado Envios",
+      "idNotaFiscal": null,
+      "codigoRastreamento": null,
+      "pedidoEcommerce": "2000013649029835",
+      "naExpedicao": false,
+      "idAgrupamento": null,
+      "idExpedicao": null,
+      "postman": {
+        "passo3": "GET /pedidos/860463935",
+        "passo2": null,
+        "passo5": null,
+        "passo6": null
+      }
+    }
+  ],
+  "shopee": [
+    {
+      "marketplace": "Shopee",
+      "pedidoId": 860477599,
+      "erpOrderId": "TINY-860477599",
+      "numeroPedido": 208580,
+      "situacao": 7,
+      "situacaoLabel": "Pronto Envio",
+      "formaEnvioNome": "Shopee Envios",
+      "idNotaFiscal": null,
+      "codigoRastreamento": null,
+      "pedidoEcommerce": "260623TVDMXXUE",
+      "naExpedicao": false,
+      "idAgrupamento": null,
+      "idExpedicao": null,
+      "postman": {
+        "passo3": "GET /pedidos/860477599",
+        "passo2": null,
+        "passo5": null,
+        "passo6": null
+      }
+    },
+    {
+      "marketplace": "Shopee",
+      "pedidoId": 860477389,
+      "erpOrderId": "TINY-860477389",
+      "numeroPedido": 208578,
+      "situacao": 7,
+      "situacaoLabel": "Pronto Envio",
+      "formaEnvioNome": "Shopee Envios",
+      "idNotaFiscal": null,
+      "codigoRastreamento": null,
+      "pedidoEcommerce": "260623TUTGNGHV",
+      "naExpedicao": false,
+      "idAgrupamento": null,
+      "idExpedicao": null,
+      "postman": {
+        "passo3": "GET /pedidos/860477389",
+        "passo2": null,
+        "passo5": null,
+        "passo6": null
+      }
+    },
+    {
+      "marketplace": "Shopee",
+      "pedidoId": 860477304,
+      "erpOrderId": "TINY-860477304",
+      "numeroPedido": 208577,
+      "situacao": 7,
+      "situacaoLabel": "Pronto Envio",
+      "formaEnvioNome": "Shopee Envios",
+      "idNotaFiscal": null,
+      "codigoRastreamento": null,
+      "pedidoEcommerce": "260623TUK0D71K",
+      "naExpedicao": false,
+      "idAgrupamento": null,
+      "idExpedicao": null,
+      "postman": {
+        "passo3": "GET /pedidos/860477304",
+        "passo2": null,
+        "passo5": null,
+        "passo6": null
+      }
+    },
+    {
+      "marketplace": "Shopee",
+      "pedidoId": 860476961,
+      "erpOrderId": "TINY-860476961",
+      "numeroPedido": 208574,
+      "situacao": 7,
+      "situacaoLabel": "Pronto Envio",
+      "formaEnvioNome": "Shopee Envios",
+      "idNotaFiscal": null,
+      "codigoRastreamento": null,
+      "pedidoEcommerce": "260623TTPDR798",
+      "naExpedicao": false,
+      "idAgrupamento": null,
+      "idExpedicao": null,
+      "postman": {
+        "passo3": "GET /pedidos/860476961",
+        "passo2": null,
+        "passo5": null,
+        "passo6": null
+      }
+    },
+    {
+      "marketplace": "Shopee",
+      "pedidoId": 860476886,
+      "erpOrderId": "TINY-860476886",
+      "numeroPedido": 208573,
+      "situacao": 7,
+      "situacaoLabel": "Pronto Envio",
+      "formaEnvioNome": "Shopee Envios",
+      "idNotaFiscal": null,
+      "codigoRastreamento": null,
+      "pedidoEcommerce": "260623TTKAJM8W",
+      "naExpedicao": false,
+      "idAgrupamento": null,
+      "idExpedicao": null,
+      "postman": {
+        "passo3": "GET /pedidos/860476886",
+        "passo2": null,
+        "passo5": null,
+        "passo6": null
+      }
+    }
+  ],
+  "referenciaFixa": {
+    "mercadoLivreNaExpedicao": {
+      "pedidoId": 860301754,
+      "idNotaFiscal": 860301759,
+      "idAgrupamento": 746503742,
+      "idExpedicao": 749882106,
+      "diagnostico": "Na expedição — erro ML S47281733718"
+    }
+  }
+}

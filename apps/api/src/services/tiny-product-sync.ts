@@ -1,5 +1,6 @@
 import { Prisma } from "@prisma/client";
 import { prisma } from "../lib/prisma.js";
+import { saveProductTinyTipo } from "./product-kit-filter.js";
 
 export type TinyProductPayload = {
   tinyId: number;
@@ -12,9 +13,20 @@ export type TinyProductPayload = {
   supplierName: string | null;
   erpStockQuantity: number | null;
   active: boolean;
+  /** Tipo no Tiny: K|S|V|F|M (Kit, Simples, Variações, Fabricado, Matéria Prima) */
+  tinyTipo: string | null;
 };
 
 export const TINY_PRODUCT_SITUACAO_EXCLUIDA = "E";
+export const TINY_PRODUCT_TIPO_KIT = "K";
+
+export function isTinyKitProductType(tipo: string | null | undefined): boolean {
+  return tipo?.trim().toUpperCase() === TINY_PRODUCT_TIPO_KIT;
+}
+
+export function isTinyProductTipoSyncable(tipo: string | null | undefined): boolean {
+  return !isTinyKitProductType(tipo);
+}
 
 function asRecord(v: unknown): Record<string, unknown> | null {
   return v && typeof v === "object" && !Array.isArray(v)
@@ -93,6 +105,9 @@ function payloadFromTinyRecord(
   const situacao = str(rec.situacao)?.toUpperCase() ?? "A";
   if (!isTinyProductSituacaoSyncable(situacao)) return null;
 
+  const tipo = str(rec.tipo)?.toUpperCase() ?? null;
+  if (!isTinyProductTipoSyncable(tipo)) return null;
+
   const tributacao = asRecord(rec.tributacao);
   const gtin = str(rec.gtin) ?? str(tributacao?.gtinEmbalagem);
 
@@ -113,6 +128,7 @@ function payloadFromTinyRecord(
     supplierName: extractSupplierNameFromTinyProduct(rec),
     erpStockQuantity: extractErpStockQuantityFromTinyProduct(rec),
     active: situacao === "A",
+    tinyTipo: tipo,
   };
 }
 
@@ -204,6 +220,7 @@ export async function upsertProductFromTiny(
       data: baseData,
     });
     await applyBarcode(existing.id, payload.barcode);
+    await saveProductTinyTipo(existing.id, payload.tinyTipo, tenantId);
     return { productId: existing.id, created: false };
   }
 
@@ -217,6 +234,7 @@ export async function upsertProductFromTiny(
         requiresItemScan: false,
       },
     });
+    await saveProductTinyTipo(created.id, payload.tinyTipo, tenantId);
     return { productId: created.id, created: true };
   } catch (e) {
     if (isUniqueConstraintError(e) && payload.barcode) {
@@ -229,6 +247,7 @@ export async function upsertProductFromTiny(
           requiresItemScan: false,
         },
       });
+      await saveProductTinyTipo(created.id, payload.tinyTipo, tenantId);
       return { productId: created.id, created: true };
     }
     throw e;

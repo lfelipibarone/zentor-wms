@@ -28,6 +28,7 @@ import { TinyConnectionStatus } from "@prisma/client";
 import { syncPendingOrderPrioritiesFromTiny } from "../services/tiny-integration.js";
 import { syncSalesOrdersFromTiny } from "../services/sync-sales-orders-from-tiny.js";
 import { syncProductsFromTiny } from "../services/sync-products-from-tiny.js";
+import { getTinySyncStatus } from "../services/tiny-sync-checkpoint.js";
 
 function wantsJson(request: {
   headers: Record<string, unknown>;
@@ -97,6 +98,15 @@ export async function tinyRoutes(app: FastifyInstance) {
         { tenantId, userId: request.authUser.id },
         connectionId,
       );
+    });
+
+    secured.get("/api/integrations/tiny/sync-status", async (request, reply) => {
+      if (!request.authUser) {
+        return reply.status(401).send({ error: "Não autenticado" });
+      }
+      const tenantId = tenantWhere(request).tenantId;
+      const connectionId = (request.query as { connectionId?: string }).connectionId;
+      return getTinySyncStatus({ tenantId, connectionId });
     });
 
     secured.get("/api/integrations/tiny/connections", async (request, reply) => {
@@ -289,7 +299,7 @@ export async function tinyRoutes(app: FastifyInstance) {
       },
     );
 
-    secured.post<{ Body: { days?: number; connectionId?: string } }>(
+    secured.post<{ Body: { days?: number; connectionId?: string; forceRestart?: boolean } }>(
       "/api/integrations/tiny/sync-orders",
       { preHandler: requireOlistConfigure },
       async (request, reply) => {
@@ -305,6 +315,7 @@ export async function tinyRoutes(app: FastifyInstance) {
               ? { connectionId: request.body.connectionId }
               : {}),
             ...(days !== undefined ? { days } : {}),
+            ...(request.body?.forceRestart ? { forceRestart: true } : {}),
           });
           return result;
         } catch (e) {

@@ -1,0 +1,303 @@
+{
+  "meta": {
+    "fetchedAt": "2026-06-17T18:02:32.709Z",
+    "pedidoId": 860386892,
+    "erpOrderId": "TINY-860386892",
+    "numeroPedido": 207751,
+    "situacao": 0,
+    "situacaoLabel": "Aberta",
+    "formaEnvioNome": "Mercado Envios",
+    "diagnostico": "FORA_EXPEDICAO",
+    "resumoTesteAnterior": {
+      "pedidoId": 860386892,
+      "erpOrderId": "TINY-860386892",
+      "numeroPedido": 207751,
+      "situacao": 0,
+      "situacaoLabel": "Aberta",
+      "formaEnvioNome": "Mercado Envios",
+      "codigoRastreamento": null,
+      "idNotaFiscal": null,
+      "naExpedicao": false,
+      "expedicao": null,
+      "etiquetas": {
+        "urls": [],
+        "marketplaceError": null,
+        "diagnostico": "FORA_EXPEDICAO"
+      }
+    }
+  },
+  "pedido": {
+    "rotas": {
+      "GET /pedidos/860386892": {
+        "rota": "GET /pedidos/860386892",
+        "params": {
+          "idPedido": 860386892
+        },
+        "ok": true,
+        "urls": [],
+        "resposta": {
+          "id": 860386892,
+          "numeroPedido": 207751,
+          "idNotaFiscal": 0,
+          "dataFaturamento": "",
+          "valorTotalProdutos": 37.9,
+          "valorTotalPedido": 37.9,
+          "listaPreco": {
+            "id": 0,
+            "nome": "Padrão",
+            "acrescimoDesconto": 0
+          },
+          "cliente": {
+            "nome": "Flavia Aparecida Neves",
+            "codigo": "",
+            "fantasia": "",
+            "tipoPessoa": "F",
+            "cpfCnpj": "293.449.068-82",
+            "inscricaoEstadual": "",
+            "rg": "",
+            "telefone": "",
+            "celular": "",
+            "email": "",
+            "endereco": {
+              "endereco": "Rua Domingos Quatroni",
+              "numero": "136",
+              "complemento": "",
+              "bairro": "Jardim do Bosque",
+              "municipio": "Ibitinga",
+              "cep": "14.945-008",
+              "uf": "SP",
+              "pais": "Brasil"
+            },
+            "id": 766895072
+          },
+          "enderecoEntrega": null,
+          "ecommerce": {
+            "id": 4751,
+            "nome": "Mercado Livre Mamute",
+            "numeroPedidoEcommerce": "2000016987482244",
+            "numeroPedidoCanalVenda": "",
+            "canalVenda": ""
+          },
+          "transportador": {
+            "id": 0,
+            "nome": "",
+            "fretePorConta": "R",
+            "formaEnvio": {
+              "id": 744061814,
+              "nome": "Mercado Envios"
+            },
+            "formaFrete": null,
+            "codigoRastreamento": "",
+            "urlRastreamento": ""
+          },
+          "deposito": null,
+          "vendedor": null,
+          "naturezaOperacao": {
+            "id": 775374075,
+            "nome": "Venda de Mercadorias - Regime normal"
+          },
+          "intermediador": {
+            "id": 381,
+            "nome": "624895842",
+            "cnpj": "03.007.331/0001-41",
+            "cnpjPagamentoInstituicao": ""
+          },
+          "pagamento": null,
+          "itens": [
+            {
+              "produto": {
+                "id": 856466712,
+                "sku": "PUXPON1075BOT32RGF",
+                "descricao": "PUXADOR PZ 1075 32mm - Rose Gold Fosco",
+                "tipo": "P"
+              },
+              "quantidade": 5,
+              "valorUnitario": 7.58,
+              "infoAdicional": ""
+            }
+          ],
+          "pagamentosIntegrados": [
+            {
+              "valor": 37.9,
+              "tipoPagamento": 3,
+              "cnpjIntermediador": "03007331000141",
+              "codigoAutorizacao": "069866",
+              "codigoBandeira": 2
+            }
+          ],
+          "situacao": 0,
+          "data": "2026-06-17",
+          "dataEntrega": "",
+          "numeroOrdemCompra": "2000016987482244",
+          "valorDesconto": 0,
+          "valorFrete": 0,
+          "valorOutrasDespesas": 0,
+          "dataPrevista": "2026-06-20",
+          "dataEnvio": "",
+          "observacoes": "Endereço:  ",
+          "observacoesInternas": "",
+          "origemPedido": 0
+        }
+      },
+      "GET /pedidos/860386892/marcadores": {
+        "rota": "GET /pedidos/860386892/marcadores",
+        "params": {
+          "idPedido": 860386892
+        },
+        "ok": true,
+        "urls": [],
+        "resposta": [
+          {
+            "descricao": "MercadoEnvios Coleta"
+          },
+          {
+            "descricao": "Etiqueta com data programada"
+          },
+          {
+            "descricao": "1ª venda"
+          }
+        ]
+      }
+    }
+  },
+  "nota": {
+    "idNotaFiscal": null,
+    "rotas": {}
+  },
+  "formaEnvio": {
+    "idFormaEnvio": 744061814,
+    "rotas": {
+      "GET /formas-envio/744061814": {
+        "rota": "GET /formas-envio/744061814",
+        "params": {
+          "idFormaEnvio": 744061814
+        },
+        "ok": true,
+        "urls": [],
+        "resposta": {
+          "nome": "Mercado Envios",
+          "tipo": "3",
+          "situacao": "1",
+          "id": 744061814,
+          "gatewayLogistico": null,
+          "formasFrete": [
+            {
+              "id": 760093007,
+              "nome": "Coleta Normal",
+              "codigo": "101",
+              "codigoExterno": "",
+              "tipoEntrega": "0"
+            },
+            {
+              "id": 760093008,
+              "nome": "Coleta Express",
+              "codigo": "102",
+              "codigoExterno": "",
+              "tipoEntrega": "0"
+            },
+            {
+              "id": 760093009,
+              "nome": "Coleta Express",
+              "codigo": "103",
+              "codigoExterno": "",
+              "tipoEntrega": "0"
+            },
+            {
+              "id": 760093010,
+              "nome": "Coleta Correios PAC Agência",
+              "codigo": "1051",
+              "codigoExterno": "",
+              "tipoEntrega": "0"
+            },
+            {
+              "id": 760093011,
+              "nome": "Coleta Correios Sedex Agência",
+              "codigo": "1061",
+              "codigoExterno": "",
+              "tipoEntrega": "0"
+            },
+            {
+              "id": 760093012,
+              "nome": "Shipping Network Fast",
+              "codigo": "155413",
+              "codigoExterno": "",
+              "tipoEntrega": "0"
+            },
+            {
+              "id": 760093013,
+              "nome": "Shipping Network Fast",
+              "codigo": "165366",
+              "codigoExterno": "",
+              "tipoEntrega": "0"
+            },
+            {
+              "id": 760093014,
+              "nome": "Coleta Normal",
+              "codigo": "101",
+              "codigoExterno": "",
+              "tipoEntrega": "0"
+            },
+            {
+              "id": 760093015,
+              "nome": "Coleta Express",
+              "codigo": "102",
+              "codigoExterno": "",
+              "tipoEntrega": "0"
+            },
+            {
+              "id": 760093016,
+              "nome": "Coleta Express",
+              "codigo": "103",
+              "codigoExterno": "",
+              "tipoEntrega": "0"
+            },
+            {
+              "id": 760093017,
+              "nome": "Coleta Correios PAC Agência",
+              "codigo": "1051",
+              "codigoExterno": "",
+              "tipoEntrega": "0"
+            },
+            {
+              "id": 760093018,
+              "nome": "Coleta Correios Sedex Agência",
+              "codigo": "1061",
+              "codigoExterno": "",
+              "tipoEntrega": "0"
+            },
+            {
+              "id": 760093020,
+              "nome": "Shipping Network Fast",
+              "codigo": "155413",
+              "codigoExterno": "",
+              "tipoEntrega": "0"
+            },
+            {
+              "id": 760093021,
+              "nome": "Shipping Network Fast",
+              "codigo": "165366",
+              "codigoExterno": "",
+              "tipoEntrega": "0"
+            },
+            {
+              "id": 760093022,
+              "nome": "Mercadoenvios Next Day",
+              "codigo": "991",
+              "codigoExterno": "",
+              "tipoEntrega": "0"
+            }
+          ]
+        }
+      }
+    }
+  },
+  "expedicao": {
+    "encontrada": false,
+    "match": null,
+    "rotas": {}
+  },
+  "etiquetas": {
+    "urls": [],
+    "rotas": {}
+  }
+}

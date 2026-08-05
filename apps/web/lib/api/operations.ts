@@ -33,17 +33,15 @@ export interface LocationRow {
   barracaoId: string | null;
   setorId: string | null;
   corredorId: string | null;
-  fileiraId: string | null;
   estanteId: string | null;
-  prateleiraId: string | null;
   colunaId: string | null;
+  linhaId: string | null;
   barracao: WarehouseRef | null;
   setor: WarehouseRef | null;
   corredor: WarehouseRef | null;
-  fileira: WarehouseRef | null;
   estante: WarehouseRef | null;
-  prateleira: WarehouseRef | null;
   coluna: WarehouseRef | null;
+  linha: WarehouseRef | null;
   type: string;
   productId: string | null;
   product: { sku: string; name: string } | null;
@@ -206,6 +204,33 @@ export function fetchLocations(params?: {
   return apiFetch<{ locations: LocationRow[]; pagination: PaginationMeta }>(
     `/api/locations?${sp}`,
   );
+}
+
+export interface UnassignedPickFaceProduct {
+  id: string | null;
+  sku: string;
+  name: string | null;
+  reason?: "no_pick_face" | "missing_product";
+  assignable?: boolean;
+  pausedOrderCount?: number;
+}
+
+export function fetchUnassignedPickFaceProducts(params?: {
+  q?: string;
+  page?: number;
+  pageSize?: number;
+  scope?: "paused_orders" | "catalog";
+}) {
+  const sp = new URLSearchParams();
+  if (params?.q?.trim()) sp.set("q", params.q.trim());
+  if (params?.page) sp.set("page", String(params.page));
+  sp.set("pageSize", String(params?.pageSize ?? 100));
+  sp.set("scope", params?.scope ?? "paused_orders");
+  return apiFetch<{
+    products: UnassignedPickFaceProduct[];
+    total: number;
+    pagination: PaginationMeta;
+  }>(`/api/locations/unassigned-products?${sp}`);
 }
 
 export function fetchBaskets(page?: number, pageSize?: number) {
@@ -391,12 +416,15 @@ export type SyncTinySalesOrdersResult = {
   cancelledRemoved: number;
   errors: Array<{ erpOrderId: string; message: string }>;
   tinyConnected: boolean;
+  resumed?: boolean;
+  rateLimited?: boolean;
   warning?: string;
 };
 
 export function syncTinySalesOrders(params?: {
   days?: number;
   connectionId?: string;
+  forceRestart?: boolean;
 }) {
   return apiFetch<SyncTinySalesOrdersResult>(
     "/api/integrations/tiny/sync-orders",
@@ -416,9 +444,51 @@ export type SyncTinyProductsResult = {
   errors: Array<{ sku: string; message: string }>;
   tinyConnected: boolean;
   resumed: boolean;
+  rateLimited?: boolean;
   fromOffset: number;
   warning?: string;
 };
+
+export type TinySyncJobStatus = {
+  kind: "products" | "orders";
+  running: boolean;
+  resumable: boolean;
+  stale: boolean;
+  pauseReason: "rate_limit" | "interrupted" | null;
+  progressPercent: number | null;
+  progressLabel: string;
+  startedAt: string | null;
+  updatedAt: string | null;
+  lastSyncAt: string | null;
+  offset: number | null;
+  total: number | null;
+  stats: {
+    created?: number;
+    updated?: number;
+    skipped?: number;
+    skippedExisting?: number;
+    listedFromTiny?: number;
+    cancelledRemoved?: number;
+  } | null;
+  phase?: "syncable" | "cancelled";
+  situacaoIndex?: number;
+  situacaoLabel?: string;
+  days?: number;
+};
+
+export type TinySyncStatusResponse = {
+  products: TinySyncJobStatus;
+  orders: TinySyncJobStatus;
+};
+
+export function fetchTinySyncStatus(connectionId?: string) {
+  const query = connectionId
+    ? `?connectionId=${encodeURIComponent(connectionId)}`
+    : "";
+  return apiFetch<TinySyncStatusResponse>(
+    `/api/integrations/tiny/sync-status${query}`,
+  );
+}
 
 export function syncTinyProducts(params?: {
   connectionId?: string;
@@ -579,6 +649,7 @@ export interface PackingOrder {
   id: string;
   erpOrderId: string;
   customerName: string | null;
+  shippingLabel?: string | null;
   marketplace?: string | null;
   status: string;
   priority?: number;

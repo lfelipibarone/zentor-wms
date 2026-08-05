@@ -1,0 +1,601 @@
+{
+  "meta": {
+    "fetchedAt": "2026-06-17T18:02:06.380Z",
+    "pedidoId": 860301754,
+    "erpOrderId": "TINY-860301754",
+    "numeroPedido": 206936,
+    "situacao": 6,
+    "situacaoLabel": "Entregue",
+    "formaEnvioNome": "Mercado Envios",
+    "diagnostico": "ERRO_MARKETPLACE",
+    "resumoTesteAnterior": {
+      "pedidoId": 860301754,
+      "erpOrderId": "TINY-860301754",
+      "numeroPedido": 206936,
+      "situacao": 6,
+      "situacaoLabel": "Entregue",
+      "formaEnvioNome": "Mercado Envios",
+      "codigoRastreamento": null,
+      "idNotaFiscal": 860301759,
+      "naExpedicao": true,
+      "expedicao": {
+        "idAgrupamento": 746503742,
+        "idExpedicao": 749882106,
+        "formaEnvioNome": "Mercado Envios",
+        "pedidoId": 860301754,
+        "idNotaFiscal": 860301759
+      },
+      "etiquetas": {
+        "urls": [],
+        "marketplaceError": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Não foi possível obter as etiquetas dos seguintes pedidos: S47281733718",
+        "diagnostico": "ERRO_MARKETPLACE"
+      }
+    }
+  },
+  "pedido": {
+    "rotas": {
+      "GET /pedidos/860301754": {
+        "rota": "GET /pedidos/860301754",
+        "params": {
+          "idPedido": 860301754
+        },
+        "ok": true,
+        "urls": [],
+        "resposta": {
+          "id": 860301754,
+          "numeroPedido": 206936,
+          "idNotaFiscal": 860301759,
+          "dataFaturamento": "2026-06-11",
+          "valorTotalProdutos": 40.25,
+          "valorTotalPedido": 40.25,
+          "listaPreco": {
+            "id": 0,
+            "nome": "Padrão",
+            "acrescimoDesconto": 0
+          },
+          "cliente": {
+            "nome": "Jaqueline Mello Sampaio",
+            "codigo": "",
+            "fantasia": "",
+            "tipoPessoa": "F",
+            "cpfCnpj": "019.317.357-35",
+            "inscricaoEstadual": "",
+            "rg": "",
+            "telefone": "",
+            "celular": "",
+            "email": "",
+            "endereco": {
+              "endereco": "Rua Mirataia",
+              "numero": "245",
+              "complemento": "Condomínio Reserva Mirataia I",
+              "bairro": "Pechincha",
+              "municipio": "Rio de Janeiro",
+              "cep": "22.770-190",
+              "uf": "RJ",
+              "pais": "Brasil"
+            },
+            "id": 766882840
+          },
+          "enderecoEntrega": {
+            "endereco": "Rua Mirataia",
+            "numero": "245",
+            "complemento": "Bloco 3 Apt 612 Referencia: Condomínio Reserva Mirataia I",
+            "bairro": "Pechincha",
+            "municipio": "Rio de Janeiro",
+            "cep": "22.770-190",
+            "uf": "RJ",
+            "pais": "Brasil",
+            "nomeDestinatario": "Jackie Sampaio",
+            "cpfCnpj": "019.317.357-35",
+            "tipoPessoa": "F",
+            "telefone": "",
+            "inscricaoEstadual": ""
+          },
+          "ecommerce": {
+            "id": 4751,
+            "nome": "Mercado Livre Mamute",
+            "numeroPedidoEcommerce": "2000013475962589",
+            "numeroPedidoCanalVenda": "",
+            "canalVenda": ""
+          },
+          "transportador": {
+            "id": 0,
+            "nome": "",
+            "fretePorConta": "R",
+            "formaEnvio": {
+              "id": 744061814,
+              "nome": "Mercado Envios"
+            },
+            "formaFrete": null,
+            "codigoRastreamento": "",
+            "urlRastreamento": ""
+          },
+          "deposito": null,
+          "vendedor": null,
+          "naturezaOperacao": {
+            "id": 775374075,
+            "nome": "Venda de Mercadorias - Regime normal"
+          },
+          "intermediador": {
+            "id": 381,
+            "nome": "624895842",
+            "cnpj": "03.007.331/0001-41",
+            "cnpjPagamentoInstituicao": ""
+          },
+          "pagamento": null,
+          "itens": [
+            {
+              "produto": {
+                "id": 744040747,
+                "sku": "PUXFRA160CRF",
+                "descricao": "PUXADOR ALUMINIO FRAME 160MM - Cromado Fosco",
+                "tipo": "P"
+              },
+              "quantidade": 5,
+              "valorUnitario": 8.05,
+              "infoAdicional": ""
+            }
+          ],
+          "pagamentosIntegrados": [
+            {
+              "valor": 40.25,
+              "tipoPagamento": 99,
+              "cnpjIntermediador": "03007331000141",
+              "codigoAutorizacao": "",
+              "codigoBandeira": 99
+            }
+          ],
+          "situacao": 6,
+          "data": "2026-06-11",
+          "dataEntrega": "2026-06-14",
+          "numeroOrdemCompra": "2000013475962589",
+          "valorDesconto": 0,
+          "valorFrete": 0,
+          "valorOutrasDespesas": 0,
+          "dataPrevista": "2026-06-14",
+          "dataEnvio": "2026-06-13 03:33:57",
+          "observacoes": "Endereço:  Condomínio Reserva Mirataia I",
+          "observacoesInternas": "",
+          "origemPedido": 0
+        }
+      },
+      "GET /pedidos/860301754/marcadores": {
+        "rota": "GET /pedidos/860301754/marcadores",
+        "params": {
+          "idPedido": 860301754
+        },
+        "ok": true,
+        "urls": [],
+        "resposta": [
+          {
+            "descricao": "MercadoEnvios Coleta"
+          },
+          {
+            "descricao": "1ª venda"
+          }
+        ]
+      }
+    }
+  },
+  "nota": {
+    "idNotaFiscal": 860301759,
+    "rotas": {
+      "GET /notas/860301759": {
+        "rota": "GET /notas/860301759",
+        "params": {
+          "idNota": 860301759
+        },
+        "ok": true,
+        "urls": [],
+        "resposta": {
+          "situacao": "6",
+          "tipo": "S",
+          "numero": "155886",
+          "serie": "5",
+          "chaveAcesso": "35260637919979000106550050001558861603017597",
+          "dataEmissao": "2026-06-11",
+          "dataPrevista": "2026-06-14",
+          "cliente": {
+            "nome": "Jaqueline Mello Sampaio",
+            "codigo": null,
+            "fantasia": null,
+            "tipoPessoa": "F",
+            "cpfCnpj": "019.317.357-35",
+            "inscricaoEstadual": "",
+            "rg": null,
+            "telefone": "",
+            "celular": null,
+            "email": "",
+            "endereco": {
+              "endereco": "Rua Mirataia",
+              "numero": "245",
+              "complemento": "Condomínio Reserva Mirataia I",
+              "bairro": "Pechincha",
+              "municipio": "Rio de Janeiro",
+              "cep": "22.770-190",
+              "uf": "RJ",
+              "pais": "Brasil"
+            },
+            "id": 766882840
+          },
+          "enderecoEntrega": {
+            "endereco": "Rua Mirataia",
+            "numero": "245",
+            "complemento": "Bloco 3 Apt 612 Referencia: Condomínio Reserva Mirataia I",
+            "bairro": "Pechincha",
+            "municipio": "Rio de Janeiro",
+            "cep": "22.770-190",
+            "uf": "RJ",
+            "pais": "Brasil",
+            "nomeDestinatario": "Jackie Sampaio",
+            "cpfCnpj": "019.317.357-35",
+            "tipoPessoa": "F",
+            "telefone": "",
+            "inscricaoEstadual": null
+          },
+          "valor": 40.25,
+          "valorProdutos": 40.25,
+          "valorFrete": 0,
+          "vendedor": null,
+          "idFormaEnvio": 744061814,
+          "idFormaFrete": 0,
+          "codigoRastreamento": "",
+          "urlRastreamento": "",
+          "fretePorConta": "R",
+          "qtdVolumes": 1,
+          "pesoBruto": 0.19,
+          "pesoLiquido": 0.19,
+          "id": 860301759,
+          "finalidade": "1",
+          "regimeTributario": 3,
+          "dataInclusao": "2026-06-11 19:03:50",
+          "baseIcms": 40.25,
+          "valorIcms": 4.83,
+          "baseIcmsSt": 0,
+          "valorIcmsSt": 0,
+          "valorServicos": 0,
+          "valorSeguro": 0,
+          "valorOutras": 0,
+          "valorIpi": 0,
+          "valorIssqn": 0,
+          "valorDesconto": 0,
+          "valorFaturado": 40.25,
+          "idIntermediador": 381,
+          "idNaturezaOperacao": 775374075,
+          "idFormaPagamento": 0,
+          "idMeioPagamento": 0,
+          "observacoes": "Endereço:  Condomínio Reserva Mirataia I\nOC: 2000013475962589\nNº Pedido: 206936\r\nTributos aproximados: R$ 5,71 (Federal) e R$ 7,25 (Estadual). Fonte: IBPT 5F6AA1\n",
+          "condicaoPagamento": "",
+          "valorNotaComImpostos": 40.25,
+          "valorBaseDiferimento": 0,
+          "percentualICMSPartilhaDestino": 100,
+          "valorTotalICMSFCPDestino": 0.81,
+          "valorIPIDevolvido": 0,
+          "tipoNotaCredito": "",
+          "tipoNotaDebito": "",
+          "valorTotalBCIBSCBS": 30.1,
+          "valorTotalIBSUF": 0.03,
+          "valorTotalCBS": 0.27,
+          "itens": [
+            {
+              "idItem": 780289976,
+              "idProduto": 744040747,
+              "codigo": "PUXFRA160CRF",
+              "ncm": "8302.42.00",
+              "descricao": "PUXADOR ALUMINIO FRAME 160MM - Cromado Fosco",
+              "unidade": "UN",
+              "quantidade": 5,
+              "valorUnitario": 8.05,
+              "valorTotal": 40.25,
+              "cfop": "6102",
+              "naturezaOperacao": "Venda de Mercadorias - Regime normal"
+            }
+          ],
+          "parcelas": [],
+          "pagamentosIntegrados": [
+            {
+              "valor": 40.25,
+              "tipoPagamento": 99,
+              "cnpjIntermediador": "03007331000141",
+              "codigoAutorizacao": "",
+              "codigoBandeira": 99
+            }
+          ],
+          "ecommerce": {
+            "id": 4751,
+            "nome": "Mercado Livre Mamute",
+            "numeroPedidoEcommerce": "2000013475962589",
+            "numeroPedidoCanalVenda": "",
+            "canalVenda": ""
+          },
+          "marcadores": [],
+          "transportador": {
+            "nome": "",
+            "cpfCnpj": "",
+            "ie": "",
+            "endereco": "",
+            "municipio": null,
+            "uf": ""
+          },
+          "origem": {
+            "id": "860301754",
+            "tipo": "venda"
+          }
+        }
+      },
+      "GET /notas/860301759/link": {
+        "rota": "GET /notas/860301759/link",
+        "params": {
+          "idNota": 860301759
+        },
+        "ok": true,
+        "urls": [],
+        "resposta": {
+          "link": "https://erp.tiny.com.br/doc.view?id=c148a7a15fce5ce1a26f05d83ca0f2d8"
+        }
+      },
+      "GET /notas/860301759/marcadores": {
+        "rota": "GET /notas/860301759/marcadores",
+        "params": {
+          "idNota": 860301759
+        },
+        "ok": true,
+        "urls": [],
+        "resposta": []
+      }
+    }
+  },
+  "formaEnvio": {
+    "idFormaEnvio": 744061814,
+    "rotas": {
+      "GET /formas-envio/744061814": {
+        "rota": "GET /formas-envio/744061814",
+        "params": {
+          "idFormaEnvio": 744061814
+        },
+        "ok": true,
+        "urls": [],
+        "resposta": {
+          "nome": "Mercado Envios",
+          "tipo": "3",
+          "situacao": "1",
+          "id": 744061814,
+          "gatewayLogistico": null,
+          "formasFrete": [
+            {
+              "id": 760093007,
+              "nome": "Coleta Normal",
+              "codigo": "101",
+              "codigoExterno": "",
+              "tipoEntrega": "0"
+            },
+            {
+              "id": 760093008,
+              "nome": "Coleta Express",
+              "codigo": "102",
+              "codigoExterno": "",
+              "tipoEntrega": "0"
+            },
+            {
+              "id": 760093009,
+              "nome": "Coleta Express",
+              "codigo": "103",
+              "codigoExterno": "",
+              "tipoEntrega": "0"
+            },
+            {
+              "id": 760093010,
+              "nome": "Coleta Correios PAC Agência",
+              "codigo": "1051",
+              "codigoExterno": "",
+              "tipoEntrega": "0"
+            },
+            {
+              "id": 760093011,
+              "nome": "Coleta Correios Sedex Agência",
+              "codigo": "1061",
+              "codigoExterno": "",
+              "tipoEntrega": "0"
+            },
+            {
+              "id": 760093012,
+              "nome": "Shipping Network Fast",
+              "codigo": "155413",
+              "codigoExterno": "",
+              "tipoEntrega": "0"
+            },
+            {
+              "id": 760093013,
+              "nome": "Shipping Network Fast",
+              "codigo": "165366",
+              "codigoExterno": "",
+              "tipoEntrega": "0"
+            },
+            {
+              "id": 760093014,
+              "nome": "Coleta Normal",
+              "codigo": "101",
+              "codigoExterno": "",
+              "tipoEntrega": "0"
+            },
+            {
+              "id": 760093015,
+              "nome": "Coleta Express",
+              "codigo": "102",
+              "codigoExterno": "",
+              "tipoEntrega": "0"
+            },
+            {
+              "id": 760093016,
+              "nome": "Coleta Express",
+              "codigo": "103",
+              "codigoExterno": "",
+              "tipoEntrega": "0"
+            },
+            {
+              "id": 760093017,
+              "nome": "Coleta Correios PAC Agência",
+              "codigo": "1051",
+              "codigoExterno": "",
+              "tipoEntrega": "0"
+            },
+            {
+              "id": 760093018,
+              "nome": "Coleta Correios Sedex Agência",
+              "codigo": "1061",
+              "codigoExterno": "",
+              "tipoEntrega": "0"
+            },
+            {
+              "id": 760093020,
+              "nome": "Shipping Network Fast",
+              "codigo": "155413",
+              "codigoExterno": "",
+              "tipoEntrega": "0"
+            },
+            {
+              "id": 760093021,
+              "nome": "Shipping Network Fast",
+              "codigo": "165366",
+              "codigoExterno": "",
+              "tipoEntrega": "0"
+            },
+            {
+              "id": 760093022,
+              "nome": "Mercadoenvios Next Day",
+              "codigo": "991",
+              "codigoExterno": "",
+              "tipoEntrega": "0"
+            }
+          ]
+        }
+      }
+    }
+  },
+  "expedicao": {
+    "encontrada": true,
+    "match": {
+      "idAgrupamento": 746503742,
+      "idExpedicao": 749882106,
+      "formaEnvioNome": "Mercado Envios",
+      "pedidoId": 860301754,
+      "idNotaFiscal": 860301759
+    },
+    "rotas": {
+      "GET /expedicao/746503742": {
+        "rota": "GET /expedicao/746503742",
+        "params": {
+          "idAgrupamento": 746503742
+        },
+        "ok": true,
+        "urls": [],
+        "resposta": {
+          "id": 746503742,
+          "identificacao": "3182",
+          "data": "2026-06-12",
+          "formaEnvio": {
+            "id": 744061814,
+            "nome": "Mercado Envios"
+          },
+          "expedicoes": [
+            {
+              "id": 749882106,
+              "data": "2026-06-11",
+              "situacao": "1",
+              "tipoObjeto": "notafiscal",
+              "idObjeto": 860301759,
+              "dataEmissao": "2026-06-11",
+              "venda": {
+                "id": 860301754,
+                "numero": 206936,
+                "data": "2026-06-11",
+                "situacao": 6
+              },
+              "notaFiscal": {
+                "id": 860301759,
+                "numero": 155886,
+                "data": "2026-06-11",
+                "situacao": 6
+              },
+              "destinatario": {
+                "nome": "Jaqueline Mello Sampaio",
+                "codigo": "",
+                "fantasia": "",
+                "tipoPessoa": "F",
+                "cpfCnpj": "019.317.357-35",
+                "inscricaoEstadual": "",
+                "rg": "",
+                "telefone": "",
+                "celular": "",
+                "email": "",
+                "endereco": {
+                  "endereco": "Rua Mirataia",
+                  "numero": "245",
+                  "complemento": "Condomínio Reserva Mirataia I",
+                  "bairro": "Pechincha",
+                  "municipio": "Rio de Janeiro",
+                  "cep": "22.770-190",
+                  "uf": "RJ",
+                  "pais": "Brasil"
+                },
+                "id": 766882840
+              },
+              "volume": {
+                "embalagem": {
+                  "id": 718341450,
+                  "tipo": 2,
+                  "descricao": "Embalagem Loja Integrada"
+                },
+                "largura": 16.3,
+                "altura": 7,
+                "comprimento": 19,
+                "diametro": 0,
+                "pesoBruto": 0.19,
+                "quantidadeVolumes": 1
+              },
+              "logistica": {
+                "codigoRastreio": "",
+                "urlRastreio": "",
+                "possuiValorDeclarado": true,
+                "valorDeclarado": 0,
+                "possuiAvisoRecebimento": true,
+                "formaFrete": null,
+                "transportador": null
+              }
+            }
+          ]
+        }
+      }
+    }
+  },
+  "etiquetas": {
+    "urls": [],
+    "rotas": {
+      "GET /expedicao/746503742/etiquetas": {
+        "rota": "GET /expedicao/746503742/etiquetas",
+        "params": {
+          "idAgrupamento": 746503742
+        },
+        "ok": false,
+        "urls": [],
+        "resposta": {
+          "erro": true,
+          "mensagem": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Não foi possível obter as etiquetas dos seguintes pedidos: S47281733718"
+        }
+      },
+      "GET /expedicao/746503742/expedicao/749882106/etiquetas": {
+        "rota": "GET /expedicao/746503742/expedicao/749882106/etiquetas",
+        "params": {
+          "idAgrupamento": 746503742,
+          "idExpedicao": 749882106
+        },
+        "ok": false,
+        "urls": [],
+        "resposta": {
+          "erro": true,
+          "mensagem": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Não foi possível obter as etiquetas dos seguintes pedidos: S47281733718"
+        }
+      }
+    }
+  }
+}

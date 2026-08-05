@@ -1,0 +1,103 @@
+{
+  "fetchedAt": "2026-06-15T14:49:01.583Z",
+  "pedidoId": 860301754,
+  "idNotaFiscal": 860301759,
+  "formaEnvioNome": "Mercado Envios",
+  "buscaExpedicao": {
+    "idFormaEnvio": 744061814,
+    "dataInicial": "2026-04-27",
+    "dataFinal": "2026-06-25",
+    "maxAgrupamentos": 500
+  },
+  "agrupamentosVarridos": 1,
+  "encontrado": {
+    "idAgrupamento": 746503742,
+    "idExpedicao": 749882106,
+    "resumo": {
+      "id": 749882106,
+      "data": "2026-06-11",
+      "situacao": "1",
+      "tipoObjeto": "notafiscal",
+      "idObjeto": 860301759,
+      "dataEmissao": "2026-06-11",
+      "venda": {
+        "id": 860301754,
+        "numero": 206936,
+        "data": "2026-06-11",
+        "situacao": 6
+      },
+      "notaFiscal": {
+        "id": 860301759,
+        "numero": 155886,
+        "data": "2026-06-11",
+        "situacao": 6
+      },
+      "destinatario": {
+        "nome": "Jaqueline Mello Sampaio",
+        "codigo": "",
+        "fantasia": "",
+        "tipoPessoa": "F",
+        "cpfCnpj": "019.317.357-35",
+        "inscricaoEstadual": "",
+        "rg": "",
+        "telefone": "",
+        "celular": "",
+        "email": "",
+        "endereco": {
+          "endereco": "Rua Mirataia",
+          "numero": "245",
+          "complemento": "Condomínio Reserva Mirataia I",
+          "bairro": "Pechincha",
+          "municipio": "Rio de Janeiro",
+          "cep": "22.770-190",
+          "uf": "RJ",
+          "pais": "Brasil"
+        },
+        "id": 766882840
+      },
+      "volume": {
+        "embalagem": {
+          "id": 718341450,
+          "tipo": 2,
+          "descricao": "Embalagem Loja Integrada"
+        },
+        "largura": 16.3,
+        "altura": 7,
+        "comprimento": 19,
+        "diametro": 0,
+        "pesoBruto": 0.19,
+        "quantidadeVolumes": 1
+      },
+      "logistica": {
+        "codigoRastreio": "",
+        "urlRastreio": "",
+        "possuiValorDeclarado": true,
+        "valorDeclarado": 0,
+        "possuiAvisoRecebimento": true,
+        "formaFrete": null,
+        "transportador": null
+      }
+    }
+  },
+  "etiquetas": {
+    "GET /expedicao/746503742/etiquetas": {
+      "ok": false,
+      "resposta": {
+        "erro": true,
+        "mensagem": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Não foi possível obter as etiquetas dos seguintes pedidos: S47281733718",
+        "statusCode": 400
+      }
+    },
+    "GET /expedicao/746503742/expedicao/749882106/etiquetas": {
+      "ok": false,
+      "resposta": {
+        "erro": true,
+        "mensagem": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Não foi possível obter as etiquetas dos seguintes pedidos: S47281733718",
+        "statusCode": 400
+      }
+    },
+    "urls": [],
+    "marketplaceError": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Não foi possível obter as etiquetas dos seguintes pedidos: S47281733718",
+    "temEtiqueta": false
+  }
+}

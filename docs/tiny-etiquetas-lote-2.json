@@ -1,0 +1,650 @@
+{
+  "fetchedAt": "2026-06-15T16:21:33.338Z",
+  "origem": "banco WMS (aleatório, limite 30, excluídos 38)",
+  "pedidoIds": [
+    860345062,
+    860317509,
+    860328924,
+    860325254,
+    860182596,
+    860322880,
+    860333423,
+    860269050,
+    860335194,
+    860336038,
+    860330524,
+    860322847,
+    860325411,
+    860299396,
+    860299805,
+    860329850,
+    860314867,
+    860272865,
+    860148763,
+    860283857,
+    860317707,
+    860327063,
+    860333909,
+    860311442,
+    860343389,
+    860345168,
+    860313590,
+    860322324,
+    860322793,
+    860331219
+  ],
+  "excluidos": [
+    860167039,
+    860168223,
+    860184598,
+    860197915,
+    860199959,
+    860199997,
+    860202821,
+    860202884,
+    860206931,
+    860208001,
+    860216070,
+    860231946,
+    860234690,
+    860242385,
+    860249908,
+    860257409,
+    860283472,
+    860285305,
+    860285920,
+    860301754,
+    860305146,
+    860309123,
+    860312342,
+    860312364,
+    860324844,
+    860325019,
+    860325373,
+    860326923,
+    860326973,
+    860327669,
+    860329553,
+    860331244,
+    860333057,
+    860334957,
+    860335917,
+    860337096,
+    860337794,
+    860342278
+  ],
+  "total": 30,
+  "comEtiqueta": 0,
+  "resultados": [
+    {
+      "erpOrderId": "TINY-860345062",
+      "pedidoId": 860345062,
+      "numeroPedido": 207378,
+      "situacao": 0,
+      "formaEnvioNome": "Mercado Envios",
+      "numeroPedidoEcommerce": "2000013465898145",
+      "idNotaFiscal": null,
+      "buscaExpedicao": {
+        "idFormaEnvio": 744061814,
+        "dataInicial": "2026-05-01",
+        "dataFinal": "2026-06-29",
+        "maxAgrupamentos": 500
+      },
+      "agrupamentosVerificados": 22,
+      "expedicao": null,
+      "etiquetas": null,
+      "temEtiqueta": false
+    },
+    {
+      "erpOrderId": "TINY-860317509",
+      "pedidoId": 860317509,
+      "numeroPedido": 207076,
+      "situacao": 7,
+      "formaEnvioNome": "Mercado Envios",
+      "numeroPedidoEcommerce": "2000016914161360",
+      "idNotaFiscal": 860317510,
+      "buscaExpedicao": {
+        "idFormaEnvio": 744061814,
+        "dataInicial": "2026-04-28",
+        "dataFinal": "2026-06-26",
+        "maxAgrupamentos": 500
+      },
+      "agrupamentosVerificados": 22,
+      "expedicao": null,
+      "etiquetas": null,
+      "temEtiqueta": false
+    },
+    {
+      "erpOrderId": "TINY-860328924",
+      "pedidoId": 860328924,
+      "numeroPedido": 207206,
+      "situacao": 7,
+      "formaEnvioNome": "Shopee Envios",
+      "numeroPedidoEcommerce": "260614431MERYY",
+      "idNotaFiscal": 860328927,
+      "buscaExpedicao": {
+        "idFormaEnvio": 756508453,
+        "dataInicial": "2026-04-30",
+        "dataFinal": "2026-06-28",
+        "maxAgrupamentos": 500
+      },
+      "agrupamentosVerificados": 20,
+      "expedicao": null,
+      "etiquetas": null,
+      "temEtiqueta": false
+    },
+    {
+      "erpOrderId": "TINY-860325254",
+      "pedidoId": 860325254,
+      "numeroPedido": 207153,
+      "situacao": 7,
+      "formaEnvioNome": "Shopee Envios",
+      "numeroPedidoEcommerce": "2606142A98UQPN",
+      "idNotaFiscal": 860325255,
+      "buscaExpedicao": {
+        "idFormaEnvio": 756508453,
+        "dataInicial": "2026-04-29",
+        "dataFinal": "2026-06-27",
+        "maxAgrupamentos": 500
+      },
+      "agrupamentosVerificados": 20,
+      "expedicao": null,
+      "etiquetas": null,
+      "temEtiqueta": false
+    },
+    {
+      "erpOrderId": "TINY-860182596",
+      "pedidoId": 860182596,
+      "numeroPedido": 205828,
+      "situacao": 7,
+      "formaEnvioNome": "Mercado Envios",
+      "numeroPedidoEcommerce": "2000013358003531",
+      "idNotaFiscal": 860315713,
+      "buscaExpedicao": {
+        "idFormaEnvio": 744061814,
+        "dataInicial": "2026-04-28",
+        "dataFinal": "2026-06-26",
+        "maxAgrupamentos": 500
+      },
+      "agrupamentosVerificados": 22,
+      "expedicao": null,
+      "etiquetas": null,
+      "temEtiqueta": false
+    },
+    {
+      "erpOrderId": "TINY-860322880",
+      "pedidoId": 860322880,
+      "numeroPedido": 207123,
+      "situacao": 7,
+      "formaEnvioNome": "Shopee Envios",
+      "numeroPedidoEcommerce": "2606131T2SSRGE",
+      "idNotaFiscal": 860322881,
+      "buscaExpedicao": {
+        "idFormaEnvio": 756508453,
+        "dataInicial": "2026-04-29",
+        "dataFinal": "2026-06-27",
+        "maxAgrupamentos": 500
+      },
+      "agrupamentosVerificados": 20,
+      "expedicao": null,
+      "etiquetas": null,
+      "temEtiqueta": false
+    },
+    {
+      "erpOrderId": "TINY-860333423",
+      "pedidoId": 860333423,
+      "numeroPedido": 207285,
+      "situacao": 0,
+      "formaEnvioNome": "Mercado Envios",
+      "numeroPedidoEcommerce": "2000013518766911",
+      "idNotaFiscal": null,
+      "buscaExpedicao": {
+        "idFormaEnvio": 744061814,
+        "dataInicial": "2026-05-01",
+        "dataFinal": "2026-06-29",
+        "maxAgrupamentos": 500
+      },
+      "agrupamentosVerificados": 22,
+      "expedicao": null,
+      "etiquetas": null,
+      "temEtiqueta": false
+    },
+    {
+      "erpOrderId": "TINY-860269050",
+      "pedidoId": 860269050,
+      "numeroPedido": 206702,
+      "situacao": 0,
+      "formaEnvioNome": "Mercado Envios",
+      "numeroPedidoEcommerce": "2000013452439381",
+      "idNotaFiscal": null,
+      "buscaExpedicao": {
+        "idFormaEnvio": 744061814,
+        "dataInicial": "2026-05-01",
+        "dataFinal": "2026-06-29",
+        "maxAgrupamentos": 500
+      },
+      "agrupamentosVerificados": 22,
+      "expedicao": null,
+      "etiquetas": null,
+      "temEtiqueta": false
+    },
+    {
+      "erpOrderId": "TINY-860335194",
+      "pedidoId": 860335194,
+      "numeroPedido": 207321,
+      "situacao": 0,
+      "formaEnvioNome": "Mercado Envios",
+      "numeroPedidoEcommerce": "2000013521427595",
+      "idNotaFiscal": null,
+      "buscaExpedicao": {
+        "idFormaEnvio": 744061814,
+        "dataInicial": "2026-05-01",
+        "dataFinal": "2026-06-29",
+        "maxAgrupamentos": 500
+      },
+      "agrupamentosVerificados": 22,
+      "expedicao": null,
+      "etiquetas": null,
+      "temEtiqueta": false
+    },
+    {
+      "erpOrderId": "TINY-860336038",
+      "pedidoId": 860336038,
+      "numeroPedido": 207332,
+      "situacao": 0,
+      "formaEnvioNome": "Mercado Envios",
+      "numeroPedidoEcommerce": "2000013522366747",
+      "idNotaFiscal": null,
+      "buscaExpedicao": {
+        "idFormaEnvio": 744061814,
+        "dataInicial": "2026-05-01",
+        "dataFinal": "2026-06-29",
+        "maxAgrupamentos": 500
+      },
+      "agrupamentosVerificados": 22,
+      "expedicao": null,
+      "etiquetas": null,
+      "temEtiqueta": false
+    },
+    {
+      "erpOrderId": "TINY-860330524",
+      "pedidoId": 860330524,
+      "numeroPedido": 207231,
+      "situacao": 0,
+      "formaEnvioNome": "Mercado Envios",
+      "numeroPedidoEcommerce": "2000016933569828",
+      "idNotaFiscal": null,
+      "buscaExpedicao": {
+        "idFormaEnvio": 744061814,
+        "dataInicial": "2026-05-01",
+        "dataFinal": "2026-06-29",
+        "maxAgrupamentos": 500
+      },
+      "agrupamentosVerificados": 22,
+      "expedicao": null,
+      "etiquetas": null,
+      "temEtiqueta": false
+    },
+    {
+      "erpOrderId": "TINY-860322847",
+      "pedidoId": 860322847,
+      "numeroPedido": 207122,
+      "situacao": 7,
+      "formaEnvioNome": "Mercado Envios",
+      "numeroPedidoEcommerce": "2000013499582589",
+      "idNotaFiscal": 860322858,
+      "buscaExpedicao": {
+        "idFormaEnvio": 744061814,
+        "dataInicial": "2026-04-29",
+        "dataFinal": "2026-06-27",
+        "maxAgrupamentos": 500
+      },
+      "agrupamentosVerificados": 22,
+      "expedicao": null,
+      "etiquetas": null,
+      "temEtiqueta": false
+    },
+    {
+      "erpOrderId": "TINY-860325411",
+      "pedidoId": 860325411,
+      "numeroPedido": 207156,
+      "situacao": 7,
+      "formaEnvioNome": "Shopee Envios",
+      "numeroPedidoEcommerce": "2606142BKE7WH6",
+      "idNotaFiscal": 860325412,
+      "buscaExpedicao": {
+        "idFormaEnvio": 756508453,
+        "dataInicial": "2026-04-29",
+        "dataFinal": "2026-06-27",
+        "maxAgrupamentos": 500
+      },
+      "agrupamentosVerificados": 20,
+      "expedicao": null,
+      "etiquetas": null,
+      "temEtiqueta": false
+    },
+    {
+      "erpOrderId": "TINY-860299396",
+      "pedidoId": 860299396,
+      "numeroPedido": 206923,
+      "situacao": 0,
+      "formaEnvioNome": "Mercado Envios",
+      "numeroPedidoEcommerce": "2000016897320344",
+      "idNotaFiscal": null,
+      "buscaExpedicao": {
+        "idFormaEnvio": 744061814,
+        "dataInicial": "2026-05-01",
+        "dataFinal": "2026-06-29",
+        "maxAgrupamentos": 500
+      },
+      "agrupamentosVerificados": 22,
+      "expedicao": null,
+      "etiquetas": null,
+      "temEtiqueta": false
+    },
+    {
+      "erpOrderId": "TINY-860299805",
+      "pedidoId": 860299805,
+      "numeroPedido": 206928,
+      "situacao": 0,
+      "formaEnvioNome": "Mercado Envios",
+      "numeroPedidoEcommerce": "2000013472678543",
+      "idNotaFiscal": null,
+      "buscaExpedicao": {
+        "idFormaEnvio": 744061814,
+        "dataInicial": "2026-05-01",
+        "dataFinal": "2026-06-29",
+        "maxAgrupamentos": 500
+      },
+      "agrupamentosVerificados": 22,
+      "expedicao": null,
+      "etiquetas": null,
+      "temEtiqueta": false
+    },
+    {
+      "erpOrderId": "TINY-860329850",
+      "pedidoId": 860329850,
+      "numeroPedido": 207224,
+      "situacao": 0,
+      "formaEnvioNome": "Mercado Envios",
+      "numeroPedidoEcommerce": "2000016932329152",
+      "idNotaFiscal": null,
+      "buscaExpedicao": {
+        "idFormaEnvio": 744061814,
+        "dataInicial": "2026-05-01",
+        "dataFinal": "2026-06-29",
+        "maxAgrupamentos": 500
+      },
+      "agrupamentosVerificados": 22,
+      "expedicao": null,
+      "etiquetas": null,
+      "temEtiqueta": false
+    },
+    {
+      "erpOrderId": "TINY-860314867",
+      "pedidoId": 860314867,
+      "numeroPedido": 207048,
+      "situacao": 7,
+      "formaEnvioNome": "Mercado Envios",
+      "numeroPedidoEcommerce": "2000013488564083",
+      "idNotaFiscal": 860314874,
+      "buscaExpedicao": {
+        "idFormaEnvio": 744061814,
+        "dataInicial": "2026-04-28",
+        "dataFinal": "2026-06-26",
+        "maxAgrupamentos": 500
+      },
+      "agrupamentosVerificados": 22,
+      "expedicao": null,
+      "etiquetas": null,
+      "temEtiqueta": false
+    },
+    {
+      "erpOrderId": "TINY-860272865",
+      "pedidoId": 860272865,
+      "numeroPedido": 206741,
+      "situacao": 0,
+      "formaEnvioNome": "Mercado Envios",
+      "numeroPedidoEcommerce": "2000013456594475",
+      "idNotaFiscal": null,
+      "buscaExpedicao": {
+        "idFormaEnvio": 744061814,
+        "dataInicial": "2026-05-01",
+        "dataFinal": "2026-06-29",
+        "maxAgrupamentos": 500
+      },
+      "agrupamentosVerificados": 22,
+      "expedicao": null,
+      "etiquetas": null,
+      "temEtiqueta": false
+    },
+    {
+      "erpOrderId": "TINY-860148763",
+      "pedidoId": 860148763,
+      "numeroPedido": 205573,
+      "situacao": 0,
+      "formaEnvioNome": "Mercado Envios",
+      "numeroPedidoEcommerce": "2000016756053508",
+      "idNotaFiscal": null,
+      "buscaExpedicao": {
+        "idFormaEnvio": 744061814,
+        "dataInicial": "2026-05-01",
+        "dataFinal": "2026-06-29",
+        "maxAgrupamentos": 500
+      },
+      "agrupamentosVerificados": 22,
+      "expedicao": null,
+      "etiquetas": null,
+      "temEtiqueta": false
+    },
+    {
+      "erpOrderId": "TINY-860283857",
+      "pedidoId": 860283857,
+      "numeroPedido": 206866,
+      "situacao": 0,
+      "formaEnvioNome": "Mercado Envios",
+      "numeroPedidoEcommerce": "2000013468454493",
+      "idNotaFiscal": null,
+      "buscaExpedicao": {
+        "idFormaEnvio": 744061814,
+        "dataInicial": "2026-05-01",
+        "dataFinal": "2026-06-29",
+        "maxAgrupamentos": 500
+      },
+      "agrupamentosVerificados": 22,
+      "expedicao": null,
+      "etiquetas": null,
+      "temEtiqueta": false
+    },
+    {
+      "erpOrderId": "TINY-860317707",
+      "pedidoId": 860317707,
+      "numeroPedido": 207083,
+      "situacao": 7,
+      "formaEnvioNome": "Mercado Envios",
+      "numeroPedidoEcommerce": "2000013492872079",
+      "idNotaFiscal": 860317708,
+      "buscaExpedicao": {
+        "idFormaEnvio": 744061814,
+        "dataInicial": "2026-04-28",
+        "dataFinal": "2026-06-26",
+        "maxAgrupamentos": 500
+      },
+      "agrupamentosVerificados": 22,
+      "expedicao": null,
+      "etiquetas": null,
+      "temEtiqueta": false
+    },
+    {
+      "erpOrderId": "TINY-860327063",
+      "pedidoId": 860327063,
+      "numeroPedido": 207185,
+      "situacao": 7,
+      "formaEnvioNome": "Shopee Envios",
+      "numeroPedidoEcommerce": "2606142V3SYN7D",
+      "idNotaFiscal": 860327068,
+      "buscaExpedicao": {
+        "idFormaEnvio": 756508453,
+        "dataInicial": "2026-04-29",
+        "dataFinal": "2026-06-27",
+        "maxAgrupamentos": 500
+      },
+      "agrupamentosVerificados": 20,
+      "expedicao": null,
+      "etiquetas": null,
+      "temEtiqueta": false
+    },
+    {
+      "erpOrderId": "TINY-860333909",
+      "pedidoId": 860333909,
+      "numeroPedido": 207296,
+      "situacao": 0,
+      "formaEnvioNome": "Mercado Envios",
+      "numeroPedidoEcommerce": "2000016939767468",
+      "idNotaFiscal": null,
+      "buscaExpedicao": {
+        "idFormaEnvio": 744061814,
+        "dataInicial": "2026-05-01",
+        "dataFinal": "2026-06-29",
+        "maxAgrupamentos": 500
+      },
+      "agrupamentosVerificados": 22,
+      "expedicao": null,
+      "etiquetas": null,
+      "temEtiqueta": false
+    },
+    {
+      "erpOrderId": "TINY-860311442",
+      "pedidoId": 860311442,
+      "numeroPedido": 207008,
+      "situacao": 0,
+      "formaEnvioNome": "Mercado Envios",
+      "numeroPedidoEcommerce": "2000013485255545",
+      "idNotaFiscal": null,
+      "buscaExpedicao": {
+        "idFormaEnvio": 744061814,
+        "dataInicial": "2026-05-01",
+        "dataFinal": "2026-06-29",
+        "maxAgrupamentos": 500
+      },
+      "agrupamentosVerificados": 22,
+      "expedicao": null,
+      "etiquetas": null,
+      "temEtiqueta": false
+    },
+    {
+      "erpOrderId": "TINY-860343389",
+      "pedidoId": 860343389,
+      "numeroPedido": 207372,
+      "situacao": 0,
+      "formaEnvioNome": "Mercado Envios",
+      "numeroPedidoEcommerce": "2000013526760271",
+      "idNotaFiscal": null,
+      "buscaExpedicao": {
+        "idFormaEnvio": 744061814,
+        "dataInicial": "2026-05-01",
+        "dataFinal": "2026-06-29",
+        "maxAgrupamentos": 500
+      },
+      "agrupamentosVerificados": 22,
+      "expedicao": null,
+      "etiquetas": null,
+      "temEtiqueta": false
+    },
+    {
+      "erpOrderId": "TINY-860345168",
+      "pedidoId": 860345168,
+      "numeroPedido": 207380,
+      "situacao": 0,
+      "formaEnvioNome": "Mercado Envios",
+      "numeroPedidoEcommerce": "2000013527482359",
+      "idNotaFiscal": null,
+      "buscaExpedicao": {
+        "idFormaEnvio": 744061814,
+        "dataInicial": "2026-05-01",
+        "dataFinal": "2026-06-29",
+        "maxAgrupamentos": 500
+      },
+      "agrupamentosVerificados": 22,
+      "expedicao": null,
+      "etiquetas": null,
+      "temEtiqueta": false
+    },
+    {
+      "erpOrderId": "TINY-860313590",
+      "pedidoId": 860313590,
+      "numeroPedido": 207027,
+      "situacao": 0,
+      "formaEnvioNome": "Mercado Envios",
+      "numeroPedidoEcommerce": "2000016908995826",
+      "idNotaFiscal": null,
+      "buscaExpedicao": {
+        "idFormaEnvio": 744061814,
+        "dataInicial": "2026-05-01",
+        "dataFinal": "2026-06-29",
+        "maxAgrupamentos": 500
+      },
+      "agrupamentosVerificados": 22,
+      "expedicao": null,
+      "etiquetas": null,
+      "temEtiqueta": false
+    },
+    {
+      "erpOrderId": "TINY-860322324",
+      "pedidoId": 860322324,
+      "numeroPedido": 207114,
+      "situacao": 0,
+      "formaEnvioNome": "Mercado Envios",
+      "numeroPedidoEcommerce": "2000016920213416",
+      "idNotaFiscal": null,
+      "buscaExpedicao": {
+        "idFormaEnvio": 744061814,
+        "dataInicial": "2026-05-01",
+        "dataFinal": "2026-06-29",
+        "maxAgrupamentos": 500
+      },
+      "agrupamentosVerificados": 22,
+      "expedicao": null,
+      "etiquetas": null,
+      "temEtiqueta": false
+    },
+    {
+      "erpOrderId": "TINY-860322793",
+      "pedidoId": 860322793,
+      "numeroPedido": 207121,
+      "situacao": 7,
+      "formaEnvioNome": "Mercado Envios",
+      "numeroPedidoEcommerce": "2000013499519717",
+      "idNotaFiscal": 860322795,
+      "buscaExpedicao": {
+        "idFormaEnvio": 744061814,
+        "dataInicial": "2026-04-29",
+        "dataFinal": "2026-06-27",
+        "maxAgrupamentos": 500
+      },
+      "agrupamentosVerificados": 22,
+      "expedicao": null,
+      "etiquetas": null,
+      "temEtiqueta": false
+    },
+    {
+      "erpOrderId": "TINY-860331219",
+      "pedidoId": 860331219,
+      "numeroPedido": 207247,
+      "situacao": 0,
+      "formaEnvioNome": "Mercado Envios",
+      "numeroPedidoEcommerce": "2000013514279293",
+      "idNotaFiscal": null,
+      "buscaExpedicao": {
+        "idFormaEnvio": 744061814,
+        "dataInicial": "2026-05-01",
+        "dataFinal": "2026-06-29",
+        "maxAgrupamentos": 500
+      },
+      "agrupamentosVerificados": 22,
+      "expedicao": null,
+      "etiquetas": null,
+      "temEtiqueta": false
+    }
+  ]
+}

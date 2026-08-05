@@ -37,10 +37,14 @@ Devido à sensibilidade dos dados de faturamento e tokens do cliente, o WMS apli
 
 O Tiny ERP limita severamente a taxa de requisições enviadas para a sua API v3. O cliente HTTP interno do WMS (`TinyApiV3Client`) gerencia essa taxa de forma automatizada:
 
-1.  **Intervalo Mínimo (`MIN_REQUEST_INTERVAL_MS`)**: O WMS impõe um atraso de segurança mínimo de **1,2 segundos** entre chamadas subsequentes para uma mesma conexão do Tiny. Caso a API tente disparar chamadas simultâneas, elas entram em uma fila e aguardam o tempo de throttle (`throttleConnection`).
-2.  **Tratamento de Rate Limit (HTTP 429)**:
-    *   Se a API responder com status HTTP 429, a conexão do tenant no banco é marcada com status `BLOCKED` e o WMS lê o cabeçalho `X-RateLimit-Reset` para descobrir por quantos segundos deve aguardar antes de tentar novamente (o padrão é 60 segundos se o cabeçalho estiver ausente).
-    *   O cliente WMS realiza até **3 tentativas** automáticas de repetição sob backoff antes de estourar um erro de timeout.
+1.  **Intervalo Mínimo (`TINY_MIN_REQUEST_INTERVAL_MS`)**: O WMS impõe um atraso padrão de **2 segundos** entre chamadas na mesma conexão (~30 req/min, margem sobre o limite Olist de **120 GET/min**). Ajustável via env `TINY_MIN_REQUEST_INTERVAL_MS` (mínimo 500 ms).
+2.  **Desaceleração proativa**: quando `X-RateLimit-Remaining` ≤ 8, o cliente pausa com base em `X-RateLimit-Reset` antes de continuar.
+3.  **Tratamento de Rate Limit (HTTP 429)**:
+    *   `X-RateLimit-Reset` = **segundos restantes** até a janela de 1 minuto resetar (ex.: `05` → aguarde ~5 s).
+    *   Até **5 tentativas** com espera entre 5 s e 120 s (+ buffer de 1 s).
+    *   A conexão **permanece `CONNECTED`**; gravamos `metadata.rateLimitUntil` e `lastError` temporários.
+    *   Status `BLOCKED` legado é **recuperado automaticamente** (abrir Integrações, sync ou worker OAuth) — **não exige reconectar OAuth**.
+    *   Sync de produtos/pedidos **interrompe** ao receber 429 (preserva checkpoint de produtos).
 
 ---
 

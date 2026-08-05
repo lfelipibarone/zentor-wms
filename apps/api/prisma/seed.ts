@@ -8,6 +8,7 @@ import {
   Permission,
 } from "@wms/shared";
 import { hashPassword } from "../src/lib/password.js";
+import { cleanupSeedDemoTenantData } from "../src/services/demo-tenant-cleanup.js";
 import {
   DEMO_TENANT_CONFIGS,
   printTestUsersGuide,
@@ -29,6 +30,8 @@ function demoProductImageUrl(sku: string): string {
 }
 
 async function main() {
+  await cleanupSeedDemoTenantData();
+
   const defaultTenant = await prisma.tenant.upsert({
     where: { slug: "default" },
     create: { name: "Default", slug: "default", active: true },

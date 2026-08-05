@@ -68,7 +68,7 @@ describe("tiny-oauth", () => {
     assert.equal(mapTinyStatusToUi(TinyConnectionStatus.CONNECTED), "VALID");
     assert.equal(mapTinyStatusToUi(TinyConnectionStatus.PENDING), "PENDING");
     assert.equal(mapTinyStatusToUi(TinyConnectionStatus.ERROR), "INVALID");
-    assert.equal(mapTinyStatusToUi(TinyConnectionStatus.BLOCKED), "BLOCKED");
+    assert.equal(mapTinyStatusToUi(TinyConnectionStatus.BLOCKED), "VALID");
     assert.equal(mapTinyStatusToUi(TinyConnectionStatus.CONNECTED, false), "INVALID");
   });
 

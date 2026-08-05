@@ -1,6 +1,6 @@
 import { OrderStatus } from "@prisma/client";
 import { prisma } from "../lib/prisma.js";
-import { getTinyApiClient, TinyApiError } from "./tiny-api-v3-client.js";
+import { getTinyApiClient, TinyApiError, isTinyRateLimitError } from "./tiny-api-v3-client.js";
 import { isTinyConnectedError } from "./tiny-purchase-receipt.js";
 import {
   isTinyOrderSituacaoSyncable,
@@ -11,8 +11,20 @@ import {
   TINY_ORDER_SITUACOES_SYNC,
   upsertOrderFromTiny,
 } from "./tiny-integration.js";
+import {
+  clearTinySyncCheckpoint,
+  isTinySyncCheckpointResumable,
+  readTinySyncCheckpoint,
+  TINY_ORDERS_CHECKPOINT_KEY,
+  TINY_ORDERS_LAST_SYNC_KEY,
+  writeTinySyncCheckpoint,
+  type TinySyncCheckpointState,
+} from "./tiny-sync-checkpoint.js";
+import {
+  releaseTinySyncLock,
+  tryAcquireTinySyncLock,
+} from "./tiny-sync-lock.js";
 
-const LAST_SYNC_KEY = "tiny.orders.lastSyncAt";
 const TINY_MAX_SYNC_DAYS = 90;
 const TINY_LIST_PAGE_SIZE = 100;
 const TINY_LIST_MAX_OFFSET = 5000;
@@ -51,6 +63,8 @@ export type SyncSalesOrdersResult = {
   cancelledRemoved: number;
   errors: Array<{ erpOrderId: string; message: string }>;
   tinyConnected: boolean;
+  resumed: boolean;
+  rateLimited: boolean;
   warning?: string;
 };
 
@@ -64,40 +78,87 @@ type TinyCleanupDb = Pick<typeof prisma, "order" | "pickWave" | "$transaction">;
 
 async function getLastSyncAt(tenantId: string): Promise<string | null> {
   const row = await prisma.systemSetting.findUnique({
-    where: { tenantId_key: { tenantId, key: LAST_SYNC_KEY } },
+    where: { tenantId_key: { tenantId, key: TINY_ORDERS_LAST_SYNC_KEY } },
   });
   return row?.value?.trim() || null;
 }
 
 async function setLastSyncAt(tenantId: string): Promise<void> {
   await prisma.systemSetting.upsert({
-    where: { tenantId_key: { tenantId, key: LAST_SYNC_KEY } },
+    where: { tenantId_key: { tenantId, key: TINY_ORDERS_LAST_SYNC_KEY } },
     create: {
       tenantId,
-      key: LAST_SYNC_KEY,
+      key: TINY_ORDERS_LAST_SYNC_KEY,
       value: new Date().toISOString(),
     },
     update: { value: new Date().toISOString() },
   });
 }
 
-export async function cleanupTenantOrdersAndWaves(
+async function loadNonUpdatableErpOrderIds(
+  tenantId: string,
+): Promise<Set<string>> {
+  const rows = await prisma.order.findMany({
+    where: {
+      tenantId,
+      erpOrderId: { startsWith: "TINY-" },
+      status: { notIn: [OrderStatus.PENDING, OrderStatus.PAUSED_ISSUE] },
+    },
+    select: { erpOrderId: true },
+  });
+  return new Set(rows.map((r) => r.erpOrderId));
+}
+
+/** Pedidos fictícios do seed — nunca apagar TINY-* ou pedidos reais. */
+export const DEMO_ORDER_WHERE = {
+  OR: [
+    { erpOrderId: { startsWith: "ERP-DEMO-" } },
+    { erpOrderId: { startsWith: "ERP-MOB-" } },
+    { erpOrderId: "ERP-10042" },
+  ],
+} as const;
+
+/** Remove só dados demo antes da 1ª sync Tiny. Preserva pedidos TINY-* existentes. */
+export async function removeDemoSeedOrdersAndWaves(
+  db: TinyCleanupDb,
+  tenantId: string,
+): Promise<TinyCleanupStats> {
+  const demoWhere = { tenantId, ...DEMO_ORDER_WHERE };
+
+  const [demoRemoved, wavesOnlyDemo] = await db.$transaction([
+    db.order.count({ where: demoWhere }),
+    db.pickWave.findMany({
+      where: {
+        tenantId,
+        orders: { every: { order: DEMO_ORDER_WHERE } },
+      },
+      select: { id: true },
+    }),
+  ]);
+
+  const waveIds = wavesOnlyDemo.map((w) => w.id);
+
+  await db.$transaction([
+    db.pickWave.deleteMany({ where: { id: { in: waveIds } } }),
+    db.order.deleteMany({ where: demoWhere }),
+  ]);
+
+  return {
+    ordersRemoved: demoRemoved,
+    wavesRemoved: waveIds.length,
+    demoRemoved,
+  };
+}
+
+/** Apaga todos os pedidos e ondas do tenant. Uso exclusivo do seed (`pnpm db:seed`). */
+export async function wipeAllTenantOrdersAndWaves(
   db: TinyCleanupDb,
   tenantId: string,
 ): Promise<TinyCleanupStats> {
   const [ordersRemoved, wavesRemoved, demoRemoved] = await db.$transaction([
     db.order.count({ where: { tenantId } }),
     db.pickWave.count({ where: { tenantId } }),
-    db.order.count({
-      where: {
-        tenantId,
-        OR: [
-          { erpOrderId: { startsWith: "ERP-DEMO-" } },
-          { erpOrderId: { startsWith: "ERP-MOB-" } },
-          { erpOrderId: "ERP-10042" },
-        ],
-      },
-    }),
+    db.order.count({ where: { tenantId, ...DEMO_ORDER_WHERE } }),
   ]);
 
   await db.$transaction([
@@ -106,6 +167,14 @@ export async function cleanupTenantOrdersAndWaves(
   ]);
 
   return { ordersRemoved, wavesRemoved, demoRemoved };
+}
+
+/** @deprecated Use removeDemoSeedOrdersAndWaves ou wipeAllTenantOrdersAndWaves */
+export async function cleanupTenantOrdersAndWaves(
+  db: TinyCleanupDb,
+  tenantId: string,
+): Promise<TinyCleanupStats> {
+  return wipeAllTenantOrdersAndWaves(db, tenantId);
 }
 
 async function removeCancelledTinyPending(
@@ -132,6 +201,8 @@ export async function syncSalesOrdersFromTiny(params: {
   userId?: string;
   connectionId?: string;
   days?: number;
+  /** Ignora checkpoint e recomeça do início */
+  forceRestart?: boolean;
 }): Promise<SyncSalesOrdersResult> {
   const days = Math.min(Math.max(params.days ?? 30, 1), TINY_MAX_SYNC_DAYS);
   const result: SyncSalesOrdersResult = {
@@ -145,8 +216,19 @@ export async function syncSalesOrdersFromTiny(params: {
     cancelledRemoved: 0,
     errors: [],
     tinyConnected: false,
+    resumed: false,
+    rateLimited: false,
   };
 
+  if (!tryAcquireTinySyncLock(params.tenantId, "orders")) {
+    return {
+      ...result,
+      tinyConnected: true,
+      warning: "Sync de pedidos já em andamento.",
+    };
+  }
+
+  try {
   let client;
   try {
     client = await getTinyApiClient({
@@ -155,6 +237,17 @@ export async function syncSalesOrdersFromTiny(params: {
       connectionId: params.connectionId,
     });
   } catch (e) {
+    if (isTinyRateLimitError(e)) {
+      return {
+        ...result,
+        tinyConnected: true,
+        rateLimited: true,
+        warning:
+          e instanceof Error
+            ? e.message
+            : "Rate limit Olist ERP: sync pausada. Retome em alguns minutos.",
+      };
+    }
     if (isTinyConnectedError(e) || e instanceof TinyApiError) {
       return {
         ...result,
@@ -168,9 +261,31 @@ export async function syncSalesOrdersFromTiny(params: {
 
   result.tinyConnected = true;
 
-  const hadSyncBefore = (await getLastSyncAt(params.tenantId)) !== null;
+  if (params.forceRestart) {
+    await clearTinySyncCheckpoint(params.tenantId, TINY_ORDERS_CHECKPOINT_KEY);
+  }
+
+  const savedCheckpoint = await readTinySyncCheckpoint(
+    params.tenantId,
+    TINY_ORDERS_CHECKPOINT_KEY,
+  );
+  let resume = isTinySyncCheckpointResumable(savedCheckpoint, {
+    connectionId: params.connectionId,
+    forceRestart: params.forceRestart,
+  });
+
+  if (resume && savedCheckpoint!.days !== undefined && savedCheckpoint!.days !== days) {
+    await clearTinySyncCheckpoint(params.tenantId, TINY_ORDERS_CHECKPOINT_KEY);
+    resume = false;
+  }
+
+  result.resumed = resume;
+  const effectiveDays = resume ? (savedCheckpoint!.days ?? days) : days;
+
+  const hadSyncBefore =
+    resume || (await getLastSyncAt(params.tenantId)) !== null;
   if (!hadSyncBefore) {
-    const cleanup = await cleanupTenantOrdersAndWaves(prisma, params.tenantId);
+    const cleanup = await removeDemoSeedOrdersAndWaves(prisma, params.tenantId);
     result.ordersRemoved = cleanup.ordersRemoved;
     result.wavesRemoved = cleanup.wavesRemoved;
     result.demoRemoved = cleanup.demoRemoved;
@@ -178,14 +293,65 @@ export async function syncSalesOrdersFromTiny(params: {
 
   const end = new Date();
   const start = new Date();
-  start.setDate(start.getDate() - days);
+  start.setDate(start.getDate() - effectiveDays);
   const dateRange = {
     dataInicial: formatDate(start),
     dataFinal: formatDate(end),
   };
 
+  const nonUpdatableOrders = await loadNonUpdatableErpOrderIds(params.tenantId);
+  const connectionId = params.connectionId?.trim() || null;
+  const startedAt = resume
+    ? savedCheckpoint!.startedAt
+    : new Date().toISOString();
+
+  let situacaoIndex = resume ? (savedCheckpoint!.situacaoIndex ?? 0) : 0;
+  let phase: "syncable" | "cancelled" = resume
+    ? (savedCheckpoint!.phase ?? "syncable")
+    : "syncable";
+  let offset = resume ? savedCheckpoint!.offset : 0;
+  let total = resume ? (savedCheckpoint!.total ?? Infinity) : Infinity;
+  let checkpointSaved = false;
+
+  const persistCheckpoint = async (
+    next: Pick<
+      TinySyncCheckpointState,
+      "situacaoIndex" | "phase" | "offset" | "total" | "situacao"
+    >,
+    opts?: { pauseReason?: "rate_limit" | "interrupted" },
+  ) => {
+    const state: TinySyncCheckpointState = {
+      status: "running",
+      kind: "orders",
+      offset: next.offset,
+      total: Number.isFinite(next.total) ? next.total : null,
+      startedAt,
+      updatedAt: new Date().toISOString(),
+      connectionId,
+      days: effectiveDays,
+      situacaoIndex: next.situacaoIndex,
+      situacao: next.situacao,
+      phase: next.phase,
+      stats: {
+        created: result.created,
+        updated: result.updated,
+        skipped: result.skipped,
+        listedFromTiny: result.listedFromTiny,
+        cancelledRemoved: result.cancelledRemoved,
+      },
+      pauseReason: opts?.pauseReason,
+    };
+    await writeTinySyncCheckpoint(params.tenantId, TINY_ORDERS_CHECKPOINT_KEY, state);
+    checkpointSaved = true;
+  };
+
   const processSyncablePedido = async (pedidoId: number) => {
     const erpOrderId = tinyErpOrderId(pedidoId);
+    if (nonUpdatableOrders.has(erpOrderId)) {
+      result.skipped += 1;
+      return;
+    }
+
     try {
       const full = await client.getPedido(pedidoId);
       const fullSituacao = parseTinyPedidoSituacao(full);
@@ -227,9 +393,11 @@ export async function syncSalesOrdersFromTiny(params: {
       ) {
         result.updated += 1;
       } else {
+        nonUpdatableOrders.add(erpOrderId);
         result.skipped += 1;
       }
     } catch (e) {
+      if (isTinyRateLimitError(e)) throw e;
       const message =
         e instanceof Error ? e.message : "Erro ao processar pedido";
       result.errors.push({ erpOrderId, message });
@@ -244,16 +412,24 @@ export async function syncSalesOrdersFromTiny(params: {
     }
   };
 
-  for (const situacao of TINY_SYNCABLE_SITUACOES) {
-    let offset = 0;
-    let total = Infinity;
+  const syncSyncableSituacao = async (situacao: number, startOffset: number) => {
+    let pageOffset = startOffset;
+    let pageTotal = total;
 
-    while (offset < total) {
+    while (pageOffset < pageTotal) {
+      await persistCheckpoint({
+        situacaoIndex,
+        phase: "syncable",
+        offset: pageOffset,
+        total: pageTotal,
+        situacao,
+      });
+
       const page = await client.listPedidos({
         ...dateRange,
         situacao,
         limit: TINY_LIST_PAGE_SIZE,
-        offset,
+        offset: pageOffset,
       });
 
       result.listedFromTiny += page.items.length;
@@ -265,23 +441,47 @@ export async function syncSalesOrdersFromTiny(params: {
       }
 
       const pag = asRecord(page.pagination);
-      total = num(pag?.total) || page.items.length;
-      if (page.items.length < TINY_LIST_PAGE_SIZE) break;
-      offset += TINY_LIST_PAGE_SIZE;
-      if (offset > TINY_LIST_MAX_OFFSET) break;
+      pageTotal = num(pag?.total) || page.items.length;
+      const nextOffset = pageOffset + TINY_LIST_PAGE_SIZE;
+
+      if (page.items.length < TINY_LIST_PAGE_SIZE) {
+        pageOffset = nextOffset;
+        break;
+      }
+
+      pageOffset = nextOffset;
+      if (pageOffset > TINY_LIST_MAX_OFFSET) break;
+
+      await persistCheckpoint({
+        situacaoIndex,
+        phase: "syncable",
+        offset: pageOffset,
+        total: pageTotal,
+        situacao,
+      });
     }
-  }
 
-  {
-    let offset = 0;
-    let total = Infinity;
+    return pageOffset;
+  };
 
-    while (offset < total) {
+  const syncCancelledPedidos = async (startOffset: number) => {
+    let pageOffset = startOffset;
+    let pageTotal = total;
+
+    while (pageOffset < pageTotal) {
+      await persistCheckpoint({
+        situacaoIndex: TINY_SYNCABLE_SITUACOES.length,
+        phase: "cancelled",
+        offset: pageOffset,
+        total: pageTotal,
+        situacao: TINY_ORDER_SITUACAO_CANCELADA,
+      });
+
       const page = await client.listPedidos({
         ...dateRange,
         situacao: TINY_ORDER_SITUACAO_CANCELADA,
         limit: TINY_LIST_PAGE_SIZE,
-        offset,
+        offset: pageOffset,
       });
 
       for (const raw of page.items) {
@@ -291,18 +491,107 @@ export async function syncSalesOrdersFromTiny(params: {
       }
 
       const pag = asRecord(page.pagination);
-      total = num(pag?.total) || page.items.length;
-      if (page.items.length < TINY_LIST_PAGE_SIZE) break;
-      offset += TINY_LIST_PAGE_SIZE;
-      if (offset > TINY_LIST_MAX_OFFSET) break;
+      pageTotal = num(pag?.total) || page.items.length;
+      const nextOffset = pageOffset + TINY_LIST_PAGE_SIZE;
+
+      if (page.items.length < TINY_LIST_PAGE_SIZE) {
+        pageOffset = nextOffset;
+        break;
+      }
+
+      pageOffset = nextOffset;
+      if (pageOffset > TINY_LIST_MAX_OFFSET) break;
+
+      await persistCheckpoint({
+        situacaoIndex: TINY_SYNCABLE_SITUACOES.length,
+        phase: "cancelled",
+        offset: pageOffset,
+        total: pageTotal,
+        situacao: TINY_ORDER_SITUACAO_CANCELADA,
+      });
     }
+  };
+
+  try {
+    if (phase === "syncable") {
+      for (; situacaoIndex < TINY_SYNCABLE_SITUACOES.length; situacaoIndex++) {
+        const situacao = TINY_SYNCABLE_SITUACOES[situacaoIndex]!;
+        const startOffset =
+          resume && situacaoIndex === (savedCheckpoint!.situacaoIndex ?? 0)
+            ? offset
+            : 0;
+        total = Infinity;
+        await syncSyncableSituacao(situacao, startOffset);
+        offset = 0;
+      }
+    }
+
+    phase = "cancelled";
+    const cancelledStartOffset =
+      resume &&
+      savedCheckpoint!.phase === "cancelled" &&
+      situacaoIndex >= TINY_SYNCABLE_SITUACOES.length
+        ? offset
+        : 0;
+    total = Infinity;
+    await syncCancelledPedidos(cancelledStartOffset);
+
+    await clearTinySyncCheckpoint(params.tenantId, TINY_ORDERS_CHECKPOINT_KEY);
+    await setLastSyncAt(params.tenantId);
+  } catch (e) {
+    const situacao =
+      phase === "cancelled"
+        ? TINY_ORDER_SITUACAO_CANCELADA
+        : TINY_SYNCABLE_SITUACOES[situacaoIndex] ??
+          TINY_SYNCABLE_SITUACOES[0]!;
+    await persistCheckpoint(
+      {
+        situacaoIndex,
+        phase,
+        offset,
+        total,
+        situacao,
+      },
+      {
+        pauseReason: isTinyRateLimitError(e) ? "rate_limit" : "interrupted",
+      },
+    ).catch(() => undefined);
+
+    if (isTinyRateLimitError(e)) {
+      result.rateLimited = true;
+      result.warning =
+        (e instanceof Error ? e.message : null) ??
+        "Rate limit Olist ERP: sync pausada. Retome em alguns minutos.";
+      await logIntegrationEvent({
+        tenantId: params.tenantId,
+        source: "TINY",
+        eventType: "sync_orders",
+        status: "ERROR",
+        message: `Sync pausada por rate limit. Criados: ${result.created}, atualizados: ${result.updated}`,
+        payload: {
+          created: result.created,
+          updated: result.updated,
+          skipped: result.skipped,
+          listedFromTiny: result.listedFromTiny,
+          errorCount: result.errors.length,
+          days: effectiveDays,
+          rateLimited: true,
+          resumed: result.resumed,
+        },
+      });
+      return result;
+    }
+    throw e;
   }
 
-  await setLastSyncAt(params.tenantId);
-
-  if (result.listedFromTiny === 0) {
+  if (result.resumed) {
     result.warning =
-      `Nenhum pedido importável nos últimos ${days} dias. O WMS importa apenas Aberta (0), Faturada (1), Aprovada (3), Preparando envio (4) e Pronto envio (7). Pedidos já enviados (5) ou entregues (6) são ignorados. Confira se há pedidos pendentes no ERP e se o OAuth tem permissão de Pedidos de Venda.`;
+      "Sync retomado de checkpoint. " +
+      (result.warning ? `${result.warning} ` : "") +
+      "Use «Recomeçar do zero» para forçar reimportação completa.";
+  } else if (result.listedFromTiny === 0) {
+    result.warning =
+      `Nenhum pedido importável nos últimos ${effectiveDays} dias. O WMS importa apenas Aberta (0), Faturada (1), Aprovada (3), Preparando envio (4) e Pronto envio (7). Pedidos já enviados (5) ou entregues (6) são ignorados. Confira se há pedidos pendentes no ERP e se o OAuth tem permissão de Pedidos de Venda.`;
   } else if (result.errors.length > 0) {
     result.warning = `${result.errors.length} pedido(s) com erro ao importar. Veja errors[] no resultado.`;
   } else if (result.created === 0 && result.updated === 0) {
@@ -314,8 +603,8 @@ export async function syncSalesOrdersFromTiny(params: {
     tenantId: params.tenantId,
     source: "TINY",
     eventType: "sync_orders",
-    status: "OK",
-    message: `Criados: ${result.created}, atualizados: ${result.updated}, ignorados: ${result.skipped}`,
+    status: result.errors.length > 0 ? "ERROR" : "OK",
+    message: `Criados: ${result.created}, atualizados: ${result.updated}, ignorados: ${result.skipped}${result.resumed ? ", retomado" : ""}`,
     payload: {
       created: result.created,
       updated: result.updated,
@@ -326,9 +615,13 @@ export async function syncSalesOrdersFromTiny(params: {
       demoRemoved: result.demoRemoved,
       cancelledRemoved: result.cancelledRemoved,
       errorCount: result.errors.length,
-      days,
+      days: effectiveDays,
+      resumed: result.resumed,
     },
   });
 
   return result;
+  } finally {
+    releaseTinySyncLock(params.tenantId, "orders");
+  }
 }

@@ -8,14 +8,26 @@ const treeInclude = {
     include: {
       corredores: {
         orderBy: order,
-        include: { fileiras: { orderBy: order } },
-      },
-      estantes: {
-        orderBy: order,
         include: {
-          prateleiras: {
+          estantes: {
             orderBy: order,
-            include: { colunas: { orderBy: order } },
+            include: {
+              colunas: {
+                orderBy: order,
+                include: {
+                  linhas: {
+                    orderBy: order,
+                    include: {
+                      location: {
+                        include: {
+                          product: { select: { sku: true, name: true } },
+                        },
+                      },
+                    },
+                  },
+                },
+              },
+            },
           },
         },
       },

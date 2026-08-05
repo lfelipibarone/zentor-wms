@@ -1,0 +1,10 @@
+# Um TINY-{id} ou só o número por linha. Linhas com # são ignoradas.
+# Exemplo do handoff (Mercado Envios, Pronto Envio):
+TINY-860197915
+TINY-860199959
+TINY-860199997
+TINY-860202821
+TINY-860202884
+TINY-860206931
+# Pedido que está na expedição Tiny (pode retornar erro do marketplace ML):
+TINY-860301754

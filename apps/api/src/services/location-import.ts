@@ -1,9 +1,10 @@
 import { LocationType, Prisma } from "@prisma/client";
 import { prisma } from "../lib/prisma.js";
 import { assertMaxPickFaceLocations } from "./location-rules.js";
+import { resumePausedOrdersAfterPickFace } from "./product-locations.js";
 import {
-  resolveLayoutCodes,
   resolveLocationLayout,
+  resolveOrCreateLayoutCodes,
 } from "./warehouse-layout.js";
 
 export interface LocationImportInput {
@@ -13,8 +14,8 @@ export interface LocationImportInput {
   barracao?: string;
   setor?: string;
   estante?: string;
-  prateleira?: string;
   coluna?: string;
+  linha?: string;
   type: LocationType;
   productSku?: string;
   capacity: number;
@@ -81,7 +82,7 @@ export function normalizeImportRow(
       error: {
         row: rowIndex,
         barcode,
-        message: "Corredor e fileira são obrigatórios",
+        message: "Corredor e linha são obrigatórios",
       },
     };
   }
@@ -135,8 +136,8 @@ export function normalizeImportRow(
       barracao: optionalText("barracao"),
       setor: optionalText("setor"),
       estante: optionalText("estante"),
-      prateleira: optionalText("prateleira"),
       coluna: optionalText("coluna"),
+      linha: optionalText("linha"),
       type,
       productSku: productSku || undefined,
       capacity: Math.floor(capacity),
@@ -181,6 +182,7 @@ export async function importLocations(
   };
 
   const productCache = new Map<string, string | null>();
+  const pickFaceProductsToResume = new Set<string>();
 
   for (let i = 0; i < rows.length; i++) {
     const input = rows[i]!;
@@ -207,13 +209,12 @@ export async function importLocations(
         }
       }
 
-      const layoutIds = await resolveLayoutCodes(tenantId, {
+      const layoutIds = await resolveOrCreateLayoutCodes(tenantId, {
         barracao: input.barracao,
         setor: input.setor,
         corredor: input.corridor,
-        fileira: input.row,
+        linha: input.linha ?? input.row,
         estante: input.estante,
-        prateleira: input.prateleira,
         coluna: input.coluna,
       });
       const layout = await resolveLocationLayout(tenantId, layoutIds, {
@@ -237,10 +238,9 @@ export async function importLocations(
         barracaoId: layout.barracaoId,
         setorId: layout.setorId,
         corredorId: layout.corredorId,
-        fileiraId: layout.fileiraId,
         estanteId: layout.estanteId,
-        prateleiraId: layout.prateleiraId,
         colunaId: layout.colunaId,
+        linhaId: layout.linhaId,
         type: input.type,
         capacity: input.capacity,
         minThreshold: input.minThreshold,
@@ -270,6 +270,9 @@ export async function importLocations(
           },
         });
         result.updated++;
+        if (input.type === LocationType.PICK_FACE && productId && baseData.active) {
+          pickFaceProductsToResume.add(productId);
+        }
       } else {
         await prisma.location.create({
           data: {
@@ -280,6 +283,9 @@ export async function importLocations(
           },
         });
         result.created++;
+        if (input.type === LocationType.PICK_FACE && productId && baseData.active) {
+          pickFaceProductsToResume.add(productId);
+        }
       }
     } catch (e) {
       const msg =
@@ -294,6 +300,10 @@ export async function importLocations(
         message: msg,
       });
     }
+  }
+
+  for (const productId of pickFaceProductsToResume) {
+    await resumePausedOrdersAfterPickFace(tenantId, productId);
   }
 
   return result;

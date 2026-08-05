@@ -82,11 +82,18 @@ export default function PackingPage() {
 
   const goToOrder = useCallback(
     async (orderId: string) => {
-      await apiFetch(`/api/packing/orders/${orderId}/start`, {
-        method: "POST",
-        body: "{}",
-      });
-      router.push(`/packing/${orderId}`);
+      try {
+        await apiFetch(`/api/packing/orders/${orderId}/start`, {
+          method: "POST",
+          body: "{}",
+        });
+        router.push(`/packing/${orderId}`);
+      } catch (e) {
+        setMessage(
+          e instanceof Error ? e.message : "Não foi possível abrir o pedido",
+        );
+        lastScanRef.current = "";
+      }
     },
     [router],
   );

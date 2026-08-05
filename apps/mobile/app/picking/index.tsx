@@ -14,8 +14,6 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { useQuery } from "@tanstack/react-query";
 import { OrderStatus } from "@wms/shared";
 import {
-  useAcceptOrder,
-  useAcceptOrdersBatch,
   useCreateWaveFromOrders,
   useMobileConfig,
   useOrderQueue,
@@ -45,7 +43,6 @@ export default function PickingHubScreen() {
     useOrderQueue();
   const data = queueData?.orders;
   const proximityGroups = queueData?.proximityGroups ?? [];
-  const accept = useAcceptOrder();
 
   const problemOrders = useQuery({
     queryKey: ["problem-orders"],
@@ -77,33 +74,20 @@ export default function PickingHubScreen() {
     }
   }, [tab, problemOrders.error]);
 
-  const handleAccept = async (order: QueueOrder | ProblemOrder) => {
-    await accept.mutateAsync(order.id);
-    router.push(`/picking/${order.id}/basket`);
-  };
-
   const handleOrderPress = async (order: QueueOrder | ProblemOrder) => {
     try {
       const session = await api.getPickingSession(order.id).catch(() => null);
-      if (
-        session &&
-        (session.order.status === OrderStatus.PICKING ||
-          session.order.status === OrderStatus.PAUSED_ISSUE)
-      ) {
-        if (session.order.basket) {
-          router.push({
-            pathname: "/picking/[orderId]/pick",
-            params: {
-              orderId: order.id,
-              basketCode: session.order.basket.code,
-            },
-          });
-        } else {
-          router.push(`/picking/${order.id}/basket`);
-        }
+      if (session?.order.basket) {
+        router.push({
+          pathname: "/picking/[orderId]/pick",
+          params: {
+            orderId: order.id,
+            basketCode: session.order.basket.code,
+          },
+        });
         return;
       }
-      await handleAccept(order);
+      router.push(`/picking/${order.id}/basket`);
     } catch (e) {
       const msg = e instanceof ApiError ? e.message : "Erro ao abrir pedido";
       showErrorAlert(msg);
@@ -203,37 +187,12 @@ function OrdersQueuePanel({
   onGoToWaves: () => void;
 }) {
   const { data: config } = useMobileConfig();
-  const acceptBatch = useAcceptOrdersBatch();
   const createWave = useCreateWaveFromOrders();
 
   const handleAcceptBatch = async (group: ProximityGroupDto) => {
-    try {
-      const result = await acceptBatch.mutateAsync(group.orderIds);
-      await onRefresh();
-      if (result.accepted.length === 0) {
-        const firstErr = result.errors[0]?.message ?? "Nenhum pedido aceito";
-        showErrorAlert(firstErr);
-        return;
-      }
-      if (result.errors.length > 0) {
-        showInfoAlert(
-          `${result.accepted.length} aceito(s). ${result.errors.length} não puderam ser aceitos.`,
-        );
-      } else {
-        showInfoAlert(`${result.accepted.length} pedido(s) aceito(s).`);
-      }
-      const firstId = result.accepted[0]!;
-      const firstOrder =
-        group.orders.find((o) => o.id === firstId) ??
-        orders.find((o) => o.id === firstId);
-      if (firstOrder) {
-        router.push(`/picking/${firstId}/basket`);
-      }
-    } catch (e) {
-      showErrorAlert(
-        e instanceof ApiError ? e.message : "Erro ao aceitar pedidos",
-      );
-    }
+    const firstId = group.orderIds[0];
+    if (!firstId) return;
+    router.push(`/picking/${firstId}/basket`);
   };
 
   const runCreateWave = async (
@@ -310,10 +269,9 @@ function OrdersQueuePanel({
                   />
                 ) : null}
                 <FactoryButton
-                  label="Aceitar todos (avulso)"
+                  label="Abrir primeiro pedido"
                   variant="secondary"
                   onPress={() => void handleAcceptBatch(g)}
-                  loading={acceptBatch.isPending}
                 />
               </View>
             </View>
@@ -510,6 +468,8 @@ function OrderCard({
 }) {
   const returned =
     "returnedFromPacking" in item && item.returnedFromPacking;
+  const resuming =
+    "resumingPicking" in item && Boolean(item.resumingPicking);
   const paused = "pausedIssue" in item && item.pausedIssue;
   const issueDetail =
     "issueDetail" in item ? item.issueDetail : null;
@@ -530,6 +490,11 @@ function OrderCard({
       {returned ? (
         <View style={styles.returnBadge}>
           <Text style={styles.returnBadgeText}>RETORNO PACKING</Text>
+        </View>
+      ) : null}
+      {resuming ? (
+        <View style={[styles.returnBadge, { backgroundColor: theme.warning }]}>
+          <Text style={styles.returnBadgeText}>EM ANDAMENTO</Text>
         </View>
       ) : null}
       {paused ? (
@@ -575,7 +540,7 @@ function OrderCard({
         ) : null}
       </View>
       <Text style={styles.tapHint}>
-        {resume || problem || returned || paused
+        {resume || problem || returned || paused || resuming
           ? "TOQUE PARA CONTINUAR"
           : "TOQUE PARA INICIAR"}
       </Text>

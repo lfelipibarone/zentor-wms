@@ -7,8 +7,8 @@ export interface ParsedLocationRow {
   barracao?: string;
   setor?: string;
   estante?: string;
-  prateleira?: string;
   coluna?: string;
+  linha?: string;
   type: string;
   productSku?: string;
   capacity: number;
@@ -30,11 +30,10 @@ const TEMPLATE_HEADERS = [
   "barcode",
   "barracao",
   "setor",
-  "estante",
-  "prateleira",
-  "coluna",
   "corredor",
-  "fileira",
+  "estante",
+  "coluna",
+  "linha",
   "tipo",
   "sku_produto",
   "capacidade",
@@ -47,10 +46,9 @@ const TEMPLATE_EXAMPLE = [
   "GON-A-01",
   "B1",
   "S1",
-  "E2",
-  "P3",
-  "C4",
   "A",
+  "E2",
+  "01",
   "01",
   "Gôndola",
   "SKU-001",
@@ -70,9 +68,8 @@ const HEADER_ALIASES: Record<string, keyof ParsedLocationRow | "skip"> = {
   barracao: "barracao",
   setor: "setor",
   estante: "estante",
-  prateleira: "prateleira",
-  pratileira: "prateleira",
   coluna: "coluna",
+  linha: "linha",
   corredor: "corridor",
   corridor: "corridor",
   fileira: "row",
@@ -185,7 +182,7 @@ export async function parseLocationsXlsx(file: File): Promise<{
       continue;
     }
     if (!corridor || !rowVal) {
-      parseErrors.push(`Linha ${i + 1} (${barcode}): corredor e fileira obrigatórios`);
+      parseErrors.push(`Linha ${i + 1} (${barcode}): corredor e linha obrigatórios`);
       continue;
     }
     if (!type) {
@@ -203,8 +200,8 @@ export async function parseLocationsXlsx(file: File): Promise<{
       barracao: cellToString(raw.barracao) || undefined,
       setor: cellToString(raw.setor) || undefined,
       estante: cellToString(raw.estante) || undefined,
-      prateleira: cellToString(raw.prateleira) || undefined,
       coluna: cellToString(raw.coluna) || undefined,
+      linha: cellToString(raw.linha) || undefined,
       type,
       productSku: cellToString(raw.productSku) || undefined,
       capacity,

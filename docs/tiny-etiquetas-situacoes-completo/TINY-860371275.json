@@ -1,0 +1,478 @@
+{
+  "meta": {
+    "fetchedAt": "2026-06-17T18:02:22.275Z",
+    "pedidoId": 860371275,
+    "erpOrderId": "TINY-860371275",
+    "numeroPedido": 207605,
+    "situacao": 7,
+    "situacaoLabel": "Pronto Envio",
+    "formaEnvioNome": "Mercado Envios",
+    "diagnostico": "FORA_EXPEDICAO",
+    "resumoTesteAnterior": {
+      "pedidoId": 860371275,
+      "erpOrderId": "TINY-860371275",
+      "numeroPedido": 207605,
+      "situacao": 7,
+      "situacaoLabel": "Pronto Envio",
+      "formaEnvioNome": "Mercado Envios",
+      "codigoRastreamento": null,
+      "idNotaFiscal": 860371276,
+      "naExpedicao": false,
+      "expedicao": null,
+      "etiquetas": {
+        "urls": [],
+        "marketplaceError": null,
+        "diagnostico": "FORA_EXPEDICAO"
+      }
+    }
+  },
+  "pedido": {
+    "rotas": {
+      "GET /pedidos/860371275": {
+        "rota": "GET /pedidos/860371275",
+        "params": {
+          "idPedido": 860371275
+        },
+        "ok": true,
+        "urls": [],
+        "resposta": {
+          "id": 860371275,
+          "numeroPedido": 207605,
+          "idNotaFiscal": 860371276,
+          "dataFaturamento": "2026-06-16",
+          "valorTotalProdutos": 24.9,
+          "valorTotalPedido": 24.9,
+          "listaPreco": {
+            "id": 0,
+            "nome": "Padrão",
+            "acrescimoDesconto": 0
+          },
+          "cliente": {
+            "nome": "Isac Ribeiro",
+            "codigo": "",
+            "fantasia": "",
+            "tipoPessoa": "F",
+            "cpfCnpj": "125.586.036-71",
+            "inscricaoEstadual": "",
+            "rg": "",
+            "telefone": "",
+            "celular": "",
+            "email": "",
+            "endereco": {
+              "endereco": "Avenida Melvin Jones",
+              "numero": "277",
+              "complemento": "prédio com árvore na frente",
+              "bairro": "Santa Ângela",
+              "municipio": "Poços de Caldas",
+              "cep": "37.701-274",
+              "uf": "MG",
+              "pais": "Brasil"
+            },
+            "id": 766893093
+          },
+          "enderecoEntrega": {
+            "endereco": "Avenida Melvin Jones",
+            "numero": "277",
+            "complemento": "AP 12 Referencia: prédio com árvore na frente",
+            "bairro": "Santa Ângela",
+            "municipio": "Poços de Caldas",
+            "cep": "37.701-274",
+            "uf": "MG",
+            "pais": "Brasil",
+            "nomeDestinatario": "Isac Ribeiro",
+            "cpfCnpj": "125.586.036-71",
+            "tipoPessoa": "F",
+            "telefone": "",
+            "inscricaoEstadual": ""
+          },
+          "ecommerce": {
+            "id": 4751,
+            "nome": "Mercado Livre Mamute",
+            "numeroPedidoEcommerce": "2000016971417766",
+            "numeroPedidoCanalVenda": "",
+            "canalVenda": ""
+          },
+          "transportador": {
+            "id": 0,
+            "nome": "",
+            "fretePorConta": "R",
+            "formaEnvio": {
+              "id": 744061814,
+              "nome": "Mercado Envios"
+            },
+            "formaFrete": null,
+            "codigoRastreamento": "",
+            "urlRastreamento": ""
+          },
+          "deposito": null,
+          "vendedor": null,
+          "naturezaOperacao": {
+            "id": 775374075,
+            "nome": "Venda de Mercadorias - Regime normal"
+          },
+          "intermediador": {
+            "id": 381,
+            "nome": "624895842",
+            "cnpj": "03.007.331/0001-41",
+            "cnpjPagamentoInstituicao": ""
+          },
+          "pagamento": null,
+          "itens": [
+            {
+              "produto": {
+                "id": 744040128,
+                "sku": "PUXMILMINI",
+                "descricao": "PUXMILMINI - PUXADOR PZ 232 - M4 - MINI MILAO (OURO VELHO)",
+                "tipo": "P"
+              },
+              "quantidade": 4,
+              "valorUnitario": 6.225,
+              "infoAdicional": ""
+            }
+          ],
+          "pagamentosIntegrados": [
+            {
+              "valor": 36.89,
+              "tipoPagamento": 3,
+              "cnpjIntermediador": "03007331000141",
+              "codigoAutorizacao": "WUA46A",
+              "codigoBandeira": 1
+            }
+          ],
+          "situacao": 7,
+          "data": "2026-06-16",
+          "dataEntrega": "",
+          "numeroOrdemCompra": "2000016971417766",
+          "valorDesconto": 0,
+          "valorFrete": 0,
+          "valorOutrasDespesas": 0,
+          "dataPrevista": "2026-06-18",
+          "dataEnvio": "",
+          "observacoes": "Endereço:  prédio com árvore na frente",
+          "observacoesInternas": "",
+          "origemPedido": 0
+        }
+      },
+      "GET /pedidos/860371275/marcadores": {
+        "rota": "GET /pedidos/860371275/marcadores",
+        "params": {
+          "idPedido": 860371275
+        },
+        "ok": true,
+        "urls": [],
+        "resposta": [
+          {
+            "descricao": "MercadoEnvios Coleta"
+          },
+          {
+            "descricao": "1ª venda"
+          }
+        ]
+      }
+    }
+  },
+  "nota": {
+    "idNotaFiscal": 860371276,
+    "rotas": {
+      "GET /notas/860371276": {
+        "rota": "GET /notas/860371276",
+        "params": {
+          "idNota": 860371276
+        },
+        "ok": true,
+        "urls": [],
+        "resposta": {
+          "situacao": "6",
+          "tipo": "S",
+          "numero": "156424",
+          "serie": "5",
+          "chaveAcesso": "35260637919979000106550050001564241603712767",
+          "dataEmissao": "2026-06-16",
+          "dataPrevista": "2026-06-18",
+          "cliente": {
+            "nome": "Isac Ribeiro",
+            "codigo": null,
+            "fantasia": null,
+            "tipoPessoa": "F",
+            "cpfCnpj": "125.586.036-71",
+            "inscricaoEstadual": "",
+            "rg": null,
+            "telefone": "",
+            "celular": null,
+            "email": "",
+            "endereco": {
+              "endereco": "Avenida Melvin Jones",
+              "numero": "277",
+              "complemento": "prédio com árvore na frente",
+              "bairro": "Santa Ângela",
+              "municipio": "Poços de Caldas",
+              "cep": "37.701-274",
+              "uf": "MG",
+              "pais": "Brasil"
+            },
+            "id": 766893093
+          },
+          "enderecoEntrega": {
+            "endereco": "Avenida Melvin Jones",
+            "numero": "277",
+            "complemento": "AP 12 Referencia: prédio com árvore na frente",
+            "bairro": "Santa Ângela",
+            "municipio": "Poços de Caldas",
+            "cep": "37.701-274",
+            "uf": "MG",
+            "pais": "Brasil",
+            "nomeDestinatario": "Isac Ribeiro",
+            "cpfCnpj": "125.586.036-71",
+            "tipoPessoa": "F",
+            "telefone": "",
+            "inscricaoEstadual": null
+          },
+          "valor": 24.9,
+          "valorProdutos": 24.9,
+          "valorFrete": 0,
+          "vendedor": null,
+          "idFormaEnvio": 744061814,
+          "idFormaFrete": 0,
+          "codigoRastreamento": "",
+          "urlRastreamento": "",
+          "fretePorConta": "R",
+          "qtdVolumes": 1,
+          "pesoBruto": 0.024,
+          "pesoLiquido": 0.024,
+          "id": 860371276,
+          "finalidade": "1",
+          "regimeTributario": 3,
+          "dataInclusao": "2026-06-16 16:23:56",
+          "baseIcms": 24.9,
+          "valorIcms": 2.99,
+          "baseIcmsSt": 0,
+          "valorIcmsSt": 0,
+          "valorServicos": 0,
+          "valorSeguro": 0,
+          "valorOutras": 0,
+          "valorIpi": 0,
+          "valorIssqn": 0,
+          "valorDesconto": 0,
+          "valorFaturado": 24.9,
+          "idIntermediador": 381,
+          "idNaturezaOperacao": 775374075,
+          "idFormaPagamento": 0,
+          "idMeioPagamento": 0,
+          "observacoes": "Endereço:  prédio com árvore na frente\nOC: 2000016971417766\nNº Pedido: 207605\r\nTributos aproximados: R$ 3,53 (Federal) e R$ 4,48 (Estadual). Fonte: IBPT 5F6AA1\n",
+          "condicaoPagamento": "",
+          "valorNotaComImpostos": 24.9,
+          "valorBaseDiferimento": 0,
+          "percentualICMSPartilhaDestino": 100,
+          "valorTotalICMSFCPDestino": 0,
+          "valorIPIDevolvido": 0,
+          "tipoNotaCredito": "",
+          "tipoNotaDebito": "",
+          "valorTotalBCIBSCBS": 19.62,
+          "valorTotalIBSUF": 0.02,
+          "valorTotalCBS": 0.18,
+          "itens": [
+            {
+              "idItem": 780299692,
+              "idProduto": 744040128,
+              "codigo": "PUXMILMINI",
+              "ncm": "8302.42.00",
+              "descricao": "PUXMILMINI - PUXADOR PZ 232 - M4 - MINI MILAO (OURO VELHO)",
+              "unidade": "UN",
+              "quantidade": 4,
+              "valorUnitario": 6.225,
+              "valorTotal": 24.9,
+              "cfop": "6102",
+              "naturezaOperacao": "Venda de Mercadorias - Regime normal"
+            }
+          ],
+          "parcelas": [],
+          "pagamentosIntegrados": [
+            {
+              "valor": 36.89,
+              "tipoPagamento": 3,
+              "cnpjIntermediador": "03007331000141",
+              "codigoAutorizacao": "WUA46A",
+              "codigoBandeira": 1
+            }
+          ],
+          "ecommerce": {
+            "id": 4751,
+            "nome": "Mercado Livre Mamute",
+            "numeroPedidoEcommerce": "2000016971417766",
+            "numeroPedidoCanalVenda": "",
+            "canalVenda": ""
+          },
+          "marcadores": [],
+          "transportador": {
+            "nome": "",
+            "cpfCnpj": "",
+            "ie": "",
+            "endereco": "",
+            "municipio": null,
+            "uf": ""
+          },
+          "origem": {
+            "id": "860371275",
+            "tipo": "venda"
+          }
+        }
+      },
+      "GET /notas/860371276/link": {
+        "rota": "GET /notas/860371276/link",
+        "params": {
+          "idNota": 860371276
+        },
+        "ok": true,
+        "urls": [],
+        "resposta": {
+          "link": "https://erp.tiny.com.br/doc.view?id=81dc75652f4cb45e6a803cc977c58a5a"
+        }
+      },
+      "GET /notas/860371276/marcadores": {
+        "rota": "GET /notas/860371276/marcadores",
+        "params": {
+          "idNota": 860371276
+        },
+        "ok": true,
+        "urls": [],
+        "resposta": []
+      }
+    }
+  },
+  "formaEnvio": {
+    "idFormaEnvio": 744061814,
+    "rotas": {
+      "GET /formas-envio/744061814": {
+        "rota": "GET /formas-envio/744061814",
+        "params": {
+          "idFormaEnvio": 744061814
+        },
+        "ok": true,
+        "urls": [],
+        "resposta": {
+          "nome": "Mercado Envios",
+          "tipo": "3",
+          "situacao": "1",
+          "id": 744061814,
+          "gatewayLogistico": null,
+          "formasFrete": [
+            {
+              "id": 760093007,
+              "nome": "Coleta Normal",
+              "codigo": "101",
+              "codigoExterno": "",
+              "tipoEntrega": "0"
+            },
+            {
+              "id": 760093008,
+              "nome": "Coleta Express",
+              "codigo": "102",
+              "codigoExterno": "",
+              "tipoEntrega": "0"
+            },
+            {
+              "id": 760093009,
+              "nome": "Coleta Express",
+              "codigo": "103",
+              "codigoExterno": "",
+              "tipoEntrega": "0"
+            },
+            {
+              "id": 760093010,
+              "nome": "Coleta Correios PAC Agência",
+              "codigo": "1051",
+              "codigoExterno": "",
+              "tipoEntrega": "0"
+            },
+            {
+              "id": 760093011,
+              "nome": "Coleta Correios Sedex Agência",
+              "codigo": "1061",
+              "codigoExterno": "",
+              "tipoEntrega": "0"
+            },
+            {
+              "id": 760093012,
+              "nome": "Shipping Network Fast",
+              "codigo": "155413",
+              "codigoExterno": "",
+              "tipoEntrega": "0"
+            },
+            {
+              "id": 760093013,
+              "nome": "Shipping Network Fast",
+              "codigo": "165366",
+              "codigoExterno": "",
+              "tipoEntrega": "0"
+            },
+            {
+              "id": 760093014,
+              "nome": "Coleta Normal",
+              "codigo": "101",
+              "codigoExterno": "",
+              "tipoEntrega": "0"
+            },
+            {
+              "id": 760093015,
+              "nome": "Coleta Express",
+              "codigo": "102",
+              "codigoExterno": "",
+              "tipoEntrega": "0"
+            },
+            {
+              "id": 760093016,
+              "nome": "Coleta Express",
+              "codigo": "103",
+              "codigoExterno": "",
+              "tipoEntrega": "0"
+            },
+            {
+              "id": 760093017,
+              "nome": "Coleta Correios PAC Agência",
+              "codigo": "1051",
+              "codigoExterno": "",
+              "tipoEntrega": "0"
+            },
+            {
+              "id": 760093018,
+              "nome": "Coleta Correios Sedex Agência",
+              "codigo": "1061",
+              "codigoExterno": "",
+              "tipoEntrega": "0"
+            },
+            {
+              "id": 760093020,
+              "nome": "Shipping Network Fast",
+              "codigo": "155413",
+              "codigoExterno": "",
+              "tipoEntrega": "0"
+            },
+            {
+              "id": 760093021,
+              "nome": "Shipping Network Fast",
+              "codigo": "165366",
+              "codigoExterno": "",
+              "tipoEntrega": "0"
+            },
+            {
+              "id": 760093022,
+              "nome": "Mercadoenvios Next Day",
+              "codigo": "991",
+              "codigoExterno": "",
+              "tipoEntrega": "0"
+            }
+          ]
+        }
+      }
+    }
+  },
+  "expedicao": {
+    "encontrada": false,
+    "match": null,
+    "rotas": {}
+  },
+  "etiquetas": {
+    "urls": [],
+    "rotas": {}
+  }
+}

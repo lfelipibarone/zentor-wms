@@ -29,6 +29,12 @@ import {
   LocationRuleError,
 } from "../services/location-rules.js";
 import {
+  listPickFacePendingSkus,
+  listProductsWithoutPickFace,
+  resumePausedOrdersAfterPickFace,
+} from "../services/product-locations.js";
+import { selectableProductWhere } from "../services/product-selectable.js";
+import {
   layoutInclude,
   resolveLocationLayout,
 } from "../services/warehouse-layout.js";
@@ -98,6 +104,7 @@ import {
   type PackingIssueType,
   cancelPacking,
   PackingSessionError,
+  fetchShippingLabelsForOrder,
 } from "../services/order-packing.js";
 import {
   completePutaway,
@@ -123,14 +130,15 @@ export async function webRoutes(app: FastifyInstance) {
       }
       const contains = { contains: q, mode: "insensitive" as const };
       const tw = tenantWhere(request);
+      const productWhere = await selectableProductWhere(tw.tenantId, {
+        ...tw,
+        active: true,
+        OR: [{ sku: contains }, { name: contains }, { barcode: contains }],
+      });
 
       const [products, orders, locations] = await Promise.all([
         prisma.product.findMany({
-          where: {
-            ...tw,
-            active: true,
-            OR: [{ sku: contains }, { name: contains }, { barcode: contains }],
-          },
+          where: productWhere,
           take: 15,
           orderBy: { sku: "asc" },
         }),
@@ -193,18 +201,22 @@ export async function webRoutes(app: FastifyInstance) {
     async (request) => {
       const q = request.query.q?.trim();
       const { page, pageSize, skip, take } = parsePagination(request.query);
-      const where: Prisma.ProductWhereInput = {
-        ...tenantWhere(request),
-        ...(q
-          ? {
-              OR: [
-                { sku: { contains: q, mode: "insensitive" } },
-                { name: { contains: q, mode: "insensitive" } },
-                { barcode: { contains: q, mode: "insensitive" } },
-              ],
-            }
-          : {}),
-      };
+      const tw = tenantWhere(request);
+      const where: Prisma.ProductWhereInput = await selectableProductWhere(
+        tw.tenantId,
+        {
+          ...tw,
+          ...(q
+            ? {
+                OR: [
+                  { sku: { contains: q, mode: "insensitive" } },
+                  { name: { contains: q, mode: "insensitive" } },
+                  { barcode: { contains: q, mode: "insensitive" } },
+                ],
+              }
+            : {}),
+        },
+      );
       const [products, total] = await Promise.all([
         prisma.product.findMany({
           where,
@@ -740,6 +752,30 @@ export async function webRoutes(app: FastifyInstance) {
   app.get<{
     Querystring: {
       q?: string;
+      page?: string;
+      pageSize?: string;
+      scope?: string;
+    };
+  }>(
+    "/api/locations/unassigned-products",
+    { preHandler: guard(Permission.REGISTERS_VIEW) },
+    async (request) => {
+      const q = request.query.q?.trim();
+      const { page, pageSize } = parsePagination(request.query);
+      const tenantId = tenantWhere(request).tenantId;
+      const scope = request.query.scope === "catalog" ? "catalog" : "paused_orders";
+
+      if (scope === "catalog") {
+        return listProductsWithoutPickFace(tenantId, { q, page, pageSize });
+      }
+
+      return listPickFacePendingSkus(tenantId, { q, page, pageSize });
+    },
+  );
+
+  app.get<{
+    Querystring: {
+      q?: string;
       sku?: string;
       page?: string;
       pageSize?: string;
@@ -782,10 +818,7 @@ export async function webRoutes(app: FastifyInstance) {
           orderBy: [{ corridor: "asc" }, { row: "asc" }],
           skip,
           take,
-          include: {
-            product: { select: { sku: true, name: true } },
-            ...layoutInclude,
-          },
+          include: layoutInclude,
         }),
         prisma.location.count({ where }),
       ]);
@@ -804,10 +837,12 @@ export async function webRoutes(app: FastifyInstance) {
       barracaoId?: string | null;
       setorId?: string | null;
       corredorId?: string | null;
-      fileiraId?: string | null;
       estanteId?: string | null;
-      prateleiraId?: string | null;
       colunaId?: string | null;
+      linhaId?: string | null;
+      proximityCorredorId?: string | null;
+      proximityEstanteId?: string | null;
+      proximityLinhaId?: string | null;
       type?: LocationType;
       productId?: string;
       capacity?: number;
@@ -820,6 +855,11 @@ export async function webRoutes(app: FastifyInstance) {
       const b = request.body ?? {};
       if (!b.barcode || !b.type) {
         return reply.status(400).send({ error: "Campos obrigatórios faltando" });
+      }
+      if (b.type === LocationType.PICK_FACE && !b.productId) {
+        return reply
+          .status(400)
+          .send({ error: "Selecione o SKU para vincular ao estoque de giro" });
       }
       try {
         const tenantId = tenantWhere(request).tenantId;
@@ -834,10 +874,12 @@ export async function webRoutes(app: FastifyInstance) {
             barracaoId: b.barracaoId,
             setorId: b.setorId,
             corredorId: b.corredorId,
-            fileiraId: b.fileiraId,
             estanteId: b.estanteId,
-            prateleiraId: b.prateleiraId,
             colunaId: b.colunaId,
+            linhaId: b.linhaId,
+            proximityCorredorId: b.proximityCorredorId,
+            proximityEstanteId: b.proximityEstanteId,
+            proximityLinhaId: b.proximityLinhaId,
           },
           { corridor: b.corridor, row: b.row },
         );
@@ -850,22 +892,25 @@ export async function webRoutes(app: FastifyInstance) {
             barracaoId: layout.barracaoId,
             setorId: layout.setorId,
             corredorId: layout.corredorId,
-            fileiraId: layout.fileiraId,
             estanteId: layout.estanteId,
-            prateleiraId: layout.prateleiraId,
             colunaId: layout.colunaId,
+            linhaId: layout.linhaId,
+            proximityCorredorId: layout.proximityCorredorId,
+            proximityEstanteId: layout.proximityEstanteId,
+            proximityLinhaId: layout.proximityLinhaId,
             type: b.type,
             productId: b.productId || null,
             capacity: b.capacity ?? 100,
             minThreshold: b.minThreshold ?? 0,
             currentQuantity: 0,
           },
-          include: {
-            product: { select: { sku: true, name: true } },
-            ...layoutInclude,
-          },
+          include: layoutInclude,
         });
-        return reply.status(201).send({ location });
+        const resumedOrders =
+          b.type === LocationType.PICK_FACE && b.productId
+            ? await resumePausedOrdersAfterPickFace(tenantId, b.productId)
+            : { resumedOrderIds: [] };
+        return reply.status(201).send({ location, resumedOrders });
       } catch (e) {
         if (e instanceof LocationRuleError) {
           return reply.status(400).send({ error: e.message });
@@ -885,10 +930,12 @@ export async function webRoutes(app: FastifyInstance) {
       barracaoId?: string | null;
       setorId?: string | null;
       corredorId?: string | null;
-      fileiraId?: string | null;
       estanteId?: string | null;
-      prateleiraId?: string | null;
       colunaId?: string | null;
+      linhaId?: string | null;
+      proximityCorredorId?: string | null;
+      proximityEstanteId?: string | null;
+      proximityLinhaId?: string | null;
       capacity?: number;
       minThreshold?: number;
       active?: boolean;
@@ -919,10 +966,12 @@ export async function webRoutes(app: FastifyInstance) {
           "barracaoId",
           "setorId",
           "corredorId",
-          "fileiraId",
           "estanteId",
-          "prateleiraId",
           "colunaId",
+          "linhaId",
+          "proximityCorredorId",
+          "proximityEstanteId",
+          "proximityLinhaId",
         ] as const;
         const hasLayoutChange = layoutFields.some(
           (f) => request.body[f] !== undefined,
@@ -949,22 +998,30 @@ export async function webRoutes(app: FastifyInstance) {
                 request.body.corredorId !== undefined
                   ? request.body.corredorId
                   : existing.corredorId,
-              fileiraId:
-                request.body.fileiraId !== undefined
-                  ? request.body.fileiraId
-                  : existing.fileiraId,
               estanteId:
                 request.body.estanteId !== undefined
                   ? request.body.estanteId
                   : existing.estanteId,
-              prateleiraId:
-                request.body.prateleiraId !== undefined
-                  ? request.body.prateleiraId
-                  : existing.prateleiraId,
               colunaId:
                 request.body.colunaId !== undefined
                   ? request.body.colunaId
                   : existing.colunaId,
+              linhaId:
+                request.body.linhaId !== undefined
+                  ? request.body.linhaId
+                  : existing.linhaId,
+              proximityCorredorId:
+                request.body.proximityCorredorId !== undefined
+                  ? request.body.proximityCorredorId
+                  : existing.proximityCorredorId,
+              proximityEstanteId:
+                request.body.proximityEstanteId !== undefined
+                  ? request.body.proximityEstanteId
+                  : existing.proximityEstanteId,
+              proximityLinhaId:
+                request.body.proximityLinhaId !== undefined
+                  ? request.body.proximityLinhaId
+                  : existing.proximityLinhaId,
             },
             { corridor: existing.corridor, row: existing.row },
           );
@@ -975,21 +1032,29 @@ export async function webRoutes(app: FastifyInstance) {
             barracaoId: layout.barracaoId,
             setorId: layout.setorId,
             corredorId: layout.corredorId,
-            fileiraId: layout.fileiraId,
             estanteId: layout.estanteId,
-            prateleiraId: layout.prateleiraId,
             colunaId: layout.colunaId,
+            linhaId: layout.linhaId,
+            proximityCorredorId: layout.proximityCorredorId,
+            proximityEstanteId: layout.proximityEstanteId,
+            proximityLinhaId: layout.proximityLinhaId,
           };
         }
         const location = await prisma.location.update({
           where: { id: request.params.id },
           data: updateData,
-          include: {
-            product: { select: { sku: true, name: true } },
-            ...layoutInclude,
-          },
+          include: layoutInclude,
         });
-        return { location };
+        const resumedOrders =
+          location.type === LocationType.PICK_FACE &&
+          location.productId &&
+          location.active
+            ? await resumePausedOrdersAfterPickFace(
+                existing.tenantId,
+                location.productId,
+              )
+            : { resumedOrderIds: [] };
+        return { location, resumedOrders };
       } catch (e) {
         if (e instanceof LocationRuleError) {
           return reply.status(400).send({ error: e.message });
@@ -1742,6 +1807,24 @@ export async function webRoutes(app: FastifyInstance) {
     async (request, reply) => {
       try {
         return await getPackingSession(request.params.id);
+      } catch (e) {
+        const message = e instanceof Error ? e.message : "Erro";
+        return reply.status(422).send({ error: message });
+      }
+    },
+  );
+
+  app.post<{ Params: { id: string }; Querystring: { refresh?: string } }>(
+    "/api/packing/orders/:id/shipping-labels",
+    { preHandler: guard(Permission.SHIPPING_VIEW) },
+    async (request, reply) => {
+      try {
+        const refresh = request.query.refresh === "1" || request.query.refresh === "true";
+        return await fetchShippingLabelsForOrder({
+          tenantId: request.authUser!.tenantId!,
+          orderId: request.params.id,
+          useCache: !refresh,
+        });
       } catch (e) {
         const message = e instanceof Error ? e.message : "Erro";
         return reply.status(422).send({ error: message });

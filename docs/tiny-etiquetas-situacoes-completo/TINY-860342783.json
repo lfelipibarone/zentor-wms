@@ -1,0 +1,560 @@
+{
+  "meta": {
+    "fetchedAt": "2026-06-17T18:02:11.993Z",
+    "pedidoId": 860342783,
+    "erpOrderId": "TINY-860342783",
+    "numeroPedido": 207368,
+    "situacao": 5,
+    "situacaoLabel": "Enviada",
+    "formaEnvioNome": "Amazon DBA",
+    "diagnostico": "ERRO_MARKETPLACE",
+    "resumoTesteAnterior": {
+      "pedidoId": 860342783,
+      "erpOrderId": "TINY-860342783",
+      "numeroPedido": 207368,
+      "situacao": 5,
+      "situacaoLabel": "Enviada",
+      "formaEnvioNome": "Amazon DBA",
+      "codigoRastreamento": null,
+      "idNotaFiscal": 860342789,
+      "naExpedicao": true,
+      "expedicao": {
+        "idAgrupamento": 746503773,
+        "idExpedicao": 749884319,
+        "formaEnvioNome": "Amazon DBA",
+        "pedidoId": 860342783,
+        "idNotaFiscal": 860342789
+      },
+      "etiquetas": {
+        "urls": [],
+        "marketplaceError": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Url das etiquetas não encontrada na Amazon.",
+        "diagnostico": "ERRO_MARKETPLACE"
+      }
+    }
+  },
+  "pedido": {
+    "rotas": {
+      "GET /pedidos/860342783": {
+        "rota": "GET /pedidos/860342783",
+        "params": {
+          "idPedido": 860342783
+        },
+        "ok": true,
+        "urls": [],
+        "resposta": {
+          "id": 860342783,
+          "numeroPedido": 207368,
+          "idNotaFiscal": 860342789,
+          "dataFaturamento": "2026-06-15",
+          "valorTotalProdutos": 95.6,
+          "valorTotalPedido": 95.6,
+          "listaPreco": {
+            "id": 0,
+            "nome": "Padrão",
+            "acrescimoDesconto": 0
+          },
+          "cliente": {
+            "nome": "Rafael",
+            "codigo": "",
+            "fantasia": "",
+            "tipoPessoa": "F",
+            "cpfCnpj": "298.984.068-01",
+            "inscricaoEstadual": "",
+            "rg": "",
+            "telefone": "(11) 7532-6106",
+            "celular": "",
+            "email": "bthc0h82s256qph@marketplace.amazon.com.br",
+            "endereco": {
+              "endereco": "Rua Nair Prado da Costa- LUZERN",
+              "numero": "20",
+              "complemento": "Swiss Park",
+              "bairro": "Swiss Park",
+              "municipio": "Campinas",
+              "cep": "13.049-586",
+              "uf": "SP",
+              "pais": "Brasil"
+            },
+            "id": 766886338
+          },
+          "enderecoEntrega": {
+            "endereco": "Rua Nair Prado da Costa- LUZERN",
+            "numero": "20",
+            "complemento": "Swiss Park",
+            "bairro": "Swiss Park",
+            "municipio": "Campinas",
+            "cep": "13.049-586",
+            "uf": "SP",
+            "pais": "Brasil",
+            "nomeDestinatario": "Rafael Ferragut",
+            "cpfCnpj": "298.984.068-01",
+            "tipoPessoa": "F",
+            "telefone": "(11) 7532-6106",
+            "inscricaoEstadual": ""
+          },
+          "ecommerce": {
+            "id": 7237,
+            "nome": "Amazon",
+            "numeroPedidoEcommerce": "702-1074609-6390604",
+            "numeroPedidoCanalVenda": "",
+            "canalVenda": ""
+          },
+          "transportador": {
+            "id": 0,
+            "nome": "",
+            "fretePorConta": "R",
+            "formaEnvio": {
+              "id": 758095424,
+              "nome": "Amazon DBA"
+            },
+            "formaFrete": null,
+            "codigoRastreamento": "",
+            "urlRastreamento": ""
+          },
+          "deposito": null,
+          "vendedor": null,
+          "naturezaOperacao": {
+            "id": 775374075,
+            "nome": "Venda de Mercadorias - Regime normal"
+          },
+          "intermediador": {
+            "id": 385,
+            "nome": "Loja Carbi oficial",
+            "cnpj": "15.436.940/0001-03",
+            "cnpjPagamentoInstituicao": ""
+          },
+          "pagamento": null,
+          "itens": [
+            {
+              "produto": {
+                "id": 744041743,
+                "sku": "PUXFLY256CRF",
+                "descricao": "PUXADOR ALUMINIO FLY 256MM - Cromado Fosco",
+                "tipo": "P"
+              },
+              "quantidade": 4,
+              "valorUnitario": 23.9,
+              "infoAdicional": ""
+            }
+          ],
+          "pagamentosIntegrados": [
+            {
+              "valor": 95.6,
+              "tipoPagamento": 99,
+              "cnpjIntermediador": "15436940000103",
+              "codigoAutorizacao": "",
+              "codigoBandeira": 99
+            }
+          ],
+          "situacao": 5,
+          "data": "2026-06-15",
+          "dataEntrega": "",
+          "numeroOrdemCompra": "702-1074609-6390604",
+          "valorDesconto": 0,
+          "valorFrete": 0,
+          "valorOutrasDespesas": 0,
+          "dataPrevista": "2026-06-18",
+          "dataEnvio": "2026-06-15 10:44:27",
+          "observacoes": "",
+          "observacoesInternas": "",
+          "origemPedido": 0
+        }
+      },
+      "GET /pedidos/860342783/marcadores": {
+        "rota": "GET /pedidos/860342783/marcadores",
+        "params": {
+          "idPedido": 860342783
+        },
+        "ok": true,
+        "urls": [],
+        "resposta": [
+          {
+            "descricao": "Amazon DBA"
+          },
+          {
+            "descricao": "Pickup"
+          }
+        ]
+      }
+    }
+  },
+  "nota": {
+    "idNotaFiscal": 860342789,
+    "rotas": {
+      "GET /notas/860342789": {
+        "rota": "GET /notas/860342789",
+        "params": {
+          "idNota": 860342789
+        },
+        "ok": true,
+        "urls": [],
+        "resposta": {
+          "situacao": "7",
+          "tipo": "S",
+          "numero": "156180",
+          "serie": "5",
+          "chaveAcesso": "35260637919979000106550050001561801603427895",
+          "dataEmissao": "2026-06-15",
+          "dataPrevista": "2026-06-18",
+          "cliente": {
+            "nome": "Rafael",
+            "codigo": null,
+            "fantasia": null,
+            "tipoPessoa": "F",
+            "cpfCnpj": "298.984.068-01",
+            "inscricaoEstadual": "",
+            "rg": null,
+            "telefone": "(11) 7532-6106",
+            "celular": null,
+            "email": "bthc0h82s256qph@marketplace.amazon.com.br",
+            "endereco": {
+              "endereco": "Rua Nair Prado da Costa- LUZERN",
+              "numero": "20",
+              "complemento": "Swiss Park",
+              "bairro": "Swiss Park",
+              "municipio": "Campinas",
+              "cep": "13.049-586",
+              "uf": "SP",
+              "pais": "Brasil"
+            },
+            "id": 766886338
+          },
+          "enderecoEntrega": {
+            "endereco": "Rua Nair Prado da Costa- LUZERN",
+            "numero": "20",
+            "complemento": "Swiss Park",
+            "bairro": "Swiss Park",
+            "municipio": "Campinas",
+            "cep": "13.049-586",
+            "uf": "SP",
+            "pais": "Brasil",
+            "nomeDestinatario": "Rafael Ferragut",
+            "cpfCnpj": "298.984.068-01",
+            "tipoPessoa": "F",
+            "telefone": "(11) 7532-6106",
+            "inscricaoEstadual": null
+          },
+          "valor": 95.6,
+          "valorProdutos": 95.6,
+          "valorFrete": 0,
+          "vendedor": null,
+          "idFormaEnvio": 758095424,
+          "idFormaFrete": 0,
+          "codigoRastreamento": "",
+          "urlRastreamento": "",
+          "fretePorConta": "R",
+          "qtdVolumes": 1,
+          "pesoBruto": 0.164,
+          "pesoLiquido": 0.164,
+          "id": 860342789,
+          "finalidade": "1",
+          "regimeTributario": 3,
+          "dataInclusao": "2026-06-15 09:59:35",
+          "baseIcms": 95.6,
+          "valorIcms": 17.21,
+          "baseIcmsSt": 0,
+          "valorIcmsSt": 0,
+          "valorServicos": 0,
+          "valorSeguro": 0,
+          "valorOutras": 0,
+          "valorIpi": 0,
+          "valorIssqn": 0,
+          "valorDesconto": 0,
+          "valorFaturado": 95.6,
+          "idIntermediador": 385,
+          "idNaturezaOperacao": 775374075,
+          "idFormaPagamento": 0,
+          "idMeioPagamento": 0,
+          "observacoes": "OC: 702-1074609-6390604\nNº Pedido: 207368\r\nTributos aproximados: R$ 13,57 (Federal) e R$ 17,21 (Estadual). Fonte: IBPT 5F6AA1\n",
+          "condicaoPagamento": "",
+          "valorNotaComImpostos": 95.6,
+          "valorBaseDiferimento": 0,
+          "percentualICMSPartilhaDestino": 100,
+          "valorTotalICMSFCPDestino": 0,
+          "valorIPIDevolvido": 0,
+          "tipoNotaCredito": "",
+          "tipoNotaDebito": "",
+          "valorTotalBCIBSCBS": 75.53,
+          "valorTotalIBSUF": 0.08,
+          "valorTotalCBS": 0.68,
+          "itens": [
+            {
+              "idItem": 780296287,
+              "idProduto": 744041743,
+              "codigo": "PUXFLY256CRF",
+              "ncm": "8302.42.00",
+              "descricao": "PUXADOR ALUMINIO FLY 256MM - Cromado Fosco",
+              "unidade": "UN",
+              "quantidade": 4,
+              "valorUnitario": 23.9,
+              "valorTotal": 95.6,
+              "cfop": "5102",
+              "naturezaOperacao": "Venda de Mercadorias - Regime normal"
+            }
+          ],
+          "parcelas": [],
+          "pagamentosIntegrados": [
+            {
+              "valor": 95.6,
+              "tipoPagamento": 99,
+              "cnpjIntermediador": "15436940000103",
+              "codigoAutorizacao": "",
+              "codigoBandeira": 99
+            }
+          ],
+          "ecommerce": {
+            "id": 7237,
+            "nome": "Amazon",
+            "numeroPedidoEcommerce": "702-1074609-6390604",
+            "numeroPedidoCanalVenda": "",
+            "canalVenda": ""
+          },
+          "marcadores": [],
+          "transportador": {
+            "nome": "",
+            "cpfCnpj": "",
+            "ie": "",
+            "endereco": "",
+            "municipio": null,
+            "uf": ""
+          },
+          "origem": {
+            "id": "860342783",
+            "tipo": "venda"
+          }
+        }
+      },
+      "GET /notas/860342789/link": {
+        "rota": "GET /notas/860342789/link",
+        "params": {
+          "idNota": 860342789
+        },
+        "ok": true,
+        "urls": [],
+        "resposta": {
+          "link": "https://erp.tiny.com.br/doc.view?id=e399ffaa09ff2e2a222210fb63a8c1c0"
+        }
+      },
+      "GET /notas/860342789/marcadores": {
+        "rota": "GET /notas/860342789/marcadores",
+        "params": {
+          "idNota": 860342789
+        },
+        "ok": true,
+        "urls": [],
+        "resposta": []
+      }
+    }
+  },
+  "formaEnvio": {
+    "idFormaEnvio": 758095424,
+    "rotas": {
+      "GET /formas-envio/758095424": {
+        "rota": "GET /formas-envio/758095424",
+        "params": {
+          "idFormaEnvio": 758095424
+        },
+        "ok": true,
+        "urls": [],
+        "resposta": {
+          "nome": "Amazon DBA",
+          "tipo": "19",
+          "situacao": "1",
+          "id": 758095424,
+          "gatewayLogistico": null,
+          "formasFrete": []
+        }
+      }
+    }
+  },
+  "expedicao": {
+    "encontrada": true,
+    "match": {
+      "idAgrupamento": 746503773,
+      "idExpedicao": 749884319,
+      "formaEnvioNome": "Amazon DBA",
+      "pedidoId": 860342783,
+      "idNotaFiscal": 860342789
+    },
+    "rotas": {
+      "GET /expedicao/746503773": {
+        "rota": "GET /expedicao/746503773",
+        "params": {
+          "idAgrupamento": 746503773
+        },
+        "ok": true,
+        "urls": [],
+        "resposta": {
+          "id": 746503773,
+          "identificacao": "3185",
+          "data": "2026-06-15",
+          "formaEnvio": {
+            "id": 758095424,
+            "nome": "Amazon DBA"
+          },
+          "expedicoes": [
+            {
+              "id": 749884319,
+              "data": "2026-06-15",
+              "situacao": "1",
+              "tipoObjeto": "notafiscal",
+              "idObjeto": 860342789,
+              "dataEmissao": "2026-06-15",
+              "venda": {
+                "id": 860342783,
+                "numero": 207368,
+                "data": "2026-06-15",
+                "situacao": 5
+              },
+              "notaFiscal": {
+                "id": 860342789,
+                "numero": 156180,
+                "data": "2026-06-15",
+                "situacao": 7
+              },
+              "destinatario": {
+                "nome": "Rafael",
+                "codigo": "",
+                "fantasia": "",
+                "tipoPessoa": "F",
+                "cpfCnpj": "298.984.068-01",
+                "inscricaoEstadual": "",
+                "rg": "",
+                "telefone": "(11) 7532-6106",
+                "celular": "",
+                "email": "bthc0h82s256qph@marketplace.amazon.com.br",
+                "endereco": {
+                  "endereco": "Rua Nair Prado da Costa- LUZERN",
+                  "numero": "20",
+                  "complemento": "Swiss Park",
+                  "bairro": "Swiss Park",
+                  "municipio": "Campinas",
+                  "cep": "13.049-586",
+                  "uf": "SP",
+                  "pais": "Brasil"
+                },
+                "id": 766886338
+              },
+              "volume": {
+                "embalagem": {
+                  "id": 718341450,
+                  "tipo": 2,
+                  "descricao": "Embalagem Loja Integrada"
+                },
+                "largura": 16.3,
+                "altura": 7,
+                "comprimento": 19,
+                "diametro": 0,
+                "pesoBruto": 0.164,
+                "quantidadeVolumes": 1
+              },
+              "logistica": {
+                "codigoRastreio": "",
+                "urlRastreio": "",
+                "possuiValorDeclarado": true,
+                "valorDeclarado": 0,
+                "possuiAvisoRecebimento": true,
+                "formaFrete": null,
+                "transportador": null
+              }
+            },
+            {
+              "id": 749884373,
+              "data": "2026-06-15",
+              "situacao": "1",
+              "tipoObjeto": "notafiscal",
+              "idObjeto": 860344031,
+              "dataEmissao": "2026-06-15",
+              "venda": {
+                "id": 860344011,
+                "numero": 207373,
+                "data": "2026-06-15",
+                "situacao": 5
+              },
+              "notaFiscal": {
+                "id": 860344031,
+                "numero": 156182,
+                "data": "2026-06-15",
+                "situacao": 7
+              },
+              "destinatario": {
+                "nome": "Erivelto Paulo dos Santos",
+                "codigo": "",
+                "fantasia": "",
+                "tipoPessoa": "F",
+                "cpfCnpj": "138.195.648-37",
+                "inscricaoEstadual": "",
+                "rg": "",
+                "telefone": "(19) 99797-2434",
+                "celular": "",
+                "email": "65kybk4clht8xsw@marketplace.amazon.com.br",
+                "endereco": {
+                  "endereco": "Rua Cardeal Arcoverde",
+                  "numero": "188",
+                  "complemento": "Casa",
+                  "bairro": "Caminhos de San Conrado (Sousa",
+                  "municipio": "Campinas",
+                  "cep": "13.104-072",
+                  "uf": "SP",
+                  "pais": "Brasil"
+                },
+                "id": 766889803
+              },
+              "volume": {
+                "embalagem": {
+                  "id": 718341450,
+                  "tipo": 2,
+                  "descricao": "Embalagem Loja Integrada"
+                },
+                "largura": 16.3,
+                "altura": 7,
+                "comprimento": 19,
+                "diametro": 0,
+                "pesoBruto": 0.08,
+                "quantidadeVolumes": 1
+              },
+              "logistica": {
+                "codigoRastreio": "",
+                "urlRastreio": "",
+                "possuiValorDeclarado": true,
+                "valorDeclarado": 0,
+                "possuiAvisoRecebimento": true,
+                "formaFrete": null,
+                "transportador": null
+              }
+            }
+          ]
+        }
+      }
+    }
+  },
+  "etiquetas": {
+    "urls": [],
+    "rotas": {
+      "GET /expedicao/746503773/etiquetas": {
+        "rota": "GET /expedicao/746503773/etiquetas",
+        "params": {
+          "idAgrupamento": 746503773
+        },
+        "ok": false,
+        "urls": [],
+        "resposta": {
+          "erro": true,
+          "mensagem": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Url das etiquetas não encontrada na Amazon."
+        }
+      },
+      "GET /expedicao/746503773/expedicao/749884319/etiquetas": {
+        "rota": "GET /expedicao/746503773/expedicao/749884319/etiquetas",
+        "params": {
+          "idAgrupamento": 746503773,
+          "idExpedicao": 749884319
+        },
+        "ok": false,
+        "urls": [],
+        "resposta": {
+          "erro": true,
+          "mensagem": "Não foi possível obter as etiquetas em sua plataforma e-commerce. Url das etiquetas não encontrada na Amazon."
+        }
+      }
+    }
+  }
+}
