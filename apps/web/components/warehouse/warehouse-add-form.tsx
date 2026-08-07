@@ -30,7 +30,7 @@ import {
 const ADDRESS_LEVELS: Array<{
   title: string;
   key: "setor" | "corredor" | "estante" | "coluna" | "linha";
-  segment?: WarehouseSegment;
+  segment: WarehouseSegment;
   parentKey?: "barracaoId" | "setorId" | "corredorId" | "estanteId" | "colunaId";
 }> = [
   { title: "Setor", key: "setor", segment: "setores", parentKey: "barracaoId" },

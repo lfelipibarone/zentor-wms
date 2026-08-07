@@ -445,6 +445,7 @@ async function buildPackingsReport(
       ? fmtDateBr(packLog.createdAt)
       : fmtDateBr(order.updatedAt);
     for (const item of order.items) {
+      if (!item.product) continue;
       rows.push({
         dataHora,
         operador: operator,

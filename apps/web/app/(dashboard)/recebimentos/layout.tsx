@@ -1,9 +1,9 @@
-import { Suspense } from "react";
+import { Suspense, type ReactNode } from "react";
 
 export default function RecebimentosLayout({
   children,
 }: {
-  children: React.ReactNode;
+  children: ReactNode;
 }) {
   return <Suspense fallback={<p className="p-6 text-muted-foreground">Carregando…</p>}>{children}</Suspense>;
 }

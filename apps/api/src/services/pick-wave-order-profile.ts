@@ -56,7 +56,9 @@ function pendingProductIds(orders: OrderWithItems[]): string[] {
   const ids = new Set<string>();
   for (const o of orders) {
     for (const it of o.items) {
-      if (it.quantityOrdered - it.quantityPicked > 0) ids.add(it.productId);
+      if (it.quantityOrdered - it.quantityPicked > 0 && it.productId) {
+        ids.add(it.productId);
+      }
     }
   }
   return [...ids];
@@ -104,7 +106,13 @@ export async function buildOrderPickProfiles(
     const pendingItems = order.items.filter(
       (it) => it.quantityOrdered - it.quantityPicked > 0,
     );
-    const distinct = [...new Set(pendingItems.map((it) => it.productId))];
+    const distinct = [
+      ...new Set(
+        pendingItems
+          .map((it) => it.productId)
+          .filter((id): id is string => Boolean(id)),
+      ),
+    ];
     const refs: PickLocationRef[] = [];
     const coordList: RouteCoord[] = [];
     const locIdSet = new Set<string>();
@@ -114,7 +122,7 @@ export async function buildOrderPickProfiles(
       if (it.pickLocationId) {
         loc = locations.find((l) => l.id === it.pickLocationId);
       }
-      if (!loc) {
+      if (!loc && it.productId) {
         const faces = facesByProduct.get(it.productId);
         loc = faces?.[0];
       }

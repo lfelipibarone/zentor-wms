@@ -29,7 +29,7 @@ export const BY_PRODUCT_MAX_DISTINCT_SKUS = 5;
 export function pendingProductIds(order: OrderWithItems): Set<string> {
   const ids = new Set<string>();
   for (const it of order.items) {
-    if (it.quantityOrdered - it.quantityPicked > 0) {
+    if (it.quantityOrdered - it.quantityPicked > 0 && it.productId) {
       ids.add(it.productId);
     }
   }

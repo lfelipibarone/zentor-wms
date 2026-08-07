@@ -123,7 +123,7 @@ type OrderRow = {
     quantityOrdered: number;
     quantityPicked: number;
     quantityPacked: number;
-    productId: string;
+    productId: string | null;
     pickLocation: {
       id: string;
       corridor: string;
@@ -138,7 +138,7 @@ type OrderRow = {
       imageUrl: string | null;
       unit: string | null;
       weight: unknown;
-    };
+    } | null;
   }>;
 };
 
@@ -161,6 +161,8 @@ async function resolvePickSegmentsForItem(
       },
     ];
   }
+
+  if (!item.productId) return [];
 
   try {
     const { segments } = await allocateQuantityAcrossPickFaces(
@@ -433,12 +435,15 @@ export async function scanPackingItem(
   if (!order) throw new Error("Pedido não encontrado");
 
   const code = barcode.trim();
-  const item = order.items.find(
-    (i) =>
-      i.product.sku === code ||
-      i.product.barcode === code ||
-      i.product.barcode?.toUpperCase() === code.toUpperCase(),
-  );
+  const item = order.items.find((i) => {
+    const product = i.product;
+    if (!product) return false;
+    return (
+      product.sku === code ||
+      product.barcode === code ||
+      product.barcode?.toUpperCase() === code.toUpperCase()
+    );
+  });
   if (!item) throw new Error("Produto não pertence ao pedido");
 
   await applyPackingQuantity(orderId, item.id, quantity);
@@ -531,11 +536,16 @@ export async function reportPackingIssue(
 
   const description = input.description?.trim().slice(0, 280) ?? "";
 
+  if (!item.product) {
+    throw new PackingSessionError("Produto do item não encontrado");
+  }
+  const product = item.product;
+
   const reasonPayload = {
     itemId: item.id,
     productId: item.productId,
-    sku: item.product.sku,
-    productName: item.product.name,
+    sku: product.sku,
+    productName: product.name,
     type: input.type,
     quantity: qty,
     description,
@@ -587,7 +597,7 @@ export async function reportPackingIssue(
     }
   });
 
-  const summary = `${item.product.sku} · ${PACKING_ISSUE_TYPE_LABEL[input.type]} · ${qty} un.`;
+  const summary = `${product.sku} · ${PACKING_ISSUE_TYPE_LABEL[input.type]} · ${qty} un.`;
   await notifyUsersWithPermission(Permission.MOBILE_ACCESS, {
     title: "Pedido retornou do packing",
     body: `${order.erpOrderId} — ${summary}`,
@@ -596,7 +606,7 @@ export async function reportPackingIssue(
       orderId: order.id,
       erpOrderId: order.erpOrderId,
       issueType: input.type,
-      sku: item.product.sku,
+      sku: product.sku,
     },
   });
 

@@ -413,18 +413,26 @@ export async function mobileRoutes(app: FastifyInstance) {
         pickLocation: item.pickLocation ? mapForRoute(item.pickLocation) : null,
       }));
 
+      const isPendingQty = (i: {
+        quantityPicked: number;
+        quantityOrdered: number;
+      }) => i.quantityPicked < i.quantityOrdered;
+
       const nextItem =
-        pickNextItemByRoute(routeItems, isPending, lastLocation) ??
+        pickNextItemByRoute(routeItems, isPendingQty, lastLocation) ??
         order.items.find(isPending);
 
       const routeQueue = sortPendingItemsByRoute(
         routeItems,
-        isPending,
+        isPendingQty,
         lastLocation,
       );
 
-      const remaining = nextItem
-        ? nextItem.quantityOrdered - nextItem.quantityPicked
+      const nextOrderItem = nextItem
+        ? (order.items.find((i) => i.id === nextItem.id) ?? null)
+        : null;
+      const remaining = nextOrderItem
+        ? nextOrderItem.quantityOrdered - nextOrderItem.quantityPicked
         : 0;
 
       return {
@@ -446,28 +454,44 @@ export async function mobileRoutes(app: FastifyInstance) {
           pickLocation: mapPickLoc(item.pickLocation),
           completed: item.quantityPicked >= item.quantityOrdered,
         })),
-        routeQueue: routeQueue.slice(0, 5).map((item) => ({
-          id: item.id,
-          lineNumber: item.lineNumber,
-          pickLocation: mapPickLoc(item.pickLocation),
-        })),
-        nextItem: nextItem
+        routeQueue: routeQueue.slice(0, 5).map((item) => {
+          const original = order.items.find((i) => i.id === item.id);
+          return {
+            id: item.id,
+            lineNumber: item.lineNumber,
+            pickLocation: original
+              ? mapPickLoc(original.pickLocation)
+              : item.pickLocation
+                ? {
+                    id: item.pickLocation.id ?? "",
+                    corridor: item.pickLocation.corridor,
+                    row: item.pickLocation.row,
+                    barcode: "",
+                    label: `${item.pickLocation.corridor}-${item.pickLocation.row}`,
+                    currentQuantity: 0,
+                    capacity: 0,
+                    minThreshold: 0,
+                  }
+                : null,
+          };
+        }),
+        nextItem: nextOrderItem
           ? {
-              id: nextItem.id,
-              lineNumber: nextItem.lineNumber,
-              quantityOrdered: nextItem.quantityOrdered,
-              quantityPicked: nextItem.quantityPicked,
+              id: nextOrderItem.id,
+              lineNumber: nextOrderItem.lineNumber,
+              quantityOrdered: nextOrderItem.quantityOrdered,
+              quantityPicked: nextOrderItem.quantityPicked,
               remaining,
-              product: nextItem.product,
-              pickLocation: mapPickLoc(nextItem.pickLocation),
+              product: nextOrderItem.product,
+              pickLocation: mapPickLoc(nextOrderItem.pickLocation),
               stockMismatchHint:
-                nextItem.pickLocation &&
-                nextItem.pickLocation.currentQuantity < remaining
-                  ? `Saldo na gôndola (${nextItem.pickLocation.currentQuantity}) menor que o pendente (${remaining})`
+                nextOrderItem.pickLocation &&
+                nextOrderItem.pickLocation.currentQuantity < remaining
+                  ? `Saldo na gôndola (${nextOrderItem.pickLocation.currentQuantity}) menor que o pendente (${remaining})`
                   : null,
             }
           : null,
-        allPicked: !nextItem,
+        allPicked: !nextOrderItem,
       };
     }
   );

@@ -1,4 +1,4 @@
-import { OrderStatus } from "@prisma/client";
+import { OrderStatus, type Prisma } from "@prisma/client";
 import { prisma } from "../lib/prisma.js";
 import { getTinyApiClient, TinyApiError, isTinyRateLimitError } from "./tiny-api-v3-client.js";
 import { isTinyConnectedError } from "./tiny-purchase-receipt.js";
@@ -110,13 +110,13 @@ async function loadNonUpdatableErpOrderIds(
 }
 
 /** Pedidos fictícios do seed — nunca apagar TINY-* ou pedidos reais. */
-export const DEMO_ORDER_WHERE = {
+export const DEMO_ORDER_WHERE: Prisma.OrderWhereInput = {
   OR: [
     { erpOrderId: { startsWith: "ERP-DEMO-" } },
     { erpOrderId: { startsWith: "ERP-MOB-" } },
     { erpOrderId: "ERP-10042" },
   ],
-} as const;
+};
 
 /** Remove só dados demo antes da 1ª sync Tiny. Preserva pedidos TINY-* existentes. */
 export async function removeDemoSeedOrdersAndWaves(

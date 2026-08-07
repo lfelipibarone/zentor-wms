@@ -213,7 +213,7 @@ async function persistRateLimitCooldown(
     where: { id: connectionId },
     data: {
       lastError: message,
-      metadata: buildRateLimitMetadata(conn?.metadata, untilMs),
+      metadata: buildRateLimitMetadata(conn?.metadata, untilMs) as object,
     },
   });
 }
@@ -523,9 +523,18 @@ export async function getTinyApiClient(
     }
   }
 
+  const encryptedAccessToken = conn.accessToken;
+  if (!encryptedAccessToken) {
+    throw new TinyApiError(
+      "Tiny ERP não conectado. Configure OAuth em Integrações → Tiny.",
+      503,
+      "NOT_CONNECTED",
+    );
+  }
+
   let token: string;
   try {
-    token = decrypt(conn.accessToken);
+    token = decrypt(encryptedAccessToken);
   } catch {
     throw new TinyApiError("Falha ao ler token Tiny (ENCRYPTION_KEY).", 500);
   }
