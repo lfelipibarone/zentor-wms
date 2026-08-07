@@ -169,7 +169,7 @@ POST /api/packing/orders/{id}/shipping-labels?refresh=1
 4. Gerar/imprimir etiqueta no ERP.
 5. No WMS, chamar busca de etiqueta (ou `?refresh=1`).
 
-### Opção 2 — Via API (ainda não integrado no WMS)
+### Opção 2 — Via API (design: packing “Buscar etiqueta”)
 
 ```http
 POST /expedicao
@@ -185,7 +185,9 @@ GET /expedicao/{idAgrupamento}/etiquetas
 
 Doc: [Criar agrupamento de expedição](https://api-docs.erp.olist.com/api-reference/expedição/criar-agrupamento-de-expedição)
 
-**Próximo passo de desenvolvimento:** automatizar esse `POST /expedicao` quando o packing detectar `NOT_IN_EXPEDICAO`.
+**Encaixe escolhido:** no botão **Buscar etiqueta** de `/packing/[orderId]` — se o pedido não estiver em agrupamento, o WMS chama `POST /expedicao` e em seguida busca as URLs (mesmo endpoint `POST /api/packing/orders/:id/shipping-labels`).
+
+Design e plano de implementação: [[superpowers/specs/2026-08-05-tiny-etiqueta-geracao-design]], [[superpowers/plans/2026-08-05-tiny-etiqueta-geracao]].
 
 ---
 
