@@ -1,0 +1,253 @@
+{
+  "titulo": "Fluxo completo: gerar etiqueta Tiny (pedido 214617 / NF 005554)",
+  "atualizadoEm": "2026-08-10T20:25:00.000Z",
+  "statusGeral": "BLOQUEADO_OAUTH",
+  "bloqueio": {
+    "motivo": "Access token expirado (401). Refresh falha com 'Invalid client or Invalid client credentials'. Conexão Tiny no WMS está ERROR; OAuth precisa ser reconectado com Client ID/Secret atuais e permissão Incluir/editar na API de Expedição.",
+    "aposReconectar": "Rodar: pnpm --filter @wms/api exec tsx --env-file .env scripts/teste-fluxo-etiqueta-completo.ts TINY-861203611"
+  },
+  "pedidoAlvo": {
+    "numeroPedidoTela": 214617,
+    "numeroNotaTela": "005554",
+    "erpOrderIdWms": "TINY-861203611",
+    "idPedidoApi": 861203611,
+    "idNotaFiscalApi": 861203622,
+    "idFormaEnvio": 743997871,
+    "formaEnvioNome": "Correios",
+    "cliente": "Rafael Garcia",
+    "obs": "TINY-860803335 é OUTRO pedido (numero 211641 / NF 002707), não usar neste fluxo."
+  },
+  "resumoDoFluxo": [
+    "1. Resolver ids (pedido/NF) a partir do número de tela ou TINY-{id}",
+    "2. GET pedido + GET nota (contexto)",
+    "3. Se ainda não estiver em agrupamento: POST /expedicao (criar)",
+    "4. GET /expedicao/{idAgrupamento} (achar idExpedicao do pedido)",
+    "5. GET etiquetas (lote e/ou individual) → URLs",
+    "6. (opcional nesta prova) POST /expedicao/{idAgrupamento}/concluir",
+    "7. Persistir URL no WMS (Order.shippingLabel) quando integrar na rota de packing"
+  ],
+  "etapas": [
+    {
+      "ordem": 1,
+      "nome": "Resolver pedido pelo número de tela",
+      "quandoUsar": "Quando só temos 214617 (não o id interno)",
+      "metodo": "GET",
+      "rota": "/pedidos?numero=214617",
+      "body": null,
+      "paraQueServe": "Descobrir idPedido interno da API (861203611).",
+      "retornoEsperado": {
+        "http": 200,
+        "shape": {
+          "itens": [{ "id": 861203611, "numeroPedido": 214617, "situacao": 1 }],
+          "paginacao": { "limit": 100, "offset": 0, "total": 1 }
+        }
+      },
+      "ultimoResultadoReal": {
+        "em": "2026-08-10T12:23:00.000Z",
+        "http": 200,
+        "ok": true,
+        "resumo": "1 item: id=861203611, numeroPedido=214617"
+      },
+      "doc": "https://api-docs.erp.olist.com/api-reference/pedidos/pesquisar-pedidos"
+    },
+    {
+      "ordem": 2,
+      "nome": "Obter pedido completo",
+      "metodo": "GET",
+      "rota": "/pedidos/861203611",
+      "body": null,
+      "paraQueServe": "Confirmar situacao, idNotaFiscal, forma de envio, itens.",
+      "retornoEsperado": {
+        "http": 200,
+        "camposChave": {
+          "id": 861203611,
+          "numeroPedido": 214617,
+          "idNotaFiscal": 861203622,
+          "situacao": 1,
+          "situacaoLabel": "Faturada",
+          "transportador.formaEnvio": { "id": 743997871, "nome": "Correios" }
+        }
+      },
+      "ultimoResultadoReal": {
+        "em": "2026-08-10T12:24:33.734Z",
+        "http": 200,
+        "ok": true,
+        "arquivoCompleto": "docs/tiny-pedido-861203611.json"
+      },
+      "doc": "https://api-docs.erp.olist.com/api-reference/pedidos/obter-pedido"
+    },
+    {
+      "ordem": 3,
+      "nome": "Obter nota fiscal",
+      "metodo": "GET",
+      "rota": "/notas/861203622",
+      "body": null,
+      "paraQueServe": "Confirmar que o número de tela da NF é 005554 (API usa id interno).",
+      "retornoEsperado": {
+        "http": 200,
+        "camposChave": {
+          "numero": "005554",
+          "serie": "11",
+          "situacao": "6",
+          "tipo": "S"
+        }
+      },
+      "ultimoResultadoReal": {
+        "em": "2026-08-10T12:24:33.734Z",
+        "http": 200,
+        "ok": true,
+        "numero": "005554"
+      },
+      "doc": "https://api-docs.erp.olist.com/api-reference/notas/obter-nota-fiscal"
+    },
+    {
+      "ordem": 4,
+      "nome": "Criar agrupamento de expedição",
+      "metodo": "POST",
+      "rota": "/expedicao",
+      "bodyPreferido": { "idsPedidos": [861203611] },
+      "bodyAlternativo": { "idsNotasFiscais": [861203622] },
+      "paraQueServe": "Colocar o pedido no módulo de expedição. Sem isso a API não tem etiqueta de transporte.",
+      "retornoEsperado": {
+        "http": 200,
+        "shape": { "id": 0 },
+        "nota": "O campo id é o idAgrupamento. Guarde-o para os próximos GETs e para concluir."
+      },
+      "ultimoResultadoReal": {
+        "em": "2026-08-10T12:25:17.433Z",
+        "http": 403,
+        "ok": false,
+        "corpo": "",
+        "interpretacao": "App OAuth sem permissão de Incluir/editar na API de Expedição, OU token emitido antes da liberação. Após liberar permissão: regenerar chaves se necessário + reconectar OAuth.",
+        "arquivo": "docs/tiny-criar-expedicao-214617.json"
+      },
+      "doc": "https://api-docs.erp.olist.com/api-reference/expedição/criar-agrupamento-de-expedição"
+    },
+    {
+      "ordem": 5,
+      "nome": "Obter detalhe do agrupamento",
+      "metodo": "GET",
+      "rota": "/expedicao/{idAgrupamento}",
+      "body": null,
+      "paraQueServe": "Achar a expedição do pedido dentro de expedicoes[] (idExpedicao, venda.id / notaFiscal.id).",
+      "retornoEsperado": {
+        "http": 200,
+        "shape": {
+          "id": 0,
+          "formaEnvio": { "id": 743997871, "nome": "Correios" },
+          "expedicoes": [
+            {
+              "id": 0,
+              "venda": { "id": 861203611 },
+              "notaFiscal": { "id": 861203622, "numero": 5554 }
+            }
+          ]
+        }
+      },
+      "ultimoResultadoReal": {
+        "ok": false,
+        "motivo": "Não executado — depende do id retornado na etapa 4."
+      },
+      "doc": "https://api-docs.erp.olist.com/api-reference/expedição/obter-agrupamento-de-expedição"
+    },
+    {
+      "ordem": 6,
+      "nome": "Obter etiquetas do agrupamento (lote)",
+      "metodo": "GET",
+      "rota": "/expedicao/{idAgrupamento}/etiquetas",
+      "body": null,
+      "paraQueServe": "URLs das etiquetas de todo o lote.",
+      "retornoEsperado": {
+        "http": 200,
+        "shape": {
+          "urls": ["https://s3.amazonaws.com/tiny-tmp-us/erp/.../etiquetas/arquivo.zpl"]
+        },
+        "errosPossiveis": {
+          "urlsVazias": "Marketplace ainda sem etiqueta / integração",
+          "mensagemMarketplace": "Não foi possível obter as etiquetas em sua plataforma e-commerce"
+        }
+      },
+      "ultimoResultadoReal": {
+        "ok": false,
+        "motivo": "Não executado — depende da etapa 4."
+      },
+      "doc": "https://api-docs.erp.olist.com/api-reference/expedição/obter-etiquetas-de-um-agrupamento-de-expedição"
+    },
+    {
+      "ordem": 7,
+      "nome": "Obter etiqueta individual da expedição",
+      "metodo": "GET",
+      "rota": "/expedicao/{idAgrupamento}/expedicao/{idExpedicao}/etiquetas",
+      "body": null,
+      "paraQueServe": "URL só deste pedido (preferível para packing).",
+      "retornoEsperado": {
+        "http": 200,
+        "shape": { "urls": ["https://s3.amazonaws.com/.../etiqueta.zpl"] }
+      },
+      "ultimoResultadoReal": {
+        "ok": false,
+        "motivo": "Não executado — depende das etapas 4 e 5."
+      },
+      "doc": "https://api-docs.erp.olist.com/api-reference/expedição/obter-etiquetas-de-uma-expedição-dentro-de-um-agrupamento"
+    },
+    {
+      "ordem": 8,
+      "nome": "Concluir agrupamento de expedição",
+      "metodo": "POST",
+      "rota": "/expedicao/{idAgrupamento}/concluir",
+      "body": null,
+      "paraQueServe": "Marcar o lote como concluído no ERP Tiny (envio/despacho). NÃO é necessário para obter a URL da etiqueta — só para fechar o fluxo no Tiny.",
+      "retornoEsperado": {
+        "http": 200,
+        "shape": null,
+        "nota": "Doc oficial: 200 OK sem schema rico. 400 se ainda não puder concluir."
+      },
+      "ultimoResultadoReal": {
+        "ok": false,
+        "motivo": "Não executado — depende da etapa 4. Na prova completa o script tenta após obter URLs."
+      },
+      "doc": "https://api-docs.erp.olist.com/api-reference/expedição/concluir-um-agrupamento-de-expedição"
+    },
+    {
+      "ordem": 9,
+      "nome": "Persistir no WMS (quando integrar na rota)",
+      "metodo": "WMS interno",
+      "rota": "POST /api/packing/orders/:id/shipping-labels",
+      "paraQueServe": "Salvar primeira URL em Order.shippingLabel e devolver para a tela de packing imprimir.",
+      "retornoEsperadoWms": {
+        "status": "OK",
+        "urls": ["..."],
+        "createdAgrupamento": true,
+        "expedicao": { "idAgrupamento": 0, "idExpedicao": 0 },
+        "cached": false
+      },
+      "ultimoResultadoReal": {
+        "ok": false,
+        "motivo": "Ainda não implementado o POST /expedicao na rota; hoje só consulta (GET) e falha com NOT_IN_EXPEDICAO."
+      }
+    }
+  ],
+  "mapaParaTelaPacking": {
+    "botao": "Buscar / imprimir etiqueta",
+    "comportamentoDesejado": [
+      "Se Order.shippingLabel existir e sem refresh → devolver cache",
+      "Senão consultar índice de expedição",
+      "Se não estiver agrupado → POST /expedicao",
+      "Buscar URLs → salvar shippingLabel → abrir/imprimir",
+      "Concluir: botão separado OU junto (nesta prova: junto, após URLs)"
+    ],
+    "camposUteisParaUI": [
+      "urls",
+      "idAgrupamento",
+      "idExpedicao",
+      "createdAgrupamento",
+      "concluido",
+      "message / status de erro"
+    ]
+  },
+  "tentativasHttpDiretas": {
+    "postExpedicaoIdsPedidos": { "http": 403, "em": "2026-08-10T12:25:17Z" },
+    "postExpedicaoIdsNotas": { "http": 403, "em": "2026-08-10T12:25:17Z" },
+    "getPedidoComTokenExpirado": { "http": 401, "em": "2026-08-10T20:25:11Z" }
+  }
+}

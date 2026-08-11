@@ -22,6 +22,7 @@
     "teste-etiquetas": "tsx scripts/teste-etiquetas-pedido.ts",
     "teste-etiquetas-lote": "tsx scripts/teste-etiquetas-lote.ts",
     "teste-etiquetas-expedicao": "tsx scripts/teste-etiquetas-expedicao.ts",
+    "teste-fluxo-etiqueta": "tsx --env-file .env scripts/teste-fluxo-etiqueta-completo.ts",
     "consulta-pedidos-expedicao": "tsx scripts/consulta-pedidos-expedicao.ts",
     "teste-etiquetas-situacoes": "tsx scripts/teste-etiquetas-situacoes.ts",
     "export-etiquetas-situacoes-completo": "tsx scripts/export-etiquetas-situacoes-completo.ts",

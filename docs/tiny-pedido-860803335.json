@@ -1,0 +1,307 @@
+{
+  "fetchedAt": "2026-08-10T12:22:30.242Z",
+  "tenantId": "cmsj10hmw0000wh98leeb2iu3",
+  "erpOrderId": "TINY-860803335",
+  "pedidoId": 860803335,
+  "doc": {
+    "pedido": "https://api-docs.erp.olist.com/api-reference/pedidos/obter-pedido",
+    "expedicao": "https://api-docs.erp.olist.com/api-reference/expedição/obter-agrupamento-de-expedição",
+    "etiquetasAgrupamento": "https://api-docs.erp.olist.com/api-reference/expedição/obter-etiquetas-de-um-agrupamento-de-expedição",
+    "etiquetasExpedicao": "https://api-docs.erp.olist.com/api-reference/expedição/obter-etiquetas-de-uma-expedição-dentro-de-um-agrupamento",
+    "nota": "https://api-docs.erp.olist.com/api-reference/notas/obter-nota-fiscal"
+  },
+  "resumo": {
+    "numeroPedido": 211641,
+    "situacao": 1,
+    "situacaoLabel": "Faturada",
+    "dataPedido": "2026-07-14",
+    "idNotaFiscal": 860803346,
+    "idFormaEnvio": 743997871,
+    "formaEnvioNome": "Correios",
+    "codigoRastreamento": "",
+    "urlRastreamento": "",
+    "expedicoesEncontradas": 0,
+    "observacao": "Pedido sem agrupamento de expedição no Tiny. Normal se ainda não foi enviado ao módulo de expedição.",
+    "buscaExpedicao": {
+      "idFormaEnvio": 743997871,
+      "idNotaFiscal": 860803346,
+      "dataInicial": "2026-05-30",
+      "dataFinal": "2026-07-28"
+    }
+  },
+  "rotas": {
+    "GET /pedidos/{idPedido}": {
+      "path": "/pedidos/860803335",
+      "resposta": {
+        "id": 860803335,
+        "numeroPedido": 211641,
+        "idNotaFiscal": 860803346,
+        "dataFaturamento": "2026-07-14",
+        "valorTotalProdutos": 10.1,
+        "valorTotalPedido": 10.1,
+        "listaPreco": {
+          "id": 0,
+          "nome": "Padrão",
+          "acrescimoDesconto": 0
+        },
+        "cliente": {
+          "nome": "Rafael Garcia",
+          "codigo": "",
+          "fantasia": "",
+          "tipoPessoa": "F",
+          "cpfCnpj": "418.743.168-30",
+          "inscricaoEstadual": "",
+          "rg": "",
+          "telefone": "",
+          "celular": "",
+          "email": "",
+          "endereco": {
+            "endereco": "Rua Itororó",
+            "numero": "522",
+            "complemento": "",
+            "bairro": "Vila Santa Inês",
+            "municipio": "Bauru",
+            "cep": "17.054-230",
+            "uf": "SP",
+            "pais": "Brasil"
+          },
+          "id": 766955443
+        },
+        "enderecoEntrega": null,
+        "ecommerce": {
+          "id": 0,
+          "nome": "",
+          "numeroPedidoEcommerce": "",
+          "numeroPedidoCanalVenda": "",
+          "canalVenda": ""
+        },
+        "transportador": {
+          "id": 0,
+          "nome": "",
+          "fretePorConta": "R",
+          "formaEnvio": {
+            "id": 743997871,
+            "nome": "Correios"
+          },
+          "formaFrete": null,
+          "codigoRastreamento": "",
+          "urlRastreamento": ""
+        },
+        "deposito": {
+          "id": 743997833,
+          "nome": " Geral (Fiscal)"
+        },
+        "vendedor": null,
+        "naturezaOperacao": {
+          "id": 775374075,
+          "nome": "Venda de Mercadorias - Regime normal"
+        },
+        "intermediador": null,
+        "pagamento": null,
+        "itens": [
+          {
+            "produto": {
+              "id": 744044602,
+              "sku": "PUXPONTOPRF",
+              "descricao": "PUXADOR PZ 1009 BOTAO 30MM - Preto Fosco",
+              "tipo": "P"
+            },
+            "quantidade": 10,
+            "valorUnitario": 1.01,
+            "infoAdicional": ""
+          }
+        ],
+        "pagamentosIntegrados": null,
+        "situacao": 1,
+        "data": "2026-07-14",
+        "dataEntrega": "",
+        "numeroOrdemCompra": "",
+        "valorDesconto": 0,
+        "valorFrete": 0,
+        "valorOutrasDespesas": 0,
+        "dataPrevista": "",
+        "dataEnvio": "",
+        "observacoes": "",
+        "observacoesInternas": "",
+        "origemPedido": 0
+      }
+    },
+    "GET /pedidos/{idPedido}/marcadores": {
+      "path": "/pedidos/860803335/marcadores",
+      "resposta": [
+        {
+          "descricao": "1ª venda"
+        },
+        {
+          "descricao": "Devolvido"
+        }
+      ]
+    },
+    "GET /notas/{idNota}": {
+      "path": "/notas/860803346",
+      "resposta": {
+        "situacao": "6",
+        "tipo": "S",
+        "numero": "002707",
+        "serie": "11",
+        "chaveAcesso": "35260737919979000106550110000027071608033469",
+        "dataEmissao": "2026-07-14",
+        "dataPrevista": "0000-00-00",
+        "cliente": {
+          "nome": "Rafael Garcia",
+          "codigo": null,
+          "fantasia": null,
+          "tipoPessoa": "F",
+          "cpfCnpj": "418.743.168-30",
+          "inscricaoEstadual": "",
+          "rg": null,
+          "telefone": "",
+          "celular": null,
+          "email": "",
+          "endereco": {
+            "endereco": "Rua Itororó",
+            "numero": "522",
+            "complemento": "",
+            "bairro": "Vila Santa Inês",
+            "municipio": "Bauru",
+            "cep": "17.054-230",
+            "uf": "SP",
+            "pais": "Brasil"
+          },
+          "id": 766955443
+        },
+        "enderecoEntrega": null,
+        "valor": 10.1,
+        "valorProdutos": 10.1,
+        "valorFrete": 0,
+        "vendedor": null,
+        "idFormaEnvio": 743997871,
+        "idFormaFrete": 0,
+        "codigoRastreamento": "",
+        "urlRastreamento": "",
+        "fretePorConta": "R",
+        "qtdVolumes": 1,
+        "pesoBruto": 0.16,
+        "pesoLiquido": 0.16,
+        "id": 860803346,
+        "finalidade": "1",
+        "regimeTributario": 3,
+        "dataInclusao": "2026-07-14 11:38:10",
+        "baseIcms": 10.1,
+        "valorIcms": 1.82,
+        "baseIcmsSt": 0,
+        "valorIcmsSt": 0,
+        "valorServicos": 0,
+        "valorSeguro": 0,
+        "valorOutras": 0,
+        "valorIpi": 0,
+        "valorIssqn": 0,
+        "valorDesconto": 0,
+        "valorFaturado": 10.1,
+        "idIntermediador": 0,
+        "idNaturezaOperacao": 775374075,
+        "idFormaPagamento": 0,
+        "idMeioPagamento": 0,
+        "observacoes": "Nº Pedido: 211641\r\nTributos aproximados: R$ 1,36 (Federal) e R$ 1,82 (Estadual). Fonte: IBPT 5F6AA1\n",
+        "condicaoPagamento": "",
+        "valorNotaComImpostos": 10.1,
+        "valorBaseDiferimento": 0,
+        "percentualICMSPartilhaDestino": 100,
+        "valorTotalICMSFCPDestino": 0,
+        "valorIPIDevolvido": 0,
+        "tipoNotaCredito": "",
+        "tipoNotaDebito": "",
+        "valorTotalBCIBSCBS": 7.98,
+        "valorTotalIBSUF": 0.01,
+        "valorTotalCBS": 0.07,
+        "itens": [
+          {
+            "idItem": 780358368,
+            "idProduto": 744044602,
+            "codigo": "PUXPONTOPRF",
+            "ncm": "7907.00.90",
+            "descricao": "PUXADOR PZ 1009 BOTAO 30MM - Preto Fosco",
+            "unidade": "UN",
+            "quantidade": 10,
+            "valorUnitario": 1.01,
+            "valorTotal": 10.1,
+            "cfop": "5102",
+            "naturezaOperacao": "Venda de Mercadorias - Regime normal"
+          }
+        ],
+        "parcelas": [],
+        "pagamentosIntegrados": [],
+        "ecommerce": {
+          "id": 0,
+          "nome": "",
+          "numeroPedidoEcommerce": "",
+          "numeroPedidoCanalVenda": "",
+          "canalVenda": ""
+        },
+        "marcadores": [
+          {
+            "descricao": "Devolvido",
+            "cor": "#808080"
+          }
+        ],
+        "transportador": {
+          "nome": "",
+          "cpfCnpj": "",
+          "ie": "",
+          "endereco": "",
+          "municipio": null,
+          "uf": " "
+        },
+        "origem": {
+          "id": "860803335",
+          "tipo": "venda"
+        }
+      }
+    },
+    "GET /notas/{idNota}/link": {
+      "path": "/notas/860803346/link",
+      "resposta": {
+        "link": "https://erp.olist.com/doc.view?id=df6c9f106f623f8e3aedd1d59469339b"
+      }
+    },
+    "GET /notas/{idNota}/marcadores": {
+      "path": "/notas/860803346/marcadores",
+      "resposta": [
+        {
+          "descricao": "Devolvido"
+        }
+      ]
+    },
+    "GET /formas-envio/{idFormaEnvio}": {
+      "path": "/formas-envio/743997871",
+      "resposta": {
+        "nome": "Correios",
+        "tipo": "1",
+        "situacao": "1",
+        "id": 743997871,
+        "gatewayLogistico": null,
+        "formasFrete": []
+      }
+    },
+    "GET /expedicao (busca por pedido)": {
+      "pedidoId": 860803335,
+      "encontradas": 0,
+      "matches": []
+    }
+  },
+  "etiquetas": {
+    "disponivel": false,
+    "urls": [],
+    "rotasTinyV3": {
+      "agrupamento": "GET /expedicao/{idAgrupamento}/etiquetas → { urls: string[] }",
+      "individual": "GET /expedicao/{idAgrupamento}/expedicao/{idExpedicao}/etiquetas → { urls: string[] }",
+      "pedido": "Não existe GET /pedidos/{id}/etiquetas na API v3"
+    },
+    "motivoIndisponivel": "Pedido/NF não está em nenhum agrupamento de expedição no Tiny. Sem agrupamento, as rotas de etiqueta retornam vazio ou 404.",
+    "naoConfundirCom": {
+      "linkNotaFiscal": "https://erp.olist.com/doc.view?id=df6c9f106f623f8e3aedd1d59469339b",
+      "descricao": "O link acima é da DANFE (documento fiscal), não da etiqueta de transporte."
+    }
+  },
+  "expedicao": []
+}

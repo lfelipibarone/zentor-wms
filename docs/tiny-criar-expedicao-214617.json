@@ -1,0 +1,30 @@
+{
+  "fetchedAt": "2026-08-10T15:08:30.733Z",
+  "tokenExpiresAt": "2026-08-10T18:17:01.220Z",
+  "connectionStatus": "ERROR",
+  "lastError": "Invalid client or Invalid client credentials",
+  "getPedidoStatus": 200,
+  "postExpedicao": [
+    {
+      "body": {
+        "idsPedidos": [
+          861203611
+        ]
+      },
+      "status": 403,
+      "text": "",
+      "json": null
+    },
+    {
+      "body": {
+        "idsNotasFiscais": [
+          861203622
+        ]
+      },
+      "status": 403,
+      "text": "",
+      "json": null
+    }
+  ],
+  "etiquetas": null
+}
