@@ -122,13 +122,20 @@ export async function tryAutoReleaseWave(): Promise<void> {
     select: { id: true },
   });
   for (const t of tenants) {
-    await tryAutoReleaseForTenant(t.id);
+    try {
+      await tryAutoReleaseForTenant(t.id);
+    } catch (e) {
+      console.warn(`[wave-scheduler] falha tenant=${t.id}`, e);
+    }
   }
 }
 
 export function startWaveScheduler(): void {
   const tick = () => {
-    void tryAutoReleaseWave();
+    void tryAutoReleaseWave().catch((e) => {
+      const msg = e instanceof Error ? e.message : String(e);
+      console.warn(`[wave-scheduler] falha no ciclo: ${msg}`);
+    });
   };
   tick();
   setInterval(tick, 60_000);

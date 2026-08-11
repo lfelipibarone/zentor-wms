@@ -6,13 +6,17 @@ export async function apiFetch<T>(
   path: string,
   init?: RequestInit,
 ): Promise<T> {
+  const headers: Record<string, string> = {
+    ...authHeaders(),
+    ...(init?.headers as Record<string, string> | undefined),
+  };
+  if (init?.body != null && headers["Content-Type"] == null) {
+    headers["Content-Type"] = "application/json";
+  }
+
   const res = await fetch(`${API_BASE}${path}`, {
     ...init,
-    headers: {
-      "Content-Type": "application/json",
-      ...authHeaders(),
-      ...init?.headers,
-    },
+    headers,
     cache: "no-store",
   });
 
