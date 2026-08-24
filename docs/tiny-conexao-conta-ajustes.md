@@ -3,7 +3,8 @@
 Este documento registra o histórico da integração OAuth com a **Olist ERP API v3** (Tiny). Ele descreve como estava o comportamento da API e do frontend antes das correções, os problemas encontrados e o que foi ajustado para que o fluxo funcione perfeitamente em ambiente de desenvolvimento local.
 
 > [!NOTE]
-> Para a referência técnica contínua (rate limits, refresh de tokens e criptografia), consulte o guia principal: [[integracao-tiny-oauth|Integração Tiny ERP (v3)]].
+> Para a referência técnica contínua (rate limits, refresh de tokens e criptografia), consulte o guia principal: [[integracao-tiny-oauth|Integração Tiny ERP (v3)]].  
+> Conta atual de prova de etiquetas: **MEU PUXADOR** — ver [[contexto-etiqueta-packing-tiny]].
 
 ---
 

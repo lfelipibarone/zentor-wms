@@ -1,0 +1,225 @@
+{
+  "fetchedAt": "2026-08-14T19:26:00.618Z",
+  "conta": "MEU PUXADOR COMERCIO DE ACESSORIOS PARA MOVEIS LTDA",
+  "connectionId": "cmst909h50epkl0016ytukm52",
+  "busca": {
+    "numeroPedidoEcommerce": "40A0133E85",
+    "idPedido": 862886936,
+    "erpOrderId": "TINY-862886936",
+    "numeroPedido": 238392
+  },
+  "pedido": {
+    "id": 862886936,
+    "numeroPedido": 238392,
+    "idNotaFiscal": 862886988,
+    "dataFaturamento": "2026-08-14",
+    "valorTotalProdutos": 59,
+    "valorTotalPedido": 65.95,
+    "listaPreco": {
+      "id": 0,
+      "nome": "Padrão",
+      "acrescimoDesconto": 0
+    },
+    "cliente": {
+      "nome": "Rafael Garcia",
+      "codigo": "",
+      "fantasia": "",
+      "tipoPessoa": "F",
+      "cpfCnpj": "418.743.168-30",
+      "inscricaoEstadual": "",
+      "rg": "",
+      "telefone": "(14) 99640-5964",
+      "celular": "(14) 99640-5964",
+      "email": "ybiatto@gmail.com",
+      "endereco": {
+        "endereco": "Rua Itororó",
+        "numero": "522",
+        "complemento": "",
+        "bairro": "Vila Santa Inês",
+        "municipio": "Bauru",
+        "cep": "17.054-230",
+        "uf": "SP",
+        "pais": "Brasil"
+      },
+      "id": 767213698
+    },
+    "enderecoEntrega": null,
+    "ecommerce": {
+      "id": 9587,
+      "nome": "Olist Vnda Commerce",
+      "numeroPedidoEcommerce": "40A0133E85",
+      "numeroPedidoCanalVenda": "",
+      "canalVenda": ""
+    },
+    "transportador": {
+      "id": 0,
+      "nome": "",
+      "fretePorConta": "R",
+      "formaEnvio": {
+        "id": 851418498,
+        "nome": "Jadlog via Melhor Envio Vnda"
+      },
+      "formaFrete": {
+        "id": 851418500,
+        "nome": ".Com"
+      },
+      "codigoRastreamento": "",
+      "urlRastreamento": ""
+    },
+    "deposito": null,
+    "vendedor": null,
+    "naturezaOperacao": {
+      "id": 767836978,
+      "nome": "Venda de Mercadorias - Regime Normal"
+    },
+    "intermediador": null,
+    "pagamento": null,
+    "itens": [
+      {
+        "produto": {
+          "id": 758369784,
+          "sku": "PUXPONTOPRF",
+          "descricao": "PUXADOR PZ 1009 BOTAO 30MM - Preto Fosco",
+          "tipo": "P"
+        },
+        "quantidade": 10,
+        "valorUnitario": 5.9,
+        "infoAdicional": ""
+      }
+    ],
+    "pagamentosIntegrados": null,
+    "situacao": 1,
+    "data": "2026-08-14",
+    "dataEntrega": "",
+    "numeroOrdemCompra": "40A0133E85",
+    "valorDesconto": 2.95,
+    "valorFrete": 9.9,
+    "valorOutrasDespesas": 0,
+    "dataPrevista": "2026-08-24",
+    "dataEnvio": "",
+    "observacoes": "",
+    "observacoesInternas": "_fbp: fb.2.1785854576387.484738295469955088\nsession: 3e592aac-a2e8-4d14-9e87-c1fc92dbe1ff\ncampaign: palhas-indianas\nutm_medium: site\nutm_source: banner\nutm_content: banner\n",
+    "origemPedido": 0
+  },
+  "marcadores": [
+    {
+      "descricao": "Promoção e-commerce"
+    },
+    {
+      "descricao": "1ª venda"
+    }
+  ],
+  "nota": {
+    "situacao": "6",
+    "tipo": "S",
+    "numero": "171579",
+    "serie": "5",
+    "chaveAcesso": "35260835322681000199550050001715791628869884",
+    "dataEmissao": "2026-08-14",
+    "dataPrevista": "2026-08-24",
+    "cliente": {
+      "nome": "Rafael Garcia",
+      "codigo": null,
+      "fantasia": null,
+      "tipoPessoa": "F",
+      "cpfCnpj": "418.743.168-30",
+      "inscricaoEstadual": "",
+      "rg": null,
+      "telefone": "(14) 99640-5964",
+      "celular": null,
+      "email": "ybiatto@gmail.com",
+      "endereco": {
+        "endereco": "Rua Itororó",
+        "numero": "522",
+        "complemento": "",
+        "bairro": "Vila Santa Inês",
+        "municipio": "Bauru",
+        "cep": "17.054-230",
+        "uf": "SP",
+        "pais": "Brasil"
+      },
+      "id": 767213698
+    },
+    "enderecoEntrega": null,
+    "valor": 65.95,
+    "valorProdutos": 59,
+    "valorFrete": 9.9,
+    "vendedor": null,
+    "idFormaEnvio": 851418498,
+    "idFormaFrete": 851418500,
+    "codigoRastreamento": "",
+    "urlRastreamento": "",
+    "fretePorConta": "R",
+    "qtdVolumes": 1,
+    "pesoBruto": 0.16,
+    "pesoLiquido": 0.16,
+    "id": 862886988,
+    "finalidade": "1",
+    "regimeTributario": 3,
+    "dataInclusao": "2026-08-14 15:42:15",
+    "baseIcms": 65.95,
+    "valorIcms": 11.87,
+    "baseIcmsSt": 0,
+    "valorIcmsSt": 0,
+    "valorServicos": 0,
+    "valorSeguro": 0,
+    "valorOutras": 0,
+    "valorIpi": 0,
+    "valorIssqn": 0,
+    "valorDesconto": 2.95,
+    "valorFaturado": 65.95,
+    "idIntermediador": 0,
+    "idNaturezaOperacao": 767836978,
+    "idFormaPagamento": 0,
+    "idMeioPagamento": 0,
+    "observacoes": "OC: 40A0133E85\nNº Pedido: 238392\r\nTributos aproximados: R$ 7,94 (Federal) e R$ 10,62 (Estadual). Fonte: IBPT 5F6AA1\n",
+    "condicaoPagamento": "",
+    "valorNotaComImpostos": 65.95,
+    "valorBaseDiferimento": 0,
+    "percentualICMSPartilhaDestino": 100,
+    "valorTotalICMSFCPDestino": 0,
+    "valorIPIDevolvido": 0,
+    "tipoNotaCredito": "",
+    "tipoNotaDebito": "",
+    "valorTotalBCIBSCBS": 52.11,
+    "valorTotalIBSUF": 0.05,
+    "valorTotalCBS": 0.47,
+    "itens": [
+      {
+        "idItem": 781002735,
+        "idProduto": 758369784,
+        "codigo": "PUXPONTOPRF",
+        "ncm": "7907.00.90",
+        "descricao": "PUXADOR PZ 1009 BOTAO 30MM - Preto Fosco",
+        "unidade": "UN",
+        "quantidade": 10,
+        "valorUnitario": 5.9,
+        "valorTotal": 59,
+        "cfop": "5102",
+        "naturezaOperacao": "Venda de Mercadorias - Regime Normal"
+      }
+    ],
+    "parcelas": [],
+    "pagamentosIntegrados": [],
+    "ecommerce": {
+      "id": 9587,
+      "nome": "Olist Vnda Commerce",
+      "numeroPedidoEcommerce": "40A0133E85",
+      "numeroPedidoCanalVenda": "",
+      "canalVenda": ""
+    },
+    "marcadores": [],
+    "transportador": {
+      "nome": "",
+      "cpfCnpj": "",
+      "ie": "",
+      "endereco": "",
+      "municipio": null,
+      "uf": ""
+    },
+    "origem": {
+      "id": "862886936",
+      "tipo": "venda"
+    }
+  }
+}

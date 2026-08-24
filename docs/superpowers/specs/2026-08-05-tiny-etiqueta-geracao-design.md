@@ -1,8 +1,10 @@
 # Design: geração de etiqueta Tiny no packing
 
-Relacionado: [[etiquetas-expedicao-tiny]], [[integracao-tiny-pedidos]], [[logica-ondas]].
+Relacionado: [[etiquetas-expedicao-tiny]], [[integracao-tiny-pedidos]], [[logica-ondas]], [[contexto-etiqueta-packing-tiny]].
 
 **Status:** aprovado via mapa tela a tela (plano de inventário).  
+**Implementação packing GET:** feita. **Create/concluir no botão:** pendente (ver checklist no contexto mestre).  
+**Adendo 2026-08-18:** validação live exige NF preferencial + concluir + busca até hoje — ver seção adendo e [[contexto-etiqueta-packing-tiny]].  
 **Decisão de encaixe:** opção **A** — gerar no “Buscar etiqueta” da conferência de packing.
 
 ---
@@ -100,7 +102,22 @@ Motivos:
 3. Não altera a transição `PICKED_AWAITING_CONFERENCE` → `DISPATCHING`.
 4. Operador pode conferir sem chamar Tiny; só gera quando precisa imprimir.
 
-**Fora de escopo desta geração:** concluir agrupamento (`POST /expedicao/{id}/concluir`), marcar `DISPATCHED` no WMS, write-back de status no Tiny, tela `/expedicao` dedicada.
+**Fora de escopo desta geração (texto original ago/05):** concluir agrupamento (`POST /expedicao/{id}/concluir`), marcar `DISPATCHED` no WMS, write-back de status no Tiny, tela `/expedicao` dedicada.
+
+### Adendo 2026-08-18 (validação live MEU PUXADOR)
+
+Documento mestre: [[contexto-etiqueta-packing-tiny]].
+
+Alterações necessárias em relação a este design:
+
+| Item original | Validação live | Ajuste |
+|---------------|----------------|--------|
+| Preferir `idsPedidos` | NF já expedida + `idsPedidos` → lote **vazio** | Preferir **`idsNotasFiscais`**; fallback pedido só se NF ausente |
+| Concluir fora de escopo | GET etiquetas em lote novo → *“ainda não foi concluído”* | **Incluir concluir** quando a Tiny exigir |
+| Índice só período do pedido | Lote da NF 171579 em **17/08** não achado com `dataFinal=14/08` | Janela até **hoje** + match NF e pedido |
+| Só create-on-miss | Etiqueta pode já existir | Busca robusta primeiro; create só se realmente ausente |
+
+Prova: NF **171579** / pedido `862886936` / agrupamento **`746538070`** / ZPL OK. WMS packing ainda só GET.
 
 ---
 
@@ -125,7 +142,11 @@ No `POST /api/packing/orders/:id/shipping-labels` (mesmo botão “Buscar etique
 - Criar: [POST /expedicao](https://api-docs.erp.olist.com/api-reference/expedição/criar-agrupamento-de-expedição) — body `idsPedidos` e/ou `idsNotasFiscais`; response `{ id }`.
 - Etiquetas: rotas GET já usadas em `tiny-expedicao-labels.ts`.
 
-Preferência inicial: **`idsPedidos`** a partir de `parseTinyPedidoId(erpOrderId)`. Não exigir NF no WMS nesta versão. Se a Tiny rejeitar (ex.: pedido exige NF), mapear erro para status novo ou `API_ERROR` com mensagem da Tiny.
+Preferência inicial (texto original): **`idsPedidos`**.  
+
+**Adendo 18/08:** preferir **`idsNotasFiscais`** (ver adendo acima e [[contexto-etiqueta-packing-tiny]]). Se a Tiny rejeitar, mapear para `CREATE_EXPEDICAO_ERROR` / `API_ERROR` com mensagem da Tiny.
+
+Também: se `GET .../etiquetas` retornar “ainda não foi concluído”, chamar `POST .../concluir` e repetir o GET.
 
 ### Tipos / status
 

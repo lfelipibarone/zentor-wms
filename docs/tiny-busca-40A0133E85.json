@@ -1,0 +1,107 @@
+{
+  "fetchedAt": "2026-08-14T19:25:20.567Z",
+  "conta": {
+    "id": "cmst909h50epkl0016ytukm52",
+    "companyName": "MEU PUXADOR COMERCIO DE ACESSORIOS PARA MOVEIS LTDA",
+    "tenantId": "cmsj10hmw0000wh98leeb2iu3"
+  },
+  "needle": "40A0133E85",
+  "searches": [
+    {
+      "ok": false,
+      "query": {
+        "numeroEcommerce": "40A0133E85"
+      },
+      "erro": "Sua consulta levou muito tempo. Por favor, ajuste seus filtros ou tente novamente mais tarde.",
+      "first": null,
+      "matchCount": 0
+    },
+    {
+      "ok": true,
+      "query": {
+        "numeroPedidoEcommerce": "40A0133E85"
+      },
+      "total": 1,
+      "first": {
+        "id": 862886936,
+        "situacao": 1,
+        "numeroPedido": 238392,
+        "ecommerce": {
+          "id": 9587,
+          "nome": "Olist Vnda Commerce",
+          "numeroPedidoEcommerce": "40A0133E85",
+          "numeroPedidoCanalVenda": "",
+          "canalVenda": ""
+        },
+        "dataCriacao": "2026-08-14",
+        "dataPrevista": "2026-08-24",
+        "cliente": {
+          "nome": "Rafael Garcia",
+          "codigo": "",
+          "fantasia": "",
+          "tipoPessoa": "F",
+          "cpfCnpj": "418.743.168-30",
+          "inscricaoEstadual": "",
+          "rg": "",
+          "telefone": "(14) 99640-5964",
+          "celular": "(14) 99640-5964",
+          "email": "ybiatto@gmail.com",
+          "endereco": {
+            "endereco": "Rua Itororó",
+            "numero": "522",
+            "complemento": "",
+            "bairro": "Vila Santa Inês",
+            "municipio": "Bauru",
+            "cep": "17.054-230",
+            "uf": "SP",
+            "pais": "Brasil"
+          },
+          "id": 767213698
+        },
+        "valor": "65.95",
+        "vendedor": null,
+        "transportador": {
+          "id": 0,
+          "nome": "",
+          "fretePorConta": "R",
+          "formaEnvio": {
+            "id": 851418498,
+            "nome": "Jadlog via Melhor Envio Vnda"
+          },
+          "formaFrete": {
+            "id": 851418500,
+            "nome": ".Com"
+          },
+          "codigoRastreamento": "",
+          "urlRastreamento": ""
+        },
+        "origemPedido": 0
+      },
+      "matchCount": 1
+    },
+    {
+      "ok": false,
+      "query": {
+        "pesquisa": "40A0133E85"
+      },
+      "erro": "Sua consulta levou muito tempo. Por favor, ajuste seus filtros ou tente novamente mais tarde.",
+      "first": null,
+      "matchCount": 0
+    },
+    {
+      "ok": true,
+      "query": {
+        "nomeCliente": "40A0133E85"
+      },
+      "total": 0,
+      "first": null,
+      "matchCount": 0
+    }
+  ],
+  "recentScan": {
+    "pages": 1,
+    "totalHint": null,
+    "hits": []
+  },
+  "detalhes": []
+}

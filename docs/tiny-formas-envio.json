@@ -1,0 +1,839 @@
+{
+  "fetchedAt": "2026-08-12T18:11:59.510Z",
+  "tenantId": "cmsj10hmw0000wh98leeb2iu3",
+  "resumo": {
+    "totalListados": 18,
+    "idsUnicos": [
+      743997871,
+      743997873,
+      743997874,
+      744061814,
+      756508453,
+      758095424,
+      758102290,
+      760085365,
+      765781241,
+      765781247,
+      765781250,
+      765781263,
+      765781271,
+      765781275,
+      798343252,
+      798343668,
+      860312768,
+      860312774
+    ],
+    "correios": {
+      "ok": true,
+      "http": 200,
+      "path": "/formas-envio/743997871",
+      "resposta": {
+        "nome": "Correios",
+        "tipo": "1",
+        "situacao": "1",
+        "id": 743997871,
+        "gatewayLogistico": null,
+        "formasFrete": []
+      }
+    }
+  },
+  "lista": [
+    {
+      "nome": "Correios",
+      "tipo": "1",
+      "situacao": "1",
+      "id": 743997871,
+      "gatewayLogistico": null
+    },
+    {
+      "nome": "Transportadora",
+      "tipo": "2",
+      "situacao": "1",
+      "id": 743997873,
+      "gatewayLogistico": null
+    },
+    {
+      "nome": "Retirar pessoalmente",
+      "tipo": "6",
+      "situacao": "1",
+      "id": 743997874,
+      "gatewayLogistico": null
+    },
+    {
+      "nome": "Mercado Envios",
+      "tipo": "3",
+      "situacao": "1",
+      "id": 744061814,
+      "gatewayLogistico": null
+    },
+    {
+      "nome": "Shopee Envios",
+      "tipo": "12",
+      "situacao": "1",
+      "id": 756508453,
+      "gatewayLogistico": null
+    },
+    {
+      "nome": "Amazon DBA",
+      "tipo": "19",
+      "situacao": "1",
+      "id": 758095424,
+      "gatewayLogistico": null
+    },
+    {
+      "nome": "Americanas Entrega",
+      "tipo": "4",
+      "situacao": "1",
+      "id": 758102290,
+      "gatewayLogistico": null
+    },
+    {
+      "nome": "Magalu Entregas",
+      "tipo": "11",
+      "situacao": "1",
+      "id": 760085365,
+      "gatewayLogistico": null
+    },
+    {
+      "nome": "Azul Cargo Express",
+      "tipo": "10",
+      "situacao": "1",
+      "id": 765781241,
+      "gatewayLogistico": {
+        "id": 765781221,
+        "nome": "Melhor Envio Loja Carbi"
+      }
+    },
+    {
+      "nome": "Buslog",
+      "tipo": "10",
+      "situacao": "1",
+      "id": 765781247,
+      "gatewayLogistico": {
+        "id": 765781221,
+        "nome": "Melhor Envio Loja Carbi"
+      }
+    },
+    {
+      "nome": "Correios Gateway",
+      "tipo": "10",
+      "situacao": "1",
+      "id": 765781250,
+      "gatewayLogistico": {
+        "id": 765781221,
+        "nome": "Melhor Envio Loja Carbi"
+      }
+    },
+    {
+      "nome": "Jadlog",
+      "tipo": "10",
+      "situacao": "1",
+      "id": 765781263,
+      "gatewayLogistico": {
+        "id": 765781221,
+        "nome": "Melhor Envio Loja Carbi"
+      }
+    },
+    {
+      "nome": "LATAM Cargo",
+      "tipo": "10",
+      "situacao": "1",
+      "id": 765781271,
+      "gatewayLogistico": {
+        "id": 765781221,
+        "nome": "Melhor Envio Loja Carbi"
+      }
+    },
+    {
+      "nome": "Loggi",
+      "tipo": "10",
+      "situacao": "1",
+      "id": 765781275,
+      "gatewayLogistico": {
+        "id": 765781221,
+        "nome": "Melhor Envio Loja Carbi"
+      }
+    },
+    {
+      "nome": "AliExpress Envios",
+      "tipo": "6",
+      "situacao": "2",
+      "id": 798343252,
+      "gatewayLogistico": null
+    },
+    {
+      "nome": "AliExpress Envios",
+      "tipo": "16",
+      "situacao": "1",
+      "id": 798343668,
+      "gatewayLogistico": null
+    },
+    {
+      "nome": "Transportadora Teste WMS",
+      "tipo": "6",
+      "situacao": "1",
+      "id": 860312768,
+      "gatewayLogistico": null
+    },
+    {
+      "nome": "Teste Transportadora WMS ",
+      "tipo": "2",
+      "situacao": "1",
+      "id": 860312774,
+      "gatewayLogistico": null
+    }
+  ],
+  "detalhes": [
+    {
+      "path": "/formas-envio/743997871",
+      "ok": true,
+      "http": 200,
+      "erro": null,
+      "resposta": {
+        "nome": "Correios",
+        "tipo": "1",
+        "situacao": "1",
+        "id": 743997871,
+        "gatewayLogistico": null,
+        "formasFrete": []
+      }
+    },
+    {
+      "path": "/formas-envio/743997873",
+      "ok": true,
+      "http": 200,
+      "erro": null,
+      "resposta": {
+        "nome": "Transportadora",
+        "tipo": "2",
+        "situacao": "1",
+        "id": 743997873,
+        "gatewayLogistico": null,
+        "formasFrete": []
+      }
+    },
+    {
+      "path": "/formas-envio/743997874",
+      "ok": true,
+      "http": 200,
+      "erro": null,
+      "resposta": {
+        "nome": "Retirar pessoalmente",
+        "tipo": "6",
+        "situacao": "1",
+        "id": 743997874,
+        "gatewayLogistico": null,
+        "formasFrete": []
+      }
+    },
+    {
+      "path": "/formas-envio/744061814",
+      "ok": true,
+      "http": 200,
+      "erro": null,
+      "resposta": {
+        "nome": "Mercado Envios",
+        "tipo": "3",
+        "situacao": "1",
+        "id": 744061814,
+        "gatewayLogistico": null,
+        "formasFrete": [
+          {
+            "id": 760093007,
+            "nome": "Coleta Normal",
+            "codigo": "101",
+            "codigoExterno": "",
+            "tipoEntrega": "0"
+          },
+          {
+            "id": 760093008,
+            "nome": "Coleta Express",
+            "codigo": "102",
+            "codigoExterno": "",
+            "tipoEntrega": "0"
+          },
+          {
+            "id": 760093009,
+            "nome": "Coleta Express",
+            "codigo": "103",
+            "codigoExterno": "",
+            "tipoEntrega": "0"
+          },
+          {
+            "id": 760093010,
+            "nome": "Coleta Correios PAC Agência",
+            "codigo": "1051",
+            "codigoExterno": "",
+            "tipoEntrega": "0"
+          },
+          {
+            "id": 760093011,
+            "nome": "Coleta Correios Sedex Agência",
+            "codigo": "1061",
+            "codigoExterno": "",
+            "tipoEntrega": "0"
+          },
+          {
+            "id": 760093012,
+            "nome": "Shipping Network Fast",
+            "codigo": "155413",
+            "codigoExterno": "",
+            "tipoEntrega": "0"
+          },
+          {
+            "id": 760093013,
+            "nome": "Shipping Network Fast",
+            "codigo": "165366",
+            "codigoExterno": "",
+            "tipoEntrega": "0"
+          },
+          {
+            "id": 760093014,
+            "nome": "Coleta Normal",
+            "codigo": "101",
+            "codigoExterno": "",
+            "tipoEntrega": "0"
+          },
+          {
+            "id": 760093015,
+            "nome": "Coleta Express",
+            "codigo": "102",
+            "codigoExterno": "",
+            "tipoEntrega": "0"
+          },
+          {
+            "id": 760093016,
+            "nome": "Coleta Express",
+            "codigo": "103",
+            "codigoExterno": "",
+            "tipoEntrega": "0"
+          },
+          {
+            "id": 760093017,
+            "nome": "Coleta Correios PAC Agência",
+            "codigo": "1051",
+            "codigoExterno": "",
+            "tipoEntrega": "0"
+          },
+          {
+            "id": 760093018,
+            "nome": "Coleta Correios Sedex Agência",
+            "codigo": "1061",
+            "codigoExterno": "",
+            "tipoEntrega": "0"
+          },
+          {
+            "id": 760093020,
+            "nome": "Shipping Network Fast",
+            "codigo": "155413",
+            "codigoExterno": "",
+            "tipoEntrega": "0"
+          },
+          {
+            "id": 760093021,
+            "nome": "Shipping Network Fast",
+            "codigo": "165366",
+            "codigoExterno": "",
+            "tipoEntrega": "0"
+          },
+          {
+            "id": 760093022,
+            "nome": "Mercadoenvios Next Day",
+            "codigo": "991",
+            "codigoExterno": "",
+            "tipoEntrega": "0"
+          }
+        ]
+      }
+    },
+    {
+      "path": "/formas-envio/756508453",
+      "ok": true,
+      "http": 200,
+      "erro": null,
+      "resposta": {
+        "nome": "Shopee Envios",
+        "tipo": "12",
+        "situacao": "1",
+        "id": 756508453,
+        "gatewayLogistico": null,
+        "formasFrete": []
+      }
+    },
+    {
+      "path": "/formas-envio/758095424",
+      "ok": true,
+      "http": 200,
+      "erro": null,
+      "resposta": {
+        "nome": "Amazon DBA",
+        "tipo": "19",
+        "situacao": "1",
+        "id": 758095424,
+        "gatewayLogistico": null,
+        "formasFrete": []
+      }
+    },
+    {
+      "path": "/formas-envio/758102290",
+      "ok": true,
+      "http": 200,
+      "erro": null,
+      "resposta": {
+        "nome": "Americanas Entrega",
+        "tipo": "4",
+        "situacao": "1",
+        "id": 758102290,
+        "gatewayLogistico": null,
+        "formasFrete": []
+      }
+    },
+    {
+      "path": "/formas-envio/760085365",
+      "ok": true,
+      "http": 200,
+      "erro": null,
+      "resposta": {
+        "nome": "Magalu Entregas",
+        "tipo": "11",
+        "situacao": "1",
+        "id": 760085365,
+        "gatewayLogistico": null,
+        "formasFrete": []
+      }
+    },
+    {
+      "path": "/formas-envio/765781241",
+      "ok": true,
+      "http": 200,
+      "erro": null,
+      "resposta": {
+        "nome": "Azul Cargo Express",
+        "tipo": "10",
+        "situacao": "1",
+        "id": 765781241,
+        "gatewayLogistico": {
+          "id": 765781221,
+          "nome": "Melhor Envio Loja Carbi"
+        },
+        "formasFrete": [
+          {
+            "id": 765781244,
+            "nome": "Amanhã",
+            "codigo": "15",
+            "codigoExterno": "15",
+            "tipoEntrega": "2"
+          },
+          {
+            "id": 765781245,
+            "nome": "e-commerce",
+            "codigo": "16",
+            "codigoExterno": "16",
+            "tipoEntrega": "1"
+          }
+        ]
+      }
+    },
+    {
+      "path": "/formas-envio/765781247",
+      "ok": true,
+      "http": 200,
+      "erro": null,
+      "resposta": {
+        "nome": "Buslog",
+        "tipo": "10",
+        "situacao": "1",
+        "id": 765781247,
+        "gatewayLogistico": {
+          "id": 765781221,
+          "nome": "Melhor Envio Loja Carbi"
+        },
+        "formasFrete": [
+          {
+            "id": 765781248,
+            "nome": "Rodoviário",
+            "codigo": "22",
+            "codigoExterno": "22",
+            "tipoEntrega": "1"
+          }
+        ]
+      }
+    },
+    {
+      "path": "/formas-envio/765781250",
+      "ok": true,
+      "http": 200,
+      "erro": null,
+      "resposta": {
+        "nome": "Correios Gateway",
+        "tipo": "10",
+        "situacao": "1",
+        "id": 765781250,
+        "gatewayLogistico": {
+          "id": 765781221,
+          "nome": "Melhor Envio Loja Carbi"
+        },
+        "formasFrete": [
+          {
+            "id": 765781251,
+            "nome": "PAC",
+            "codigo": "1",
+            "codigoExterno": "1",
+            "tipoEntrega": "1"
+          },
+          {
+            "id": 765781254,
+            "nome": "SEDEX",
+            "codigo": "2",
+            "codigoExterno": "2",
+            "tipoEntrega": "2"
+          },
+          {
+            "id": 765781256,
+            "nome": "Mini Envios",
+            "codigo": "17",
+            "codigoExterno": "17",
+            "tipoEntrega": "0"
+          },
+          {
+            "id": 765781259,
+            "nome": "PAC Centralizado",
+            "codigo": "28",
+            "codigoExterno": "28",
+            "tipoEntrega": "1"
+          },
+          {
+            "id": 765781260,
+            "nome": "SEDEX Centralizado",
+            "codigo": "29",
+            "codigoExterno": "29",
+            "tipoEntrega": "2"
+          },
+          {
+            "id": 765781262,
+            "nome": "Mini Envios Centralizado",
+            "codigo": "30",
+            "codigoExterno": "30",
+            "tipoEntrega": "0"
+          }
+        ]
+      }
+    },
+    {
+      "path": "/formas-envio/765781263",
+      "ok": true,
+      "http": 200,
+      "erro": null,
+      "resposta": {
+        "nome": "Jadlog",
+        "tipo": "10",
+        "situacao": "1",
+        "id": 765781263,
+        "gatewayLogistico": {
+          "id": 765781221,
+          "nome": "Melhor Envio Loja Carbi"
+        },
+        "formasFrete": [
+          {
+            "id": 765781265,
+            "nome": ".Package",
+            "codigo": "3",
+            "codigoExterno": "3",
+            "tipoEntrega": "1"
+          },
+          {
+            "id": 765781266,
+            "nome": ".Com",
+            "codigo": "4",
+            "codigoExterno": "4",
+            "tipoEntrega": "2"
+          },
+          {
+            "id": 765781268,
+            "nome": ".Package Centralizado",
+            "codigo": "27",
+            "codigoExterno": "27",
+            "tipoEntrega": "1"
+          }
+        ]
+      }
+    },
+    {
+      "path": "/formas-envio/765781271",
+      "ok": true,
+      "http": 200,
+      "erro": null,
+      "resposta": {
+        "nome": "LATAM Cargo",
+        "tipo": "10",
+        "situacao": "1",
+        "id": 765781271,
+        "gatewayLogistico": {
+          "id": 765781221,
+          "nome": "Melhor Envio Loja Carbi"
+        },
+        "formasFrete": [
+          {
+            "id": 765781272,
+            "nome": "éFácil",
+            "codigo": "12",
+            "codigoExterno": "12",
+            "tipoEntrega": "2"
+          }
+        ]
+      }
+    },
+    {
+      "path": "/formas-envio/765781275",
+      "ok": true,
+      "http": 200,
+      "erro": null,
+      "resposta": {
+        "nome": "Loggi",
+        "tipo": "10",
+        "situacao": "1",
+        "id": 765781275,
+        "gatewayLogistico": {
+          "id": 765781221,
+          "nome": "Melhor Envio Loja Carbi"
+        },
+        "formasFrete": [
+          {
+            "id": 765781277,
+            "nome": "Express",
+            "codigo": "31",
+            "codigoExterno": "31",
+            "tipoEntrega": "2"
+          },
+          {
+            "id": 765781279,
+            "nome": "Coleta",
+            "codigo": "32",
+            "codigoExterno": "32",
+            "tipoEntrega": "2"
+          }
+        ]
+      }
+    },
+    {
+      "path": "/formas-envio/798343252",
+      "ok": true,
+      "http": 200,
+      "erro": null,
+      "resposta": {
+        "nome": "AliExpress Envios",
+        "tipo": "6",
+        "situacao": "2",
+        "id": 798343252,
+        "gatewayLogistico": null,
+        "formasFrete": []
+      }
+    },
+    {
+      "path": "/formas-envio/798343668",
+      "ok": true,
+      "http": 200,
+      "erro": null,
+      "resposta": {
+        "nome": "AliExpress Envios",
+        "tipo": "16",
+        "situacao": "1",
+        "id": 798343668,
+        "gatewayLogistico": null,
+        "formasFrete": []
+      }
+    },
+    {
+      "path": "/formas-envio/860312768",
+      "ok": true,
+      "http": 200,
+      "erro": null,
+      "resposta": {
+        "nome": "Transportadora Teste WMS",
+        "tipo": "6",
+        "situacao": "1",
+        "id": 860312768,
+        "gatewayLogistico": null,
+        "formasFrete": []
+      }
+    },
+    {
+      "path": "/formas-envio/860312774",
+      "ok": true,
+      "http": 200,
+      "erro": null,
+      "resposta": {
+        "nome": "Teste Transportadora WMS ",
+        "tipo": "2",
+        "situacao": "1",
+        "id": 860312774,
+        "gatewayLogistico": null,
+        "formasFrete": []
+      }
+    }
+  ],
+  "etapasLista": [
+    {
+      "ok": true,
+      "http": 200,
+      "path": "/formas-envio",
+      "query": {
+        "limit": 100,
+        "offset": 0
+      },
+      "resposta": {
+        "itens": [
+          {
+            "nome": "Correios",
+            "tipo": "1",
+            "situacao": "1",
+            "id": 743997871,
+            "gatewayLogistico": null
+          },
+          {
+            "nome": "Transportadora",
+            "tipo": "2",
+            "situacao": "1",
+            "id": 743997873,
+            "gatewayLogistico": null
+          },
+          {
+            "nome": "Retirar pessoalmente",
+            "tipo": "6",
+            "situacao": "1",
+            "id": 743997874,
+            "gatewayLogistico": null
+          },
+          {
+            "nome": "Mercado Envios",
+            "tipo": "3",
+            "situacao": "1",
+            "id": 744061814,
+            "gatewayLogistico": null
+          },
+          {
+            "nome": "Shopee Envios",
+            "tipo": "12",
+            "situacao": "1",
+            "id": 756508453,
+            "gatewayLogistico": null
+          },
+          {
+            "nome": "Amazon DBA",
+            "tipo": "19",
+            "situacao": "1",
+            "id": 758095424,
+            "gatewayLogistico": null
+          },
+          {
+            "nome": "Americanas Entrega",
+            "tipo": "4",
+            "situacao": "1",
+            "id": 758102290,
+            "gatewayLogistico": null
+          },
+          {
+            "nome": "Magalu Entregas",
+            "tipo": "11",
+            "situacao": "1",
+            "id": 760085365,
+            "gatewayLogistico": null
+          },
+          {
+            "nome": "Azul Cargo Express",
+            "tipo": "10",
+            "situacao": "1",
+            "id": 765781241,
+            "gatewayLogistico": {
+              "id": 765781221,
+              "nome": "Melhor Envio Loja Carbi"
+            }
+          },
+          {
+            "nome": "Buslog",
+            "tipo": "10",
+            "situacao": "1",
+            "id": 765781247,
+            "gatewayLogistico": {
+              "id": 765781221,
+              "nome": "Melhor Envio Loja Carbi"
+            }
+          },
+          {
+            "nome": "Correios Gateway",
+            "tipo": "10",
+            "situacao": "1",
+            "id": 765781250,
+            "gatewayLogistico": {
+              "id": 765781221,
+              "nome": "Melhor Envio Loja Carbi"
+            }
+          },
+          {
+            "nome": "Jadlog",
+            "tipo": "10",
+            "situacao": "1",
+            "id": 765781263,
+            "gatewayLogistico": {
+              "id": 765781221,
+              "nome": "Melhor Envio Loja Carbi"
+            }
+          },
+          {
+            "nome": "LATAM Cargo",
+            "tipo": "10",
+            "situacao": "1",
+            "id": 765781271,
+            "gatewayLogistico": {
+              "id": 765781221,
+              "nome": "Melhor Envio Loja Carbi"
+            }
+          },
+          {
+            "nome": "Loggi",
+            "tipo": "10",
+            "situacao": "1",
+            "id": 765781275,
+            "gatewayLogistico": {
+              "id": 765781221,
+              "nome": "Melhor Envio Loja Carbi"
+            }
+          },
+          {
+            "nome": "AliExpress Envios",
+            "tipo": "6",
+            "situacao": "2",
+            "id": 798343252,
+            "gatewayLogistico": null
+          },
+          {
+            "nome": "AliExpress Envios",
+            "tipo": "16",
+            "situacao": "1",
+            "id": 798343668,
+            "gatewayLogistico": null
+          },
+          {
+            "nome": "Transportadora Teste WMS",
+            "tipo": "6",
+            "situacao": "1",
+            "id": 860312768,
+            "gatewayLogistico": null
+          },
+          {
+            "nome": "Teste Transportadora WMS ",
+            "tipo": "2",
+            "situacao": "1",
+            "id": 860312774,
+            "gatewayLogistico": null
+          }
+        ],
+        "paginacao": {
+          "limit": 100,
+          "offset": 0,
+          "total": 18
+        }
+      }
+    }
+  ]
+}

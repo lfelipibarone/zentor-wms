@@ -1,0 +1,185 @@
+{
+  "fetchedAt": "2026-08-14T19:40:02.649Z",
+  "pedidoResumo": {
+    "id": 862886936,
+    "numero": 238392,
+    "idNota": 862886988,
+    "ecommerce": {
+      "id": 9587,
+      "nome": "Olist Vnda Commerce",
+      "numeroPedidoEcommerce": "40A0133E85",
+      "numeroPedidoCanalVenda": "",
+      "canalVenda": ""
+    },
+    "transportador": {
+      "id": 0,
+      "nome": "",
+      "fretePorConta": "R",
+      "formaEnvio": {
+        "id": 851418498,
+        "nome": "Jadlog via Melhor Envio Vnda"
+      },
+      "formaFrete": {
+        "id": 851418500,
+        "nome": ".Com"
+      },
+      "codigoRastreamento": "",
+      "urlRastreamento": ""
+    }
+  },
+  "notaResumo": {
+    "id": 862886988,
+    "numero": "171579",
+    "situacao": "6",
+    "rastreio": "",
+    "urlRastreamento": "",
+    "idFormaEnvio": 851418498
+  },
+  "samples": [
+    {
+      "idAgr": 746537716,
+      "first": {
+        "id": 750138723,
+        "data": "2026-08-14",
+        "situacao": "1",
+        "tipoObjeto": "notafiscal",
+        "idObjeto": 862882170,
+        "dataEmissao": "2026-08-14",
+        "venda": {
+          "id": 862882169,
+          "numero": 238320,
+          "data": "2026-08-14",
+          "situacao": 7
+        },
+        "notaFiscal": {
+          "id": 862882170,
+          "numero": 171534,
+          "data": "2026-08-14",
+          "situacao": 7
+        },
+        "destinatario": {
+          "nome": "Lia Araujo Guabiraba",
+          "codigo": "",
+          "fantasia": "",
+          "tipoPessoa": "F",
+          "cpfCnpj": "068.726.573-83",
+          "inscricaoEstadual": "",
+          "rg": "",
+          "telefone": "(85) 99154-1308",
+          "celular": "(85) 99154-1308",
+          "email": "liaa.guabs@gmail.com",
+          "endereco": {
+            "endereco": "Rua dos Guajajaras",
+            "numero": "718",
+            "complemento": "Ap 1401",
+            "bairro": "Centro",
+            "municipio": "Belo Horizonte",
+            "cep": "30.180-106",
+            "uf": "MG",
+            "pais": "Brasil"
+          },
+          "id": 767213258
+        },
+        "volume": {
+          "embalagem": {
+            "id": 718341525,
+            "tipo": 2,
+            "descricao": "Embalagem Loja Integrada"
+          },
+          "largura": 16.3,
+          "altura": 7,
+          "comprimento": 19,
+          "diametro": 0,
+          "pesoBruto": 0.108,
+          "quantidadeVolumes": 1
+        },
+        "logistica": {
+          "codigoRastreio": "",
+          "urlRastreio": "",
+          "possuiValorDeclarado": true,
+          "valorDeclarado": 45.8,
+          "possuiAvisoRecebimento": true,
+          "formaFrete": {
+            "id": 851418500,
+            "nome": ".Com"
+          },
+          "transportador": null
+        }
+      },
+      "count": 4
+    },
+    {
+      "idAgr": 746537716,
+      "first": {
+        "id": 750138723,
+        "data": "2026-08-14",
+        "situacao": "1",
+        "tipoObjeto": "notafiscal",
+        "idObjeto": 862882170,
+        "dataEmissao": "2026-08-14",
+        "venda": {
+          "id": 862882169,
+          "numero": 238320,
+          "data": "2026-08-14",
+          "situacao": 7
+        },
+        "notaFiscal": {
+          "id": 862882170,
+          "numero": 171534,
+          "data": "2026-08-14",
+          "situacao": 7
+        },
+        "destinatario": {
+          "nome": "Lia Araujo Guabiraba",
+          "codigo": "",
+          "fantasia": "",
+          "tipoPessoa": "F",
+          "cpfCnpj": "068.726.573-83",
+          "inscricaoEstadual": "",
+          "rg": "",
+          "telefone": "(85) 99154-1308",
+          "celular": "(85) 99154-1308",
+          "email": "liaa.guabs@gmail.com",
+          "endereco": {
+            "endereco": "Rua dos Guajajaras",
+            "numero": "718",
+            "complemento": "Ap 1401",
+            "bairro": "Centro",
+            "municipio": "Belo Horizonte",
+            "cep": "30.180-106",
+            "uf": "MG",
+            "pais": "Brasil"
+          },
+          "id": 767213258
+        },
+        "volume": {
+          "embalagem": {
+            "id": 718341525,
+            "tipo": 2,
+            "descricao": "Embalagem Loja Integrada"
+          },
+          "largura": 16.3,
+          "altura": 7,
+          "comprimento": 19,
+          "diametro": 0,
+          "pesoBruto": 0.108,
+          "quantidadeVolumes": 1
+        },
+        "logistica": {
+          "codigoRastreio": "",
+          "urlRastreio": "",
+          "possuiValorDeclarado": true,
+          "valorDeclarado": 45.8,
+          "possuiAvisoRecebimento": true,
+          "formaFrete": {
+            "id": 851418500,
+            "nome": ".Com"
+          },
+          "transportador": null
+        }
+      },
+      "count": 4
+    }
+  ],
+  "found": []
+}

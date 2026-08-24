@@ -1,0 +1,140 @@
+{
+  "fetchedAt": "2026-08-14T19:37:51.428Z",
+  "conta": "MEU PUXADOR COMERCIO DE ACESSORIOS PARA MOVEIS LTDA",
+  "connectionId": "cmst909h50epkl0016ytukm52",
+  "pedidoAlvo": {
+    "numeroPedidoEcommerce": "40A0133E85",
+    "numeroPedido": 238392,
+    "idPedido": 862886936,
+    "idNotaFiscal": 862886988,
+    "erpOrderId": "TINY-862886936"
+  },
+  "resultado": {
+    "etiquetaObtida": false,
+    "urls": [],
+    "idAgrupamento": 746537725,
+    "idExpedicao": null,
+    "expedicoesCount": 0,
+    "wms": null
+  },
+  "etapas": [
+    {
+      "nome": "GET pedido",
+      "status": 429,
+      "ok": false,
+      "json": null,
+      "text": ""
+    },
+    {
+      "nome": "GET nota",
+      "status": 429,
+      "ok": false,
+      "json": null,
+      "text": ""
+    },
+    {
+      "nome": "POST /expedicao idsPedidos",
+      "status": 200,
+      "ok": true,
+      "json": {
+        "id": 746537725
+      },
+      "text": "{\"id\":746537725}",
+      "body": {
+        "idsPedidos": [
+          862886936
+        ]
+      }
+    },
+    {
+      "nome": "GET detalhe apos create pedido",
+      "status": 429,
+      "ok": false,
+      "json": null,
+      "text": ""
+    },
+    {
+      "nome": "POST /expedicao idsNotasFiscais",
+      "status": 400,
+      "ok": false,
+      "json": {
+        "mensagem": "Ocorreram erros de validação",
+        "detalhes": [
+          {
+            "campo": "idsNotasFiscais[0]",
+            "mensagem": "Nota fiscal com id '862886988' já foi expedida"
+          }
+        ]
+      },
+      "text": "{\"mensagem\":\"Ocorreram erros de validação\",\"detalhes\":[{\"campo\":\"idsNotasFiscais[0]\",\"mensagem\":\"Nota fiscal com id '862886988' já foi expedida\"}]}",
+      "body": {
+        "idsNotasFiscais": [
+          862886988
+        ]
+      }
+    },
+    {
+      "nome": "POST origens idsPedidos",
+      "status": 204,
+      "ok": true,
+      "json": null,
+      "text": ""
+    },
+    {
+      "nome": "POST origens idsNotasFiscais",
+      "status": 400,
+      "ok": false,
+      "json": {
+        "mensagem": "Ocorreram erros de validação",
+        "detalhes": [
+          {
+            "campo": "idsNotasFiscais[0]",
+            "mensagem": "Nota fiscal com id '862886988' já foi expedida"
+          }
+        ]
+      },
+      "text": "{\"mensagem\":\"Ocorreram erros de validação\",\"detalhes\":[{\"campo\":\"idsNotasFiscais[0]\",\"mensagem\":\"Nota fiscal com id '862886988' já foi expedida\"}]}"
+    },
+    {
+      "nome": "GET detalhe apos origens",
+      "status": 200,
+      "ok": true,
+      "json": {
+        "id": 746537725,
+        "identificacao": "8902",
+        "data": "2026-08-14",
+        "formaEnvio": {
+          "id": 851418498,
+          "nome": "Jadlog via Melhor Envio Vnda"
+        },
+        "expedicoes": []
+      },
+      "text": "{\"id\":746537725,\"identificacao\":\"8902\",\"data\":\"2026-08-14\",\"formaEnvio\":{\"id\":851418498,\"nome\":\"Jadlog via Melhor Envio Vnda\"},\"expedicoes\":[]}"
+    },
+    {
+      "nome": "GET etiquetas ANTES concluir",
+      "status": 400,
+      "ok": false,
+      "json": {
+        "mensagem": "Agrupamento ainda não foi concluído"
+      },
+      "text": "{\"mensagem\":\"Agrupamento ainda não foi concluído\"}"
+    },
+    {
+      "nome": "POST concluir",
+      "status": 200,
+      "ok": true,
+      "json": null,
+      "text": ""
+    },
+    {
+      "nome": "GET etiquetas DEPOIS concluir",
+      "status": 400,
+      "ok": false,
+      "json": {
+        "mensagem": "Nenhuma expedição foi encontrada para este agrupamento."
+      },
+      "text": "{\"mensagem\":\"Nenhuma expedição foi encontrada para este agrupamento.\"}"
+    }
+  ]
+}

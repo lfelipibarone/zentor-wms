@@ -1,12 +1,26 @@
-# Postman — Tiny Etiquetas (reunião suporte)
+# Postman — Tiny Etiquetas
 
-## Importar (recomendado — sem 401)
+**Contexto completo (ago/2026):** [[../contexto-etiqueta-packing-tiny]]
 
-**Opção A — mais fácil:** importe só este arquivo (token já embutido):
+## Buscar NF / expedição (MEU PUXADOR — 40A0133E85)
 
-- `Tiny-Etiquetas-Expedicao.pronto.postman_collection.json`
+Collection dedicada (recomendada para o fluxo atual):
 
-Não precisa de environment. Abra **01 — Info conta** → **GET /info** → Send.
+- Guia: **[README-busca-nf.md](./README-busca-nf.md)**
+- `Tiny-Busca-NF-Expedicao.pronto.postman_collection.json` — 1 arquivo, token embutido
+- `Tiny-Busca-NF-Expedicao.postman_collection.json` + `.local` / `.example`
+
+Prova rápida:
+
+1. `GET /expedicao/746538070` — NF **171579** em `expedicoes[]`
+2. `GET /expedicao/746538070/etiquetas` — `{ urls: […zpl] }`
+
+## Collection reunião suporte (CARBI / marketplaces)
+
+### Importar
+
+**Opção A — mais fácil:** `Tiny-Etiquetas-Expedicao.pronto.postman_collection.json`  
+(token embutido; regenerar com `pnpm export-postman-tiny-etiquetas` em `apps/api`)
 
 **Opção B:** collection + environment:
 
@@ -14,40 +28,33 @@ Não precisa de environment. Abra **01 — Info conta** → **GET /info** → Se
 2. `Tiny-Etiquetas-Expedicao.local.postman_environment.json`
 3. Ative o environment **LOCAL** no canto superior direito.
 
-## Antes da reunião
+### Antes da reunião
 
 ```powershell
 cd apps/api
 pnpm export-postman-tiny-etiquetas
 ```
 
-Isso renova o access token se estiver perto de expirar e regrava o environment.
+Se der 401: pasta **00 — OAuth** → **Refresh access_token**.
 
-Se der 401 durante a call: pasta **00 — OAuth** → **Refresh access_token**.
-
-## Demo sugerida
+### Demo sugerida (collection clássica)
 
 1. **00 — OAuth** → Refresh (se 401)
-2. **01 — Info conta** → GET /info (CNPJ: ver `companyCnpj` no environment)
-3. **02 — Mercado Envios** — requests 1→6 em ordem
-4. Mostrar que 1–4 OK e 5–6 retornam erro sem `urls[]`
-5. **03 — Amazon DBA** — repetir
-6. **06 — Produtos** — lista, filtro por SKU (`codigo`), nome, GTIN e detalhe por id
-7. *(Opcional)* **05 — WMS** — mesmo fluxo via nossa API
+2. **01 — Info conta** → GET /info
+3. **02 — Mercado Envios** — requests 1→6 (etiquetas podem falhar sem `urls[]`)
+4. **03 — Amazon DBA** — repetir
+5. **06 — Produtos** — filtros SKU / nome / GTIN
+6. *(Opcional)* **05 — WMS** — via API packing
 
-## Conta
+### Conta (environment clássico — pode ser CARBI)
 
-| Campo | Valor |
+| Campo | Valor típico no export |
 |-------|-------|
 | Tenant | Default |
-| Empresa | CARBI & MS DISTRIBUIDORA DE ARTIGOS PARA CASA LTDA |
-| CNPJ | 37.919.979/0001-06 |
-| Client ID | tiny-api-e6759dea860deb3c29929001bc15128ed11d4025-1781104682 |
+| Empresa | Depende da connection exportada (CARBI ou MEU PUXADOR) |
+
+Para MEU PUXADOR / Jadlog / NF 171579, use a collection **Busca NF**, não a demo Mercado/Amazon.
 
 ## Arquivos com tokens
 
-`*.local.postman_environment.json` contém secrets — **não commitar** (gitignore).
-
-Gerado em: 2026-07-14T12:40:44.522Z
-Tenant: Default
-Token expira: 2026-07-14T15:29:34.856Z
+`*.local.postman_environment.json` e `*.pronto.postman_collection.json` contêm secrets — **não commitar** (gitignore).

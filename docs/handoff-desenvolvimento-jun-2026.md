@@ -1,6 +1,10 @@
 # Handoff de desenvolvimento — Zentor WMS (jun/2026)
 
-Documento de continuidade para o próximo desenvolvedor. Resume **o que foi feito**, **o que está bloqueado**, **artefatos de teste** e **prioridades** deixadas em aberto na sessão de trabalho encerrada em 12/jun/2026.
+Documento de continuidade **histórico** (sessão encerrada em **12/jun/2026**). Resume o que foi feito naquela época, bloqueios de Mercado Envios e scripts.
+
+> **Atualização ago/2026:** para etiquetas de transporte / packing / MEU PUXADOR / NF 171579, use o documento mestre  
+> [[contexto-etiqueta-packing-tiny|Contexto etiqueta packing Tiny]]  
+> (ZPL validado no lote `746538070`; WMS ainda só GET no botão “Buscar etiqueta”).
 
 > Lista operacional resumida (notas soltas): [[Tarefas|Tarefas.md]]
 

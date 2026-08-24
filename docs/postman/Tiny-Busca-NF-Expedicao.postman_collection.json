@@ -1,0 +1,784 @@
+{
+  "info": {
+    "_postman_id": "zentor-tiny-busca-nf-v2-nosek",
+    "name": "Zentor Tiny - Busca NF Expedicao (40A0133E85)",
+    "description": "Importe esta collection + environment local OU use o arquivo .pronto (token embutido).",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "auth": {
+    "type": "noauth"
+  },
+  "event": [
+    {
+      "listen": "prerequest",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "const url = pm.request.url.toString();",
+          "if (url.includes('openid-connect/token')) return;",
+          "const token = pm.collectionVariables.get('accessToken') || pm.environment.get('accessToken');",
+          "if (!token) { console.warn('accessToken vazio'); return; }",
+          "pm.request.headers.upsert({ key: 'Authorization', value: 'Bearer ' + token });"
+        ]
+      }
+    }
+  ],
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "https://api.tiny.com.br/public-api/v3"
+    },
+    {
+      "key": "tokenUrl",
+      "value": "https://accounts.tiny.com.br/realms/tiny/protocol/openid-connect/token"
+    },
+    {
+      "key": "accessToken",
+      "value": ""
+    },
+    {
+      "key": "refreshToken",
+      "value": ""
+    },
+    {
+      "key": "clientId",
+      "value": ""
+    },
+    {
+      "key": "clientSecret",
+      "value": ""
+    },
+    {
+      "key": "idPedido",
+      "value": "862886936"
+    },
+    {
+      "key": "idNota",
+      "value": "862886988"
+    },
+    {
+      "key": "idFormaEnvio",
+      "value": "851418498"
+    },
+    {
+      "key": "dataInicial",
+      "value": "2026-08-14"
+    },
+    {
+      "key": "dataFinal",
+      "value": "2026-08-14"
+    },
+    {
+      "key": "idAgrupamento",
+      "value": "746537716"
+    },
+    {
+      "key": "idExpedicao",
+      "value": "750138723"
+    },
+    {
+      "key": "offset",
+      "value": "0"
+    },
+    {
+      "key": "limit",
+      "value": "50"
+    }
+  ],
+  "item": [
+    {
+      "name": "00 - OAuth",
+      "item": [
+        {
+          "name": "Refresh access_token",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "  const j = pm.response.json();",
+                  "  if (j.access_token) pm.collectionVariables.set(\"accessToken\", j.access_token);",
+                  "  if (j.refresh_token) pm.collectionVariables.set(\"refreshToken\", j.refresh_token);",
+                  "  console.log(\"Token OK\");",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/x-www-form-urlencoded"
+              }
+            ],
+            "body": {
+              "mode": "urlencoded",
+              "urlencoded": [
+                {
+                  "key": "grant_type",
+                  "value": "refresh_token"
+                },
+                {
+                  "key": "client_id",
+                  "value": "{{clientId}}"
+                },
+                {
+                  "key": "client_secret",
+                  "value": "{{clientSecret}}"
+                },
+                {
+                  "key": "refresh_token",
+                  "value": "{{refreshToken}}"
+                }
+              ]
+            },
+            "url": {
+              "raw": "https://accounts.tiny.com.br/realms/tiny/protocol/openid-connect/token",
+              "protocol": "https",
+              "host": [
+                "accounts",
+                "tiny",
+                "com",
+                "br"
+              ],
+              "path": [
+                "realms",
+                "tiny",
+                "protocol",
+                "openid-connect",
+                "token"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "01 - Pedido e NF",
+      "item": [
+        {
+          "name": "1 GET pedido",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}",
+                "type": "text"
+              }
+            ],
+            "auth": {
+              "type": "noauth"
+            },
+            "url": {
+              "raw": "https://api.tiny.com.br/public-api/v3/pedidos/{{idPedido}}",
+              "protocol": "https",
+              "host": [
+                "api",
+                "tiny",
+                "com",
+                "br"
+              ],
+              "path": [
+                "public-api",
+                "v3",
+                "pedidos",
+                "{{idPedido}}"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const j = pm.response.json();",
+                  "if (j.idNotaFiscal) pm.collectionVariables.set(\"idNota\", String(j.idNotaFiscal));",
+                  "const f = j.transportador && j.transportador.formaEnvio;",
+                  "if (f && f.id) pm.collectionVariables.set(\"idFormaEnvio\", String(f.id));",
+                  "console.log(\"pedido\", j.id, \"NF\", j.idNotaFiscal, \"ecom\", j.ecommerce && j.ecommerce.numeroPedidoEcommerce);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "2 GET nota",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}",
+                "type": "text"
+              }
+            ],
+            "auth": {
+              "type": "noauth"
+            },
+            "url": {
+              "raw": "https://api.tiny.com.br/public-api/v3/notas/{{idNota}}",
+              "protocol": "https",
+              "host": [
+                "api",
+                "tiny",
+                "com",
+                "br"
+              ],
+              "path": [
+                "public-api",
+                "v3",
+                "notas",
+                "{{idNota}}"
+              ]
+            }
+          }
+        },
+        {
+          "name": "3 GET nota link DANFE",
+          "description": "DANFE fiscal — nao e etiqueta ZPL",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}",
+                "type": "text"
+              }
+            ],
+            "auth": {
+              "type": "noauth"
+            },
+            "url": {
+              "raw": "https://api.tiny.com.br/public-api/v3/notas/{{idNota}}/link",
+              "protocol": "https",
+              "host": [
+                "api",
+                "tiny",
+                "com",
+                "br"
+              ],
+              "path": [
+                "public-api",
+                "v3",
+                "notas",
+                "{{idNota}}",
+                "link"
+              ]
+            },
+            "description": "DANFE fiscal — nao e etiqueta ZPL"
+          }
+        }
+      ]
+    },
+    {
+      "name": "02 - Buscar NF nos lotes",
+      "item": [
+        {
+          "name": "1 GET listar expedicao",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}",
+                "type": "text"
+              }
+            ],
+            "auth": {
+              "type": "noauth"
+            },
+            "url": {
+              "raw": "https://api.tiny.com.br/public-api/v3/expedicao?orderBy=desc&limit={{limit}}&offset={{offset}}&dataInicial={{dataInicial}}&dataFinal={{dataFinal}}&idFormaEnvio={{idFormaEnvio}}",
+              "protocol": "https",
+              "host": [
+                "api",
+                "tiny",
+                "com",
+                "br"
+              ],
+              "path": [
+                "public-api",
+                "v3",
+                "expedicao"
+              ],
+              "query": [
+                {
+                  "key": "orderBy",
+                  "value": "desc"
+                },
+                {
+                  "key": "limit",
+                  "value": "{{limit}}"
+                },
+                {
+                  "key": "offset",
+                  "value": "{{offset}}"
+                },
+                {
+                  "key": "dataInicial",
+                  "value": "{{dataInicial}}"
+                },
+                {
+                  "key": "dataFinal",
+                  "value": "{{dataFinal}}"
+                },
+                {
+                  "key": "idFormaEnvio",
+                  "value": "{{idFormaEnvio}}"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const j = pm.response.json();",
+                  "const itens = j.itens || [];",
+                  "console.log(\"itens\", itens.length, \"paginacao\", j.paginacao);",
+                  "itens.slice(0, 15).forEach((it) => console.log(it.id, it.identificacao, it.data, it.formaEnvio && it.formaEnvio.nome));",
+                  "if (itens[0]) pm.collectionVariables.set(\"idAgrupamento\", String(itens[0].id));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "2 GET detalhe (procura NF)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}",
+                "type": "text"
+              }
+            ],
+            "auth": {
+              "type": "noauth"
+            },
+            "url": {
+              "raw": "https://api.tiny.com.br/public-api/v3/expedicao/{{idAgrupamento}}",
+              "protocol": "https",
+              "host": [
+                "api",
+                "tiny",
+                "com",
+                "br"
+              ],
+              "path": [
+                "public-api",
+                "v3",
+                "expedicao",
+                "{{idAgrupamento}}"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const idNota = Number(pm.collectionVariables.get(\"idNota\"));",
+                  "const idPedido = Number(pm.collectionVariables.get(\"idPedido\"));",
+                  "const j = pm.response.json();",
+                  "const exps = j.expedicoes || [];",
+                  "console.log(\"lote\", j.id, \"exps\", exps.length);",
+                  "let hit = null;",
+                  "exps.forEach((e) => {",
+                  "  const nf = e.notaFiscal && e.notaFiscal.id;",
+                  "  const ped = e.venda && e.venda.id;",
+                  "  const ok = nf === idNota || e.idObjeto === idNota || ped === idPedido;",
+                  "  console.log(\" exp\", e.id, \"nf\", nf, \"ped\", ped, ok ? \"<<< MATCH\" : \"\");",
+                  "  if (ok) hit = e;",
+                  "});",
+                  "if (hit) {",
+                  "  pm.collectionVariables.set(\"idExpedicao\", String(hit.id));",
+                  "  console.log(\"ACHEI — idExpedicao\", hit.id);",
+                  "} else {",
+                  "  console.log(\"Nao esta neste lote. Mude idAgrupamento ou offset e liste de novo.\");",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "3 GET etiquetas do lote",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}",
+                "type": "text"
+              }
+            ],
+            "auth": {
+              "type": "noauth"
+            },
+            "url": {
+              "raw": "https://api.tiny.com.br/public-api/v3/expedicao/{{idAgrupamento}}/etiquetas",
+              "protocol": "https",
+              "host": [
+                "api",
+                "tiny",
+                "com",
+                "br"
+              ],
+              "path": [
+                "public-api",
+                "v3",
+                "expedicao",
+                "{{idAgrupamento}}",
+                "etiquetas"
+              ]
+            }
+          }
+        },
+        {
+          "name": "4 GET etiqueta individual",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}",
+                "type": "text"
+              }
+            ],
+            "auth": {
+              "type": "noauth"
+            },
+            "url": {
+              "raw": "https://api.tiny.com.br/public-api/v3/expedicao/{{idAgrupamento}}/expedicao/{{idExpedicao}}/etiquetas",
+              "protocol": "https",
+              "host": [
+                "api",
+                "tiny",
+                "com",
+                "br"
+              ],
+              "path": [
+                "public-api",
+                "v3",
+                "expedicao",
+                "{{idAgrupamento}}",
+                "expedicao",
+                "{{idExpedicao}}",
+                "etiquetas"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "03 - Criar concluir (pedido alvo)",
+      "item": [
+        {
+          "name": "1 POST create NF",
+          "description": "Esperado 400: NF ja expedida",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "auth": {
+              "type": "noauth"
+            },
+            "url": {
+              "raw": "https://api.tiny.com.br/public-api/v3/expedicao",
+              "protocol": "https",
+              "host": [
+                "api",
+                "tiny",
+                "com",
+                "br"
+              ],
+              "path": [
+                "public-api",
+                "v3",
+                "expedicao"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"idsNotasFiscais\": [{{idNota}}]\n}"
+            },
+            "description": "Esperado 400: NF ja expedida"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "console.log(pm.response.code, pm.response.text());",
+                  "if (pm.response.code === 200) {",
+                  "  const j = pm.response.json();",
+                  "  if (j.id) pm.collectionVariables.set(\"idAgrupamento\", String(j.id));",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "2 POST create pedido",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "auth": {
+              "type": "noauth"
+            },
+            "url": {
+              "raw": "https://api.tiny.com.br/public-api/v3/expedicao",
+              "protocol": "https",
+              "host": [
+                "api",
+                "tiny",
+                "com",
+                "br"
+              ],
+              "path": [
+                "public-api",
+                "v3",
+                "expedicao"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"idsPedidos\": [{{idPedido}}]\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "console.log(pm.response.code, pm.response.text());",
+                  "if (pm.response.code === 200) {",
+                  "  const j = pm.response.json();",
+                  "  if (j.id) pm.collectionVariables.set(\"idAgrupamento\", String(j.id));",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "3 GET detalhe",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}",
+                "type": "text"
+              }
+            ],
+            "auth": {
+              "type": "noauth"
+            },
+            "url": {
+              "raw": "https://api.tiny.com.br/public-api/v3/expedicao/{{idAgrupamento}}",
+              "protocol": "https",
+              "host": [
+                "api",
+                "tiny",
+                "com",
+                "br"
+              ],
+              "path": [
+                "public-api",
+                "v3",
+                "expedicao",
+                "{{idAgrupamento}}"
+              ]
+            }
+          }
+        },
+        {
+          "name": "4 POST concluir",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}",
+                "type": "text"
+              }
+            ],
+            "auth": {
+              "type": "noauth"
+            },
+            "url": {
+              "raw": "https://api.tiny.com.br/public-api/v3/expedicao/{{idAgrupamento}}/concluir",
+              "protocol": "https",
+              "host": [
+                "api",
+                "tiny",
+                "com",
+                "br"
+              ],
+              "path": [
+                "public-api",
+                "v3",
+                "expedicao",
+                "{{idAgrupamento}}",
+                "concluir"
+              ]
+            }
+          }
+        },
+        {
+          "name": "5 GET etiquetas",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}",
+                "type": "text"
+              }
+            ],
+            "auth": {
+              "type": "noauth"
+            },
+            "url": {
+              "raw": "https://api.tiny.com.br/public-api/v3/expedicao/{{idAgrupamento}}/etiquetas",
+              "protocol": "https",
+              "host": [
+                "api",
+                "tiny",
+                "com",
+                "br"
+              ],
+              "path": [
+                "public-api",
+                "v3",
+                "expedicao",
+                "{{idAgrupamento}}",
+                "etiquetas"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "04 - Amostra ZPL que funciona",
+      "item": [
+        {
+          "name": "1 GET detalhe 746537716",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}",
+                "type": "text"
+              }
+            ],
+            "auth": {
+              "type": "noauth"
+            },
+            "url": {
+              "raw": "https://api.tiny.com.br/public-api/v3/expedicao/746537716",
+              "protocol": "https",
+              "host": [
+                "api",
+                "tiny",
+                "com",
+                "br"
+              ],
+              "path": [
+                "public-api",
+                "v3",
+                "expedicao",
+                "746537716"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.collectionVariables.set(\"idAgrupamento\", \"746537716\");",
+                  "pm.collectionVariables.set(\"idExpedicao\", \"750138723\");"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "2 GET etiquetas ZPL",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}",
+                "type": "text"
+              }
+            ],
+            "auth": {
+              "type": "noauth"
+            },
+            "url": {
+              "raw": "https://api.tiny.com.br/public-api/v3/expedicao/746537716/etiquetas",
+              "protocol": "https",
+              "host": [
+                "api",
+                "tiny",
+                "com",
+                "br"
+              ],
+              "path": [
+                "public-api",
+                "v3",
+                "expedicao",
+                "746537716",
+                "etiquetas"
+              ]
+            }
+          }
+        }
+      ]
+    }
+  ]
+}

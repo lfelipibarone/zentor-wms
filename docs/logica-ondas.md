@@ -2,6 +2,8 @@
 
 Este documento serve como referência técnica e operacional para a liberação consolidada de pedidos (ondas de separação) e gerenciamento da fila de packing no WMS.
 
+**Etiqueta de envio no packing:** painel “Etiqueta de envio” em `/packing/[orderId]` — ver [[contexto-etiqueta-packing-tiny]].
+
 ---
 
 ## 📖 Glossário

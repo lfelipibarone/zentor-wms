@@ -19,13 +19,17 @@ Utilize os links abaixo para navegar pelas diferentes seções do sistema:
 *   [[logica-ondas|Lógica de Ondas e Packing]]: Estratégias de partição de ondas (`BY_PRODUCT`, `PROXIMITY`, `SINGLE_ITEM`), regras de priorização de marketplaces (ex: Mercado Livre) e fila consolidada de packing.
 
 ### 🔌 Integrações e Testes
-*   [[handoff-desenvolvimento-jun-2026|Handoff de desenvolvimento (jun/2026)]]: **Leia primeiro** — contexto do que foi feito, bloqueios (etiquetas Mercado Envios), pendências e scripts de diagnóstico.
+*   [[contexto-etiqueta-packing-tiny|Contexto mestre: etiquetas Tiny / packing]]: **Comece aqui (ago/2026)** — MEU PUXADOR, NF 171579, lote `746538070`, fluxo API, WMS, tela a tela, Postman, checklist de implementação.
+*   [[handoff-desenvolvimento-jun-2026|Handoff de desenvolvimento (jun/2026)]]: Histórico jun/2026 (bloqueios Mercado Envios); complementar ao contexto mestre acima.
 *   [[integracao-tiny-oauth|Integração Tiny ERP (v3)]]: Autenticação OAuth v3, tratamento automático de Rate Limit (HTTP 429), worker de refresh de tokens e logs de eventos.
 *   [[integracao-tiny-pedidos|Integração Tiny — Pedidos de venda]]: Webhooks, sync pull `GET /pedidos`, situações, SKU, diagnóstico e troubleshooting (jun/2026).
-*   [[etiquetas-expedicao-tiny|Etiquetas de expedição Tiny]]: Por que a etiqueta às vezes não vem; fluxo GET expedição; cenários de diagnóstico.
-*   [[superpowers/specs/2026-08-05-tiny-etiqueta-geracao-design|Design: geração de etiqueta Tiny no packing]]: Mapa tela a tela + decisão de gerar no “Buscar etiqueta” (`POST /expedicao`).
-*   [[superpowers/plans/2026-08-05-tiny-etiqueta-geracao|Plano: implementar geração de etiqueta]]: Tasks TDD para create-on-miss no packing.
+*   [[etiquetas-expedicao-tiny|Etiquetas de expedição Tiny]]: Guia conceitual (DANFE vs ZPL, marketplace vs transportadora, cenários de diagnóstico).
+*   [[tiny-status-etiqueta-2026-08-17|Status validação 17–18/08/2026]]: Prova ZPL + lições (datas, lote vazio, Melhor Envio).
+*   [[contexto-etiqueta-tiny-214617|Caso CARBI 214617]]: Correios / NF já expedida (histórico).
+*   [[superpowers/specs/2026-08-05-tiny-etiqueta-geracao-design|Design: geração de etiqueta Tiny no packing]]: Design original + **adendo ago/2026** (NF preferencial, concluir, busca por data).
+*   [[superpowers/plans/2026-08-05-tiny-etiqueta-geracao|Plano: implementar geração de etiqueta]]: Tasks TDD (revisar adendo antes de implementar).
 *   [[tiny-conexao-conta-ajustes|Conexão Tiny — histórico e ajustes]]: Problemas encontrados ao conectar a conta, correções aplicadas e roteiro de teste local.
+*   [[postman/README|Postman Tiny]]: Collections de reunião + busca NF (`40A0133E85`).
 *   [[usuarios-teste|Credenciais e Testes]]: Guia de usuários pré-cadastrados via seed, testes de isolamento multi-tenant e validação de acessos.
 *   [[Tarefas|Lista de tarefas soltas]]: Notas operacionais originais (referenciadas no handoff).
 

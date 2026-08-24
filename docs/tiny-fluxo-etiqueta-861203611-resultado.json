@@ -1,0 +1,299 @@
+{
+  "fetchedAt": "2026-08-12T17:45:11.798Z",
+  "tenantId": "cmsj10hmw0000wh98leeb2iu3",
+  "pedidoAlvo": {
+    "erpOrderId": "TINY-861203611",
+    "idPedido": 861203611,
+    "numeroPedido": 214617,
+    "idNotaFiscal": 861203622,
+    "numeroNota": "005554"
+  },
+  "resultado": {
+    "idAgrupamento": 746506388,
+    "idExpedicao": null,
+    "urls": [],
+    "etiquetaObtida": false,
+    "etapasOk": 4,
+    "etapasTotal": 6
+  },
+  "etapas": [
+    {
+      "ordem": 1,
+      "nome": "Obter pedido completo",
+      "metodo": "GET",
+      "rota": "/pedidos/861203611",
+      "http": 200,
+      "ok": true,
+      "resposta": {
+        "id": 861203611,
+        "numeroPedido": 214617,
+        "idNotaFiscal": 861203622,
+        "dataFaturamento": "2026-08-07",
+        "valorTotalProdutos": 10.1,
+        "valorTotalPedido": 10.1,
+        "listaPreco": {
+          "id": 0,
+          "nome": "Padrão",
+          "acrescimoDesconto": 0
+        },
+        "cliente": {
+          "nome": "Rafael Garcia",
+          "codigo": "",
+          "fantasia": "",
+          "tipoPessoa": "F",
+          "cpfCnpj": "418.743.168-30",
+          "inscricaoEstadual": "",
+          "rg": "",
+          "telefone": "",
+          "celular": "",
+          "email": "",
+          "endereco": {
+            "endereco": "Rua Itororó",
+            "numero": "522",
+            "complemento": "",
+            "bairro": "Vila Santa Inês",
+            "municipio": "Bauru",
+            "cep": "17.054-230",
+            "uf": "SP",
+            "pais": "Brasil"
+          },
+          "id": 766955443
+        },
+        "enderecoEntrega": null,
+        "ecommerce": {
+          "id": 0,
+          "nome": "",
+          "numeroPedidoEcommerce": "",
+          "numeroPedidoCanalVenda": "",
+          "canalVenda": ""
+        },
+        "transportador": {
+          "id": 0,
+          "nome": "",
+          "fretePorConta": "R",
+          "formaEnvio": {
+            "id": 743997871,
+            "nome": "Correios"
+          },
+          "formaFrete": null,
+          "codigoRastreamento": "",
+          "urlRastreamento": ""
+        },
+        "deposito": {
+          "id": 743997833,
+          "nome": " Geral (Fiscal)"
+        },
+        "vendedor": null,
+        "naturezaOperacao": {
+          "id": 775374075,
+          "nome": "Venda de Mercadorias - Regime normal"
+        },
+        "intermediador": null,
+        "pagamento": null,
+        "itens": [
+          {
+            "produto": {
+              "id": 744044602,
+              "sku": "PUXPONTOPRF",
+              "descricao": "PUXADOR PZ 1009 BOTAO 30MM - Preto Fosco",
+              "tipo": "P"
+            },
+            "quantidade": 10,
+            "valorUnitario": 1.01,
+            "infoAdicional": ""
+          }
+        ],
+        "pagamentosIntegrados": null,
+        "situacao": 1,
+        "data": "2026-08-07",
+        "dataEntrega": "",
+        "numeroOrdemCompra": "",
+        "valorDesconto": 0,
+        "valorFrete": 0,
+        "valorOutrasDespesas": 0,
+        "dataPrevista": "",
+        "dataEnvio": "",
+        "observacoes": "",
+        "observacoesInternas": "",
+        "origemPedido": 0
+      }
+    },
+    {
+      "ordem": 2,
+      "nome": "Obter nota fiscal",
+      "metodo": "GET",
+      "rota": "/notas/861203622",
+      "http": 200,
+      "ok": true,
+      "resposta": {
+        "situacao": "6",
+        "tipo": "S",
+        "numero": "005554",
+        "serie": "11",
+        "chaveAcesso": "35260837919979000106550110000055541612036228",
+        "dataEmissao": "2026-08-07",
+        "dataPrevista": "0000-00-00",
+        "cliente": {
+          "nome": "Rafael Garcia",
+          "codigo": null,
+          "fantasia": null,
+          "tipoPessoa": "F",
+          "cpfCnpj": "418.743.168-30",
+          "inscricaoEstadual": "",
+          "rg": null,
+          "telefone": "",
+          "celular": null,
+          "email": "",
+          "endereco": {
+            "endereco": "Rua Itororó",
+            "numero": "522",
+            "complemento": "",
+            "bairro": "Vila Santa Inês",
+            "municipio": "Bauru",
+            "cep": "17.054-230",
+            "uf": "SP",
+            "pais": "Brasil"
+          },
+          "id": 766955443
+        },
+        "enderecoEntrega": null,
+        "valor": 10.1,
+        "valorProdutos": 10.1,
+        "valorFrete": 0,
+        "vendedor": null,
+        "idFormaEnvio": 743997871,
+        "idFormaFrete": 0,
+        "codigoRastreamento": "",
+        "urlRastreamento": "",
+        "fretePorConta": "R",
+        "qtdVolumes": 1,
+        "pesoBruto": 0.16,
+        "pesoLiquido": 0.16,
+        "id": 861203622,
+        "finalidade": "1",
+        "regimeTributario": 3,
+        "dataInclusao": "2026-08-07 14:05:59",
+        "baseIcms": 10.1,
+        "valorIcms": 1.82,
+        "baseIcmsSt": 0,
+        "valorIcmsSt": 0,
+        "valorServicos": 0,
+        "valorSeguro": 0,
+        "valorOutras": 0,
+        "valorIpi": 0,
+        "valorIssqn": 0,
+        "valorDesconto": 0,
+        "valorFaturado": 10.1,
+        "idIntermediador": 0,
+        "idNaturezaOperacao": 775374075,
+        "idFormaPagamento": 0,
+        "idMeioPagamento": 0,
+        "observacoes": "Nº Pedido: 214617\r\nTributos aproximados: R$ 1,36 (Federal) e R$ 1,82 (Estadual). Fonte: IBPT 5F6AA1\n",
+        "condicaoPagamento": "",
+        "valorNotaComImpostos": 10.1,
+        "valorBaseDiferimento": 0,
+        "percentualICMSPartilhaDestino": 100,
+        "valorTotalICMSFCPDestino": 0,
+        "valorIPIDevolvido": 0,
+        "tipoNotaCredito": "",
+        "tipoNotaDebito": "",
+        "valorTotalBCIBSCBS": 7.98,
+        "valorTotalIBSUF": 0.01,
+        "valorTotalCBS": 0.07,
+        "itens": [
+          {
+            "idItem": 780407596,
+            "idProduto": 744044602,
+            "codigo": "PUXPONTOPRF",
+            "ncm": "7907.00.90",
+            "descricao": "PUXADOR PZ 1009 BOTAO 30MM - Preto Fosco",
+            "unidade": "UN",
+            "quantidade": 10,
+            "valorUnitario": 1.01,
+            "valorTotal": 10.1,
+            "cfop": "5102",
+            "naturezaOperacao": "Venda de Mercadorias - Regime normal"
+          }
+        ],
+        "parcelas": [],
+        "pagamentosIntegrados": [],
+        "ecommerce": {
+          "id": 0,
+          "nome": "",
+          "numeroPedidoEcommerce": "",
+          "numeroPedidoCanalVenda": "",
+          "canalVenda": ""
+        },
+        "marcadores": [],
+        "transportador": {
+          "nome": "",
+          "cpfCnpj": "",
+          "ie": "",
+          "endereco": "",
+          "municipio": null,
+          "uf": " "
+        },
+        "origem": {
+          "id": "861203611",
+          "tipo": "venda"
+        }
+      },
+      "observacao": "numero tela NF = 005554"
+    },
+    {
+      "ordem": 3,
+      "nome": "Criar agrupamento de expedição",
+      "metodo": "POST",
+      "rota": "/expedicao",
+      "requestBody": {
+        "idsPedidos": [
+          861203611
+        ]
+      },
+      "http": 200,
+      "ok": true,
+      "resposta": {
+        "id": 746506388
+      }
+    },
+    {
+      "ordem": 4,
+      "nome": "Obter detalhe do agrupamento",
+      "metodo": "GET",
+      "rota": "/expedicao/746506388",
+      "http": 200,
+      "ok": true,
+      "resposta": {
+        "id": 746506388,
+        "identificacao": "3289",
+        "data": "2026-08-12",
+        "formaEnvio": {
+          "id": 743997871,
+          "nome": "Correios"
+        },
+        "expedicoes": []
+      }
+    },
+    {
+      "ordem": 5,
+      "nome": "Obter etiquetas do agrupamento (lote)",
+      "metodo": "GET",
+      "rota": "/expedicao/746506388/etiquetas",
+      "http": 400,
+      "ok": false,
+      "resposta": null,
+      "erro": "Agrupamento ainda não foi concluído"
+    },
+    {
+      "ordem": 6,
+      "nome": "Concluir agrupamento de expedição",
+      "metodo": "POST",
+      "rota": "/expedicao/746506388/concluir",
+      "http": 400,
+      "ok": false,
+      "resposta": null,
+      "erro": "Nenhuma expedição vinculada a este agrupamento",
+      "observacao": "Concluir fecha o lote no Tiny; etiqueta já pode existir antes deste passo."
+    }
+  ]
+}

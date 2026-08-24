@@ -1,0 +1,65 @@
+{
+  "fetchedAt": "2026-08-14T19:48:13.591Z",
+  "fonteValidacao": {
+    "postmanMcp": "401 Unauthorized — não disponível",
+    "docOficial": "https://api-docs.erp.olist.com/llms.txt (seção Expedição)",
+    "collectionLocal": "docs/postman/Tiny-Etiquetas-Expedicao.postman_collection.json"
+  },
+  "contratoObservado": {
+    "criar": "POST /expedicao → { id }",
+    "concluir": "POST /expedicao/{idAgrupamento}/concluir",
+    "etiquetas": "GET /expedicao/{idAgrupamento}/etiquetas → { urls }",
+    "origens": "POST /expedicao/{idAgrupamento}/origens",
+    "errosVistos": [
+      "Agrupamento ainda não foi concluído (GET etiquetas antes de concluir)",
+      "Nenhuma expedição vinculada / encontrada (lote vazio ou sem objetos)",
+      "Nota fiscal com id 'X' já foi expedida (POST create/origens com NF)"
+    ],
+    "sampleEtiquetasEmAgrupamentoComObjetos": {
+      "sampleId": 746537716,
+      "steps": [
+        {
+          "step": "etiquetas-antes-em-agrupamento-com-objetos",
+          "status": 200,
+          "json": {
+            "urls": [
+              "https://s3.amazonaws.com/tiny-tmp-us/erp/NzQ1NTI2NjY0/api/etiquetas/1c8fc9b1634dd9bc49def3eab2c13eb0.zpl"
+            ]
+          }
+        }
+      ]
+    }
+  },
+  "pedidoAlvo": {
+    "pedidoId": 862886936,
+    "idNota": 862886988,
+    "ecommerce": "40A0133E85",
+    "numeroPedido": 238392
+  },
+  "buscaExpedicao": {
+    "scanned": 250,
+    "unicos": 250,
+    "foundCount": 0,
+    "found": []
+  },
+  "retesteCreate": {
+    "idsNotasFiscais": {
+      "status": 400,
+      "json": {
+        "mensagem": "Ocorreram erros de validação",
+        "detalhes": [
+          {
+            "campo": "idsNotasFiscais[0]",
+            "mensagem": "Nota fiscal com id '862886988' já foi expedida"
+          }
+        ]
+      }
+    },
+    "idsPedidos": {
+      "status": 200,
+      "json": {
+        "id": 746537726
+      }
+    }
+  }
+}

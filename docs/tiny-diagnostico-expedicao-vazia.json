@@ -1,0 +1,184 @@
+{
+  "fetchedAt": "2026-08-12T17:46:07.244Z",
+  "out": [
+    {
+      "step": "create pedidos",
+      "status": 200,
+      "text": "{\"id\":746506389}",
+      "json": {
+        "id": 746506389
+      }
+    },
+    {
+      "step": "create notas",
+      "status": 400,
+      "text": "{\"mensagem\":\"Ocorreram erros de validação\",\"detalhes\":[{\"campo\":\"idsNotasFiscais[0]\",\"mensagem\":\"Nota fiscal com id '861203622' já foi expedida\"}]}",
+      "json": {
+        "mensagem": "Ocorreram erros de validação",
+        "detalhes": [
+          {
+            "campo": "idsNotasFiscais[0]",
+            "mensagem": "Nota fiscal com id '861203622' já foi expedida"
+          }
+        ]
+      }
+    },
+    {
+      "step": "create both",
+      "status": 400,
+      "text": "{\"mensagem\":\"Ocorreram erros de validação\",\"detalhes\":[{\"campo\":\"idsNotasFiscais[0]\",\"mensagem\":\"Nota fiscal com id '861203622' já foi expedida\"}]}",
+      "json": {
+        "mensagem": "Ocorreram erros de validação",
+        "detalhes": [
+          {
+            "campo": "idsNotasFiscais[0]",
+            "mensagem": "Nota fiscal com id '861203622' já foi expedida"
+          }
+        ]
+      }
+    },
+    {
+      "step": "origens pedidos 746506387",
+      "status": 204,
+      "text": "",
+      "json": null
+    },
+    {
+      "step": "origens notas 746506387",
+      "status": 400,
+      "text": "{\"mensagem\":\"Ocorreram erros de validação\",\"detalhes\":[{\"campo\":\"idsNotasFiscais[0]\",\"mensagem\":\"Nota fiscal com id '861203622' já foi expedida\"}]}",
+      "json": {
+        "mensagem": "Ocorreram erros de validação",
+        "detalhes": [
+          {
+            "campo": "idsNotasFiscais[0]",
+            "mensagem": "Nota fiscal com id '861203622' já foi expedida"
+          }
+        ]
+      }
+    },
+    {
+      "step": "get 746506387",
+      "status": 200,
+      "text": "{\"id\":746506387,\"identificacao\":\"3288\",\"data\":\"2026-08-12\",\"formaEnvio\":{\"id\":743997871,\"nome\":\"Correios\"},\"expedicoes\":[]}",
+      "json": {
+        "id": 746506387,
+        "identificacao": "3288",
+        "data": "2026-08-12",
+        "formaEnvio": {
+          "id": 743997871,
+          "nome": "Correios"
+        },
+        "expedicoes": []
+      }
+    },
+    {
+      "step": "get 746506388",
+      "status": 200,
+      "text": "{\"id\":746506388,\"identificacao\":\"3289\",\"data\":\"2026-08-12\",\"formaEnvio\":{\"id\":743997871,\"nome\":\"Correios\"},\"expedicoes\":[]}",
+      "json": {
+        "id": 746506388,
+        "identificacao": "3289",
+        "data": "2026-08-12",
+        "formaEnvio": {
+          "id": 743997871,
+          "nome": "Correios"
+        },
+        "expedicoes": []
+      }
+    },
+    {
+      "step": "lista recente",
+      "status": 200,
+      "json": {
+        "itens": [
+          {
+            "id": 746506389,
+            "identificacao": "3290",
+            "data": "2026-08-12",
+            "quantidadeObjetos": 0,
+            "formaEnvio": {
+              "id": 743997871,
+              "nome": "Correios"
+            }
+          },
+          {
+            "id": 746506388,
+            "identificacao": "3289",
+            "data": "2026-08-12",
+            "quantidadeObjetos": 0,
+            "formaEnvio": {
+              "id": 743997871,
+              "nome": "Correios"
+            }
+          },
+          {
+            "id": 746506387,
+            "identificacao": "3288",
+            "data": "2026-08-12",
+            "quantidadeObjetos": 0,
+            "formaEnvio": {
+              "id": 743997871,
+              "nome": "Correios"
+            }
+          },
+          {
+            "id": 746506367,
+            "identificacao": "3287",
+            "data": "2026-08-12",
+            "quantidadeObjetos": 0,
+            "formaEnvio": {
+              "id": 758095424,
+              "nome": "Amazon DBA"
+            }
+          },
+          {
+            "id": 746506360,
+            "identificacao": "3286",
+            "data": "2026-08-12",
+            "quantidadeObjetos": 0,
+            "formaEnvio": {
+              "id": 758095424,
+              "nome": "Amazon DBA"
+            }
+          }
+        ],
+        "paginacao": {
+          "limit": 5,
+          "offset": 0,
+          "total": 3093
+        }
+      }
+    },
+    {
+      "step": "sample 746506389",
+      "status": 200,
+      "expedicoesLen": 0,
+      "formaEnvio": {
+        "id": 743997871,
+        "nome": "Correios"
+      },
+      "firstExp": null
+    },
+    {
+      "step": "sample 746506388",
+      "status": 200,
+      "expedicoesLen": 0,
+      "formaEnvio": {
+        "id": 743997871,
+        "nome": "Correios"
+      },
+      "firstExp": null
+    },
+    {
+      "step": "sample 746506387",
+      "status": 200,
+      "expedicoesLen": 0,
+      "formaEnvio": {
+        "id": 743997871,
+        "nome": "Correios"
+      },
+      "firstExp": null
+    }
+  ]
+}

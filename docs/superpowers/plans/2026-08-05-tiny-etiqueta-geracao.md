@@ -1,21 +1,25 @@
 # Tiny etiqueta geração (packing) Implementation Plan
 
+> **Adendo 2026-08-18:** antes de implementar, ler [[contexto-etiqueta-packing-tiny]]. Preferir `idsNotasFiscais`, incluir `POST .../concluir` quando GET etiquetas exigir, e ampliar janela de busca de agrupamentos até a data de hoje. O texto das tasks abaixo ainda reflete o spec original (só `idsPedidos`, sem concluir) — **atualizar as tasks ao executar**.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Ao clicar “Buscar etiqueta” no packing, se o pedido Tiny não estiver em agrupamento de expedição, o WMS cria o agrupamento via `POST /expedicao` e em seguida obtém as URLs das etiquetas.
 
-**Architecture:** Estender `tiny-expedicao-labels.ts` com `criarAgrupamentoExpedicao`. Em `fetchShippingLabelsForOrder`, quando o índice não achar o pedido, chamar create → re-resolver match → buscar etiquetas (fluxo GET existente). Endpoint e tela de packing permanecem os mesmos; resultado ganha `createdAgrupamento?: boolean`.
+**Architecture:** Estender `tiny-expedicao-labels.ts` com `criarAgrupamentoExpedicao` (+ `concluirAgrupamentoExpedicao`). Em `fetchShippingLabelsForOrder`: busca ampliada → se miss, create (NF preferencial) → validar `expedicoes[]` → concluir se necessário → GET etiquetas. Endpoint e tela de packing permanecem os mesmos; resultado ganha `createdAgrupamento?` / `concludedAgrupamento?`.
 
 **Tech Stack:** Fastify API, Tiny API v3 OAuth client, Prisma `Order.shippingLabel`, React packing page, Vitest/node tests no padrão `apps/api/src/services/tiny-*.test.ts`.
 
-**Spec:** [docs/superpowers/specs/2026-08-05-tiny-etiqueta-geracao-design.md](../specs/2026-08-05-tiny-etiqueta-geracao-design.md)
+**Spec:** [docs/superpowers/specs/2026-08-05-tiny-etiqueta-geracao-design.md](../specs/2026-08-05-tiny-etiqueta-geracao-design.md) (+ adendo 18/08)  
+**Contexto:** [docs/contexto-etiqueta-packing-tiny.md](../../contexto-etiqueta-packing-tiny.md)
 
 ## Global Constraints
 
 - Encaixe **somente** no fluxo “Buscar etiqueta” (opção A do spec) — não no `completePacking`.
-- Preferir `idsPedidos` a partir de `TINY-{id}`; não exigir NF nesta versão.
-- Não concluir agrupamento na Tiny; não mudar status do pedido WMS por causa da etiqueta.
-- Não editar o arquivo de plano Cursor anexado pelo usuário; docs novos em `docs/superpowers/`.
+- Preferir `idsNotasFiscais` quando o pedido Tiny tiver NF; fallback `idsPedidos` se sem NF.
+- **Concluir** agrupamento quando GET etiquetas retornar “ainda não foi concluído”.
+- Não mudar status do pedido WMS por causa da etiqueta.
+- Não editar o arquivo de plano Cursor anexado pelo usuário; docs novos em `docs/superpowers/` / `docs/contexto-*.md`.
 
 ---
 

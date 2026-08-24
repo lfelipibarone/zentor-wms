@@ -1,4 +1,5 @@
-> **Handoff completo:** ver [[handoff-desenvolvimento-jun-2026|Handoff de desenvolvimento (jun/2026)]] — este arquivo mantém apenas as notas originais.
+> **Handoff completo (jun/2026):** [[handoff-desenvolvimento-jun-2026]]  
+> **Etiquetas / packing (ago/2026):** [[contexto-etiqueta-packing-tiny]]
 
 Coluna Nova Produtos
 Fornecedor > Add
@@ -29,7 +30,9 @@ EXPEDICAO ETIQUETA SAIDA  EMPRESA > CLIENTE
 
 /expedicao/{idAgrupamento}/etiquetas
 
-/expedicao/{idAgrupamento}/expedicao/{idExpedicao/etiquetas
+/expedicao/{idAgrupamento}/expedicao/{idExpedicao}/etiquetas
+
+(Prova Jadlog: agrupamento `746538070` — NF 171579 — ver contexto mestre)
 -------------------------------------------------------------
 
 - Tela Cadastro

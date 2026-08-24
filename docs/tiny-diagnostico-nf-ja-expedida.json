@@ -1,0 +1,26 @@
+{
+  "fetchedAt": "2026-08-12T17:47:04.593Z",
+  "notaResumo": {
+    "status": 200,
+    "situacao": "6",
+    "numero": "005554",
+    "id": 861203622
+  },
+  "createNotasErro": {
+    "status": 400,
+    "text": "{\"mensagem\":\"Ocorreram erros de validação\",\"detalhes\":[{\"campo\":\"idsNotasFiscais[0]\",\"mensagem\":\"Nota fiscal com id '861203622' já foi expedida\"}]}",
+    "json": {
+      "mensagem": "Ocorreram erros de validação",
+      "detalhes": [
+        {
+          "campo": "idsNotasFiscais[0]",
+          "mensagem": "Nota fiscal com id '861203622' já foi expedida"
+        }
+      ]
+    }
+  },
+  "listaTotal": 3,
+  "agrupamentosUnicosScan": 3,
+  "found": [],
+  "samplesComObjetos": []
+}

@@ -1,0 +1,61 @@
+{
+  "fetchedAt": "2026-08-12T18:10:21.526Z",
+  "probes": [
+    {
+      "path": "/pedidos/861203611/etiquetas",
+      "status": 404,
+      "json": {
+        "mensagem": "O recurso solicitado não foi encontrado. Verifique a URL e tente novamente"
+      },
+      "text": "{\"mensagem\":\"O recurso solicitado não foi encontrado. Verifique a URL e tente novamente\"}"
+    },
+    {
+      "path": "/notas/861203622/etiquetas",
+      "status": 404,
+      "json": {
+        "mensagem": "O recurso solicitado não foi encontrado. Verifique a URL e tente novamente"
+      },
+      "text": "{\"mensagem\":\"O recurso solicitado não foi encontrado. Verifique a URL e tente novamente\"}"
+    },
+    {
+      "path": "/notas/861203622/link",
+      "status": 200,
+      "json": {
+        "link": "https://erp.olist.com/doc.view?id=ff5f3bb63187627c0881cdb2e149375a"
+      },
+      "text": "{\"link\":\"https:\\/\\/erp.olist.com\\/doc.view?id=ff5f3bb63187627c0881cdb2e149375a\"}"
+    },
+    {
+      "path": "/logisticas",
+      "status": 404,
+      "json": {
+        "mensagem": "O recurso solicitado não foi encontrado. Verifique a URL e tente novamente"
+      },
+      "text": "{\"mensagem\":\"O recurso solicitado não foi encontrado. Verifique a URL e tente novamente\"}"
+    },
+    {
+      "path": "/formas-envio/743997871",
+      "status": 200,
+      "json": {
+        "nome": "Correios",
+        "tipo": "1",
+        "situacao": "1",
+        "id": 743997871,
+        "gatewayLogistico": null,
+        "formasFrete": []
+      },
+      "text": "{\"nome\":\"Correios\",\"tipo\":\"1\",\"situacao\":\"1\",\"id\":743997871,\"gatewayLogistico\":null,\"formasFrete\":[]}"
+    }
+  ],
+  "wmsLabel": {
+    "status": "NOT_IN_EXPEDICAO",
+    "urls": [],
+    "message": "Pedido não está em agrupamento de expedição no Tiny. Agrupe na expedição antes de imprimir a etiqueta.",
+    "cached": false
+  },
+  "janela": {
+    "total": 11,
+    "unicos": 11,
+    "found": []
+  }
+}

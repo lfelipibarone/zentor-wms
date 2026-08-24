@@ -2,6 +2,8 @@
 
 O **Zentor WMS** utiliza a API v3 pública do Olist ERP (Tiny) para importação de pedidos de venda, consulta de notas fiscais de entrada ( DANFE ) e sincronização de status de conferência.
 
+**Etiquetas de transporte / packing:** [[contexto-etiqueta-packing-tiny]] (não confundir DANFE com ZPL).
+
 ---
 
 ## ⚙️ Registro do Aplicativo no ERP

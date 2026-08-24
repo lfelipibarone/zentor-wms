@@ -2,7 +2,9 @@
 
 Documento para entender **por que a etiqueta às vezes vem e às vezes não**, e **o que o WMS precisa fazer** para buscá-la corretamente.
 
-Relacionado: [[handoff-desenvolvimento-jun-2026]], [[integracao-tiny-pedidos]], [[Tarefas]].
+**Contexto operacional atual (MEU PUXADOR, packing, NF 171579):** [[contexto-etiqueta-packing-tiny]]
+
+Relacionado: [[handoff-desenvolvimento-jun-2026]], [[integracao-tiny-pedidos]], [[Tarefas]], [[contexto-etiqueta-packing-tiny]].
 
 ---
 
@@ -366,13 +368,28 @@ Não necessariamente. O código busca corretamente **quando o pedido está na ex
 Não na API v3. Sempre passa pelo módulo de expedição.
 
 **E se agruparmos via API automaticamente?**  
-É o próximo passo técnico recomendado. Pode destravar Mercado Envios em alguns casos, mas não garante URL se o ML recusar.
+É o caminho do packing (“Buscar etiqueta”): create + concluir quando necessário + GET urls. Detalhes e prova live (NF 171579 / lote `746538070`): [[contexto-etiqueta-packing-tiny]]. Mercado Envios ainda pode não devolver URL mesmo após agrupar.
+
+---
+
+## Estado WMS (ago/2026)
+
+| Capacidade | Status |
+|------------|--------|
+| Buscar etiqueta (GET índice + URLs) | Implementado em packing |
+| Create `POST /expedicao` no botão | **Pendente** |
+| Concluir agrupamento | **Pendente** (necessário em vários casos) |
+| Prova Jadlog Melhor Envio (ZPL) | OK na API Tiny; ver contexto mestre |
+
+Roteiro tela a tela e IDs de teste: [[contexto-etiqueta-packing-tiny]].
 
 ---
 
 ## Referências
 
+- [[contexto-etiqueta-packing-tiny|Contexto mestre packing / Tiny]]
 - [Listar agrupamentos de expedição](https://api-docs.erp.olist.com/api-reference/expedição/listar-agrupamentos-de-expedição)
 - [Obter etiquetas de agrupamento](https://api-docs.erp.olist.com/api-reference/expedição/obter-etiquetas-de-um-agrupamento-de-expedição)
 - [Criar agrupamento de expedição](https://api-docs.erp.olist.com/api-reference/expedição/criar-agrupamento-de-expedição)
+- [Concluir agrupamento](https://api-docs.erp.olist.com/api-reference/expedição/concluir-um-agrupamento-de-expedição)
 - Artefatos de teste: `docs/tiny-etiquetas-lote.json`, `docs/tiny-etiquetas-860301754.json`, `docs/tiny-teste-rotas.json`
