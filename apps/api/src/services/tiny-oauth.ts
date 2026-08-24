@@ -904,9 +904,30 @@ export async function cancelTinyDraft(
       oauthRedirectUri: null,
       status: TinyConnectionStatus.PENDING,
       lastError: null,
-      isActive: true,
+      isActive: false,
+      isDefault: false,
+      deletedAt: new Date(),
     },
   });
+
+  if (conn.isDefault) {
+    const next = await prisma.tinyConnection.findFirst({
+      where: {
+        tenantId: scope.tenantId,
+        userId: scope.userId,
+        deletedAt: null,
+        isActive: true,
+        id: { not: conn.id },
+      },
+      orderBy: { updatedAt: "desc" },
+    });
+    if (next) {
+      await prisma.tinyConnection.update({
+        where: { id: next.id },
+        data: { isDefault: true },
+      });
+    }
+  }
 
   return { ok: true };
 }

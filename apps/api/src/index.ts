@@ -38,9 +38,14 @@ async function main() {
   await app.register(integrationRoutes);
   await app.register(tinyRoutes);
 
-  void recoverStaleTinyBlockedConnections().then((n) => {
-    if (n > 0) console.log(`[api] ${n} conexão(ões) Tiny recuperada(s) de BLOCKED`);
-  });
+  void recoverStaleTinyBlockedConnections()
+    .then((n) => {
+      if (n > 0) console.log(`[api] ${n} conexão(ões) Tiny recuperada(s) de BLOCKED`);
+    })
+    .catch((e) => {
+      const msg = e instanceof Error ? e.message : String(e);
+      console.warn(`[api] falha ao recuperar conexões Tiny BLOCKED: ${msg}`);
+    });
   startWaveScheduler();
   startTinyOAuthRefreshWorker();
   startTinyOrderSyncScheduler();
