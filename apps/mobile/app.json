@@ -7,8 +7,15 @@
     "scheme": "wms",
     "userInterfaceStyle": "dark",
     "newArchEnabled": true,
+    "icon": "./assets/icon.png",
+    "splash": {
+      "image": "./assets/splash-icon.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#0B0F14"
+    },
     "ios": {
       "supportsTablet": true,
+      "bundleIdentifier": "br.com.zentor.wms",
       "infoPlist": {
         "NSCameraUsageDescription": "A câmera é usada para ler códigos de barras no galpão."
       }
@@ -16,6 +23,7 @@
     "android": {
       "package": "br.com.zentor.wms",
       "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#0B0F14"
       },
       "permissions": [
