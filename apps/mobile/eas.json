@@ -11,7 +11,8 @@
     "preview": {
       "distribution": "internal",
       "android": {
-        "buildType": "apk"
+        "buildType": "apk",
+        "gradleCommand": ":app:assembleRelease --no-configure-on-demand"
       },
       "env": {
         "EXPO_PUBLIC_API_URL": "https://wms-backend-4dhznc-57e100-177-7-39-127.sslip.io"

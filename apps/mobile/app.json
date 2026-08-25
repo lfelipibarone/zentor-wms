@@ -1,12 +1,12 @@
 {
   "expo": {
-    "name": "WMS Mobile",
+    "name": "WMS",
     "slug": "wms-mobile",
     "version": "1.0.0",
     "orientation": "portrait",
     "scheme": "wms",
     "userInterfaceStyle": "dark",
-    "newArchEnabled": true,
+    "newArchEnabled": false,
     "icon": "./assets/icon.png",
     "splash": {
       "image": "./assets/splash-icon.png",
@@ -17,6 +17,7 @@
       "supportsTablet": true,
       "bundleIdentifier": "br.com.zentor.wms",
       "infoPlist": {
+        "CFBundleDisplayName": "WMS Mobile",
         "NSCameraUsageDescription": "A câmera é usada para ler códigos de barras no galpão."
       }
     },
