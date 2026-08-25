@@ -15,6 +15,7 @@ export interface OrderRow {
   itemCount: number;
   qtyOrdered: number;
   qtyPicked: number;
+  hasShippingLabel?: boolean;
   createdAt: string;
   updatedAt: string;
 }

@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { ChevronDown, ChevronRight } from "lucide-react";
 import { MarketplaceBadge } from "@/components/ops/marketplace-badge";
 import { OrderStatusBadge } from "@/components/ops/order-status-badge";
+import { ShippingLabelBadge } from "@/components/ops/shipping-label-badge";
 import {
   Table,
   TableBody,
@@ -110,6 +111,7 @@ function OrderCardHeader({ order }: { order: BoardOrderEntry }) {
         <div className="flex flex-wrap items-center gap-2">
           <KindBadge kind="order" />
           <p className="font-mono text-lg font-bold">{order.erpOrderId}</p>
+          <ShippingLabelBadge available={Boolean(order.hasShippingLabel)} />
         </div>
         <p className="text-sm text-muted-foreground">
           {order.customerName ?? "—"} · Cesta {order.basketCode ?? "—"} ·{" "}
@@ -263,6 +265,7 @@ function WaveCardDetail({ waveId }: { waveId: string }) {
       erpOrderId: string;
       customerName: string | null;
       status: string;
+      hasShippingLabel?: boolean;
     }>
   >([]);
 
@@ -339,6 +342,7 @@ function WaveCardDetail({ waveId }: { waveId: string }) {
                 <TableHead>Pedido ERP</TableHead>
                 <TableHead>Cliente</TableHead>
                 <TableHead>Status</TableHead>
+                <TableHead>Etiqueta</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -348,6 +352,13 @@ function WaveCardDetail({ waveId }: { waveId: string }) {
                   <TableCell>{o.customerName ?? "—"}</TableCell>
                   <TableCell>
                     <OrderStatusBadge status={o.status} />
+                  </TableCell>
+                  <TableCell>
+                    {o.hasShippingLabel ? (
+                      <ShippingLabelBadge available />
+                    ) : (
+                      <span className="text-xs text-muted-foreground">—</span>
+                    )}
                   </TableCell>
                 </TableRow>
               ))}

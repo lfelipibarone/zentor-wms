@@ -752,4 +752,8 @@ export async function sortWaveAllocationWeb(
   });
 }
 
-export { fetchShippingLabelsForOrder } from "./tiny-shipping-labels.js";
+export {
+  fetchShippingLabelsForOrder,
+  fetchShippingLabelFile,
+  fetchShippingLabelPreview,
+} from "./tiny-shipping-labels.js";

@@ -15,6 +15,14 @@ import {
   seedDemoTenant,
 } from "./seed-demo-tenants.js";
 import { seedPurchaseReceiptDemos } from "./seed-purchase-receipts.js";
+import {
+  printFlowStagesGuide,
+  seedFlowStages,
+} from "./seed-flow-stages.js";
+import {
+  printWarehouseDemoGuide,
+  seedWarehouseDemo,
+} from "./seed-warehouse-demo.js";
 
 const prisma = new PrismaClient();
 
@@ -306,173 +314,53 @@ async function main() {
     }),
   ]);
 
-  const [screw, motor, cable, valve, filter] = products;
+  const [screw, motor, cable] = products;
 
-  // --- Localizações (algumas abaixo do mínimo → alertas) ---
-  const locations = await Promise.all([
-    prisma.location.upsert({
-      where: { tenantId_barcode: { tenantId: TENANT_ID, barcode: "LOC-A01-01" } },
-      create: {
-        tenantId: TENANT_ID,
-        corridor: "A",
-        row: "01",
-        barcode: "LOC-A01-01",
-        type: "PICK_FACE",
-        productId: screw.id,
-        currentQuantity: 8,
-        capacity: 100,
-        minThreshold: 20,
-      },
-      update: { currentQuantity: 8 },
-    }),
-    prisma.location.upsert({
-      where: { tenantId_barcode: { tenantId: TENANT_ID, barcode: "LOC-A02-01" } },
-      create: {
-        tenantId: TENANT_ID,
-        corridor: "A",
-        row: "02",
-        barcode: "LOC-A02-01",
-        type: "PICK_FACE",
-        productId: motor.id,
-        currentQuantity: 1,
-        capacity: 10,
-        minThreshold: 2,
-      },
-      update: { currentQuantity: 1 },
-    }),
-    prisma.location.upsert({
-      where: { tenantId_barcode: { tenantId: TENANT_ID, barcode: "LOC-B01-03" } },
-      create: {
-        tenantId: TENANT_ID,
-        corridor: "B",
-        row: "01",
-        barcode: "LOC-B01-03",
-        type: "PICK_FACE",
-        productId: cable.id,
-        currentQuantity: 5,
-        capacity: 80,
-        minThreshold: 15,
-      },
-      update: { currentQuantity: 5 },
-    }),
-    prisma.location.upsert({
-      where: { tenantId_barcode: { tenantId: TENANT_ID, barcode: "LOC-B02-02" } },
-      create: {
-        tenantId: TENANT_ID,
-        corridor: "B",
-        row: "02",
-        barcode: "LOC-B02-02",
-        type: "PICK_FACE",
-        productId: valve.id,
-        currentQuantity: 12,
-        capacity: 40,
-        minThreshold: 10,
-      },
-      update: { currentQuantity: 12 },
-    }),
-    prisma.location.upsert({
-      where: { tenantId_barcode: { tenantId: TENANT_ID, barcode: "LOC-C01-01" } },
-      create: {
-        tenantId: TENANT_ID,
-        corridor: "C",
-        row: "01",
-        barcode: "LOC-C01-01",
-        type: "PICK_FACE",
-        productId: filter.id,
-        currentQuantity: 2,
-        capacity: 30,
-        minThreshold: 8,
-      },
-      update: { currentQuantity: 2 },
-    }),
-    prisma.location.upsert({
-      where: { tenantId_barcode: { tenantId: TENANT_ID, barcode: "LOC-C02-04" } },
-      create: {
-        tenantId: TENANT_ID,
-        corridor: "C",
-        row: "02",
-        barcode: "LOC-C02-04",
-        type: "PICK_FACE",
-        productId: screw.id,
-        currentQuantity: 45,
-        capacity: 100,
-        minThreshold: 20,
-      },
-      update: { currentQuantity: 45 },
-    }),
-  ]);
-
-  const [locA, locB, locC, locD, locE] = locations;
-  const prodCycle = [screw, motor, cable];
-  const locCycle = [locA, locB, locC, locD, locE];
-
-  const pulmaoLocations = await Promise.all([
-    prisma.location.upsert({
-      where: { tenantId_barcode: { tenantId: TENANT_ID, barcode: "PUL-A01-01" } },
-      create: {
-        tenantId: TENANT_ID,
-        corridor: "P",
-        row: "01",
-        barcode: "PUL-A01-01",
-        type: "PULMAO",
-        productId: screw.id,
-        currentQuantity: 500,
-        capacity: 2000,
-        minThreshold: 100,
-      },
-      update: { currentQuantity: 500 },
-    }),
-    prisma.location.upsert({
-      where: { tenantId_barcode: { tenantId: TENANT_ID, barcode: "PUL-B01-01" } },
-      create: {
-        tenantId: TENANT_ID,
-        corridor: "P",
-        row: "02",
-        barcode: "PUL-B01-01",
-        type: "PULMAO",
-        productId: motor.id,
-        currentQuantity: 80,
-        capacity: 200,
-        minThreshold: 20,
-      },
-      update: { currentQuantity: 80 },
-    }),
-    prisma.location.upsert({
-      where: { tenantId_barcode: { tenantId: TENANT_ID, barcode: "PUL-C01-01" } },
-      create: {
-        tenantId: TENANT_ID,
-        corridor: "P",
-        row: "03",
-        barcode: "PUL-C01-01",
-        type: "PULMAO",
-        productId: cable.id,
-        currentQuantity: 300,
-        capacity: 1000,
-        minThreshold: 50,
-      },
-      update: { currentQuantity: 300 },
-    }),
-  ]);
-
-  void pulmaoLocations;
-
-  const basket1 = await prisma.basket.upsert({
-    where: { tenantId_code: { tenantId: TENANT_ID, code: "CESTA-001" } },
-    create: {
-      tenantId: TENANT_ID,
-      code: "CESTA-001",
-      barcode: "BASKET001",
-    },
-    update: {},
+  const warehouse = await seedWarehouseDemo(prisma, {
+    tenantId: TENANT_ID,
+    products: products.map((p) => ({ id: p.id, sku: p.sku, name: p.name })),
   });
-  const basket2 = await prisma.basket.upsert({
-    where: { tenantId_code: { tenantId: TENANT_ID, code: "CESTA-002" } },
-    create: {
-      tenantId: TENANT_ID,
-      code: "CESTA-002",
-      barcode: "BASKET002",
+
+  const pickFaces = warehouse.pickFaces;
+  const locCycle = pickFaces;
+  const prodCycle = [screw, motor, cable];
+
+  const basketDefs = [
+    { code: "CESTA-001", barcode: "BASKET001" },
+    { code: "CESTA-002", barcode: "BASKET002" },
+    { code: "CESTA-003", barcode: "BASKET003" },
+    { code: "CESTA-004", barcode: "BASKET004" },
+  ] as const;
+  const baskets = await Promise.all(
+    basketDefs.map((b) =>
+      prisma.basket.upsert({
+        where: { tenantId_code: { tenantId: TENANT_ID, code: b.code } },
+        create: {
+          tenantId: TENANT_ID,
+          code: b.code,
+          barcode: b.barcode,
+        },
+        update: {},
+      }),
+    ),
+  );
+
+  const flowStages = await seedFlowStages(prisma, {
+    tenantId: TENANT_ID,
+    pickerId: pickerJoao.id,
+    operadorId: operador.id,
+    products: products.map((p) => ({ id: p.id, sku: p.sku, name: p.name })),
+    pickFaces: pickFaces.map((l) => ({
+      id: l.id,
+      barcode: l.barcode,
+      productId: l.productId,
+    })),
+    baskets: baskets.map((b) => ({ id: b.id, code: b.code })),
+    productWithoutPickFace: {
+      id: warehouse.productWithoutPickFace.id,
+      sku: warehouse.productWithoutPickFace.sku,
+      name: warehouse.productWithoutPickFace.name,
     },
-    update: {},
   });
 
   await seedPurchaseReceiptDemos(prisma, {
@@ -555,11 +443,15 @@ async function main() {
   }
 
   console.log("\n=== Help Route — tenant default (dados completos) ===\n");
-  console.log("Dashboard esperado:");
-  console.log("  Aguardando separação: ~24");
-  console.log("  Aguardando conferência: ~11");
-  console.log("  Prontos para expedir: ~18");
-  console.log("  Alertas de gôndola: 4 localizações\n");
+  console.log("Dashboard / abas (seed local):");
+  console.log("  PENDING + onda: DEMO-PENDING-01, DEMO-WAVE-ORDER-01");
+  console.log("  PICKING: DEMO-PICKING-01");
+  console.log("  PAUSED: DEMO-PAUSED-01 (SKU), DEMO-PAUSED-NO-FACE-01 (sem giro)");
+  console.log("  Packing: DEMO-PACKING-01, TINY-862886936 (com etiqueta ZPL)");
+  console.log("  DISPATCHING / DISPATCHED: DEMO-DISPATCHING-01 / DEMO-DISPATCHED-01");
+  console.log("  Layout: Gestão Barracão → BAURU (giro + pulmão)\n");
+  printWarehouseDemoGuide(warehouse);
+  printFlowStagesGuide(flowStages);
   printTestUsersGuide();
 }
 

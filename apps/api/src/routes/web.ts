@@ -105,6 +105,8 @@ import {
   cancelPacking,
   PackingSessionError,
   fetchShippingLabelsForOrder,
+  fetchShippingLabelFile,
+  fetchShippingLabelPreview,
 } from "../services/order-packing.js";
 import {
   completePutaway,
@@ -371,6 +373,7 @@ export async function webRoutes(app: FastifyInstance) {
           itemCount: o._count.items,
           qtyOrdered: o.items.reduce((s, i) => s + i.quantityOrdered, 0),
           qtyPicked: o.items.reduce((s, i) => s + i.quantityPicked, 0),
+          hasShippingLabel: Boolean(o.shippingLabel),
           createdAt: o.createdAt,
           updatedAt: o.updatedAt,
         })),
@@ -1825,6 +1828,59 @@ export async function webRoutes(app: FastifyInstance) {
           orderId: request.params.id,
           useCache: !refresh,
         });
+      } catch (e) {
+        const message = e instanceof Error ? e.message : "Erro";
+        return reply.status(422).send({ error: message });
+      }
+    },
+  );
+
+  app.get<{ Params: { id: string }; Querystring: { refresh?: string } }>(
+    "/api/packing/orders/:id/shipping-label/file",
+    { preHandler: guard(Permission.SHIPPING_VIEW) },
+    async (request, reply) => {
+      try {
+        const refresh = request.query.refresh === "1" || request.query.refresh === "true";
+        const file = await fetchShippingLabelFile({
+          tenantId: request.authUser!.tenantId!,
+          orderId: request.params.id,
+          useCache: !refresh,
+        });
+        if (!file.ok) {
+          return reply.status(422).send(file.result);
+        }
+        return reply
+          .header("Content-Type", file.contentType)
+          .header(
+            "Content-Disposition",
+            `attachment; filename="${file.filename}"`,
+          )
+          .send(file.content);
+      } catch (e) {
+        const message = e instanceof Error ? e.message : "Erro";
+        return reply.status(422).send({ error: message });
+      }
+    },
+  );
+
+  app.get<{ Params: { id: string }; Querystring: { refresh?: string } }>(
+    "/api/packing/orders/:id/shipping-label/preview",
+    { preHandler: guard(Permission.SHIPPING_VIEW) },
+    async (request, reply) => {
+      try {
+        const refresh = request.query.refresh === "1" || request.query.refresh === "true";
+        const preview = await fetchShippingLabelPreview({
+          tenantId: request.authUser!.tenantId!,
+          orderId: request.params.id,
+          useCache: !refresh,
+        });
+        if (!preview.ok) {
+          return reply.status(422).send(preview.result);
+        }
+        return reply
+          .header("Content-Type", preview.contentType)
+          .header("Cache-Control", "private, max-age=300")
+          .send(preview.content);
       } catch (e) {
         const message = e instanceof Error ? e.message : "Erro";
         return reply.status(422).send({ error: message });

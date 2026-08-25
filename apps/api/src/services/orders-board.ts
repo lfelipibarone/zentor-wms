@@ -24,6 +24,7 @@ function mapOrderRow(o: {
   priority: number;
   collectionDeadline: Date | null;
   marketplace: string | null;
+  shippingLabel: string | null;
   createdAt: Date;
   updatedAt: Date;
   assignedPicker: { name: string } | null;
@@ -45,6 +46,7 @@ function mapOrderRow(o: {
     itemCount: o._count.items,
     qtyOrdered: o.items.reduce((s, i) => s + i.quantityOrdered, 0),
     qtyPicked: o.items.reduce((s, i) => s + i.quantityPicked, 0),
+    hasShippingLabel: Boolean(o.shippingLabel),
     createdAt: o.createdAt.toISOString(),
     updatedAt: o.updatedAt.toISOString(),
   };
@@ -187,6 +189,7 @@ export async function getWaveDetail(tenantId: string, waveId: string) {
               customerName: true,
               status: true,
               marketplace: true,
+              shippingLabel: true,
             },
           },
         },
@@ -216,6 +219,7 @@ export async function getWaveDetail(tenantId: string, waveId: string) {
       customerName: wo.order.customerName,
       status: wo.order.status,
       marketplace: wo.order.marketplace,
+      hasShippingLabel: Boolean(wo.order.shippingLabel),
     })),
   };
 }

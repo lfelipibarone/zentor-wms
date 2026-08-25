@@ -264,3 +264,172 @@ export function findPedidoNoIndice(
 ): ExpedicaoMatch | null {
   return index.get(pedidoId) ?? (idNotaFiscal ? index.get(idNotaFiscal) ?? null : null);
 }
+
+export type CriarAgrupamentoBody =
+  | { idsNotasFiscais: number[] }
+  | { idsPedidos: number[] };
+
+/** POST /expedicao — criar agrupamento */
+export async function criarAgrupamentoExpedicao(
+  client: TinyApiV3Client,
+  body: CriarAgrupamentoBody,
+) {
+  return client.request("POST", "/expedicao", { body });
+}
+
+/** POST /expedicao/{id}/concluir */
+export async function concluirAgrupamentoExpedicao(
+  client: TinyApiV3Client,
+  idAgrupamento: number,
+) {
+  return client.request("POST", `/expedicao/${idAgrupamento}/concluir`);
+}
+
+export async function obterPedidoTiny(
+  client: TinyApiV3Client,
+  pedidoId: number,
+) {
+  return client.request("GET", `/pedidos/${pedidoId}`);
+}
+
+export function extrairIdNotaFiscalPedido(pedido: unknown): number | null {
+  return num(asRecord(pedido)?.idNotaFiscal);
+}
+
+export async function findMatchInAgrupamento(
+  client: TinyApiV3Client,
+  idAgrupamento: number,
+  pedidoId: number,
+  idNotaFiscal?: number | null,
+): Promise<ExpedicaoMatch | null> {
+  const detalhe = asRecord(await obterAgrupamentoExpedicao(client, idAgrupamento));
+  const formaEnvioNome = str(asRecord(detalhe?.formaEnvio)?.nome);
+
+  for (const exp of asArray(detalhe?.expedicoes)) {
+    if (!pedidoNaExpedicao(pedidoId, idNotaFiscal ?? null, exp)) continue;
+    const idExpedicao = num(asRecord(exp)?.id);
+    if (!idExpedicao) continue;
+    return {
+      idAgrupamento,
+      idExpedicao,
+      formaEnvioNome,
+      pedidoId,
+      idNotaFiscal: num(asRecord(asRecord(exp)?.notaFiscal)?.id) ?? idNotaFiscal ?? null,
+    };
+  }
+
+  return null;
+}
+
+export function needsConcludeEtiqueta(message: string | null | undefined): boolean {
+  if (!message) return false;
+  const m = message.toLowerCase();
+  return (
+    m.includes("conclu") ||
+    m.includes("concluded") ||
+    m.includes("não foi concluído") ||
+    m.includes("nao foi concluido")
+  );
+}
+
+/** Busca etiquetas; se a Tiny exigir, conclui o agrupamento e tenta de novo. */
+export async function buscarEtiquetasExpedicaoComConcluir(
+  client: TinyApiV3Client,
+  match: ExpedicaoMatch,
+): Promise<EtiquetasResult & { concludedAgrupamento?: boolean }> {
+  let result = await buscarEtiquetasExpedicao(client, match);
+  if (result.urls.length > 0) return result;
+
+  if (!needsConcludeEtiqueta(result.marketplaceError)) return result;
+
+  try {
+    await concluirAgrupamentoExpedicao(client, match.idAgrupamento);
+    result = await buscarEtiquetasExpedicao(client, match);
+    return { ...result, concludedAgrupamento: true };
+  } catch (e) {
+    const message = e instanceof Error ? e.message : String(e);
+    return {
+      ...result,
+      marketplaceError: result.marketplaceError ?? message,
+    };
+  }
+}
+
+export type EnsureExpedicaoResult = {
+  match: ExpedicaoMatch | null;
+  createdAgrupamento: boolean;
+  error?: string;
+};
+
+/** Localiza pedido no índice ou cria agrupamento na Tiny (NF preferencial). */
+export async function ensurePedidoInExpedicao(
+  client: TinyApiV3Client,
+  pedidoId: number,
+): Promise<EnsureExpedicaoResult> {
+  let index = await buildPedidoExpedicaoIndex(client);
+  let idNotaFiscal: number | null = null;
+
+  try {
+    const pedido = await obterPedidoTiny(client, pedidoId);
+    idNotaFiscal = extrairIdNotaFiscalPedido(pedido);
+  } catch {
+    /* pedido sem NF ainda é válido para create por idsPedidos */
+  }
+
+  const existing = findPedidoNoIndice(index, pedidoId, idNotaFiscal);
+  if (existing) {
+    return { match: existing, createdAgrupamento: false };
+  }
+
+  let idAgrupamento: number | null = null;
+  let createError: string | null = null;
+
+  if (idNotaFiscal) {
+    try {
+      const created = await criarAgrupamentoExpedicao(client, {
+        idsNotasFiscais: [idNotaFiscal],
+      });
+      idAgrupamento = num(asRecord(created)?.id);
+    } catch (e) {
+      createError = e instanceof Error ? e.message : String(e);
+    }
+  }
+
+  if (!idAgrupamento) {
+    try {
+      const created = await criarAgrupamentoExpedicao(client, {
+        idsPedidos: [pedidoId],
+      });
+      idAgrupamento = num(asRecord(created)?.id);
+      createError = null;
+    } catch (e) {
+      createError = e instanceof Error ? e.message : String(e);
+    }
+  }
+
+  if (idAgrupamento) {
+    const match = await findMatchInAgrupamento(
+      client,
+      idAgrupamento,
+      pedidoId,
+      idNotaFiscal,
+    );
+    if (match) {
+      return { match, createdAgrupamento: true };
+    }
+  }
+
+  index = await buildPedidoExpedicaoIndex(client);
+  const afterCreate = findPedidoNoIndice(index, pedidoId, idNotaFiscal);
+  if (afterCreate) {
+    return { match: afterCreate, createdAgrupamento: Boolean(idAgrupamento) };
+  }
+
+  return {
+    match: null,
+    createdAgrupamento: Boolean(idAgrupamento),
+    error:
+      createError ??
+      "Pedido não está em agrupamento de expedição no Tiny. Verifique NF e forma de envio.",
+  };
+}

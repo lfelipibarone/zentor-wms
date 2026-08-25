@@ -1,13 +1,13 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { PageHeader } from "@/components/ops/page-header";
 import { CollectionDeadlineIndicator } from "@/components/ops/collection-deadline-indicator";
 import { MarketplaceBadge } from "@/components/ops/marketplace-badge";
 import { DataState } from "@/components/ops/data-state";
 import { PackingIssueModal } from "@/components/ops/packing-issue-modal";
+import { ShippingLabelPanel } from "@/components/ops/shipping-label-panel";
 import { ProductImageZoom } from "@/components/ops/product-image-zoom";
 import {
   Table,
@@ -37,9 +37,6 @@ export default function PackingOrderDetailPage() {
   const [message, setMessage] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [issueModalOpen, setIssueModalOpen] = useState(false);
-  const [labelLoading, setLabelLoading] = useState(false);
-  const [labelMessage, setLabelMessage] = useState<string | null>(null);
-  const [labelUrls, setLabelUrls] = useState<string[]>([]);
   const packedProgressRef = useRef(false);
   const reportedRef = useRef(false);
 
@@ -53,8 +50,6 @@ export default function PackingOrderDetailPage() {
       });
       const session = await fetchPackingSession(orderId);
       setOrder(session);
-      setLabelUrls(session.shippingLabel ? [session.shippingLabel] : []);
-      setLabelMessage(null);
       packedProgressRef.current = session.items.some((i) => i.quantityPacked > 0);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Erro ao carregar pedido");
@@ -158,39 +153,6 @@ export default function PackingOrderDetailPage() {
       setMessage(e instanceof Error ? e.message : "Erro ao finalizar");
     } finally {
       setSaving(false);
-    }
-  };
-
-  const handleFetchShippingLabel = async (refresh = false) => {
-    if (!order) return;
-    setLabelLoading(true);
-    setLabelMessage(null);
-    try {
-      const result = await apiFetch<{
-        status: string;
-        urls: string[];
-        message?: string;
-        cached?: boolean;
-      }>(
-        `/api/packing/orders/${order.id}/shipping-labels${refresh ? "?refresh=1" : ""}`,
-        { method: "POST", body: "{}" },
-      );
-      if (result.status === "OK" && result.urls.length > 0) {
-        setLabelUrls(result.urls);
-        setOrder((prev) =>
-          prev ? { ...prev, shippingLabel: result.urls[0] ?? null } : prev,
-        );
-        setLabelMessage(
-          result.cached ? "Etiqueta em cache" : "Etiqueta obtida do Tiny",
-        );
-      } else {
-        setLabelUrls([]);
-        setLabelMessage(result.message ?? "Etiqueta indisponível");
-      }
-    } catch (e) {
-      setLabelMessage(e instanceof Error ? e.message : "Erro ao buscar etiqueta");
-    } finally {
-      setLabelLoading(false);
     }
   };
 
@@ -353,57 +315,17 @@ export default function PackingOrderDetailPage() {
                   </div>
                 </div>
 
-                <div className="rounded-xl border bg-white p-4 shadow-sm">
-                  <p className="text-sm font-semibold">Etiqueta de envio</p>
-                  {labelUrls.length > 0 ? (
-                    <div className="mt-2 flex flex-col gap-2">
-                      {labelUrls.map((url) => (
-                        <a
-                          key={url}
-                          href={url}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="truncate rounded-lg border border-emerald-300 bg-emerald-50 px-3 py-2 text-sm font-medium text-emerald-900 hover:bg-emerald-100"
-                        >
-                          Abrir etiqueta
-                        </a>
-                      ))}
-                    </div>
-                  ) : (
-                    <p className="mt-2 text-sm text-muted-foreground">
-                      Nenhuma etiqueta capturada ainda.
-                    </p>
-                  )}
-                  {labelMessage ? (
-                    <p
-                      className={`mt-2 text-xs ${
-                        labelUrls.length > 0 ? "text-emerald-800" : "text-amber-800"
-                      }`}
-                    >
-                      {labelMessage}
-                    </p>
-                  ) : null}
-                  <div className="mt-3 flex flex-wrap gap-2">
-                    <button
-                      type="button"
-                      disabled={labelLoading || saving}
-                      onClick={() => void handleFetchShippingLabel(false)}
-                      className="rounded-lg bg-slate-900 px-3 py-1.5 text-sm font-semibold text-white disabled:opacity-50"
-                    >
-                      {labelLoading ? "Buscando…" : "Buscar etiqueta"}
-                    </button>
-                    {labelUrls.length > 0 ? (
-                      <button
-                        type="button"
-                        disabled={labelLoading || saving}
-                        onClick={() => void handleFetchShippingLabel(true)}
-                        className="rounded-lg border px-3 py-1.5 text-sm font-medium disabled:opacity-50"
-                      >
-                        Atualizar
-                      </button>
-                    ) : null}
-                  </div>
-                </div>
+                <ShippingLabelPanel
+                  orderId={order.id}
+                  erpOrderId={order.erpOrderId}
+                  initialUrl={order.shippingLabel}
+                  disabled={saving}
+                  onLabelCached={(url) =>
+                    setOrder((prev) =>
+                      prev ? { ...prev, shippingLabel: url } : prev,
+                    )
+                  }
+                />
 
                 <form
                   onSubmit={handleScan}
