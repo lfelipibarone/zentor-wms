@@ -8,7 +8,8 @@
     "dev:go": "expo start --go",
     "android": "expo start --android",
     "ios": "expo start --ios",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "eas-build-post-install": "cd ../.. && pnpm --filter @wms/shared build"
   },
   "dependencies": {
     "@expo/metro-runtime": "~56.0.15",

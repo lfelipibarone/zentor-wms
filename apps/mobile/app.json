@@ -19,7 +19,8 @@
         "backgroundColor": "#0B0F14"
       },
       "permissions": [
-        "android.permission.CAMERA"
+        "android.permission.CAMERA",
+        "android.permission.RECORD_AUDIO"
       ]
     },
     "plugins": [
@@ -34,6 +35,12 @@
     ],
     "experiments": {
       "typedRoutes": true
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "6d8f512e-3ff2-4e5d-bd14-fb3040fafc13"
+      }
     }
   }
 }
