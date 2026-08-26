@@ -6,6 +6,7 @@
     "orientation": "portrait",
     "scheme": "wms",
     "userInterfaceStyle": "dark",
+    "newArchEnabled": false,
     "icon": "./assets/icon.png",
     "splash": {
       "image": "./assets/splash-icon.png",
