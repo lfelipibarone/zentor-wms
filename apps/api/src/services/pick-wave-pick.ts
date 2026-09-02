@@ -6,6 +6,10 @@ import {
 import { prisma } from "../lib/prisma.js";
 import { PickWaveError, assertWaveOperatorForMutation } from "./pick-wave.js";
 import { findProductByBarcode } from "./location-stock.js";
+import {
+  ensurePickingEndLog,
+  ensurePickingStartLog,
+} from "./order-time-log-helpers.js";
 
 export interface ConsolidatedPickInput {
   lineId: string;
@@ -157,6 +161,25 @@ export async function confirmConsolidatedPick(input: ConsolidatedPickInput) {
         ...(lineComplete ? { pickCompletedAt: now } : {}),
       },
     });
+
+    const affectedOrderIds = new Set(
+      allocationUpdates.map((upd) => {
+        const alloc = line.allocations.find((a) => a.id === upd.id)!;
+        return alloc.orderItem.orderId;
+      }),
+    );
+
+    for (const orderId of affectedOrderIds) {
+      await ensurePickingStartLog(tx, orderId, input.userId);
+
+      const items = await tx.orderItem.findMany({ where: { orderId } });
+      const pickComplete = items.every(
+        (i) => i.quantityPicked >= i.quantityOrdered,
+      );
+      if (pickComplete) {
+        await ensurePickingEndLog(tx, orderId, input.userId);
+      }
+    }
   });
 
   const updated = await prisma.pickWaveLine.findUnique({

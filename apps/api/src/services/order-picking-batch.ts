@@ -1,5 +1,7 @@
 import { OrderStatus } from "@prisma/client";
 import { prisma } from "../lib/prisma.js";
+import { recordOrderStageChange } from "./order-stage-log.js";
+import { ensureResumeAfterPause } from "./order-time-log-helpers.js";
 
 const ACCEPTABLE_STATUSES: OrderStatus[] = [
   OrderStatus.PENDING,
@@ -61,18 +63,38 @@ async function tryAcceptOneOrder(
     };
   }
 
-  const result = await prisma.order.updateMany({
-    where: {
-      id: orderId,
+  const fromStatus = order.status;
+
+  const accepted = await prisma.$transaction(async (tx) => {
+    const result = await tx.order.updateMany({
+      where: {
+        id: orderId,
+        tenantId,
+        status: { in: ACCEPTABLE_STATUSES },
+      },
+      data: {
+        status: OrderStatus.PICKING,
+        assignedPickerId: userId,
+      },
+    });
+    if (result.count === 0) return false;
+
+    await recordOrderStageChange(tx, {
       tenantId,
-      status: { in: ACCEPTABLE_STATUSES },
-    },
-    data: {
-      status: OrderStatus.PICKING,
-      assignedPickerId: userId,
-    },
+      orderId,
+      fromStatus,
+      toStatus: OrderStatus.PICKING,
+      userId,
+    });
+
+    if (fromStatus === OrderStatus.PAUSED_ISSUE) {
+      await ensureResumeAfterPause(tx, orderId, userId);
+    }
+
+    return true;
   });
-  if (result.count === 0) {
+
+  if (!accepted) {
     return { ok: false, message: "Pedido já aceito ou indisponível na fila" };
   }
   return { ok: true };

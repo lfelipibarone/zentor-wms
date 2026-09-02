@@ -15,6 +15,7 @@ import {
   seedDemoTenant,
 } from "./seed-demo-tenants.js";
 import { seedPurchaseReceiptDemos } from "./seed-purchase-receipts.js";
+import { seedFlowStageDemos } from "./seed-flow-stages.js";
 
 const prisma = new PrismaClient();
 
@@ -529,6 +530,14 @@ async function main() {
       },
     });
   }
+
+  await seedFlowStageDemos(prisma, {
+    tenantId: TENANT_ID,
+    userId: operador.id,
+    productId: screw.id,
+    pickLocationId: locA.id,
+    basketId: basket1.id,
+  });
 
   for (const config of DEMO_TENANT_CONFIGS) {
     await seedDemoTenant(prisma, config);

@@ -192,6 +192,7 @@ model User {
 
   /// Eventos de tempo registrados por este usuário
   orderTimeLogs OrderTimeLog[]
+  orderStageLogs OrderStageLog[]
 
   notifications Notification[]
   pushDevices   PushDevice[]
@@ -609,6 +610,7 @@ model Order {
 
   items              OrderItem[]
   timeLogs           OrderTimeLog[]
+  stageLogs          OrderStageLog[]
   inventoryMovements InventoryMovement[]
   waveOrders         PickWaveOrder[]
 
@@ -774,6 +776,30 @@ model OrderTimeLog {
   @@index([orderId, createdAt])
   @@index([userId])
   @@map("order_time_logs")
+}
+
+// -----------------------------------------------------------------------------
+// OrderStageLog — trilha de transições de status do pedido
+// -----------------------------------------------------------------------------
+
+model OrderStageLog {
+  id         String       @id @default(cuid())
+  tenantId   String
+  orderId    String
+  fromStatus OrderStatus?
+  toStatus   OrderStatus
+  userId     String?
+  /// Motivo opcional (JSON para devolução do packing, texto para pausa)
+  reason     String?
+  createdAt  DateTime     @default(now())
+
+  order Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  user  User? @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([tenantId, createdAt])
+  @@index([tenantId, toStatus, createdAt])
+  @@index([orderId, createdAt])
+  @@map("order_stage_logs")
 }
 
 // -----------------------------------------------------------------------------

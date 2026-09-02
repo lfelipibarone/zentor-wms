@@ -24,6 +24,7 @@ import {
   sortWavePackingLines,
 } from "./packing-queue-sort.js";
 import { listReplenishmentNeeds } from "./replenishment-queue.js";
+import { recordOrderStageChange } from "./order-stage-log.js";
 
 export class PackingSessionError extends Error {
   constructor(
@@ -456,15 +457,25 @@ export async function completePacking(orderId: string, userId: string) {
     throw new Error("Ainda há itens pendentes de conferência no packing");
   }
 
-  await prisma.$transaction([
-    prisma.order.update({
+  const orderBefore = await prisma.order.findUnique({ where: { id: orderId } });
+  if (!orderBefore) throw new Error("Pedido não encontrado");
+
+  await prisma.$transaction(async (tx) => {
+    await tx.order.update({
       where: { id: orderId },
       data: { status: OrderStatus.DISPATCHING },
-    }),
-    prisma.orderTimeLog.create({
+    });
+    await recordOrderStageChange(tx, {
+      tenantId: orderBefore.tenantId,
+      orderId,
+      fromStatus: OrderStatus.PICKED_AWAITING_CONFERENCE,
+      toStatus: OrderStatus.DISPATCHING,
+      userId,
+    });
+    await tx.orderTimeLog.create({
       data: { orderId, userId, event: OrderTimeLogEvent.PACK_END },
-    }),
-  ]);
+    });
+  });
 
   const order = await prisma.order.findUnique({ where: { id: orderId } });
   if (order) {
@@ -581,6 +592,14 @@ export async function reportPackingIssue(
         status: OrderStatus.PACKING_RETURNED_TO_PICKING,
         assignedPickerId: null,
       },
+    });
+    await recordOrderStageChange(tx, {
+      tenantId: order.tenantId,
+      orderId,
+      fromStatus: order.status,
+      toStatus: OrderStatus.PACKING_RETURNED_TO_PICKING,
+      userId,
+      reason: JSON.stringify(reasonPayload),
     });
     await tx.orderTimeLog.create({
       data: {
