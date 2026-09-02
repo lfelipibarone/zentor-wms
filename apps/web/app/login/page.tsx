@@ -46,9 +46,9 @@ function LoginForm() {
           <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-xl bg-primary text-lg font-black text-primary-foreground">
             W
           </div>
-          <h1 className="text-2xl font-bold tracking-tight">Entrar no Help Route</h1>
+          <h1 className="text-2xl font-bold tracking-tight">Zentor WMS</h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            Help Route · WMS
+            Help Route · gestão de armazém, picking, packing e expedição integrada ao Tiny ERP
           </p>
         </div>
 

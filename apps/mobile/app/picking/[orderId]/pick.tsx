@@ -85,7 +85,7 @@ export default function PickScreen() {
           locationLabel: next.pickLocation.label,
           systemQuantity: next.pickLocation.currentQuantity ?? 0,
           capacity: next.pickLocation.capacity ?? 9999,
-          productBarcode: next.product.barcode,
+          productBarcode: next.product?.barcode ?? null,
           orderId,
           itemId: next.id,
         }
@@ -148,7 +148,7 @@ export default function PickScreen() {
     setScannerOpen(false);
     if (!next) return;
 
-    const expected = next.product.barcode;
+    const expected = next.product?.barcode;
     if (expected && barcode !== expected) {
       setFeedback(`Produto incorreto. Esperado: ${expected}`);
       return;
@@ -268,7 +268,7 @@ export default function PickScreen() {
     );
   }
 
-  const requiresScan = next.product.requiresItemScan;
+  const requiresScan = next.product?.requiresItemScan ?? false;
   const locLabel = next.pickLocation
     ? (next.pickLocation.label ??
       `${next.pickLocation.corridor}-${next.pickLocation.row}`)
@@ -326,13 +326,17 @@ export default function PickScreen() {
       <View style={styles.productCard}>
         <View style={styles.productRow}>
           <ProductThumbnail
-            imageUrl={next.product.imageUrl}
-            alt={next.product.name}
+            imageUrl={next.product?.imageUrl}
+            alt={next.product?.name ?? "Produto"}
             size={88}
           />
           <View style={styles.productInfo}>
-            <Text style={styles.sku}>{next.product.sku}</Text>
-            <Text style={styles.productName}>{next.product.name}</Text>
+            <Text style={styles.sku}>
+              {next.product?.sku ?? "SKU indisponível"}
+            </Text>
+            <Text style={styles.productName}>
+              {next.product?.name ?? "Produto não encontrado"}
+            </Text>
             <Text style={styles.qty}>
               Separar: {next.remaining} de {next.quantityOrdered}
             </Text>
@@ -411,13 +415,13 @@ export default function PickScreen() {
               {session.items.map((item) => (
                 <View key={item.id} style={styles.itemsPreviewRow}>
                   <ProductThumbnail
-                    imageUrl={item.product.imageUrl}
-                    alt={item.product.name}
+                    imageUrl={item.product?.imageUrl}
+                    alt={item.product?.name ?? "Produto"}
                     size={40}
                   />
                   <View style={styles.itemsPreviewInfo}>
                     <Text style={styles.itemsPreviewSku}>
-                      {item.product.sku}
+                      {item.product?.sku ?? "SKU indisponível"}
                     </Text>
                     <Text style={styles.itemsPreviewQty}>
                       {item.quantityPicked}/{item.quantityOrdered} un.

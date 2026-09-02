@@ -6,6 +6,16 @@ import {
 import { prisma } from "../lib/prisma.js";
 import { buildPaginationMeta } from "../lib/pagination.js";
 import { marketplaceWhereClause } from "./marketplace-filter.js";
+import {
+  buildIntegrationIssueSummary,
+  loadLastIssues,
+  type IssueDetail,
+} from "./picking-problems.js";
+
+const ISSUE_BOARD_STATUSES: OrderStatus[] = [
+  OrderStatus.PACKING_RETURNED_TO_PICKING,
+  OrderStatus.PAUSED_ISSUE,
+];
 
 export type BoardKind = "all" | "order" | "wave";
 
@@ -13,25 +23,45 @@ const orderListInclude = {
   assignedPicker: { select: { name: true } },
   basket: { select: { code: true } },
   _count: { select: { items: true } },
-  items: { select: { quantityOrdered: true, quantityPicked: true } },
+  items: {
+    select: {
+      quantityOrdered: true,
+      quantityPicked: true,
+      productId: true,
+      erpSku: true,
+      product: { select: { sku: true } },
+    },
+  },
 } as const;
 
-function mapOrderRow(o: {
-  id: string;
-  erpOrderId: string;
-  customerName: string | null;
-  status: OrderStatus;
-  priority: number;
-  collectionDeadline: Date | null;
-  marketplace: string | null;
-  shippingLabel: string | null;
-  createdAt: Date;
-  updatedAt: Date;
-  assignedPicker: { name: string } | null;
-  basket: { code: string } | null;
-  _count: { items: number };
-  items: Array<{ quantityOrdered: number; quantityPicked: number }>;
-}) {
+type OrderListRow = Prisma.OrderGetPayload<{ include: typeof orderListInclude }>;
+
+function mapIssueFields(
+  order: OrderListRow,
+  issue: IssueDetail | undefined,
+): { issueSummary: string | null; issueDetail: IssueDetail | null } {
+  const integrationSummary =
+    order.status === OrderStatus.PAUSED_ISSUE && !issue
+      ? buildIntegrationIssueSummary(order.items)
+      : null;
+  return {
+    issueSummary: issue?.summary ?? integrationSummary,
+    issueDetail: issue ?? null,
+  };
+}
+
+async function mapOrdersWithIssues(orders: OrderListRow[]) {
+  const problemIds = orders
+    .filter((o) => ISSUE_BOARD_STATUSES.includes(o.status))
+    .map((o) => o.id);
+  const issueMap = await loadLastIssues(problemIds);
+  return orders.map((o) => ({
+    ...mapOrderRow(o),
+    ...mapIssueFields(o, issueMap.get(o.id)),
+  }));
+}
+
+function mapOrderRow(o: OrderListRow) {
   return {
     kind: "order" as const,
     id: o.id,
@@ -255,7 +285,7 @@ export async function getOrdersBoard(
       prisma.order.count({ where: orderWhere }),
     ]);
     return {
-      entries: orders.map(mapOrderRow),
+      entries: await mapOrdersWithIssues(orders),
       pagination: buildPaginationMeta(total, page, pageSize),
       counts,
     };
@@ -304,9 +334,12 @@ export async function getOrdersBoard(
     }),
   ]);
 
-  type Merged = ReturnType<typeof mapOrderRow> | ReturnType<typeof mapWaveRow>;
+  const ordersWithIssues = await mapOrdersWithIssues(orders);
+  type Merged =
+    | (typeof ordersWithIssues)[number]
+    | ReturnType<typeof mapWaveRow>;
   const merged: Merged[] = [
-    ...orders.map(mapOrderRow),
+    ...ordersWithIssues,
     ...waves.map(mapWaveRow),
   ].sort(
     (a, b) =>

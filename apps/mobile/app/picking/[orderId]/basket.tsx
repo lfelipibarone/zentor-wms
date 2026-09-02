@@ -115,14 +115,16 @@ export default function BasketScanScreen() {
                 style={[styles.itemRow, item.completed && styles.itemDone]}
               >
                 <ProductThumbnail
-                  imageUrl={item.product.imageUrl}
-                  alt={item.product.name}
+                  imageUrl={item.product?.imageUrl}
+                  alt={item.product?.name ?? "Produto"}
                   size={56}
                 />
                 <View style={styles.itemInfo}>
-                  <Text style={styles.itemSku}>{item.product.sku}</Text>
+                  <Text style={styles.itemSku}>
+                    {item.product?.sku ?? "SKU indisponível"}
+                  </Text>
                   <Text style={styles.itemName} numberOfLines={2}>
-                    {item.product.name}
+                    {item.product?.name ?? "Produto não encontrado"}
                   </Text>
                   <Text style={styles.itemMeta}>
                     {item.quantityOrdered} un.

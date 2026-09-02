@@ -16,6 +16,7 @@ import {
 import { cn } from "@/lib/utils";
 import {
   fetchOrderDetail,
+  type BoardIssueDetail,
   type BoardEntry,
   type BoardOrderEntry,
 } from "@/lib/api/operations";
@@ -40,12 +41,14 @@ export function WorkboardEntryCard({
 }) {
   const isOrder = entry.kind === "order";
   const isActive = isOrder && ACTIVE_STATUSES.has(entry.status);
+  const hasIssue = isOrder && Boolean(entry.issueSummary);
 
   return (
     <div
       className={cn(
         "rounded-xl border bg-white shadow-sm",
         isActive && "border-teal-200 bg-teal-50/30",
+        hasIssue && "border-amber-300 bg-amber-50/40",
       )}
     >
       <div className="flex items-start gap-2 p-4">
@@ -127,6 +130,12 @@ function OrderCardHeader({ order }: { order: BoardOrderEntry }) {
               })}`
             : ""}
         </p>
+        {order.issueSummary ? (
+          <OrderIssueBanner
+            summary={order.issueSummary}
+            detail={order.issueDetail}
+          />
+        ) : null}
       </div>
       <div className="flex flex-col items-end gap-1">
         <OrderStatusBadge status={order.status} />
@@ -134,6 +143,49 @@ function OrderCardHeader({ order }: { order: BoardOrderEntry }) {
           {order.qtyPicked}/{order.qtyOrdered} un.
         </span>
       </div>
+    </div>
+  );
+}
+
+function OrderIssueBanner({
+  summary,
+  detail,
+}: {
+  summary: string;
+  detail?: BoardIssueDetail | null;
+}) {
+  const title =
+    detail?.source === "PACKING"
+      ? "Motivo do retorno (packing)"
+      : detail?.source === "PAUSE"
+        ? "Motivo do problema (separação)"
+        : "Motivo reportado";
+
+  return (
+    <div className="mt-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-950">
+      <p className="font-semibold">{title}</p>
+      {detail?.typeLabel ? (
+        <p>
+          <span className="font-medium">Tipo:</span> {detail.typeLabel}
+        </p>
+      ) : null}
+      {detail?.sku ? (
+        <p>
+          <span className="font-medium">SKU:</span> {detail.sku}
+          {detail.productName ? ` — ${detail.productName}` : ""}
+        </p>
+      ) : null}
+      {detail && detail.quantity > 0 ? (
+        <p>
+          <span className="font-medium">Quantidade:</span> {detail.quantity} un.
+        </p>
+      ) : null}
+      <p className="font-medium">{summary}</p>
+      {detail?.description &&
+      detail.description !== summary &&
+      !summary.includes(detail.description) ? (
+        <p className="text-amber-900">{detail.description}</p>
+      ) : null}
     </div>
   );
 }

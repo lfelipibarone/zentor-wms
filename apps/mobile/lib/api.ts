@@ -107,7 +107,7 @@ export interface PickingItemDto {
   lineNumber: number;
   quantityOrdered: number;
   quantityPicked: number;
-  product: Product;
+  product: Product | null;
   pickLocation: PickLocationDto | null;
   completed: boolean;
 }
@@ -134,7 +134,7 @@ export interface PickingSession {
     quantityOrdered: number;
     quantityPicked: number;
     remaining: number;
-    product: Product;
+    product: Product | null;
     pickLocation: PickLocationDto | null;
     stockMismatchHint?: string | null;
   } | null;

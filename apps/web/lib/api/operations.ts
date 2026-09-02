@@ -2,6 +2,16 @@ import { apiFetch } from "@/lib/api/client";
 import type { PaginationMeta } from "@/lib/pagination";
 import { DEFAULT_PAGE_SIZE } from "@/lib/pagination";
 
+export interface BoardIssueDetail {
+  source: "PACKING" | "PAUSE";
+  typeLabel: string;
+  sku: string;
+  productName: string | null;
+  quantity: number;
+  description: string | null;
+  summary: string;
+}
+
 export interface OrderRow {
   id: string;
   erpOrderId: string;
@@ -16,6 +26,8 @@ export interface OrderRow {
   qtyOrdered: number;
   qtyPicked: number;
   hasShippingLabel?: boolean;
+  issueSummary?: string | null;
+  issueDetail?: BoardIssueDetail | null;
   createdAt: string;
   updatedAt: string;
 }

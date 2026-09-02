@@ -1,6 +1,11 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
+  Keyboard,
+  KeyboardAvoidingView,
   Modal,
+  Platform,
+  Pressable,
+  ScrollView,
   StyleSheet,
   Text,
   TextInput,
@@ -31,51 +36,97 @@ export function ProblemReportModal({
 }: ProblemReportModalProps) {
   const [reason, setReason] = useState("");
 
+  useEffect(() => {
+    if (!visible) setReason("");
+  }, [visible]);
+
+  const handleClose = () => {
+    Keyboard.dismiss();
+    onClose();
+  };
+
+  const handleSubmit = () => {
+    const trimmed = reason.trim();
+    if (!trimmed) return;
+    Keyboard.dismiss();
+    onSubmit(trimmed);
+  };
+
   return (
-    <Modal visible={visible} transparent animationType="fade">
-      <View style={styles.overlay}>
-        <View style={styles.card}>
-          <Text style={styles.title}>Relatar problema</Text>
-          <Text style={styles.subtitle}>
-            O tempo será pausado e a equipe na Web será notificada.
-          </Text>
+    <Modal
+      visible={visible}
+      transparent
+      animationType="fade"
+      onRequestClose={handleClose}
+    >
+      <KeyboardAvoidingView
+        style={styles.flex}
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
+        keyboardVerticalOffset={Platform.OS === "ios" ? 8 : 0}
+      >
+        <Pressable style={styles.overlay} onPress={Keyboard.dismiss}>
+          <Pressable style={styles.card} onPress={() => Keyboard.dismiss()}>
+            <ScrollView
+              keyboardShouldPersistTaps="handled"
+              keyboardDismissMode="on-drag"
+              showsVerticalScrollIndicator={false}
+              contentContainerStyle={styles.scrollContent}
+            >
+              <Text style={styles.title}>Relatar problema</Text>
+              <Text style={styles.subtitle}>
+                O tempo será pausado e a equipe na Web será notificada.
+              </Text>
 
-          <View style={styles.presets}>
-            {PRESETS.map((p) => (
-              <FactoryButton
-                key={p}
-                label={p}
-                variant="secondary"
-                onPress={() => setReason(p)}
-                style={styles.presetBtn}
+              <View style={styles.presets}>
+                {PRESETS.map((p) => (
+                  <FactoryButton
+                    key={p}
+                    label={p}
+                    variant="secondary"
+                    onPress={() => {
+                      Keyboard.dismiss();
+                      setReason(p);
+                    }}
+                    style={styles.presetBtn}
+                  />
+                ))}
+              </View>
+
+              <TextInput
+                style={styles.input}
+                value={reason}
+                onChangeText={setReason}
+                placeholder="Descreva o problema..."
+                placeholderTextColor={theme.textMuted}
+                multiline
+                textAlignVertical="top"
+                blurOnSubmit
+                returnKeyType="done"
+                onSubmitEditing={Keyboard.dismiss}
               />
-            ))}
-          </View>
 
-          <TextInput
-            style={styles.input}
-            value={reason}
-            onChangeText={setReason}
-            placeholder="Descreva o problema..."
-            placeholderTextColor={theme.textMuted}
-            multiline
-          />
-
-          <FactoryButton
-            label="Enviar e pausar"
-            variant="danger"
-            loading={loading}
-            disabled={!reason.trim()}
-            onPress={() => onSubmit(reason.trim())}
-          />
-          <FactoryButton label="Cancelar" variant="secondary" onPress={onClose} />
-        </View>
-      </View>
+              <FactoryButton
+                label="Enviar e pausar"
+                variant="danger"
+                loading={loading}
+                disabled={!reason.trim()}
+                onPress={handleSubmit}
+              />
+              <FactoryButton
+                label="Cancelar"
+                variant="secondary"
+                onPress={handleClose}
+              />
+            </ScrollView>
+          </Pressable>
+        </Pressable>
+      </KeyboardAvoidingView>
     </Modal>
   );
 }
 
 const styles = StyleSheet.create({
+  flex: { flex: 1 },
   overlay: {
     flex: 1,
     backgroundColor: "rgba(0,0,0,0.75)",
@@ -85,9 +136,11 @@ const styles = StyleSheet.create({
     backgroundColor: theme.surface,
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
+    maxHeight: "90%",
+  },
+  scrollContent: {
     padding: spacing.lg,
     gap: spacing.md,
-    maxHeight: "90%",
   },
   title: {
     fontSize: typography.title,
@@ -99,6 +152,7 @@ const styles = StyleSheet.create({
   presetBtn: { minHeight: 52 },
   input: {
     minHeight: 80,
+    maxHeight: 140,
     borderWidth: 2,
     borderColor: theme.border,
     borderRadius: 12,

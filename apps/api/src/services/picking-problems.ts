@@ -82,7 +82,7 @@ function parsePauseIssueLog(reason: string | null): IssueDetail {
   };
 }
 
-async function loadLastIssues(orderIds: string[]) {
+export async function loadLastIssues(orderIds: string[]) {
   const lastIssueByOrder = new Map<string, IssueDetail>();
   if (orderIds.length === 0) return lastIssueByOrder;
 
@@ -115,7 +115,7 @@ function mapOrderIssueFields(issue: IssueDetail | undefined) {
   };
 }
 
-function buildIntegrationIssueSummary(
+export function buildIntegrationIssueSummary(
   items: Array<{
     productId: string | null;
     erpSku: string | null;
