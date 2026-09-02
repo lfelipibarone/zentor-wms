@@ -1,6 +1,12 @@
 import { OrderStatus, PickWaveLineSortStatus, PickWaveStatus } from "@prisma/client";
 import { prisma } from "../lib/prisma.js";
 import { PickWaveError, assertWaveOperatorForMutation } from "./pick-wave.js";
+import { recordOrderStageChange } from "./order-stage-log.js";
+import {
+  ensurePackEndLog,
+  ensurePackStartLog,
+  ensurePickingEndLog,
+} from "./order-time-log-helpers.js";
 
 export interface SortAllocationInput {
   lineId: string;
@@ -12,17 +18,52 @@ export interface SortAllocationInput {
   webPacking?: boolean;
 }
 
-async function checkOrderComplete(orderId: string, tx: Parameters<Parameters<typeof prisma.$transaction>[0]>[0]) {
+async function checkOrderComplete(
+  orderId: string,
+  tenantId: string,
+  userId: string,
+  tx: Parameters<Parameters<typeof prisma.$transaction>[0]>[0],
+) {
   const items = await tx.orderItem.findMany({ where: { orderId } });
   const complete = items.every(
     (i) => i.quantityPicked >= i.quantityOrdered,
   );
-  if (complete) {
-    await tx.order.update({
-      where: { id: orderId },
-      data: { status: OrderStatus.PICKED_AWAITING_CONFERENCE },
-    });
-  }
+  if (!complete) return;
+
+  const order = await tx.order.findUnique({ where: { id: orderId } });
+  if (!order) return;
+  if (order.status === OrderStatus.PICKED_AWAITING_CONFERENCE) return;
+
+  await tx.order.update({
+    where: { id: orderId },
+    data: { status: OrderStatus.PICKED_AWAITING_CONFERENCE },
+  });
+  await recordOrderStageChange(tx, {
+    tenantId,
+    orderId,
+    fromStatus: order.status,
+    toStatus: OrderStatus.PICKED_AWAITING_CONFERENCE,
+    userId,
+  });
+  await ensurePickingEndLog(tx, orderId, userId);
+}
+
+async function checkOrderSortComplete(
+  orderId: string,
+  userId: string,
+  tx: Parameters<Parameters<typeof prisma.$transaction>[0]>[0],
+) {
+  const allocations = await tx.pickWaveAllocation.findMany({
+    where: { orderItem: { orderId } },
+  });
+  if (allocations.length === 0) return;
+
+  const allSorted = allocations.every(
+    (a) => a.quantitySorted >= a.quantity,
+  );
+  if (!allSorted) return;
+
+  await ensurePackEndLog(tx, orderId, userId);
 }
 
 export async function confirmSortAllocation(input: SortAllocationInput) {
@@ -76,8 +117,12 @@ export async function confirmSortAllocation(input: SortAllocationInput) {
   const newSorted = alloc.quantitySorted + quantity;
   const allocComplete = newSorted >= alloc.quantity;
   const now = new Date();
+  const orderId = alloc.orderItem.orderId;
+  const tenantId = line.wave.tenantId;
 
   await prisma.$transaction(async (tx) => {
+    await ensurePackStartLog(tx, orderId, input.userId);
+
     await tx.pickWaveAllocation.update({
       where: { id: alloc.id },
       data: {
@@ -90,7 +135,7 @@ export async function confirmSortAllocation(input: SortAllocationInput) {
 
     if (basketId && alloc.orderItem.order.basketId !== basketId) {
       await tx.order.update({
-        where: { id: alloc.orderItem.orderId },
+        where: { id: orderId },
         data: { basketId },
       });
     }
@@ -108,7 +153,8 @@ export async function confirmSortAllocation(input: SortAllocationInput) {
       });
     }
 
-    await checkOrderComplete(alloc.orderItem.orderId, tx);
+    await checkOrderComplete(orderId, tenantId, input.userId, tx);
+    await checkOrderSortComplete(orderId, input.userId, tx);
   });
 
   const updatedAlloc = await prisma.pickWaveAllocation.findUnique({

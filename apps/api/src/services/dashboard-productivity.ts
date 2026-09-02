@@ -5,6 +5,12 @@ import {
   OrderTimeLogEvent,
 } from "@prisma/client";
 import { prisma } from "../lib/prisma.js";
+import {
+  getDashboardStageMetrics,
+  type DashboardStageMetrics,
+} from "./dashboard-operations-metrics.js";
+
+export type { DashboardStageMetrics };
 
 export interface DashboardProductivityDto {
   kpis: {
@@ -36,6 +42,7 @@ export interface DashboardProductivityDto {
     minThreshold: number;
     capacity: number;
   }>;
+  stageMetrics: DashboardStageMetrics;
   updatedAt: string;
 }
 
@@ -92,6 +99,7 @@ export async function getDashboardProductivity(
     endLogsYesterday,
     enteredDispatchToday,
     enteredDispatchYesterday,
+    stageMetrics,
   ] = await Promise.all([
     prisma.order.count({ where: { tenantId, status: OrderStatus.PENDING } }),
     prisma.order.count({
@@ -162,6 +170,7 @@ export async function getDashboardProductivity(
         updatedAt: { gte: yesterdayStart, lte: yesterdayEnd },
       },
     }),
+    getDashboardStageMetrics(tenantId),
   ]);
 
   // Prisma não suporta comparar duas colunas no where — filtro em memória
@@ -234,6 +243,7 @@ export async function getDashboardProductivity(
     hourly,
     pickerRanking,
     shelfAlerts,
+    stageMetrics,
     updatedAt: now.toISOString(),
   };
 }

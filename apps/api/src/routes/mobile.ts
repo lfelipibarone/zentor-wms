@@ -599,20 +599,31 @@ export async function mobileRoutes(app: FastifyInstance) {
       const order = await prisma.order.findUnique({ where: { id: orderId } });
       if (!order) return reply.status(404).send({ error: "Pedido não encontrado" });
 
-      await prisma.$transaction([
-        prisma.order.update({
+      await prisma.$transaction(async (tx) => {
+        await tx.order.update({
           where: { id: orderId },
           data: { status: OrderStatus.PAUSED_ISSUE },
-        }),
-        prisma.orderTimeLog.create({
+        });
+        const { recordOrderStageChange } = await import(
+          "../services/order-stage-log.js"
+        );
+        await recordOrderStageChange(tx, {
+          tenantId: order.tenantId,
+          orderId,
+          fromStatus: order.status,
+          toStatus: OrderStatus.PAUSED_ISSUE,
+          userId,
+          reason,
+        });
+        await tx.orderTimeLog.create({
           data: {
             orderId,
             userId,
             event: OrderTimeLogEvent.PAUSE,
             reason,
           },
-        }),
-      ]);
+        });
+      });
 
       return { status: OrderStatus.PAUSED_ISSUE, notified: true };
     }
@@ -637,19 +648,29 @@ export async function mobileRoutes(app: FastifyInstance) {
         return reply.status(400).send({ error: "Ainda há itens pendentes" });
       }
 
-      await prisma.$transaction([
-        prisma.order.update({
+      await prisma.$transaction(async (tx) => {
+        await tx.order.update({
           where: { id: orderId },
           data: { status: OrderStatus.PICKED_AWAITING_CONFERENCE },
-        }),
-        prisma.orderTimeLog.create({
+        });
+        const { recordOrderStageChange } = await import(
+          "../services/order-stage-log.js"
+        );
+        await recordOrderStageChange(tx, {
+          tenantId: order.tenantId,
+          orderId,
+          fromStatus: order.status,
+          toStatus: OrderStatus.PICKED_AWAITING_CONFERENCE,
+          userId,
+        });
+        await tx.orderTimeLog.create({
           data: {
             orderId,
             userId,
             event: OrderTimeLogEvent.END,
           },
-        }),
-      ]);
+        });
+      });
 
       return { status: OrderStatus.PICKED_AWAITING_CONFERENCE };
     }

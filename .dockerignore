@@ -9,7 +9,8 @@ dist
 **/.env
 **/.env.*
 !**/.env.example
-apps/mobile
+apps/mobile/*
+!apps/mobile/package.json
 docs
 **/*.md
 **/coverage

@@ -255,9 +255,19 @@ export async function resumePausedOrdersAfterPickFace(
     );
     if (blocked) continue;
 
-    await prisma.order.update({
-      where: { id: order.id },
-      data: { status: OrderStatus.PENDING },
+    await prisma.$transaction(async (tx) => {
+      await tx.order.update({
+        where: { id: order.id },
+        data: { status: OrderStatus.PENDING },
+      });
+      const { recordOrderStageChange } = await import("./order-stage-log.js");
+      await recordOrderStageChange(tx, {
+        tenantId,
+        orderId: order.id,
+        fromStatus: OrderStatus.PAUSED_ISSUE,
+        toStatus: OrderStatus.PENDING,
+        userId: null,
+      });
     });
     await enrichOrderPriority(order.id);
     resumedOrderIds.push(order.id);

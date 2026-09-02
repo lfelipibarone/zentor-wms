@@ -8,6 +8,9 @@ import { KpiCards } from "./kpi-cards";
 import { HourlyChart } from "./hourly-chart";
 import { PickerRanking } from "./picker-ranking";
 import { ShelfAlerts } from "./shelf-alerts";
+import { StageMetricsCards } from "./stage-metrics-cards";
+import { ReturnsByReasonChart } from "./returns-by-reason-chart";
+import { StageDurationChart } from "./stage-duration-chart";
 
 export function DashboardView() {
   const [data, setData] = useState<DashboardProductivity | null>(null);
@@ -85,6 +88,21 @@ export function DashboardView() {
       </header>
 
       <KpiCards kpis={data.kpis} />
+
+      <div>
+        <h2 className="mb-4 text-lg font-semibold tracking-tight">
+          Tempos e devoluções
+        </h2>
+        <div className="space-y-6">
+          <StageMetricsCards metrics={data.stageMetrics} />
+          <section className="grid gap-6 lg:grid-cols-2">
+            <StageDurationChart metrics={data.stageMetrics} />
+            <ReturnsByReasonChart
+              data={data.stageMetrics.packingReturns.byReason}
+            />
+          </section>
+        </div>
+      </div>
 
       <section className="grid gap-6 lg:grid-cols-3">
         <div className="lg:col-span-2">

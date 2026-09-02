@@ -2127,14 +2127,28 @@ export async function webRoutes(app: FastifyInstance) {
         return reply.status(400).send({ error: "Pedido não está na fila de expedição" });
       }
 
-      const updated = await prisma.order.update({
-        where: { id: order.id },
-        data: {
-          status: next,
-          ...(next === OrderStatus.DISPATCHED
-            ? { dispatchedAt: new Date() }
-            : {}),
-        },
+      const updated = await prisma.$transaction(async (tx) => {
+        const row = await tx.order.update({
+          where: { id: order.id },
+          data: {
+            status: next,
+            ...(next === OrderStatus.DISPATCHED
+              ? { dispatchedAt: new Date() }
+              : {}),
+          },
+        });
+        const { recordOrderStageChange } = await import(
+          "../services/order-stage-log.js"
+        );
+        const userId = request.authUser!.id;
+        await recordOrderStageChange(tx, {
+          tenantId: order.tenantId,
+          orderId: order.id,
+          fromStatus: order.status,
+          toStatus: next,
+          userId,
+        });
+        return row;
       });
 
       if (next === OrderStatus.DISPATCHING) {

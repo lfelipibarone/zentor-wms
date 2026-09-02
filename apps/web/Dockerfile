@@ -18,7 +18,8 @@ COPY apps/web ./apps/web
 ARG NEXT_PUBLIC_API_URL
 ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
 RUN pnpm --filter @wms/shared build \
-  && pnpm --filter @wms/web build
+  && pnpm --filter @wms/web build \
+  && mkdir -p apps/web/public
 
 FROM base AS runner
 ENV NODE_ENV=production

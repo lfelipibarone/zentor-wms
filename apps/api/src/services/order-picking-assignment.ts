@@ -1,5 +1,7 @@
-import { OrderStatus } from "@prisma/client";
+import { OrderStatus, OrderTimeLogEvent } from "@prisma/client";
 import { prisma } from "../lib/prisma.js";
+import { recordOrderStageChange } from "./order-stage-log.js";
+import { ensureResumeAfterPause } from "./order-time-log-helpers.js";
 
 const ACCEPTABLE_STATUSES: OrderStatus[] = [
   OrderStatus.PENDING,
@@ -55,12 +57,21 @@ export async function releaseOrderAccept(
     );
   }
 
-  await prisma.order.update({
-    where: { id: orderId },
-    data: {
-      status: OrderStatus.PENDING,
-      assignedPickerId: null,
-    },
+  await prisma.$transaction(async (tx) => {
+    await tx.order.update({
+      where: { id: orderId },
+      data: {
+        status: OrderStatus.PENDING,
+        assignedPickerId: null,
+      },
+    });
+    await recordOrderStageChange(tx, {
+      tenantId,
+      orderId,
+      fromStatus: order.status,
+      toStatus: OrderStatus.PENDING,
+      userId,
+    });
   });
 
   return { released: true, status: OrderStatus.PENDING };
@@ -117,18 +128,38 @@ export async function acceptOrderForPicking(
     );
   }
 
-  const result = await prisma.order.updateMany({
-    where: {
-      id: orderId,
+  const fromStatus = order.status;
+
+  const result = await prisma.$transaction(async (tx) => {
+    const updateResult = await tx.order.updateMany({
+      where: {
+        id: orderId,
+        tenantId,
+        status: { in: ACCEPTABLE_STATUSES },
+      },
+      data: {
+        status: OrderStatus.PICKING,
+        assignedPickerId: userId,
+      },
+    });
+    if (updateResult.count === 0) return 0;
+
+    await recordOrderStageChange(tx, {
       tenantId,
-      status: { in: ACCEPTABLE_STATUSES },
-    },
-    data: {
-      status: OrderStatus.PICKING,
-      assignedPickerId: userId,
-    },
+      orderId,
+      fromStatus,
+      toStatus: OrderStatus.PICKING,
+      userId,
+    });
+
+    if (fromStatus === OrderStatus.PAUSED_ISSUE) {
+      await ensureResumeAfterPause(tx, orderId, userId);
+    }
+
+    return updateResult.count;
   });
-  if (result.count === 0) {
+
+  if (result === 0) {
     throw new OrderPickingAssignmentError(
       "Pedido já aceito ou indisponível na fila",
       409,
