@@ -1,6 +1,3 @@
 packages:
   - "apps/*"
   - "packages/*"
-
-# Prefer hoisted installs for Expo native builds (see .npmrc node-linker).
-nodeLinker: hoisted
