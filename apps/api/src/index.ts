@@ -1,5 +1,6 @@
 import Fastify from "fastify";
 import cors from "@fastify/cors";
+import { ensureDatabaseReady } from "./lib/ensure-db.js";
 import { adminRoutes } from "./routes/admin.js";
 import { authRoutes } from "./routes/auth.js";
 import { mobileRoutes } from "./routes/mobile.js";
@@ -18,6 +19,8 @@ const PORT = Number(process.env.PORT ?? 3333);
 const HOST = process.env.HOST ?? "0.0.0.0";
 
 async function main() {
+  await ensureDatabaseReady();
+
   const app = Fastify({ logger: true });
 
   await app.register(cors, {

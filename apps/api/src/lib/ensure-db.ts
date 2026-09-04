@@ -1,0 +1,82 @@
+import { execFileSync } from "node:child_process";
+import { createRequire } from "node:module";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
+import { prisma } from "./prisma.js";
+
+/** apps/api (dist/lib → .. → apps/api) */
+const apiRoot = join(dirname(fileURLToPath(import.meta.url)), "..");
+const requireFromApi = createRequire(join(apiRoot, "package.json"));
+
+function resolvePackageCli(pkg: string): string {
+  const pkgJsonPath = requireFromApi.resolve(`${pkg}/package.json`);
+  const pkgJson = requireFromApi(pkgJsonPath) as {
+    bin?: string | Record<string, string>;
+  };
+  const binField = pkgJson.bin;
+  const binRel =
+    typeof binField === "string"
+      ? binField
+      : (binField?.[pkg] ?? Object.values(binField ?? {})[0]);
+  if (!binRel) {
+    throw new Error(`Pacote ${pkg} sem bin`);
+  }
+  return join(dirname(pkgJsonPath), binRel);
+}
+
+function runCli(pkg: string, args: string[]) {
+  const entry = resolvePackageCli(pkg);
+  execFileSync(process.execPath, [entry, ...args], {
+    cwd: apiRoot,
+    env: process.env,
+    stdio: "inherit",
+  });
+}
+
+/**
+ * Aplica schema Prisma (+ seed se banco vazio) antes de aceitar tráfego.
+ * Roda dentro do `node .../index.js` — independente de Docker/Nixpacks CMD.
+ * Desligar: WMS_SKIP_DB_ENSURE=1
+ */
+export async function ensureDatabaseReady(): Promise<void> {
+  if (
+    process.env.WMS_SKIP_DB_ENSURE === "1" ||
+    process.env.WMS_SKIP_DB_ENSURE === "true"
+  ) {
+    console.log("[ensure-db] pulado (WMS_SKIP_DB_ENSURE)");
+    return;
+  }
+
+  if (!process.env.DATABASE_URL) {
+    console.warn("[ensure-db] DATABASE_URL ausente — pulando");
+    return;
+  }
+
+  console.log("[ensure-db] aplicando schema (prisma db push)...");
+  runCli("prisma", ["db", "push", "--skip-generate"]);
+
+  const forceSeed =
+    process.env.WMS_AUTO_SEED === "1" ||
+    process.env.WMS_AUTO_SEED === "true";
+
+  let tenantCount = 0;
+  try {
+    tenantCount = await prisma.tenant.count();
+  } catch (err) {
+    console.warn(
+      "[ensure-db] falha ao contar tenants após push:",
+      err instanceof Error ? err.message : err,
+    );
+  }
+
+  if (forceSeed || tenantCount === 0) {
+    console.log(
+      forceSeed
+        ? "[ensure-db] WMS_AUTO_SEED=1 — rodando seed..."
+        : "[ensure-db] banco sem tenants — rodando seed...",
+    );
+    runCli("tsx", ["prisma/seed.ts"]);
+  }
+
+  console.log("[ensure-db] ok");
+}
