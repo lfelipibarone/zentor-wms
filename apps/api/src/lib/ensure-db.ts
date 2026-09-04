@@ -4,8 +4,9 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { prisma } from "./prisma.js";
 
-/** apps/api (dist/lib → .. → apps/api) */
-const apiRoot = join(dirname(fileURLToPath(import.meta.url)), "..");
+/** apps/api — funciona a partir de dist/lib ou src/lib */
+const apiRoot = join(dirname(fileURLToPath(import.meta.url)), "../..");
+const schemaPath = join(apiRoot, "prisma", "schema.prisma");
 const requireFromApi = createRequire(join(apiRoot, "package.json"));
 
 function resolvePackageCli(pkg: string): string {
@@ -52,8 +53,15 @@ export async function ensureDatabaseReady(): Promise<void> {
     return;
   }
 
+  const { existsSync } = await import("node:fs");
+  if (!existsSync(schemaPath)) {
+    throw new Error(
+      `[ensure-db] schema não encontrado em ${schemaPath} (cwd apiRoot=${apiRoot})`,
+    );
+  }
+
   console.log("[ensure-db] aplicando schema (prisma db push)...");
-  runCli("prisma", ["db", "push", "--skip-generate"]);
+  runCli("prisma", ["db", "push", "--skip-generate", "--schema", schemaPath]);
 
   const forceSeed =
     process.env.WMS_AUTO_SEED === "1" ||
