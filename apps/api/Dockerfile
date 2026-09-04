@@ -26,7 +26,9 @@ FROM base AS runner
 ENV NODE_ENV=production
 ENV PORT=3333
 ENV HOST=0.0.0.0
+# Homolog: aplica schema (+ seed se banco vazio) antes de subir a API
+ENV WMS_AUTO_SEED=1
 COPY --from=build /app /app
 EXPOSE 3333
-# Usa env do Dokploy (não depende de arquivo .env)
-CMD ["node", "apps/api/dist/index.js"]
+# Usa env do Dokploy (DATABASE_URL etc.). Não depende de arquivo .env
+CMD ["pnpm", "--filter", "@wms/api", "start:homolog"]

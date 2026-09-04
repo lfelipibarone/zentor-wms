@@ -1,5 +1,5 @@
-# Fallback quando Dokploy usa Nixpacks (monorepo pnpm).
-# Cada app deve sobrescrever build/start via env NIXPACKS_* no Dokploy.
+# Fallback se alguma app no Dokploy ainda usar Nixpacks.
+# Preferência do time: build Docker (apps/api/Dockerfile, apps/web/Dockerfile).
 
 [phases.setup]
 nixPkgs = ["nodejs_20", "openssl"]
@@ -19,4 +19,4 @@ cmds = [
 ]
 
 [start]
-cmd = "node apps/api/dist/index.js"
+cmd = "pnpm --filter @wms/api start:homolog"
