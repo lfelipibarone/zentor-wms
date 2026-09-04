@@ -6,6 +6,16 @@ function reportFilename(result: ReportResult, ext: string): string {
   return `help-route-${result.report}-${period}.${ext}`;
 }
 
+function sanitizeSheetName(name: string): string {
+  return name.replace(/[:\\/?*[\]]/g, " ").trim().slice(0, 31) || "Relatorio";
+}
+
+function cellValue(value: string | number | null | undefined): string | number {
+  if (value === null || value === undefined) return "";
+  if (typeof value === "number") return value;
+  return String(value);
+}
+
 function rowsForExport(result: ReportResult): string[][] {
   const header = result.columns.map((c) => c.header);
   const body = result.rows.map((row) =>
@@ -18,21 +28,36 @@ function rowsForExport(result: ReportResult): string[][] {
   return [header, ...body];
 }
 
+function triggerBlobDownload(blob: Blob, filename: string): void {
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement("a");
+  anchor.href = url;
+  anchor.download = filename;
+  anchor.rel = "noopener";
+  document.body.appendChild(anchor);
+  anchor.click();
+  anchor.remove();
+  URL.revokeObjectURL(url);
+}
+
 export async function exportReportXlsx(result: ReportResult): Promise<void> {
   const XLSX = await import("xlsx");
   const sheetData = result.rows.map((row) => {
     const line: Record<string, string | number> = {};
     for (const col of result.columns) {
-      const v = row[col.key];
-      line[col.header] = v === null || v === undefined ? "" : v;
+      line[col.header] = cellValue(row[col.key]);
     }
     return line;
   });
 
   const ws = XLSX.utils.json_to_sheet(sheetData);
   const wb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, ws, result.title.slice(0, 31));
-  XLSX.writeFile(wb, reportFilename(result, "xlsx"));
+  XLSX.utils.book_append_sheet(wb, ws, sanitizeSheetName(result.title));
+  const buffer = XLSX.write(wb, { bookType: "xlsx", type: "array" });
+  const blob = new Blob([buffer], {
+    type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  });
+  triggerBlobDownload(blob, reportFilename(result, "xlsx"));
 }
 
 export async function exportReportPdf(result: ReportResult): Promise<void> {

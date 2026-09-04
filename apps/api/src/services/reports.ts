@@ -11,9 +11,14 @@ import { marketplaceWhereClause } from "./marketplace-filter.js";
 import { marketplaceDisplayLabel } from "./marketplace-priority.js";
 
 import {
+  loadPickerNamesBeforeEvents,
+  pickerAttributionKey,
+} from "./picker-attribution.js";
+import {
   buildOperationTimeReport,
   OPERATION_TIME_REPORT_IDS,
 } from "./operation-time-reports.js";
+import { buildOrderOperationTimelineReport } from "./order-operation-timeline.js";
 import {
   fmtDateBr,
   type ReportColumn,
@@ -33,6 +38,7 @@ export const REPORT_IDS = [
   "low_stock",
   "packing_issues",
   "volume_by_marketplace",
+  "order_operation_timeline",
   ...OPERATION_TIME_REPORT_IDS,
 ] as const;
 
@@ -53,6 +59,7 @@ export const REPORTS_WITH_MARKETPLACE_FILTER = new Set<ReportId>([
   "packing_issues",
   "picking_time_by_order",
   "packing_time_by_order",
+  "order_operation_timeline",
 ]);
 
 function withMarketplaceFilter(
@@ -80,13 +87,25 @@ export function endOfDay(date: Date): Date {
   return d;
 }
 
+/** Interpreta "YYYY-MM-DD" como dia civil local (evita deslocamento UTC). */
+function parseLocalDateString(dateStr: string): Date {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(dateStr.trim());
+  if (!match) {
+    return new Date(dateStr);
+  }
+  const year = Number(match[1]);
+  const month = Number(match[2]);
+  const day = Number(match[3]);
+  return new Date(year, month - 1, day);
+}
+
 export function parseDateRange(
   fromStr?: string,
   toStr?: string,
 ): { from: Date; to: Date } {
   const now = new Date();
-  const from = fromStr ? startOfDay(new Date(fromStr)) : startOfDay(now);
-  const to = toStr ? endOfDay(new Date(toStr)) : endOfDay(now);
+  const from = fromStr ? startOfDay(parseLocalDateString(fromStr)) : startOfDay(now);
+  const to = toStr ? endOfDay(parseLocalDateString(toStr)) : endOfDay(now);
   if (Number.isNaN(from.getTime()) || Number.isNaN(to.getTime())) {
     throw new Error("Datas inválidas");
   }
@@ -132,6 +151,7 @@ export function reportTitle(id: ReportId): string {
     low_stock: "Gôndolas abaixo do mínimo",
     packing_issues: "Incidentes no packing",
     volume_by_marketplace: "Volume por marketplace",
+    order_operation_timeline: "Tempos por etapa do pedido (segundos)",
     picking_time_by_order: "Tempo de picking por pedido",
     picking_time_by_user: "Tempo de picking por operador",
     packing_time_by_order: "Tempo de packing por pedido",
@@ -183,6 +203,13 @@ export async function runReport(params: {
       return buildPackingIssuesReport(tenantId, from, to, marketplace);
     case "volume_by_marketplace":
       return buildVolumeByMarketplaceReport(tenantId, from, to);
+    case "order_operation_timeline":
+      return (await buildOrderOperationTimelineReport(
+        tenantId,
+        from,
+        to,
+        marketplace,
+      )) as ReportResult;
     case "picking_time_by_order":
     case "picking_time_by_user":
     case "packing_time_by_order":
@@ -371,7 +398,7 @@ async function buildPickingReport(
 
   const rows = movements.map((m) => ({
     dataHora: fmtDateBr(m.createdAt),
-    operador: m.user.name,
+    operador: m.user?.name ?? "—",
     pedidoErp: m.order?.erpOrderId ?? null,
     sku: m.product.sku,
     produto: m.product.name,
@@ -440,7 +467,7 @@ async function buildPackingsReport(
   const rows: Record<string, string | number | null>[] = [];
   for (const order of orders) {
     const packLog = order.timeLogs[0];
-    const operator = packLog?.user.name ?? "—";
+    const operator = packLog?.user?.name ?? "—";
     const dataHora = packLog
       ? fmtDateBr(packLog.createdAt)
       : fmtDateBr(order.updatedAt);
@@ -513,6 +540,10 @@ async function buildPackingIssuesReport(
     },
   });
 
+  const pickerNames = await loadPickerNamesBeforeEvents(
+    logs.map((log) => ({ orderId: log.orderId, before: log.createdAt })),
+  );
+
   const rows = logs.map((log) => {
     let parsed: {
       sku?: string;
@@ -531,6 +562,8 @@ async function buildPackingIssuesReport(
     const typeLabel = parsed.type
       ? PACKING_ISSUE_TYPE_LABEL[parsed.type] ?? parsed.type
       : null;
+    const pickerName =
+      pickerNames.get(pickerAttributionKey(log.orderId, log.createdAt)) ?? null;
     return {
       dataHora: fmtDateBr(log.createdAt),
       pedidoErp: log.order?.erpOrderId ?? null,
@@ -541,7 +574,8 @@ async function buildPackingIssuesReport(
       tipo: typeLabel,
       quantidade: parsed.quantity ?? null,
       descricao: parsed.description || null,
-      reportadoPor: log.user.name,
+      separadoPor: pickerName,
+      reportadoPor: log.user?.name ?? null,
     };
   });
 
@@ -560,7 +594,8 @@ async function buildPackingIssuesReport(
       { key: "tipo", header: "Tipo" },
       { key: "quantidade", header: "Qtd" },
       { key: "descricao", header: "Descrição" },
-      { key: "reportadoPor", header: "Reportado por" },
+      { key: "separadoPor", header: "Separado por" },
+      { key: "reportadoPor", header: "Reportado por (conferência)" },
     ],
     rows,
     totalRows: rows.length,
@@ -708,7 +743,7 @@ async function buildMovementsReport(
     sku: m.product.sku,
     produto: m.product.name,
     quantidade: m.quantity,
-    operador: m.user.name,
+    operador: m.user?.name ?? "—",
     localOrigem: m.fromLocation?.barcode ?? null,
     localDestino: m.toLocation?.barcode ?? null,
     pedidoErp: m.order?.erpOrderId ?? null,

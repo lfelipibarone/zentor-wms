@@ -13,6 +13,7 @@ export type ReportId =
   | "movements"
   | "low_stock"
   | "packing_issues"
+  | "order_operation_timeline"
   | "picking_time_by_order"
   | "picking_time_by_user"
   | "packing_time_by_order"
@@ -47,9 +48,15 @@ export function defaultReportPeriod(): { from: string; to: string } {
   const to = new Date();
   const from = new Date();
   from.setDate(from.getDate() - 6);
+  const fmt = (d: Date) => {
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, "0");
+    const day = String(d.getDate()).padStart(2, "0");
+    return `${y}-${m}-${day}`;
+  };
   return {
-    from: from.toISOString().slice(0, 10),
-    to: to.toISOString().slice(0, 10),
+    from: fmt(from),
+    to: fmt(to),
   };
 }
 

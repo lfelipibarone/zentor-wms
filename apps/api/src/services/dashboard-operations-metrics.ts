@@ -23,12 +23,28 @@ export interface ReturnReasonCount {
   count: number;
 }
 
+export interface PackingReturnDetail {
+  orderId: string;
+  erpOrderId: string;
+  issueType: string;
+  issueLabel: string;
+  sku: string;
+  productName: string | null;
+  quantity: number;
+  reportedAt: string;
+  pickerId: string | null;
+  pickerName: string | null;
+  reportedById: string | null;
+  reportedByName: string | null;
+}
+
 export interface PackingReturnMetrics {
   countToday: number;
   inQueue: number;
   avgResolutionSec: number;
   deltaVsYesterday?: number;
   byReason: ReturnReasonCount[];
+  recentReturns: PackingReturnDetail[];
 }
 
 export interface DashboardStageMetrics {
@@ -300,6 +316,67 @@ function parseIssueType(reason: string | null): PackingIssueType | null {
   }
 }
 
+function parseIssuePayload(reason: string | null): {
+  type: PackingIssueType | "UNKNOWN";
+  label: string;
+  sku: string;
+  productName: string | null;
+  quantity: number;
+} {
+  const type = parseIssueType(reason) ?? "UNKNOWN";
+  let sku = "";
+  let productName: string | null = null;
+  let quantity = 0;
+  if (reason) {
+    try {
+      const parsed = JSON.parse(reason) as {
+        sku?: string;
+        productName?: string;
+        quantity?: number;
+      };
+      sku = parsed.sku ?? "";
+      productName = parsed.productName?.trim() || null;
+      quantity = parsed.quantity ?? 0;
+    } catch {
+      /* ignore */
+    }
+  }
+  const label =
+    type in PACKING_ISSUE_TYPE_LABEL
+      ? PACKING_ISSUE_TYPE_LABEL[type as PackingIssueType]
+      : "Outro";
+  return { type, label, sku, productName, quantity };
+}
+
+function resolvePickerBefore(
+  orderId: string,
+  before: Date,
+  stageByOrder: Map<
+    string,
+    Array<{
+      createdAt: Date;
+      user: { id: string; name: string } | null;
+    }>
+  >,
+  endByOrder: Map<
+    string,
+    Array<{
+      createdAt: Date;
+      user: { id: string; name: string } | null;
+    }>
+  >,
+): { id: string; name: string } | null {
+  const stages = stageByOrder.get(orderId) ?? [];
+  for (const stage of stages) {
+    if (stage.createdAt < before && stage.user) return stage.user;
+  }
+  const ends = endByOrder.get(orderId) ?? [];
+  for (const end of ends) {
+    if (end.createdAt < before && end.user) return end.user;
+  }
+  return null;
+}
+
 async function fetchPackingReturnMetrics(
   tenantId: string,
   todayStart: Date,
@@ -335,8 +412,12 @@ async function fetchPackingReturnMetrics(
           event: OrderTimeLogEvent.PACK_REPORT_ISSUE,
           createdAt: { gte: todayStart, lte: todayEnd },
         },
-        select: { orderId: true, reason: true, createdAt: true },
-        orderBy: { createdAt: "asc" },
+        include: {
+          order: { select: { erpOrderId: true } },
+          user: { select: { id: true, name: true } },
+        },
+        orderBy: { createdAt: "desc" },
+        take: 30,
       }),
     ]);
 
@@ -360,8 +441,74 @@ async function fetchPackingReturnMetrics(
   const issueOrderIds = [...new Set(issueLogs.map((l) => l.orderId))];
   let resolutionTotalSec = 0;
   let resolutionCount = 0;
+  let recentReturns: PackingReturnDetail[] = [];
 
   if (issueOrderIds.length > 0) {
+    const [stageLogs, pickEndLogs] = await Promise.all([
+      prisma.orderStageLog.findMany({
+        where: {
+          orderId: { in: issueOrderIds },
+          toStatus: OrderStatus.PICKED_AWAITING_CONFERENCE,
+          userId: { not: null },
+        },
+        select: {
+          orderId: true,
+          createdAt: true,
+          user: { select: { id: true, name: true } },
+        },
+        orderBy: { createdAt: "desc" },
+      }),
+      prisma.orderTimeLog.findMany({
+        where: {
+          orderId: { in: issueOrderIds },
+          event: OrderTimeLogEvent.END,
+        },
+        select: {
+          orderId: true,
+          createdAt: true,
+          user: { select: { id: true, name: true } },
+        },
+        orderBy: { createdAt: "desc" },
+      }),
+    ]);
+
+    const stageByOrder = new Map<string, typeof stageLogs>();
+    for (const log of stageLogs) {
+      const list = stageByOrder.get(log.orderId) ?? [];
+      list.push(log);
+      stageByOrder.set(log.orderId, list);
+    }
+    const endByOrder = new Map<string, typeof pickEndLogs>();
+    for (const log of pickEndLogs) {
+      const list = endByOrder.get(log.orderId) ?? [];
+      list.push(log);
+      endByOrder.set(log.orderId, list);
+    }
+
+    recentReturns = issueLogs.map((issue) => {
+      const payload = parseIssuePayload(issue.reason);
+      const picker = resolvePickerBefore(
+        issue.orderId,
+        issue.createdAt,
+        stageByOrder,
+        endByOrder,
+      );
+      return {
+        orderId: issue.orderId,
+        erpOrderId: issue.order.erpOrderId,
+        issueType: payload.type,
+        issueLabel: payload.label,
+        sku: payload.sku,
+        productName: payload.productName,
+        quantity: payload.quantity,
+        reportedAt: issue.createdAt.toISOString(),
+        pickerId: picker?.id ?? null,
+        pickerName: picker?.name ?? null,
+        reportedById: issue.user?.id ?? null,
+        reportedByName: issue.user?.name ?? null,
+      };
+    });
+
     const packEndLogs = await prisma.orderTimeLog.findMany({
       where: {
         orderId: { in: issueOrderIds },
@@ -371,15 +518,15 @@ async function fetchPackingReturnMetrics(
       orderBy: { createdAt: "asc" },
     });
 
-    const endByOrder = new Map<string, Date[]>();
+    const packEndByOrder = new Map<string, Date[]>();
     for (const log of packEndLogs) {
-      const list = endByOrder.get(log.orderId) ?? [];
+      const list = packEndByOrder.get(log.orderId) ?? [];
       list.push(log.createdAt);
-      endByOrder.set(log.orderId, list);
+      packEndByOrder.set(log.orderId, list);
     }
 
     for (const issue of issueLogs) {
-      const ends = endByOrder.get(issue.orderId) ?? [];
+      const ends = packEndByOrder.get(issue.orderId) ?? [];
       const nextEnd = ends.find((d) => d.getTime() > issue.createdAt.getTime());
       if (nextEnd) {
         resolutionTotalSec += msToSeconds(
@@ -399,6 +546,7 @@ async function fetchPackingReturnMetrics(
         : 0,
     deltaVsYesterday: pctDelta(returnsToday, returnsYesterday),
     byReason,
+    recentReturns,
   };
 }
 

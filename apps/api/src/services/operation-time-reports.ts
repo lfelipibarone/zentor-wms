@@ -121,7 +121,7 @@ async function fetchIndividualPickingRows(
     rows.push({
       pedidoErp: endLog.order.erpOrderId,
       marketplace: marketplaceDisplayLabel(endLog.order.marketplace),
-      operador: startLog.user.name,
+      operador: startLog.user?.name ?? "—",
       origem: "INDIVIDUAL",
       inicio: fmtDateBr(startLog.createdAt),
       fim: fmtDateBr(endLog.createdAt),
@@ -268,7 +268,7 @@ async function fetchIndividualPackingRows(
     rows.push({
       pedidoErp: endLog.order.erpOrderId,
       marketplace: marketplaceDisplayLabel(endLog.order.marketplace),
-      operador: startLog.user.name,
+      operador: startLog.user?.name ?? "—",
       origem: "INDIVIDUAL",
       inicio: fmtDateBr(startLog.createdAt),
       fim: fmtDateBr(endLog.createdAt),

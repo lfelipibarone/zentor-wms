@@ -2241,6 +2241,15 @@ export async function webRoutes(app: FastifyInstance) {
         group: "operational",
       },
       {
+        id: "order_operation_timeline",
+        label: "Tempos por etapa (segundos)",
+        description:
+          "Separação, embalagem até o erro, correção e embalagem final — por pedido, em segundos",
+        requiresPeriod: true,
+        group: "operation_times",
+        acceptsMarketplaceFilter: true,
+      },
+      {
         id: "picking_time_by_order",
         label: "Tempo de picking por pedido",
         description: "Duração de separação por pedido (onda e individual)",

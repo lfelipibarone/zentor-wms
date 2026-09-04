@@ -11,6 +11,7 @@ import { ShelfAlerts } from "./shelf-alerts";
 import { StageMetricsCards } from "./stage-metrics-cards";
 import { ReturnsByReasonChart } from "./returns-by-reason-chart";
 import { StageDurationChart } from "./stage-duration-chart";
+import { PackingReturnsTable } from "./packing-returns-table";
 
 export function DashboardView() {
   const [data, setData] = useState<DashboardProductivity | null>(null);
@@ -101,6 +102,9 @@ export function DashboardView() {
               data={data.stageMetrics.packingReturns.byReason}
             />
           </section>
+          <PackingReturnsTable
+            data={data.stageMetrics.packingReturns.recentReturns ?? []}
+          />
         </div>
       </div>
 

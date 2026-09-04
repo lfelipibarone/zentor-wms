@@ -46,12 +46,28 @@ export interface ReturnReasonCount {
   count: number;
 }
 
+export interface PackingReturnDetail {
+  orderId: string;
+  erpOrderId: string;
+  issueType: string;
+  issueLabel: string;
+  sku: string;
+  productName: string | null;
+  quantity: number;
+  reportedAt: string;
+  pickerId: string | null;
+  pickerName: string | null;
+  reportedById: string | null;
+  reportedByName: string | null;
+}
+
 export interface PackingReturnMetrics {
   countToday: number;
   inQueue: number;
   avgResolutionSec: number;
   deltaVsYesterday?: number;
   byReason: ReturnReasonCount[];
+  recentReturns: PackingReturnDetail[];
 }
 
 export interface DashboardStageMetrics {
