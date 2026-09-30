@@ -8,6 +8,7 @@ import {
 } from "./permissions.js";
 import { requireTenantContext } from "./tenant-context.js";
 import { verifySession, type SessionPayload } from "./session-token.js";
+import { resolveUserPermissions } from "../services/role-permissions.js";
 
 declare module "fastify" {
   interface FastifyRequest {
@@ -33,7 +34,6 @@ async function loadAuthUser(request: FastifyRequest): Promise<boolean> {
       email: true,
       name: true,
       role: true,
-      permissions: true,
       active: true,
       tenantId: true,
       isPlatformAdmin: true,
@@ -47,7 +47,8 @@ async function loadAuthUser(request: FastifyRequest): Promise<boolean> {
     });
     if (!tenant?.active) return false;
   }
-  request.authUser = user;
+  const permissions = await resolveUserPermissions(user);
+  request.authUser = { ...user, permissions };
   return true;
 }
 

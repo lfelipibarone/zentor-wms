@@ -63,6 +63,27 @@ export const PERMISSION_CATALOG: PermissionMeta[] = [
   },
 ];
 
+/** Permissões editáveis na matriz de cargos (canais + módulos) */
+export const ROLE_MATRIX_CATALOG: PermissionMeta[] = [
+  { key: Permission.MOBILE_ACCESS, label: "App Mobile", group: "Canais" },
+  { key: Permission.WEB_ACCESS, label: "Painel Web", group: "Canais" },
+  { key: Permission.SALES_VIEW, label: "Pedidos", group: "Módulos" },
+  { key: Permission.RECEIPTS_VIEW, label: "Recebimentos", group: "Módulos" },
+  { key: Permission.STOCK_VIEW, label: "Estoque", group: "Módulos" },
+  { key: Permission.SHIPPING_VIEW, label: "Expedição", group: "Módulos" },
+  { key: Permission.REGISTERS_VIEW, label: "Cadastros", group: "Módulos" },
+  { key: Permission.REPORTS_VIEW, label: "Relatórios", group: "Módulos" },
+];
+
+export const ROLE_MATRIX_KEYS = ROLE_MATRIX_CATALOG.map((p) => p.key);
+
+/** Cargos cuja matriz pode ser editada pelo admin da empresa */
+export const EDITABLE_TENANT_ROLES: UserRole[] = [
+  "PICKER",
+  "REPLENISHER",
+  "EXPEDITER",
+];
+
 export const ALL_PERMISSION_KEYS = PERMISSION_CATALOG.map((p) => p.key);
 
 /** Super-admin da plataforma (sem tenant) — apenas gestão de clientes e acesso web */
@@ -109,6 +130,50 @@ export function defaultPermissionsForRole(role: UserRole): PermissionKey[] {
   return [...ROLE_DEFAULTS[role]];
 }
 
+export function tenantAdminPermissions(): PermissionKey[] {
+  return [...TENANT_ADMIN_PERMISSIONS];
+}
+
+/**
+ * Resolve permissões de um cargo a partir da matriz do tenant.
+ * `matrixPermissions` = linha salva; se ausente, usa defaults do sistema.
+ */
+export function resolveRolePermissions(
+  role: UserRole,
+  matrixPermissions?: string[] | null,
+): PermissionKey[] {
+  if (role === "ADMIN") return tenantAdminPermissions();
+  if (matrixPermissions && matrixPermissions.length > 0) {
+    return matrixPermissions.filter((p): p is PermissionKey =>
+      ALL_PERMISSION_KEYS.includes(p as PermissionKey),
+    );
+  }
+  return defaultPermissionsForRole(role);
+}
+
+/** Completa chaves derivadas ao salvar a matriz editável */
+export function expandRoleMatrixPermissions(
+  selected: string[],
+): PermissionKey[] {
+  const set = new Set<PermissionKey>(
+    selected.filter((p): p is PermissionKey =>
+      ROLE_MATRIX_KEYS.includes(p as PermissionKey),
+    ),
+  );
+  set.add(Permission.NOTIFICATIONS_VIEW);
+  if (set.has(Permission.WEB_ACCESS)) {
+    set.add(Permission.DASHBOARD_VIEW);
+  }
+  if (set.has(Permission.REGISTERS_VIEW)) {
+    set.add(Permission.PRODUCTS_MANAGE);
+  }
+  return [...set];
+}
+
+/**
+ * `user.permissions` deve já estar resolvido (matriz do cargo).
+ * Fallback para defaults apenas se a lista vier vazia (legado).
+ */
 export function hasPermission(
   user: { role: string; permissions: string[]; isPlatformAdmin?: boolean },
   permission: PermissionKey,
@@ -129,11 +194,10 @@ export function hasPermission(
 export function canAccessWeb(user: {
   role: string;
   permissions: string[];
+  isPlatformAdmin?: boolean;
 }): boolean {
   return hasPermission(user, Permission.WEB_ACCESS);
 }
-
-const MOBILE_ROLES = new Set(["PICKER", "REPLENISHER"]);
 
 export function canAccessMobile(user: {
   role: string;
@@ -141,9 +205,5 @@ export function canAccessMobile(user: {
   isPlatformAdmin?: boolean;
 }): boolean {
   if (user.isPlatformAdmin) return false;
-  if (user.role === "ADMIN") return true;
-  if (user.permissions && user.permissions.length > 0) {
-    return user.permissions.includes(Permission.MOBILE_ACCESS);
-  }
-  return MOBILE_ROLES.has(user.role);
+  return hasPermission(user, Permission.MOBILE_ACCESS);
 }

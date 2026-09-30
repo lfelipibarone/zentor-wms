@@ -2,7 +2,6 @@ import { apiFetch } from "@/lib/api/client";
 import type { AuthUser } from "@/lib/auth";
 import type { PaginationMeta } from "@/lib/pagination";
 import { DEFAULT_PAGE_SIZE } from "@/lib/pagination";
-import type { PermissionKey } from "@wms/shared";
 
 export interface CreateUserBody {
   email: string;
@@ -10,7 +9,6 @@ export interface CreateUserBody {
   password: string;
   role: string;
   active?: boolean;
-  permissions?: PermissionKey[];
 }
 
 export interface UpdateUserBody {
@@ -19,7 +17,6 @@ export interface UpdateUserBody {
   password?: string;
   role?: string;
   active?: boolean;
-  permissions?: PermissionKey[];
 }
 
 export function fetchUsers(params?: {

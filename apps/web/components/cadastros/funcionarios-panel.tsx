@@ -3,12 +3,9 @@
 import { useCallback, useEffect, useState } from "react";
 import { Plus, Search } from "lucide-react";
 import {
-  PERMISSION_CATALOG,
   Permission,
   UserRole,
   UserRoleLabel,
-  defaultPermissionsForRole,
-  type PermissionKey,
 } from "@wms/shared";
 import { useAuth } from "@/components/auth/auth-provider";
 import { PageHeader } from "@/components/ops/page-header";
@@ -28,10 +25,6 @@ import { createUser, fetchUsers, updateUser } from "@/lib/api/users";
 
 const ROLES = Object.values(UserRole);
 
-const TENANT_PERMISSION_CATALOG = PERMISSION_CATALOG.filter(
-  (p) => p.key !== Permission.TENANTS_MANAGE,
-);
-
 type FormState = {
   id?: string;
   email: string;
@@ -39,7 +32,6 @@ type FormState = {
   password: string;
   role: string;
   active: boolean;
-  permissions: PermissionKey[];
 };
 
 const emptyForm = (): FormState => ({
@@ -48,7 +40,6 @@ const emptyForm = (): FormState => ({
   password: "",
   role: UserRole.EXPEDITER,
   active: true,
-  permissions: defaultPermissionsForRole(UserRole.EXPEDITER),
 });
 
 function roleLabel(role: string): string {
@@ -58,7 +49,7 @@ function roleLabel(role: string): string {
 export function FuncionariosPanel({
   embedded = false,
   title = "Funcionários",
-  description = "Cadastre funcionários, defina cargos e permissões de acesso.",
+  description = "Cadastre funcionários e atribua um cargo. Canais e módulos são definidos em Admin → Cargos.",
 }: {
   embedded?: boolean;
   title?: string;
@@ -117,28 +108,7 @@ export function FuncionariosPanel({
       password: "",
       role: u.role,
       active: u.active !== false,
-      permissions: u.permissions as PermissionKey[],
     });
-
-  const togglePermission = (key: PermissionKey) => {
-    if (!form) return;
-    const has = form.permissions.includes(key);
-    setForm({
-      ...form,
-      permissions: has
-        ? form.permissions.filter((p) => p !== key)
-        : [...form.permissions, key],
-    });
-  };
-
-  const onRoleChange = (role: string) => {
-    if (!form) return;
-    setForm({
-      ...form,
-      role,
-      permissions: defaultPermissionsForRole(role as UserRole),
-    });
-  };
 
   const save = async () => {
     if (!form) return;
@@ -151,7 +121,6 @@ export function FuncionariosPanel({
           email: form.email,
           role: form.role,
           active: form.active,
-          permissions: form.permissions,
         };
         if (form.password) body.password = form.password;
         await updateUser(form.id, body);
@@ -167,7 +136,6 @@ export function FuncionariosPanel({
           password: form.password,
           role: form.role,
           active: form.active,
-          permissions: form.permissions,
         });
       }
       setForm(null);
@@ -179,35 +147,7 @@ export function FuncionariosPanel({
     }
   };
 
-  const grouped = TENANT_PERMISSION_CATALOG.reduce(
-    (acc, p) => {
-      if (!acc[p.group]) acc[p.group] = [];
-      acc[p.group].push(p);
-      return acc;
-    },
-    {} as Record<string, typeof TENANT_PERMISSION_CATALOG>,
-  );
-
   const empty = !loading && !error && users.length === 0;
-
-  const formWarnings: string[] = [];
-  if (form) {
-    if (!form.active) {
-      formWarnings.push(
-        "Funcionário inativo não consegue fazer login no painel nem no app mobile.",
-      );
-    }
-    if (!form.permissions.includes(Permission.WEB_ACCESS)) {
-      formWarnings.push(
-        'Sem a permissão "Acesso ao painel web", o funcionário não conseguirá entrar no painel.',
-      );
-    }
-    if (!form.permissions.includes(Permission.MOBILE_ACCESS)) {
-      formWarnings.push(
-        'Sem a permissão "Acesso ao app mobile", o funcionário não conseguirá entrar no app.',
-      );
-    }
-  }
 
   return (
     <div className="space-y-4">
@@ -323,10 +263,17 @@ export function FuncionariosPanel({
 
       {form && canManage ? (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-          <div className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-xl bg-white p-6 shadow-xl">
+          <div className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-xl bg-white p-6 shadow-xl">
             <h2 className="text-lg font-bold">
               {form.id ? "Editar funcionário" : "Novo funcionário"}
             </h2>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Permissões vêm do cargo. Ajuste a matriz em{" "}
+              <a href="/admin/cargos" className="font-medium text-[#0d9488] hover:underline">
+                Admin → Cargos
+              </a>
+              .
+            </p>
             <div className="mt-4 grid gap-4 sm:grid-cols-2">
               <div>
                 <label className="text-sm font-medium">Nome</label>
@@ -363,7 +310,7 @@ export function FuncionariosPanel({
                 <select
                   className="mt-1 w-full rounded-lg border px-3 py-2 text-sm"
                   value={form.role}
-                  onChange={(e) => onRoleChange(e.target.value)}
+                  onChange={(e) => setForm({ ...form, role: e.target.value })}
                 >
                   {ROLES.map((r) => (
                     <option key={r} value={r}>
@@ -372,7 +319,7 @@ export function FuncionariosPanel({
                   ))}
                 </select>
               </div>
-              <label className="flex items-center gap-2 text-sm">
+              <label className="flex items-center gap-2 text-sm sm:col-span-2">
                 <input
                   type="checkbox"
                   checked={form.active}
@@ -384,39 +331,12 @@ export function FuncionariosPanel({
               </label>
             </div>
 
-            {formWarnings.length > 0 ? (
-              <div className="mt-4 space-y-2 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
-                {formWarnings.map((msg) => (
-                  <p key={msg}>{msg}</p>
-                ))}
+            {!form.active ? (
+              <div className="mt-4 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
+                Funcionário inativo não consegue fazer login no painel nem no app
+                mobile.
               </div>
             ) : null}
-
-            <p className="mt-6 text-sm font-medium">Permissões</p>
-            <div className="mt-2 space-y-4">
-              {Object.entries(grouped).map(([group, items]) => (
-                <div key={group}>
-                  <p className="text-xs font-semibold uppercase text-muted-foreground">
-                    {group}
-                  </p>
-                  <div className="mt-2 grid gap-2 sm:grid-cols-2">
-                    {items.map((p) => (
-                      <label
-                        key={p.key}
-                        className="flex items-center gap-2 text-sm"
-                      >
-                        <input
-                          type="checkbox"
-                          checked={form.permissions.includes(p.key)}
-                          onChange={() => togglePermission(p.key)}
-                        />
-                        {p.label}
-                      </label>
-                    ))}
-                  </div>
-                </div>
-              ))}
-            </div>
 
             <div className="mt-6 flex justify-end gap-2">
               <button

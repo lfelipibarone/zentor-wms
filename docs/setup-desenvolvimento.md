@@ -112,4 +112,4 @@ Após executar `pnpm dev`, verifique os seguintes endereços locais:
 *   **Servidor API**: `http://localhost:3333/health` (ou rotas da API)
 *   **Prisma Studio**: `http://localhost:5555`
 
-Para obter a lista de e-mails e senhas criados pelo seed para realizar o login e validar as restrições de cada tenant, abra o documento [[usuarios-teste|Usuários de Teste]].
+Os e-mails e senhas iniciais criados pelo seed estão em [[usuarios-padrao|Usuários padrão]].

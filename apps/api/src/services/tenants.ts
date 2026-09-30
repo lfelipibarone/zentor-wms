@@ -1,7 +1,7 @@
 import { Prisma } from "@prisma/client";
-import { defaultPermissionsForRole, Permission } from "@wms/shared";
 import { prisma } from "../lib/prisma.js";
 import { hashPassword } from "../lib/password.js";
+import { seedTenantRolePermissions } from "./role-permissions.js";
 
 export class TenantServiceError extends Error {
   constructor(
@@ -98,6 +98,7 @@ export async function createTenant(params: { name: string; slug?: string; cnpj?:
         active: true,
       },
     });
+    await seedTenantRolePermissions(t.id, tx);
     return t;
   });
 
@@ -121,15 +122,12 @@ export async function updateTenant(
   });
 }
 
-const TENANT_ADMIN_DEFAULT_PERMISSIONS = defaultPermissionsForRole("ADMIN");
-
 export async function createTenantAdminUser(
   tenantId: string,
   params: {
     email: string;
     name: string;
     password: string;
-    permissions?: string[];
   },
 ) {
   const tenant = await prisma.tenant.findUnique({ where: { id: tenantId } });
@@ -147,14 +145,7 @@ export async function createTenantAdminUser(
   const exists = await prisma.user.findUnique({ where: { email } });
   if (exists) throw new TenantServiceError("E-mail já cadastrado", 409);
 
-  const permissions =
-    params.permissions?.length && params.permissions.length > 0
-      ? params.permissions
-      : TENANT_ADMIN_DEFAULT_PERMISSIONS;
-
-  if (permissions.includes(Permission.TENANTS_MANAGE)) {
-    throw new TenantServiceError("Admin do cliente não pode gerenciar a plataforma");
-  }
+  await seedTenantRolePermissions(tenantId);
 
   const user = await prisma.user.create({
     data: {
@@ -164,7 +155,7 @@ export async function createTenantAdminUser(
       role: "ADMIN",
       tenantId,
       isPlatformAdmin: false,
-      permissions,
+      permissions: [],
       active: true,
     },
   });
@@ -206,9 +197,11 @@ export async function listTenantUsers(tenantId: string) {
 }
 
 export async function ensureDefaultTenant() {
-  return prisma.tenant.upsert({
+  const tenant = await prisma.tenant.upsert({
     where: { slug: "default" },
     create: { name: "Default", slug: "default", active: true },
     update: {},
   });
+  await seedTenantRolePermissions(tenant.id);
+  return tenant;
 }

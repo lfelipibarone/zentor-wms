@@ -9,7 +9,6 @@ import { webRoutes } from "./routes/web.js";
 import { notificationRoutes } from "./routes/notifications.js";
 import { integrationRoutes } from "./routes/integrations.js";
 import { tinyRoutes } from "./routes/tiny.js";
-import { demoLabelRoutes } from "./routes/demo-labels.js";
 import { startWaveScheduler } from "./services/wave-scheduler.js";
 import { startTinyOAuthRefreshWorker } from "./services/tiny-oauth-refresh-worker.js";
 import { startTinyOrderSyncScheduler } from "./services/tiny-order-sync-scheduler.js";
@@ -30,7 +29,6 @@ async function main() {
   });
 
   app.get("/health", async () => ({ ok: true }));
-  await app.register(demoLabelRoutes);
 
   await app.register(authRoutes);
   await app.register(adminRoutes);

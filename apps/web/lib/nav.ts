@@ -133,14 +133,20 @@ export const ADMIN_NAV: NavItem[] = [
   },
   {
     href: "/admin/usuarios",
-    label: "Usuários e permissões",
+    label: "Usuários",
     icon: Users,
+    permission: Permission.USERS_MANAGE,
+  },
+  {
+    href: "/admin/cargos",
+    label: "Cargos",
+    icon: Shield,
     permission: Permission.USERS_MANAGE,
   },
   {
     href: "/admin/configuracoes",
     label: "Configurações",
-    icon: Shield,
+    icon: Settings,
     permission: Permission.SETTINGS_MANAGE,
   },
 ];

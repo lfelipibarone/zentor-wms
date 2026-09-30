@@ -1,26 +1,33 @@
-import type { PrismaClient } from "@prisma/client";
-import {
-  ALL_PERMISSION_KEYS,
-  defaultPermissionsForRole,
-  Permission,
-} from "@wms/shared";
+import type { PrismaClient, UserRole } from "@prisma/client";
+import { PLATFORM_ADMIN_PERMISSIONS } from "@wms/shared";
 import { hashPassword } from "../lib/password.js";
+import { seedTenantRolePermissions } from "./role-permissions.js";
 
 export type EnsureDefaultUsersResult = {
   defaultTenantId: string;
   platformAdminEmail: string;
   tenantAdminEmail: string;
-  tenantAdminAliasEmail: string;
   operadorEmail: string;
+  pickerEmail: string;
+};
+
+type DefaultUser = {
+  email: string;
+  name: string;
+  password: string;
+  role: UserRole;
+  isPlatformAdmin: boolean;
+  tenantId: string | null;
+  permissions: string[];
 };
 
 /**
- * Garante a hierarquia padrão de usuários no tenant principal (`default`):
- * 1. Super-Admin da Plataforma (`admin@wms.local` / `admin123`) -> gestão de clientes, isPlatformAdmin: true, tenantId: null
- * 2. Admin da Conta (`adm@wms.local` / `admin123`) -> gestão total da conta/tenant Default, role: ADMIN, tenantId: default
- * 3. Admin da Conta Alias (`admin@default.local` / `admin123`) -> mesmo papel e tenant
- * 4. Operador / Expedidor (`operador@wms.local` / `operador123`) -> role: EXPEDITER, tenantId: default
- * 5. Garante conexão Tiny cadastrada para o admin e operador
+ * Garante os usuários padrão. A senha só é definida na criação — trocas feitas
+ * pelo painel não são sobrescritas no boot.
+ * 1. Super-admin da plataforma (`admin@wms.local`) -> gestão de clientes, sem tenant
+ * 2. Admin da conta (`adm@wms.local`) -> gestão total do tenant `default`
+ * 3. Operador (`operador@wms.local`) -> EXPEDITER no tenant `default`
+ * 4. Separador mobile (`picker@wms.local`) -> PICKER no tenant `default`
  */
 export async function ensureDefaultUsers(
   client: PrismaClient,
@@ -33,123 +40,60 @@ export async function ensureDefaultUsers(
       cnpj: "03.007.331/0001-41",
       active: true,
     },
-    update: {
-      active: true,
-      cnpj: "03.007.331/0001-41",
-    },
+    update: { active: true },
   });
   const TENANT_ID = defaultTenant.id;
+  await seedTenantRolePermissions(TENANT_ID, client);
 
-  // 1. Super-Admin da Plataforma
-  await client.user.upsert({
-    where: { email: "admin@wms.local" },
-    create: {
+  const users: DefaultUser[] = [
+    {
       email: "admin@wms.local",
       name: "Administrador Help Route",
-      password: hashPassword("admin123"),
+      password: "admin123",
       role: "ADMIN",
       isPlatformAdmin: true,
       tenantId: null,
-      permissions: [...ALL_PERMISSION_KEYS],
-      active: true,
+      permissions: [...PLATFORM_ADMIN_PERMISSIONS],
     },
-    update: {
-      password: hashPassword("admin123"),
-      role: "ADMIN",
-      active: true,
-      isPlatformAdmin: true,
-      tenantId: null,
-      permissions: [...ALL_PERMISSION_KEYS],
-    },
-  });
-
-  // 2. Administrador da Conta (Tenant Admin)
-  const tenantAdminPermissions = defaultPermissionsForRole("ADMIN");
-
-  const admConta = await client.user.upsert({
-    where: { email: "adm@wms.local" },
-    create: {
+    {
       email: "adm@wms.local",
       name: "Administrador da Conta",
-      password: hashPassword("admin123"),
+      password: "admin123",
       role: "ADMIN",
-      tenantId: TENANT_ID,
       isPlatformAdmin: false,
-      permissions: tenantAdminPermissions,
-      active: true,
-    },
-    update: {
-      password: hashPassword("admin123"),
-      name: "Administrador da Conta",
-      role: "ADMIN",
-      active: true,
       tenantId: TENANT_ID,
-      isPlatformAdmin: false,
-      permissions: tenantAdminPermissions,
+      permissions: [],
     },
-  });
-
-  // 3. Admin da Conta Alias
-  await client.user.upsert({
-    where: { email: "admin@default.local" },
-    create: {
-      email: "admin@default.local",
-      name: "Admin Default",
-      password: hashPassword("admin123"),
-      role: "ADMIN",
-      tenantId: TENANT_ID,
-      isPlatformAdmin: false,
-      permissions: tenantAdminPermissions,
-      active: true,
-    },
-    update: {
-      password: hashPassword("admin123"),
-      name: "Admin Default",
-      role: "ADMIN",
-      active: true,
-      tenantId: TENANT_ID,
-      isPlatformAdmin: false,
-      permissions: tenantAdminPermissions,
-    },
-  });
-
-  // 4. Operador / Expedidor da Conta (Apenas Telas Operacionais)
-  const operadorPermissions = defaultPermissionsForRole("EXPEDITER");
-
-  const operador = await client.user.upsert({
-    where: { email: "operador@wms.local" },
-    create: {
+    {
       email: "operador@wms.local",
-      name: "Felipe Figueiredo",
-      password: hashPassword("operador123"),
+      name: "Operador",
+      password: "operador123",
       role: "EXPEDITER",
-      tenantId: TENANT_ID,
       isPlatformAdmin: false,
-      permissions: operadorPermissions,
-      active: true,
-    },
-    update: {
-      password: hashPassword("operador123"),
-      name: "Felipe Figueiredo",
-      role: "EXPEDITER",
-      active: true,
       tenantId: TENANT_ID,
-      isPlatformAdmin: false,
-      permissions: operadorPermissions,
+      permissions: [],
     },
-  });
+    {
+      email: "picker@wms.local",
+      name: "Separador",
+      password: "dev",
+      role: "PICKER",
+      isPlatformAdmin: false,
+      tenantId: TENANT_ID,
+      permissions: [],
+    },
+  ];
 
-  // 5. Tiny connection padrão vinculada ao Admin da Conta
-  const existingTiny = await client.tinyConnection.findFirst({
-    where: { tenantId: TENANT_ID, userId: admConta.id, deletedAt: null },
-  });
-  if (!existingTiny) {
-    await client.tinyConnection.create({
-      data: {
-        tenantId: TENANT_ID,
-        userId: admConta.id,
-        name: "Tiny ERP",
-        isDefault: true,
+  for (const { password, ...user } of users) {
+    await client.user.upsert({
+      where: { email: user.email },
+      create: { ...user, password: hashPassword(password), active: true },
+      update: {
+        role: user.role,
+        isPlatformAdmin: user.isPlatformAdmin,
+        tenantId: user.tenantId,
+        active: true,
+        ...(user.isPlatformAdmin ? { permissions: user.permissions } : {}),
       },
     });
   }
@@ -158,7 +102,7 @@ export async function ensureDefaultUsers(
     defaultTenantId: TENANT_ID,
     platformAdminEmail: "admin@wms.local",
     tenantAdminEmail: "adm@wms.local",
-    tenantAdminAliasEmail: "admin@default.local",
     operadorEmail: "operador@wms.local",
+    pickerEmail: "picker@wms.local",
   };
 }

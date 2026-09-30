@@ -24,13 +24,8 @@ export function PlatformHomeView() {
       <div className="rounded-xl border border-amber-200 bg-amber-50 p-6 text-sm text-amber-950">
         <p className="font-semibold">Pedidos, ondas e estoque</p>
         <p className="mt-2">
-          Essas operações pertencem a cada cliente. Para testar pedidos e ondas,
-          faça login com o admin do tenant (ex.:{" "}
-          <code className="rounded bg-amber-100 px-1">adm@wms.local</code> ou{" "}
-          <code className="rounded bg-amber-100 px-1">admin@loja-a.local</code>
-          ). Consulte{" "}
-          <code className="rounded bg-amber-100 px-1">docs/usuarios-teste.md</code>{" "}
-          no repositório.
+          Essas operações pertencem a cada cliente. Para operar pedidos e ondas,
+          faça login com o administrador do cliente.
         </p>
       </div>
 

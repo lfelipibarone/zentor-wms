@@ -1,10 +1,5 @@
 import type { FastifyInstance } from "fastify";
-import {
-  ALL_PERMISSION_KEYS,
-  defaultPermissionsForRole,
-  Permission,
-  type UserRole,
-} from "@wms/shared";
+import { type UserRole } from "@wms/shared";
 import { prisma } from "../lib/prisma.js";
 import { hashPassword } from "../lib/password.js";
 import {
@@ -14,6 +9,13 @@ import {
 import { tenantWhere } from "../lib/tenant-context.js";
 import { toPublicUser } from "../lib/user-dto.js";
 import { parsePagination, buildPaginationMeta } from "../lib/pagination.js";
+import {
+  getRolePermissionMap,
+  listTenantRolePermissions,
+  permissionsFromMap,
+  RolePermissionServiceError,
+  updateTenantRolePermissions,
+} from "../services/role-permissions.js";
 
 const ROLES: UserRole[] = ["ADMIN", "EXPEDITER", "REPLENISHER", "PICKER"];
 
@@ -37,7 +39,7 @@ export async function adminRoutes(app: FastifyInstance) {
             }
           : {}),
       };
-      const [users, total] = await Promise.all([
+      const [users, total, roleMap] = await Promise.all([
         prisma.user.findMany({
           where,
           orderBy: { name: "asc" },
@@ -45,9 +47,15 @@ export async function adminRoutes(app: FastifyInstance) {
           take,
         }),
         prisma.user.count({ where }),
+        getRolePermissionMap(tenantId),
       ]);
       return {
-        users: users.map(toPublicUser),
+        users: users.map((u) =>
+          toPublicUser({
+            ...u,
+            permissions: permissionsFromMap(u.role, roleMap),
+          }),
+        ),
         pagination: buildPaginationMeta(total, page, pageSize),
       };
     },
@@ -59,7 +67,6 @@ export async function adminRoutes(app: FastifyInstance) {
       name?: string;
       password?: string;
       role?: string;
-      permissions?: string[];
       active?: boolean;
     };
   }>("/api/admin/users", { preHandler: requireUsersManage }, async (request, reply) => {
@@ -88,27 +95,26 @@ export async function adminRoutes(app: FastifyInstance) {
       return reply.status(409).send({ error: "E-mail já cadastrado" });
     }
 
-    let permissions =
-      request.body?.permissions?.filter((p) =>
-        ALL_PERMISSION_KEYS.includes(p as never),
-      ) ?? defaultPermissionsForRole(role);
-
-    permissions = permissions.filter((p) => p !== Permission.TENANTS_MANAGE);
-
+    const roleMap = await getRolePermissionMap(tenantId);
     const user = await prisma.user.create({
       data: {
         email,
         name,
         password: hashPassword(password),
         role,
-        permissions,
+        permissions: [],
         active: request.body?.active ?? true,
         tenantId,
         isPlatformAdmin: false,
       },
     });
 
-    return reply.status(201).send({ user: toPublicUser(user) });
+    return reply.status(201).send({
+      user: toPublicUser({
+        ...user,
+        permissions: permissionsFromMap(user.role, roleMap),
+      }),
+    });
   });
 
   app.patch<{
@@ -118,7 +124,6 @@ export async function adminRoutes(app: FastifyInstance) {
       name?: string;
       password?: string;
       role?: string;
-      permissions?: string[];
       active?: boolean;
     };
   }>(
@@ -166,11 +171,7 @@ export async function adminRoutes(app: FastifyInstance) {
           return reply.status(400).send({ error: "Papel inválido" });
         }
         data.role = request.body.role as UserRole;
-      }
-      if (request.body?.permissions) {
-        data.permissions = request.body.permissions
-          .filter((p) => ALL_PERMISSION_KEYS.includes(p as never))
-          .filter((p) => p !== Permission.TENANTS_MANAGE);
+        data.permissions = [];
       }
       if (typeof request.body?.active === "boolean") {
         data.active = request.body.active;
@@ -180,8 +181,46 @@ export async function adminRoutes(app: FastifyInstance) {
         where: { id: existing.id },
         data,
       });
+      const roleMap = await getRolePermissionMap(tenantId);
 
-      return { user: toPublicUser(user) };
+      return {
+        user: toPublicUser({
+          ...user,
+          permissions: permissionsFromMap(user.role, roleMap),
+        }),
+      };
+    },
+  );
+
+  app.get(
+    "/api/admin/role-permissions",
+    { preHandler: requireUsersManage },
+    async (request) => {
+      const tenantId = tenantWhere(request).tenantId;
+      const roles = await listTenantRolePermissions(tenantId);
+      return { roles };
+    },
+  );
+
+  app.put<{
+    Body: { roles?: Array<{ role: string; permissions: string[] }> };
+  }>(
+    "/api/admin/role-permissions",
+    { preHandler: requireUsersManage },
+    async (request, reply) => {
+      const tenantId = tenantWhere(request).tenantId;
+      try {
+        const roles = await updateTenantRolePermissions(
+          tenantId,
+          request.body?.roles ?? [],
+        );
+        return { roles };
+      } catch (e) {
+        if (e instanceof RolePermissionServiceError) {
+          return reply.status(e.statusCode).send({ error: e.message });
+        }
+        throw e;
+      }
     },
   );
 

@@ -24,7 +24,7 @@ O **Zentor WMS** é um monorepo **pnpm** com:
 Documentação existente (Obsidian/wikilinks): [[README|Centro de Documentação]].
 
 **Setup local:** [[setup-desenvolvimento|Guia de Setup]]  
-**Usuários de teste:** [[usuarios-teste|Credenciais e Testes]]
+**Usuários padrão:** [[usuarios-padrao|Usuários padrão]]
 
 ---
 
@@ -363,7 +363,7 @@ Inclui: `tiny-integration`, `tiny-sales-order-sync`, `tiny-product-sync`, `tiny-
 1. [ ] Clonar, `pnpm install`, Docker Postgres, `.env` — [[setup-desenvolvimento]].
 2. [ ] Aplicar migrations Prisma + SQLs manuais se necessário.
 3. [ ] `pnpm dev` — API `:3333`, Web `:3000`.
-4. [ ] Login com usuário de [[usuarios-teste]].
+4. [ ] Login com usuário de [[usuarios-padrao]].
 5. [ ] Conectar OAuth em `/integracoes/tiny`.
 6. [ ] Rodar sync produtos + sync pedidos; validar SKUs.
 7. [ ] Ler `docs/tiny-etiquetas-lote.json` e reproduzir com `teste-etiquetas-lote.ts`.

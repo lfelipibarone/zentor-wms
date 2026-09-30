@@ -1,4 +1,8 @@
 import { prisma } from "../lib/prisma.js";
+import {
+  getRolePermissionMap,
+  permissionsFromMap,
+} from "./role-permissions.js";
 
 export async function createNotification(params: {
   userId: string;
@@ -37,17 +41,38 @@ export async function notifyUsersWithPermission(
       active: true,
       ...(tenantId ? { tenantId } : {}),
     },
-    select: { id: true, role: true, permissions: true },
+    select: { id: true, role: true, tenantId: true, isPlatformAdmin: true },
   });
 
-  const targets = users.filter(
-    (u) => u.role === "ADMIN" || u.permissions.includes(permission),
-  );
+  const mapsByTenant = new Map<
+    string,
+    Awaited<ReturnType<typeof getRolePermissionMap>>
+  >();
+  const targets: string[] = [];
+
+  for (const u of users) {
+    if (u.role === "ADMIN") {
+      targets.push(u.id);
+      continue;
+    }
+    if (!u.tenantId) continue;
+    let map = mapsByTenant.get(u.tenantId);
+    if (!map) {
+      map = await getRolePermissionMap(u.tenantId);
+      mapsByTenant.set(u.tenantId, map);
+    }
+    const perms = permissionsFromMap(u.role, map, {
+      isPlatformAdmin: u.isPlatformAdmin,
+    });
+    if (perms.includes(permission as never)) {
+      targets.push(u.id);
+    }
+  }
 
   await Promise.all(
-    targets.map((u) =>
+    targets.map((userId) =>
       createNotification({
-        userId: u.id,
+        userId,
         title: payload.title,
         body: payload.body,
         category: payload.category,

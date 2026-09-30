@@ -74,4 +74,4 @@ O Zentor WMS protege o isolamento de dados das empresas clientes (tenants) em to
 *   **Isolamento**: O Super-Admin **não** tem acesso operacional a gôndolas, ondas, pedidos, relatórios de produtividade ou configurações de integrações Tiny de nenhum cliente. Ele opera exclusivamente na interface de cadastro de clientes.
 *   **Mobile**: O acesso ao aplicativo mobile (`apps/mobile`) é sumariamente **bloqueado** para o Super-Admin da plataforma.
 
-Para entender como criar e testar esses usuários no seu ambiente local, consulte o guia [[usuarios-teste|Credenciais e Usuários de Teste]].
+Os usuários criados por padrão estão em [[usuarios-padrao|Usuários padrão]].

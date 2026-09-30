@@ -3,6 +3,7 @@ import type { Prisma } from "@prisma/client";
 import {
   ALL_PERMISSION_KEYS,
   defaultPermissionsForRole,
+  PLATFORM_ADMIN_PERMISSIONS,
   type UserRole,
 } from "@wms/shared";
 import { prisma } from "../lib/prisma.js";
@@ -116,21 +117,16 @@ export async function platformRoutes(app: FastifyInstance) {
       email?: string;
       name?: string;
       password?: string;
-      permissions?: string[];
     };
   }>(
     "/api/platform/tenants/:id/admin-user",
     { preHandler: requirePlatformAdmin },
     async (request, reply) => {
       try {
-        const permissions = request.body?.permissions?.filter((p) =>
-          ALL_PERMISSION_KEYS.includes(p as never),
-        );
         const user = await createTenantAdminUser(request.params.id, {
           email: request.body?.email ?? "",
           name: request.body?.name ?? "",
           password: request.body?.password ?? "",
-          permissions,
         });
         return reply.status(201).send({ user: toPublicUser(user) });
       } catch (e) {
@@ -255,14 +251,9 @@ export async function platformRoutes(app: FastifyInstance) {
       }
     }
 
-    let permissions =
-      request.body?.permissions?.filter((p) =>
-        ALL_PERMISSION_KEYS.includes(p as never),
-      ) ?? defaultPermissionsForRole(role);
-
-    if (!isPlatformAdmin) {
-      permissions = permissions.filter((p) => p !== "tenants.manage");
-    }
+    const permissions = isPlatformAdmin
+      ? [...PLATFORM_ADMIN_PERMISSIONS]
+      : [];
 
     const user = await prisma.user.create({
       data: {
@@ -280,7 +271,14 @@ export async function platformRoutes(app: FastifyInstance) {
       },
     });
 
-    return reply.status(201).send({ user: toPublicUser(user) });
+    return reply.status(201).send({
+      user: toPublicUser({
+        ...user,
+        permissions: isPlatformAdmin
+          ? [...PLATFORM_ADMIN_PERMISSIONS]
+          : defaultPermissionsForRole(role),
+      }),
+    });
   });
 
   app.patch<{
@@ -363,9 +361,26 @@ export async function platformRoutes(app: FastifyInstance) {
     }
 
     if (request.body?.permissions) {
-      data.permissions = request.body.permissions.filter((p) =>
-        ALL_PERMISSION_KEYS.includes(p as never),
-      );
+      // Permissões de colaboradores de tenant vêm da matriz de cargos.
+      // Só platform admin grava lista explícita.
+      const willBePlatform =
+        typeof request.body?.isPlatformAdmin === "boolean"
+          ? request.body.isPlatformAdmin
+          : existing.isPlatformAdmin;
+      if (willBePlatform) {
+        data.permissions = request.body.permissions.filter((p) =>
+          ALL_PERMISSION_KEYS.includes(p as never),
+        );
+      } else {
+        data.permissions = [];
+      }
+    } else if (
+      typeof request.body?.isPlatformAdmin === "boolean" &&
+      !request.body.isPlatformAdmin
+    ) {
+      data.permissions = [];
+    } else if (request.body?.role && !existing.isPlatformAdmin) {
+      data.permissions = [];
     }
 
     const updated = await prisma.user.update({

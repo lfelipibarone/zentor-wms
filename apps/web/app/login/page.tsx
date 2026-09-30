@@ -13,43 +13,15 @@ function loginRedirect(user: AuthUser, from: string): string {
   return from.startsWith("/") ? from : "/";
 }
 
-const QUICK_USERS = [
-  {
-    role: "Admin da Conta",
-    email: "adm@wms.local",
-    password: "admin123",
-    description: "Gestão total da conta: pedidos, estoque, usuários e configurações",
-    badge: "Recomendado",
-  },
-  {
-    role: "Operador",
-    email: "operador@wms.local",
-    password: "operador123",
-    description: "Operação do CD: pedidos, separação, packing e estoque",
-  },
-  {
-    role: "Super-admin Plataforma",
-    email: "admin@wms.local",
-    password: "admin123",
-    description: "Gestão de múltiplos clientes/tenants (sem operação do CD)",
-  },
-];
-
 function LoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const from = searchParams.get("from") ?? "/";
 
-  const [email, setEmail] = useState("adm@wms.local");
-  const [password, setPassword] = useState("admin123");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-
-  const selectQuickUser = (u: (typeof QUICK_USERS)[number]) => {
-    setEmail(u.email);
-    setPassword(u.password);
-    setError(null);
-  };
 
   const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -68,8 +40,8 @@ function LoginForm() {
   };
 
   return (
-    <div className="flex min-h-screen items-center justify-center px-4">
-      <div className="w-full max-w-md rounded-xl border bg-card p-8 shadow-sm">
+    <div className="flex min-h-screen items-center justify-center px-4 py-8">
+      <div className="w-full max-w-lg rounded-xl border bg-card p-8 shadow-sm">
         <div className="mb-8 text-center">
           <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-xl bg-primary text-lg font-black text-primary-foreground">
             W
@@ -128,53 +100,6 @@ function LoginForm() {
             Entrar
           </button>
         </form>
-
-        <div className="mt-6 border-t pt-4">
-          <p className="mb-2.5 text-center text-xs font-medium text-muted-foreground">
-            Acesso rápido para testes e homologação:
-          </p>
-          <div className="space-y-1.5">
-            {QUICK_USERS.map((u) => {
-              const selected = email === u.email;
-              return (
-                <button
-                  key={u.email}
-                  type="button"
-                  onClick={() => selectQuickUser(u)}
-                  className={`w-full rounded-lg border p-2.5 text-left transition ${
-                    selected
-                      ? "border-[#0d9488] bg-teal-50/60 ring-1 ring-[#0d9488]"
-                      : "border-border hover:bg-slate-50"
-                  }`}
-                >
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-semibold text-foreground">
-                      {u.role}
-                    </span>
-                    {u.badge ? (
-                      <span className="rounded bg-teal-100 px-1.5 py-0.5 text-[10px] font-bold text-teal-800">
-                        {u.badge}
-                      </span>
-                    ) : null}
-                  </div>
-                  <div className="mt-0.5 flex items-center justify-between text-[11px] text-muted-foreground">
-                    <span className="font-mono">{u.email}</span>
-                    <span className="font-mono text-slate-400">{u.password}</span>
-                  </div>
-                </button>
-              );
-            })}
-          </div>
-
-          <div className="mt-4 text-center">
-            <a
-              href="/docs/usuarios-teste"
-              className="inline-block text-xs font-medium text-[#0d9488] hover:underline"
-            >
-              Consultar documentação completa de usuários
-            </a>
-          </div>
-        </div>
       </div>
     </div>
   );

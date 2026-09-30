@@ -2,9 +2,7 @@
 /**
  * Garante schema Prisma no Postgres antes de subir a API.
  * Homolog (Dokploy):
- * - banco vazio → seed completo
- * - banco já populado → o boot da API (ensure-db.ts) recria QA-H-*
- *   ou POST /demo/seed-homolog-qa
+ * - banco vazio → seed (tenant default, usuários padrão e configurações)
  */
 import { spawnSync } from "node:child_process";
 import { createRequire } from "node:module";
@@ -55,9 +53,7 @@ if (tenantCount === 0 || forceFullSeed) {
   );
   run("pnpm", ["run", "db:seed"]);
 } else {
-  console.log(
-    "[ensure-db] tenants ok — QA-H-* no boot da API ou POST /demo/seed-homolog-qa",
-  );
+  console.log("[ensure-db] tenants ok");
 }
 
 console.log("[ensure-db] ok");

@@ -2,6 +2,7 @@ import { useState } from "react";
 import {
   KeyboardAvoidingView,
   Platform,
+  ScrollView,
   StyleSheet,
   Text,
   TextInput,
@@ -15,7 +16,7 @@ import { theme, spacing, typography } from "@/lib/theme";
 
 export default function LoginScreen() {
   const { login } = useAuth();
-  const [email, setEmail] = useState("picker@wms.local");
+  const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -38,45 +39,46 @@ export default function LoginScreen() {
       style={styles.root}
       behavior={Platform.OS === "ios" ? "padding" : undefined}
     >
-      <View style={styles.card}>
-        <Text style={styles.brand}>Help Route</Text>
-        <Text style={styles.subtitle}>WMS · Operações de galpão</Text>
+      <ScrollView
+        contentContainerStyle={styles.scroll}
+        keyboardShouldPersistTaps="handled"
+      >
+        <View style={styles.card}>
+          <Text style={styles.brand}>Help Route</Text>
+          <Text style={styles.subtitle}>WMS · Operações de galpão</Text>
 
-        <Text style={styles.label}>E-mail</Text>
-        <TextInput
-          value={email}
-          onChangeText={setEmail}
-          autoCapitalize="none"
-          keyboardType="email-address"
-          autoComplete="username"
-          style={styles.input}
-          placeholderTextColor={theme.textMuted}
-        />
+          <Text style={styles.label}>E-mail</Text>
+          <TextInput
+            value={email}
+            onChangeText={setEmail}
+            autoCapitalize="none"
+            keyboardType="email-address"
+            autoComplete="username"
+            style={styles.input}
+            placeholderTextColor={theme.textMuted}
+          />
 
-        <Text style={styles.label}>Senha</Text>
-        <TextInput
-          value={password}
-          onChangeText={setPassword}
-          secureTextEntry
-          autoComplete="password"
-          style={styles.input}
-          placeholderTextColor={theme.textMuted}
-        />
+          <Text style={styles.label}>Senha</Text>
+          <TextInput
+            value={password}
+            onChangeText={setPassword}
+            secureTextEntry
+            autoComplete="password"
+            style={styles.input}
+            placeholderTextColor={theme.textMuted}
+          />
 
-        {error ? <Text style={styles.error}>{error}</Text> : null}
+          {error ? <Text style={styles.error}>{error}</Text> : null}
 
-        <FactoryButton
-          label={loading ? "Entrando…" : "Entrar"}
-          onPress={onSubmit}
-          loading={loading}
-        />
+          <FactoryButton
+            label={loading ? "Entrando…" : "Entrar"}
+            onPress={onSubmit}
+            loading={loading}
+          />
 
-        <Text style={styles.hint}>
-          Separador: picker@wms.local / dev{"\n"}
-          Admin também pode acessar o mobile.{"\n"}
-          API: {getApiBaseUrl()}
-        </Text>
-      </View>
+          <Text style={styles.hint}>API: {getApiBaseUrl()}</Text>
+        </View>
+      </ScrollView>
     </KeyboardAvoidingView>
   );
 }
@@ -85,6 +87,9 @@ const styles = StyleSheet.create({
   root: {
     flex: 1,
     backgroundColor: theme.bg,
+  },
+  scroll: {
+    flexGrow: 1,
     justifyContent: "center",
     padding: spacing.lg,
   },

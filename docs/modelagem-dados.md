@@ -70,7 +70,7 @@ classDiagram
 ## 🗂️ Tabelas Principais (Dicionário de Modelos)
 
 ### 🏢 Núcleo Corporativo (Multi-Tenancy)
-*   **`Tenant` (tabela: `tenants`)**: Define os clientes da plataforma (empresas independentes). Cada registro possui um `slug` único (ex: `demo-loja-a`).
+*   **`Tenant` (tabela: `tenants`)**: Define os clientes da plataforma (empresas independentes). Cada registro possui um `slug` único (ex: `default`).
 *   **`User` (tabela: `users`)**: Armazena as credenciais, papéis (`UserRole`) e permissões granulares dos usuários de galpão e administradores. Associa-se a um `Tenant` (exceto o Super-Admin).
 *   **`SystemSetting` (tabela: `system_settings`)**: Armazena chaves de configuração personalizadas por tenant (ex: comportamento das ondas, segredos de webhook).
 

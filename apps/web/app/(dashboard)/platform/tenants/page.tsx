@@ -2,7 +2,6 @@
 
 import { Fragment, useCallback, useEffect, useState } from "react";
 import { ChevronDown, ChevronRight, Loader2, Plus, UserPlus } from "lucide-react";
-import { defaultPermissionsForRole, UserRole } from "@wms/shared";
 import { apiFetch } from "@/lib/api/client";
 
 type TenantRow = {
@@ -95,7 +94,6 @@ export default function PlatformTenantsPage() {
           email: adminForm.email.trim(),
           name: adminForm.name.trim(),
           password: adminForm.password,
-          permissions: defaultPermissionsForRole(UserRole.ADMIN),
         }),
       });
       setAdminForm(null);

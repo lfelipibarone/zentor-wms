@@ -30,7 +30,7 @@ Utilize os links abaixo para navegar pelas diferentes seções do sistema:
 *   [[superpowers/plans/2026-08-05-tiny-etiqueta-geracao|Plano: implementar geração de etiqueta]]: Tasks TDD (revisar adendo antes de implementar).
 *   [[tiny-conexao-conta-ajustes|Conexão Tiny — histórico e ajustes]]: Problemas encontrados ao conectar a conta, correções aplicadas e roteiro de teste local.
 *   [[postman/README|Postman Tiny]]: Collections de reunião + busca NF (`40A0133E85`).
-*   [[usuarios-teste|Credenciais e Testes]]: Guia de usuários pré-cadastrados via seed, testes de isolamento multi-tenant e validação de acessos.
+*   [[usuarios-padrao|Usuários padrão]]: Usuários criados automaticamente no boot da API.
 *   [[Tarefas|Lista de tarefas soltas]]: Notas operacionais originais (referenciadas no handoff).
 
 ---

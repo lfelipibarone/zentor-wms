@@ -160,4 +160,4 @@ http://localhost:3333/integrations/tiny/oauth/callback
 *   [[integracao-tiny-oauth|Integração Tiny ERP (v3)]] — Detalhes da API v3 e controle de rate limits.
 *   [[integracao-tiny-pedidos|Integração Tiny — Pedidos de venda]] — Sync pull, situação Aberta (0), filtro `origemPedido`, SKU (jun/2026).
 *   [[setup-desenvolvimento|Guia de Setup Local]] — Variáveis de ambiente e Docker.
-*   [[usuarios-teste|Credenciais e Testes]] — Contas e e-mails criados por padrão.
+*   [[usuarios-padrao|Usuários padrão]] — Contas e e-mails criados por padrão.

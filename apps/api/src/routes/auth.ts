@@ -6,18 +6,21 @@ import { requireAuth } from "../lib/auth-guard.js";
 import {
   canAccessMobile,
   canAccessWeb,
-  effectivePermissions,
 } from "../lib/permissions.js";
 import { signSession } from "../lib/session-token.js";
 import { toPublicUser } from "../lib/user-dto.js";
+import { resolveUserPermissions } from "../services/role-permissions.js";
 
 async function loadUserForAuth(email: string) {
-  return prisma.user.findUnique({
+  const user = await prisma.user.findUnique({
     where: { email },
     include: {
       tenant: { select: { id: true, name: true, slug: true, cnpj: true, active: true } },
     },
   });
+  if (!user) return null;
+  const permissions = await resolveUserPermissions(user);
+  return { ...user, permissions };
 }
 
 function sessionUser(user: {
@@ -28,17 +31,16 @@ function sessionUser(user: {
   tenantId: string | null;
   isPlatformAdmin: boolean;
 }) {
-  const permissions = effectivePermissions(user);
   return {
     token: signSession({
       id: user.id,
       email: user.email,
       role: user.role,
-      permissions,
+      permissions: user.permissions,
       tenantId: user.tenantId,
       isPlatformAdmin: user.isPlatformAdmin,
     }),
-    permissions,
+    permissions: user.permissions,
   };
 }
 
@@ -141,9 +143,11 @@ export async function authRoutes(app: FastifyInstance) {
       },
     });
     if (!user) return { user: toPublicUser(request.authUser!) };
+    const permissions = await resolveUserPermissions(user);
     return {
       user: toPublicUser({
         ...user,
+        permissions,
         tenant: user.tenant,
       }),
     };
@@ -210,10 +214,12 @@ export async function authRoutes(app: FastifyInstance) {
         tenant: { select: { id: true, name: true, slug: true } },
       },
     });
+    const permissions = await resolveUserPermissions(updated);
 
     return {
       user: toPublicUser({
         ...updated,
+        permissions,
         tenant: updated.tenant,
       }),
     };
@@ -231,8 +237,9 @@ export async function authRoutes(app: FastifyInstance) {
           tenant: { select: { id: true, name: true, slug: true } },
         },
       });
+      const permissions = await resolveUserPermissions(updated);
       return {
-        user: toPublicUser({ ...updated, tenant: updated.tenant }),
+        user: toPublicUser({ ...updated, permissions, tenant: updated.tenant }),
         configured: Boolean(token),
       };
     },

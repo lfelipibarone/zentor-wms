@@ -157,8 +157,25 @@ model Tenant {
   integrationEventLogs    IntegrationEventLog[]
   systemSettings          SystemSetting[]
   locationProximityReferences LocationProximityReference[]
+  rolePermissions         TenantRolePermission[]
 
   @@map("tenants")
+}
+
+/// Matriz de permissões por cargo, configurável por empresa
+model TenantRolePermission {
+  id          String   @id @default(cuid())
+  tenantId    String
+  role        UserRole
+  permissions String[]
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, role])
+  @@index([tenantId])
+  @@map("tenant_role_permissions")
 }
 
 // -----------------------------------------------------------------------------

@@ -4,10 +4,7 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { prisma } from "./prisma.js";
 import { ensureDefaultUsers } from "../services/ensure-default-users.js";
-import {
-  printHomologQaGuide,
-  runHomologQaSeedForDefaultTenant,
-} from "../services/homolog-qa-seed.js";
+import { ensureAllTenantsRolePermissions } from "../services/role-permissions.js";
 
 /** apps/api — funciona a partir de dist/lib ou src/lib */
 const apiRoot = join(dirname(fileURLToPath(import.meta.url)), "../..");
@@ -82,15 +79,25 @@ export async function ensureDatabaseReady(): Promise<void> {
     );
   }
 
-  console.log("[ensure-db] garantindo usuários padrão (super-admin, adm da conta, operador)...");
+  console.log("[ensure-db] garantindo usuários padrão (super-admin, adm da conta, operador, separador)...");
   try {
     const defaultUsers = await ensureDefaultUsers(prisma);
     console.log(
-      `[ensure-db] usuários prontos: platform=${defaultUsers.platformAdminEmail}, tenantAdmin=${defaultUsers.tenantAdminEmail}, operador=${defaultUsers.operadorEmail}`,
+      `[ensure-db] usuários prontos: platform=${defaultUsers.platformAdminEmail}, tenantAdmin=${defaultUsers.tenantAdminEmail}, operador=${defaultUsers.operadorEmail}, separador=${defaultUsers.pickerEmail}`,
     );
   } catch (err) {
     console.warn(
       "[ensure-db] falha ao garantir usuários padrão:",
+      err instanceof Error ? err.message : err,
+    );
+  }
+
+  try {
+    await ensureAllTenantsRolePermissions(prisma);
+    console.log("[ensure-db] matrizes de cargo por tenant prontas");
+  } catch (err) {
+    console.warn(
+      "[ensure-db] falha ao garantir matrizes de cargo:",
       err instanceof Error ? err.message : err,
     );
   }
@@ -102,18 +109,6 @@ export async function ensureDatabaseReady(): Promise<void> {
         : "[ensure-db] banco sem tenants — rodando seed completo...",
     );
     runCli("tsx", ["prisma/seed.ts"]);
-  } else {
-    // Homolog com banco já populado: refresca só QA-H-* no boot (in-process)
-    console.log("[ensure-db] atualizando pedidos QA-H-*...");
-    try {
-      const result = await runHomologQaSeedForDefaultTenant(prisma);
-      printHomologQaGuide(result);
-    } catch (err) {
-      console.warn(
-        "[ensure-db] falha ao atualizar QA-H-*:",
-        err instanceof Error ? err.message : err,
-      );
-    }
   }
 
   console.log("[ensure-db] ok");

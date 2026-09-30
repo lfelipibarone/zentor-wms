@@ -20,6 +20,7 @@ export {
   type UserRole,
 };
 
+/** Assume `user.permissions` já resolvido da matriz do cargo. */
 export function effectivePermissions(user: {
   role: string;
   permissions: string[];
