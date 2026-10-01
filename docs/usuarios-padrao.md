@@ -6,5 +6,5 @@ Criados automaticamente no boot da API (`apps/api/src/services/ensure-default-us
 | --- | --- | --- | --- |
 | Admin master (plataforma) | `admin@wms.local` | `admin123` | Web — gestão de clientes |
 | Admin da conta | `adm@wms.local` | `admin123` | Web e mobile — tenant `default` |
-| Operador | `operador@wms.local` | `operador123` | Web e mobile — tenant `default` |
+| Operador | `operador@wms.local` | `operador123` | Web — tenant `default` |
 | Separador | `picker@wms.local` | `dev` | Mobile — tenant `default` |
