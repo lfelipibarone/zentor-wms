@@ -24,7 +24,6 @@ import {
 } from "./tiny-sync-lock.js";
 
 const LIST_PAGE_SIZE = 100;
-const MAX_OFFSET = 10_000;
 
 function asRecord(v: unknown): Record<string, unknown> | null {
   return v && typeof v === "object" && !Array.isArray(v)
@@ -288,7 +287,6 @@ export async function syncProductsFromTiny(params: {
       }
 
       offset = nextOffset;
-      if (offset > MAX_OFFSET) break;
 
       await persistCheckpoint(offset, total);
     }
