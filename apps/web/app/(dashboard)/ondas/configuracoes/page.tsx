@@ -392,6 +392,8 @@ export default function WaveSettingsPage() {
                 }
                 className="rounded-lg border bg-white px-3 py-2 text-sm"
               >
+                <option value="BY_APPROACH">Por onda de aproximação</option>
+                <option value="SINGLE_WAVE">Onda única</option>
                 <option value="SINGLE_ITEM">Item único</option>
                 <option value="PROXIMITY">Proximidade</option>
                 <option value="BY_PRODUCT">SKU compartilhado</option>

@@ -13,7 +13,7 @@ export interface WaveRow {
   createdAt: string;
 }
 
-export type WavePartitionStrategy = "SINGLE_ITEM" | "PROXIMITY" | "BY_PRODUCT";
+export type WavePartitionStrategy = "SINGLE_ITEM" | "PROXIMITY" | "BY_PRODUCT" | "BY_APPROACH" | "SINGLE_WAVE";
 
 export interface WavePreview {
   orderCount: number;
@@ -38,6 +38,7 @@ export interface WavePreview {
     orderCount: number;
     lineCount: number;
     gondolaPasses: number;
+    parts?: Array<{ name: string; lineCount: number }>;
     orderIds: string[];
     orders: WavePreview["orders"];
     lines: WavePreview["lines"];
