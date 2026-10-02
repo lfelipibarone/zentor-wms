@@ -1761,10 +1761,19 @@ export async function webRoutes(app: FastifyInstance) {
     async (request) => listPackingQueue(tenantWhere(request).tenantId),
   );
 
-  app.get(
+  app.get<{ Querystring: { approachWaveId?: string } }>(
     "/api/packing/queue/unified",
     { preHandler: guard(Permission.SHIPPING_VIEW) },
-    async (request) => listUnifiedPackingQueue(tenantWhere(request).tenantId),
+    async (request, reply) => {
+      try {
+        return await listUnifiedPackingQueue(tenantWhere(request).tenantId, {
+          approachWaveId: request.query.approachWaveId?.trim() || undefined,
+        });
+      } catch (e) {
+        if (e instanceof PackingSessionError) return reply.status(e.statusCode).send({ error: e.message });
+        throw e;
+      }
+    },
   );
 
   app.post<{ Body: { barcode?: string } }>(

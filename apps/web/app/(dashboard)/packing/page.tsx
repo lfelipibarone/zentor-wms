@@ -16,8 +16,11 @@ import {
   type PackingOrder,
   type PackingQueueItem,
 } from "@/lib/api/operations";
+import { fetchTenantApproachWaves, type ApproachWaveSummary } from "@/lib/api/approach-waves";
 
 type QueueFilter = "all" | "wave" | "order" | "replenishment";
+
+const ZONE_STORAGE_KEY = "packing.approachWaveId";
 
 function normalizeBasketCode(code: string) {
   return code.trim().toLowerCase();
@@ -62,19 +65,39 @@ export default function PackingPage() {
   const openingRef = useRef(false);
   const basketInputRef = useRef<HTMLInputElement>(null);
   const lastScanRef = useRef("");
+  const [zones, setZones] = useState<ApproachWaveSummary[]>([]);
+  const [zone, setZone] = useState(() =>
+    typeof window === "undefined" ? "" : (window.localStorage.getItem(ZONE_STORAGE_KEY) ?? ""),
+  );
+
+  useEffect(() => {
+    fetchTenantApproachWaves("PACKING")
+      .then((d) => setZones(d.waves))
+      .catch(() => setZones([]));
+  }, []);
+
+  const changeZone = (value: string) => {
+    setZone(value);
+    if (value) window.localStorage.setItem(ZONE_STORAGE_KEY, value);
+    else window.localStorage.removeItem(ZONE_STORAGE_KEY);
+  };
 
   const loadQueue = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
-      const data = await fetchUnifiedPackingQueue();
+      const data = await fetchUnifiedPackingQueue(zone || undefined);
       setItems(data.items);
     } catch (e) {
+      if (zone && e instanceof Error && e.message.includes("não encontrada")) {
+        changeZone("");
+        return;
+      }
       setError(e instanceof Error ? e.message : "Erro ao carregar fila");
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [zone]);
 
   useEffect(() => {
     loadQueue();
@@ -206,6 +229,22 @@ export default function PackingPage() {
         <div className="order-2 space-y-4 lg:order-1">
           <div className="flex flex-wrap items-center gap-2">
             <MarketplaceFilter value={marketplace} onChange={setMarketplace} />
+            {zones.length > 0 ? (
+              <select
+                value={zone}
+                onChange={(e) => changeZone(e.target.value)}
+                className="rounded-lg border bg-white px-3 py-2 text-sm"
+                title="Onda de aproximação desta mesa"
+              >
+                <option value="">Todas as áreas</option>
+                {zones.map((z) => (
+                  <option key={z.id} value={z.id}>
+                    {z.name}
+                  </option>
+                ))}
+                <option value="none">Sem área</option>
+              </select>
+            ) : null}
           </div>
 
           <div className="flex flex-wrap gap-2">

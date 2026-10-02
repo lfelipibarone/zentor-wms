@@ -747,8 +747,9 @@ export function fetchPackingQueue() {
   return apiFetch<{ orders: PackingOrder[] }>("/api/packing/orders/queue");
 }
 
-export function fetchUnifiedPackingQueue() {
-  return apiFetch<{ items: PackingQueueItem[] }>("/api/packing/queue/unified");
+export function fetchUnifiedPackingQueue(approachWaveId?: string) {
+  const qs = approachWaveId ? `?approachWaveId=${encodeURIComponent(approachWaveId)}` : "";
+  return apiFetch<{ items: PackingQueueItem[] }>(`/api/packing/queue/unified${qs}`);
 }
 
 export function searchPackingOrder(q: string) {
