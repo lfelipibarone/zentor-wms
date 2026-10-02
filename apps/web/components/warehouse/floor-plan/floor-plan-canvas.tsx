@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, type PointerEvent as ReactPointerEvent } from "react";
+import { useRef, type PointerEvent as ReactPointerEvent, type ReactNode } from "react";
 import type { FloorElement, FloorElementType, FloorPlanEstante, RoutePreview } from "@/lib/api/floor-plan";
 import {
   DANGER_COLOR,
@@ -45,10 +45,12 @@ export function FloorPlanCanvas({
   reachability,
   issueElementIds,
   route,
+  overlay,
   onSelect,
   onPlace,
   onElementChange,
   onDragEnd,
+  onPointClick,
 }: {
   widthCells: number;
   heightCells: number;
@@ -61,16 +63,18 @@ export function FloorPlanCanvas({
   reachability: Reachability;
   issueElementIds: Set<string>;
   route: RoutePreview | null;
+  overlay?: ReactNode;
   onSelect: (id: string | null) => void;
   onPlace: (type: FloorElementType, x: number, y: number) => void;
   onElementChange: (element: FloorElement) => void;
   onDragEnd: (changed: boolean) => void;
+  onPointClick?: (x: number, y: number) => void;
 }) {
   const svgRef = useRef<SVGSVGElement>(null);
   const dragRef = useRef<DragState | null>(null);
   const cellPx = BASE_CELL_PX * zoom;
 
-  const cellAt = (ev: { clientX: number; clientY: number }) => {
+  const pointAt = (ev: { clientX: number; clientY: number }) => {
     const svg = svgRef.current;
     const m = svg?.getScreenCTM();
     if (!svg || !m) return { x: 0, y: 0 };
@@ -78,6 +82,11 @@ export function FloorPlanCanvas({
     pt.x = ev.clientX;
     pt.y = ev.clientY;
     const p = pt.matrixTransform(m.inverse());
+    return { x: p.x, y: p.y };
+  };
+
+  const cellAt = (ev: { clientX: number; clientY: number }) => {
+    const p = pointAt(ev);
     return { x: Math.floor(p.x), y: Math.floor(p.y) };
   };
 
@@ -95,6 +104,11 @@ export function FloorPlanCanvas({
   };
 
   const onPointerDown = (ev: ReactPointerEvent<SVGSVGElement>) => {
+    if (onPointClick && ev.button === 0) {
+      const p = pointAt(ev);
+      if (p.x >= 0 && p.y >= 0 && p.x < widthCells && p.y < heightCells) onPointClick(p.x, p.y);
+      return;
+    }
     if (!interactive || ev.button !== 0) return;
     const c = cellAt(ev);
     if (c.x < 0 || c.y < 0 || c.x >= widthCells || c.y >= heightCells) return;
@@ -142,7 +156,7 @@ export function FloorPlanCanvas({
       className="block select-none bg-white"
       style={{
         touchAction: "none",
-        cursor: interactive && tool !== "select" ? "crosshair" : "default",
+        cursor: onPointClick ? "pointer" : interactive && tool !== "select" ? "crosshair" : "default",
       }}
       onPointerDown={onPointerDown}
       onPointerMove={onPointerMove}
@@ -208,6 +222,8 @@ export function FloorPlanCanvas({
           }}
         />
       ) : null}
+
+      {overlay}
 
       {route ? <RouteOverlay route={route} /> : null}
 

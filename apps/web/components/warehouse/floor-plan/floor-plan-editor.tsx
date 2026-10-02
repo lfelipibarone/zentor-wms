@@ -18,7 +18,16 @@ import {
   type FloorPlanValidation,
   type RoutePreview,
 } from "@/lib/api/floor-plan";
+import {
+  fetchApproachWaves,
+  saveApproachWaves,
+  type ApproachWave,
+  type ApproachWaveKind,
+} from "@/lib/api/approach-waves";
 import { FloorPlanCanvas, type FloorTool } from "./floor-plan-canvas";
+import { ApproachOverlay } from "./approach-overlay";
+import { ApproachWavesPanel, type ApproachPick } from "./approach-waves-panel";
+import { sameStop, stopFromPoint } from "./approach-geometry";
 import {
   ElementPropertiesPanel,
   GondolaElevation,
@@ -35,11 +44,13 @@ import {
   clampElement,
   computeReachability,
   createElement,
+  elementAt,
   elementEstanteIds,
   formatMeters,
   gondolaForEstante,
   gondolaGeometry,
   gondolaView,
+  isBlocking,
   overlapsEstante,
   type Face,
   rotateElement,
@@ -47,7 +58,13 @@ import {
   toDraft,
 } from "./geometry";
 
-type Mode = "edit" | "route";
+type Mode = "edit" | "route" | "approach";
+
+const MODE_LABELS: Record<Mode, string> = {
+  edit: "Editar planta",
+  route: "Simular rota",
+  approach: "Ondas de aproximação",
+};
 
 const TOOLS: Array<{ id: FloorTool; title: string; icon: ReactNode }> = [
   { id: "select", title: "Selecionar e mover (V)", icon: <MousePointer2 className="h-4 w-4" /> },
@@ -92,6 +109,34 @@ export function FloorPlanEditor({ barracaoId, onSaved }: { barracaoId: string; o
   const [route, setRoute] = useState<RoutePreview | null>(null);
   const [routeLoading, setRouteLoading] = useState(false);
   const [routeError, setRouteError] = useState<string | null>(null);
+
+  const [approachKind, setApproachKind] = useState<ApproachWaveKind>("PICKING");
+  const [approachWaves, setApproachWaves] = useState<ApproachWave[]>([]);
+  const [approachSelected, setApproachSelected] = useState<number | null>(null);
+  const [approachPick, setApproachPick] = useState<ApproachPick>(null);
+  const [approachDirty, setApproachDirty] = useState(false);
+  const [approachSaving, setApproachSaving] = useState(false);
+  const [approachError, setApproachError] = useState<string | null>(null);
+
+  const loadApproach = useCallback(
+    async (kind: ApproachWaveKind) => {
+      setApproachError(null);
+      try {
+        const { waves } = await fetchApproachWaves(barracaoId, kind);
+        setApproachWaves(waves);
+        setApproachSelected(waves.length > 0 ? 0 : null);
+        setApproachPick(null);
+        setApproachDirty(false);
+      } catch (e) {
+        setApproachError(e instanceof Error ? e.message : "Erro ao carregar ondas de aproximação");
+      }
+    },
+    [barracaoId],
+  );
+
+  useEffect(() => {
+    if (mode === "approach") void loadApproach(approachKind);
+  }, [mode, approachKind, loadApproach]);
 
   const nextId = useRef(1);
 
@@ -377,6 +422,51 @@ export function FloorPlanEditor({ barracaoId, onSaved }: { barracaoId: string; o
     }
   };
 
+  const confirmLeaveApproach = () =>
+    !approachDirty || window.confirm("Descartar alterações nas ondas de aproximação?");
+
+  const changeApproach = (waves: ApproachWave[]) => {
+    setApproachWaves(waves);
+    setApproachDirty(true);
+  };
+
+  const onApproachClick = (px: number, py: number) => {
+    if (approachSelected == null || !approachPick) return;
+    const wave = approachWaves[approachSelected];
+    if (!wave) return;
+    if (approachPick === "start") {
+      const x = Math.floor(px);
+      const y = Math.floor(py);
+      const hit = elementAt(elements, x, y);
+      if (hit && isBlocking(hit)) {
+        setApproachError("A saída precisa ficar numa célula livre");
+        return;
+      }
+      setApproachError(null);
+      changeApproach(approachWaves.map((w, i) => (i === approachSelected ? { ...w, startX: x, startY: y } : w)));
+      setApproachPick("stops");
+      return;
+    }
+    const stop = stopFromPoint(elements, estanteById, px, py);
+    if (!stop || wave.stops.some((s) => sameStop(s, stop))) return;
+    changeApproach(approachWaves.map((w, i) => (i === approachSelected ? { ...w, stops: [...w.stops, stop] } : w)));
+  };
+
+  const saveApproach = async () => {
+    setApproachSaving(true);
+    setApproachError(null);
+    try {
+      const { waves } = await saveApproachWaves(barracaoId, approachKind, approachWaves);
+      setApproachWaves(waves);
+      setApproachDirty(false);
+      setApproachPick(null);
+    } catch (e) {
+      setApproachError(e instanceof Error ? e.message : "Erro ao salvar ondas de aproximação");
+    } finally {
+      setApproachSaving(false);
+    }
+  };
+
   useEffect(() => {
     const onKey = (ev: KeyboardEvent) => {
       if (mode !== "edit" || isTypingTarget(ev.target)) return;
@@ -416,11 +506,12 @@ export function FloorPlanEditor({ barracaoId, onSaved }: { barracaoId: string; o
       <div className="space-y-4">
         <div className="overflow-hidden rounded-xl border bg-white shadow-sm">
           <div className="flex flex-wrap items-center gap-2 border-b bg-slate-50 px-4 py-2.5">
-            {(["edit", "route"] as Mode[]).map((m2) => (
+            {(["edit", "route", "approach"] as Mode[]).map((m2) => (
               <button
                 key={m2}
                 type="button"
                 onClick={() => {
+                  if (mode === "approach" && m2 !== "approach" && !confirmLeaveApproach()) return;
                   setMode(m2);
                   setTool("select");
                 }}
@@ -428,7 +519,7 @@ export function FloorPlanEditor({ barracaoId, onSaved }: { barracaoId: string; o
                   mode === m2 ? "bg-[#0d9488] text-white" : "text-slate-600 hover:bg-slate-200"
                 }`}
               >
-                {m2 === "edit" ? "Editar planta" : "Simular rota"}
+                {MODE_LABELS[m2]}
               </button>
             ))}
             <div className="ml-2 flex items-center gap-1">
@@ -511,6 +602,17 @@ export function FloorPlanEditor({ barracaoId, onSaved }: { barracaoId: string; o
                   onDragEnd={(changed) => {
                     if (changed) markDirty();
                   }}
+                  onPointClick={mode === "approach" ? onApproachClick : undefined}
+                  overlay={
+                    mode === "approach" ? (
+                      <ApproachOverlay
+                        waves={approachWaves}
+                        selectedIndex={approachSelected}
+                        elements={elements}
+                        estantes={estanteById}
+                      />
+                    ) : null
+                  }
                 />
               </div>
               <div className="flex flex-wrap items-center gap-4 border-t px-4 py-2 text-xs text-slate-500">
@@ -561,7 +663,7 @@ export function FloorPlanEditor({ barracaoId, onSaved }: { barracaoId: string; o
                   <hr />
                   <ValidationPanel validation={validation} validating={validating} onFocusElement={setSelectedId} />
                 </>
-              ) : (
+              ) : mode === "route" ? (
                 <RoutePanel
                   orderId={orderId}
                   onOrderIdChange={setOrderId}
@@ -569,6 +671,27 @@ export function FloorPlanEditor({ barracaoId, onSaved }: { barracaoId: string; o
                   loading={routeLoading}
                   error={routeError}
                   route={route}
+                />
+              ) : (
+                <ApproachWavesPanel
+                  kind={approachKind}
+                  onKindChange={(k) => {
+                    if (k === approachKind || !confirmLeaveApproach()) return;
+                    setApproachKind(k);
+                  }}
+                  waves={approachWaves}
+                  selectedIndex={approachSelected}
+                  onSelect={setApproachSelected}
+                  onChange={changeApproach}
+                  pick={approachPick}
+                  onPickChange={setApproachPick}
+                  estanteCode={(id) => estanteById.get(id)?.code ?? "?"}
+                  dirty={approachDirty}
+                  saving={approachSaving}
+                  error={approachError}
+                  planDirty={dirty}
+                  onSave={saveApproach}
+                  onDiscard={() => void loadApproach(approachKind)}
                 />
               )}
             </div>
