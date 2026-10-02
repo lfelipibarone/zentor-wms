@@ -14,7 +14,7 @@ import { PickWaveError } from "./pick-wave-error.js";
 export { PickWaveError } from "./pick-wave-error.js";
 import { marketplaceWhereClause } from "./marketplace-filter.js";
 import { sortOrdersByPickProximity } from "./order-proximity.js";
-import { buildOrderPickProfiles } from "./pick-wave-order-profile.js";
+import { buildOrderPickProfiles, proximityLimitFor } from "./pick-wave-order-profile.js";
 import {
   getExcludedOrderDetails,
   getExcludedOrderIds,
@@ -30,6 +30,7 @@ import {
   assertUniformMarketplace,
 } from "./wave-marketplace.js";
 import { getWaveSettings } from "./wave-settings.js";
+import { getRouteEngine } from "./route-engine/index.js";
 
 function formatLocation(loc: { corridor: string; row: string; barcode: string }) {
   return `${loc.corridor}-${loc.row} · ${loc.barcode}`;
@@ -289,6 +290,7 @@ export async function previewWaveRelease(
     remaining.length > 0 ? remaining : orders,
     {
       maxDistance: partitionSettings.proximityMaxDistance,
+      maxDistanceMeters: partitionSettings.proximityMaxDistanceMeters,
       maxGroups: 5,
     },
   );
@@ -596,7 +598,7 @@ export async function addOrdersToWave(
           newOrder,
           existingInWave,
           profiles,
-          settings.proximityMaxDistance,
+          proximityLimitFor(profiles, settings),
         )
       ) {
         throw new PickWaveError(
@@ -966,6 +968,18 @@ export async function listReleasedWaves(tenantId: string) {
 }
 
 export async function getReleasedWaveById(tenantId: string, waveId: string) {
+  const [wave, engine] = await Promise.all([
+    findReleasedWaveById(tenantId, waveId),
+    getRouteEngine(tenantId),
+  ]);
+  if (!wave || engine.kind !== "PHYSICAL") return wave;
+  const sortedLines = engine
+    .sortByRoute(wave.lines.map((line) => ({ ...line.pickLocation, __line: line })))
+    .map((l) => l.__line);
+  return { ...wave, lines: sortedLines };
+}
+
+function findReleasedWaveById(tenantId: string, waveId: string) {
   return prisma.pickWave.findFirst({
     where: { tenantId, id: waveId, status: PickWaveStatus.RELEASED },
     include: {

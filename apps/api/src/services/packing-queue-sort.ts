@@ -1,11 +1,9 @@
 import { computeOrderPriority } from "./marketplace-priority.js";
-import {
-  locationDistance,
-  sortLocationsByRoute,
-  toRouteCoord,
-  type LocationLike,
-  type RouteCoord,
-} from "./location-route.js";
+import { toRouteCoord, type LocationLike } from "./location-route.js";
+import { LegacyRouteEngine } from "./route-engine/legacy-engine.js";
+import type { RoutableLocation, RouteEngine } from "./route-engine/types.js";
+
+const legacyEngine = new LegacyRouteEngine();
 
 export type PackingSortItem = {
   id: string;
@@ -15,7 +13,7 @@ export type PackingSortItem = {
   marketplace: string | null;
   items: Array<{
     quantityPicked: number;
-    pickLocation: LocationLike | null;
+    pickLocation: RoutableLocation | null;
   }>;
 };
 
@@ -23,7 +21,7 @@ export type WaveLineSortItem = {
   id: string;
   waveUrgency: number;
   collectionDeadline: Date | null;
-  pickLocation: LocationLike;
+  pickLocation: RoutableLocation;
 };
 
 function isCollectionToday(deadline: Date | null, now: Date): boolean {
@@ -72,38 +70,39 @@ export function formatRouteLabel(
 /** Primeira gôndola na rota entre itens já separados. */
 export function orderRouteAnchor(
   items: PackingSortItem["items"],
-): { coord: RouteCoord; label: string } | null {
+  engine: RouteEngine = legacyEngine,
+): { location: RoutableLocation; label: string } | null {
   const locs = items
     .filter((i) => i.quantityPicked > 0 && i.pickLocation)
     .map((i) => i.pickLocation!);
   if (locs.length === 0) {
     const any = items.find((i) => i.pickLocation)?.pickLocation;
     if (!any) return null;
-    return { coord: toRouteCoord(any), label: formatRouteLabel(any) };
+    return { location: any, label: formatRouteLabel(any) };
   }
-  const sorted = sortLocationsByRoute(locs);
-  const first = sorted[0]!;
-  return { coord: toRouteCoord(first), label: formatRouteLabel(first) };
+  const first = engine.sortByRoute(locs)[0]!;
+  return { location: first, label: formatRouteLabel(first) };
 }
 
 export function comparePackingOrders(
   a: PackingSortItem,
   b: PackingSortItem,
   now = new Date(),
-  cursor?: RouteCoord | null,
+  cursor?: RoutableLocation | null,
+  engine: RouteEngine = legacyEngine,
 ): number {
   const urgA = scorePackingUrgency(a, now);
   const urgB = scorePackingUrgency(b, now);
   if (urgB !== urgA) return urgB - urgA;
 
   if (cursor) {
-    const anchorA = orderRouteAnchor(a.items);
-    const anchorB = orderRouteAnchor(b.items);
+    const anchorA = orderRouteAnchor(a.items, engine);
+    const anchorB = orderRouteAnchor(b.items, engine);
     const distA = anchorA
-      ? locationDistance(cursor, anchorA.coord)
+      ? engine.distance(cursor, anchorA.location)
       : Number.MAX_SAFE_INTEGER;
     const distB = anchorB
-      ? locationDistance(cursor, anchorB.coord)
+      ? engine.distance(cursor, anchorB.location)
       : Number.MAX_SAFE_INTEGER;
     if (distA !== distB) return distA - distB;
   }
@@ -118,10 +117,11 @@ export function comparePackingOrders(
 export function sortPackingOrders<T extends PackingSortItem>(
   orders: T[],
   now = new Date(),
+  engine: RouteEngine = legacyEngine,
 ): T[] {
   const sorted = [...orders];
-  sorted.sort((a, b) => comparePackingOrders(a, b, now));
-  let cursor: RouteCoord | null = null;
+  sorted.sort((a, b) => comparePackingOrders(a, b, now, null, engine));
+  let cursor: RoutableLocation | null = null;
   const result: T[] = [];
   const remaining = new Set(sorted.map((o) => o.id));
 
@@ -130,7 +130,7 @@ export function sortPackingOrders<T extends PackingSortItem>(
     let bestCmp = 0;
     for (const o of sorted) {
       if (!remaining.has(o.id)) continue;
-      const cmp = comparePackingOrders(o, best ?? o, now, cursor);
+      const cmp = comparePackingOrders(o, best ?? o, now, cursor, engine);
       if (!best || cmp < 0) {
         best = o;
         bestCmp = cmp;
@@ -139,8 +139,8 @@ export function sortPackingOrders<T extends PackingSortItem>(
     if (!best) break;
     remaining.delete(best.id);
     result.push(best);
-    const anchor = orderRouteAnchor(best.items);
-    if (anchor) cursor = anchor.coord;
+    const anchor = orderRouteAnchor(best.items, engine);
+    if (anchor) cursor = anchor.location;
     void bestCmp;
   }
   return result;
@@ -149,15 +149,14 @@ export function sortPackingOrders<T extends PackingSortItem>(
 export function compareWavePackingLines(
   a: WaveLineSortItem,
   b: WaveLineSortItem,
-  cursor?: RouteCoord | null,
+  cursor?: RoutableLocation | null,
+  engine: RouteEngine = legacyEngine,
 ): number {
   if (b.waveUrgency !== a.waveUrgency) return b.waveUrgency - a.waveUrgency;
 
   if (cursor) {
-    const coordA = toRouteCoord(a.pickLocation);
-    const coordB = toRouteCoord(b.pickLocation);
-    const distA = locationDistance(cursor, coordA);
-    const distB = locationDistance(cursor, coordB);
+    const distA = engine.distance(cursor, a.pickLocation);
+    const distB = engine.distance(cursor, b.pickLocation);
     if (distA !== distB) return distA - distB;
   } else {
     const cA = toRouteCoord(a.pickLocation);
@@ -175,10 +174,11 @@ export function compareWavePackingLines(
 
 export function sortWavePackingLines<T extends WaveLineSortItem>(
   lines: T[],
+  engine: RouteEngine = legacyEngine,
 ): T[] {
   const sorted = [...lines];
-  sorted.sort((a, b) => compareWavePackingLines(a, b));
-  let cursor: RouteCoord | null = null;
+  sorted.sort((a, b) => compareWavePackingLines(a, b, null, engine));
+  let cursor: RoutableLocation | null = null;
   const result: T[] = [];
   const remaining = new Set(sorted.map((l) => l.id));
 
@@ -186,13 +186,13 @@ export function sortWavePackingLines<T extends WaveLineSortItem>(
     let best: T | null = null;
     for (const l of sorted) {
       if (!remaining.has(l.id)) continue;
-      const cmp = best ? compareWavePackingLines(l, best, cursor) : -1;
+      const cmp = best ? compareWavePackingLines(l, best, cursor, engine) : -1;
       if (!best || cmp < 0) best = l;
     }
     if (!best) break;
     remaining.delete(best.id);
     result.push(best);
-    cursor = toRouteCoord(best.pickLocation);
+    cursor = best.pickLocation;
   }
   return result;
 }

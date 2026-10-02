@@ -4,6 +4,7 @@ import {
   buildOrderPickProfiles,
   orderUrgencyScore,
   profileProximityDistance,
+  proximityLimitFor,
   sortOrdersByUrgency,
   type OrderPickProfile,
 } from "./pick-wave-order-profile.js";
@@ -164,12 +165,20 @@ export function sortOrdersByPickProximity<T extends OrderWithItems>(
 export async function buildPickProximityGroups(
   tenantId: string,
   orders: OrderWithItems[],
-  opts?: { maxDistance?: number; maxGroups?: number; maxOrdersPerGroup?: number },
+  opts?: {
+    maxDistance?: number;
+    maxDistanceMeters?: number;
+    maxGroups?: number;
+    maxOrdersPerGroup?: number;
+  },
 ): Promise<ProximityCluster<OrderWithItems>[]> {
   const profiles = await buildOrderPickProfiles(tenantId, orders);
   const eligible = orders.filter((o) => profiles.has(o.id));
   return clusterOrdersByProximity(eligible, profiles, {
-    maxDistance: opts?.maxDistance ?? 2,
+    maxDistance: proximityLimitFor(profiles, {
+      proximityMaxDistance: opts?.maxDistance ?? 2,
+      proximityMaxDistanceMeters: opts?.maxDistanceMeters,
+    }),
     maxClusters: opts?.maxGroups ?? 10,
     maxOrdersPerCluster: opts?.maxOrdersPerGroup ?? 8,
   });

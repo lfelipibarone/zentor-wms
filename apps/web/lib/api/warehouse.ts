@@ -34,6 +34,7 @@ export interface WarehouseLayoutLocation {
 
 export interface WarehouseLinhaNode extends WarehouseNode {
   colunaId?: string;
+  face?: LocationFace;
   location?: WarehouseLayoutLocation | null;
 }
 
@@ -131,6 +132,7 @@ export interface WarehouseLayoutListRow {
   estante: string;
   coluna: string;
   linha: string;
+  face?: LocationFace;
   sku: string;
   capacity: number | null;
   minThreshold: number | null;
@@ -185,6 +187,8 @@ export function updateWarehouseItem(
   });
 }
 
+export type LocationFace = "A" | "B";
+
 export interface CreateWarehousePositionBody {
   colunaId?: string;
   setorCode?: string;
@@ -193,21 +197,14 @@ export interface CreateWarehousePositionBody {
   colunaCode?: string;
   linhaCode?: string;
   linhaName?: string | null;
+  face?: LocationFace;
   barcode: string;
   type: "PICK_FACE" | "PULMAO";
-  productId?: string | null;
-  capacity: number;
-  minThreshold?: number;
-  currentQuantity?: number;
   active?: boolean;
   barracaoId?: string | null;
   setorId?: string | null;
   corredorId?: string | null;
   estanteId?: string | null;
-  proximityCorredorId?: string | null;
-  proximityEstanteId?: string | null;
-  proximityLinhaId?: string | null;
-  proximityReferences?: WarehouseProximityReference[];
 }
 
 export function createWarehousePosition(body: CreateWarehousePositionBody) {
@@ -220,12 +217,86 @@ export function createWarehousePosition(body: CreateWarehousePositionBody) {
   });
 }
 
+export type GenerateEstanteBody = {
+  barracaoId: string;
+  estanteCode: string;
+  ld: { colunas: number; linhas: number };
+  le: { colunas: number; linhas: number } | null;
+  type: "PICK_FACE" | "PULMAO";
+};
+
+export type GenerateEstanteResult = {
+  estanteId: string;
+  created: number;
+  skipped: number;
+  relabeled: number;
+  errors: Array<{ address: string; message: string }>;
+};
+
+export type EstanteSide = { colunas: number; linhas: number };
+
+export type InventoryLayoutRow = { address: string; sku: string };
+
+export type InventoryLayoutEstante = {
+  barracao: string;
+  estante: string;
+  ld: EstanteSide;
+  le: EstanteSide | null;
+};
+
+export type InventoryLayoutPreview = {
+  estantes: Array<InventoryLayoutEstante & { addressCount: number }>;
+  assignments: Array<{ code: string; sku: string }>;
+  extraSkus: Array<{ code: string; skus: string[] }>;
+  invalid: Array<{ row: number; address: string; message: string }>;
+  emptyRows: number;
+  pulmaoRefs: number;
+  missingBarracoes: string[];
+};
+
+export type InventoryLayoutResult = {
+  estantes: number;
+  created: number;
+  skipped: number;
+  relabeled: number;
+  errors: Array<{ address: string; message: string }>;
+  skus: { associated: number; unchanged: number; notFound: string[] };
+};
+
+export function previewInventoryLayout(rows: InventoryLayoutRow[]) {
+  return apiFetch<InventoryLayoutPreview>("/api/warehouse/inventory-layout/preview", {
+    method: "POST",
+    body: JSON.stringify({ rows }),
+  });
+}
+
+export function applyInventoryLayout(body: {
+  rows: InventoryLayoutRow[];
+  estantes: InventoryLayoutEstante[];
+}) {
+  return apiFetch<InventoryLayoutResult>("/api/warehouse/inventory-layout/apply", {
+    method: "POST",
+    body: JSON.stringify(body),
+  });
+}
+
+export function generateEstante(body: GenerateEstanteBody) {
+  return apiFetch<GenerateEstanteResult>("/api/warehouse/estantes/generate", {
+    method: "POST",
+    body: JSON.stringify(body),
+  });
+}
+
 export function updateWarehousePosition(
   linhaId: string,
   body: Partial<CreateWarehousePositionBody> & {
     linhaActive?: boolean;
     linhaCode?: string;
     linhaName?: string | null;
+    productId?: string | null;
+    capacity?: number;
+    minThreshold?: number;
+    currentQuantity?: number;
   },
 ) {
   return apiFetch<{ location: WarehouseLayoutLocation }>(

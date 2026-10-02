@@ -99,4 +99,28 @@ describe("order-proximity", () => {
       "c deve ficar mais distante de a/b",
     );
   });
+
+  it("no mapa físico agrupa pela distância em metros e ignora o centróide", () => {
+    const walkMeters: Record<string, number> = { "A|B": 4, "A|Z": 40, "B|Z": 38 };
+    const routeDistance = (x: { row: string }, y: { row: string }) =>
+      x.row === y.row ? 0 : walkMeters[[x.row, y.row].sort().join("|")]!;
+    const physical = (id: string, row: string, centroid: { corridor: number; row: number }) => ({
+      ...profile(id, centroid),
+      routeAnchor: { corridor: "X", row },
+      routeDistance,
+    });
+    // Centróides enganosos: "z" parece vizinho de "a" no corredor/linha, mas fica a 40 m de caminhada.
+    const profiles = new Map<string, OrderPickProfile>([
+      ["a", physical("a", "A", { corridor: 1, row: 1 })],
+      ["b", physical("b", "B", { corridor: 9, row: 9 })],
+      ["z", physical("z", "Z", { corridor: 1, row: 2 })],
+    ]);
+    const clusters = clusterOrdersByProximity(
+      [mockOrder("a", { corridor: 1, row: 1 }), mockOrder("b", { corridor: 9, row: 9 }), mockOrder("z", { corridor: 1, row: 2 })],
+      profiles,
+      { maxDistance: 10, maxClusters: 10, maxOrdersPerCluster: 8 },
+    );
+    const withA = clusters.find((c) => c.orderIds.includes("a"))!;
+    assert.deepEqual([...withA.orderIds].sort(), ["a", "b"]);
+  });
 });

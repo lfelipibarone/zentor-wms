@@ -131,6 +131,7 @@ export async function mobileRoutes(app: FastifyInstance) {
     const orders = sortOrdersByPickProximity(rawOrders, profiles);
     const clusters = await buildPickProximityGroups(tenantId, orders, {
       maxDistance: settings.proximityMaxDistance,
+      maxDistanceMeters: settings.proximityMaxDistanceMeters,
       maxGroups: 8,
       maxOrdersPerGroup: 8,
     });
@@ -361,21 +362,17 @@ export async function mobileRoutes(app: FastifyInstance) {
             orderBy: { lineNumber: "asc" },
             include: {
               product: true,
-              pickLocation: {
-                include: {
-                  proximityCorredor: { select: { code: true } },
-                  proximityEstante: { select: { code: true } },
-                  proximityLinha: { select: { code: true } },
-                },
-              },
+              pickLocation: true,
             },
           },
         },
       });
       if (!order) return reply.status(404).send({ error: "Pedido não encontrado" });
 
-      const { pickNextItemByRoute, sortPendingItemsByRoute, mapLocationForRoute } =
-        await import("../services/location-route.js");
+      const { mapLocationForRoute } = await import("../services/location-route.js");
+      const { getRouteEngine, pickNextItemByEngine, sortPendingItemsByEngine } =
+        await import("../services/route-engine/index.js");
+      const engine = await getRouteEngine(order.tenantId);
 
       const isPending = (i: (typeof order.items)[0]) =>
         i.quantityPicked < i.quantityOrdered;
@@ -416,10 +413,11 @@ export async function mobileRoutes(app: FastifyInstance) {
       }) => i.quantityPicked < i.quantityOrdered;
 
       const nextItem =
-        pickNextItemByRoute(routeItems, isPendingQty, lastLocation) ??
+        pickNextItemByEngine(engine, routeItems, isPendingQty, lastLocation) ??
         order.items.find(isPending);
 
-      const routeQueue = sortPendingItemsByRoute(
+      const routeQueue = sortPendingItemsByEngine(
+        engine,
         routeItems,
         isPendingQty,
         lastLocation,

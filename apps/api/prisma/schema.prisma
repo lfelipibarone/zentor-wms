@@ -30,6 +30,22 @@ enum LocationType {
   PULMAO    // Estoque de reserva / reabastecimento
 }
 
+/// Lado da gôndola: A = frente, B = verso (acessado pelo corredor oposto)
+enum LocationFace {
+  A
+  B
+}
+
+enum FloorElementType {
+  GONDOLA
+  OBSTACLE
+  START_POINT
+  PACKING_POINT
+  DOCK
+  /// Área de conferência do recebimento; a armazenagem (pulmão) parte daqui.
+  RECEIVING_AREA
+}
+
 /// Ciclo de vida do pedido no WMS
 enum OrderStatus {
   PENDING
@@ -158,6 +174,8 @@ model Tenant {
   systemSettings          SystemSetting[]
   locationProximityReferences LocationProximityReference[]
   rolePermissions         TenantRolePermission[]
+  floorPlans              WarehouseFloorPlan[]
+  floorElements           WarehouseFloorElement[]
 
   @@map("tenants")
 }
@@ -346,6 +364,7 @@ model WarehouseBarracao {
   tenant    Tenant           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   setores   WarehouseSetor[]
   locations Location[]
+  floorPlan WarehouseFloorPlan?
 
   @@unique([tenantId, code])
   @@index([tenantId])
@@ -415,6 +434,8 @@ model WarehouseEstante {
   locations Location[]
   proximityLocations Location[] @relation("LocationProximityEstante")
   proximityReferenceEstante LocationProximityReference[] @relation("ProximityRefEstante")
+  floorElements WarehouseFloorElement[]
+  floorElementsB WarehouseFloorElement[] @relation("FloorElementEstanteB")
 
   @@unique([tenantId, corredorId, code])
   @@index([tenantId])
@@ -450,6 +471,7 @@ model WarehouseLinha {
   colunaId  String
   code      String
   name      String?
+  face      LocationFace @default(A)
   pickOrder Int      @default(0)
   active    Boolean  @default(true)
   createdAt DateTime @default(now())
@@ -461,7 +483,7 @@ model WarehouseLinha {
   proximityReferences Location[] @relation("LocationProximityLinha")
   proximityReferenceLinha LocationProximityReference[] @relation("ProximityRefLinha")
 
-  @@unique([tenantId, colunaId, code])
+  @@unique([tenantId, colunaId, code, face])
   @@index([tenantId])
   @@index([colunaId])
   @@map("warehouse_linhas")
@@ -489,6 +511,8 @@ model Location {
   proximityCorredorId String?
   proximityEstanteId  String?
   proximityLinhaId    String?
+  /// Espelha WarehouseLinha.face; usado pelo Route Engine
+  face                LocationFace @default(A)
   type                LocationType
   /// Produto alocado nesta posição (opcional — pulmão pode estar vazio ou em transição)
   productId       String?
@@ -561,6 +585,74 @@ model LocationProximityReference {
   @@index([tenantId])
   @@index([locationId])
   @@map("location_proximity_references")
+}
+
+// -----------------------------------------------------------------------------
+// Mapa físico do barracão (Warehouse Layout Editor / Route Engine)
+// -----------------------------------------------------------------------------
+
+/// Planta 2D em grade de um barracão. Coordenadas dos elementos em células.
+model WarehouseFloorPlan {
+  id          String   @id @default(cuid())
+  tenantId    String
+  barracaoId  String   @unique
+  cellSizeCm  Int      @default(50)
+  widthCells  Int
+  heightCells Int
+  /// Incrementa a cada save; invalida o cache do Route Engine
+  version     Int      @default(1)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  tenant   Tenant                  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  barracao WarehouseBarracao       @relation(fields: [barracaoId], references: [id], onDelete: Cascade)
+  elements WarehouseFloorElement[]
+
+  @@index([tenantId])
+  @@map("warehouse_floor_plans")
+}
+
+/// Elemento da planta. GONDOLA: eixo longo em X com rotation 0; Face A no lado
+/// y-1 e Face B no lado y+height (rotation 90: Face A em x+width, Face B em x-1).
+/// colunaReversedA/B invertem o sentido das linhas só na face correspondente.
+/// A gôndola representa uma estante do cadastro (estanteId).
+model WarehouseFloorElement {
+  id             String           @id @default(cuid())
+  tenantId       String
+  floorPlanId    String
+  type           FloorElementType
+  x              Int
+  y              Int
+  width          Int
+  height         Int
+  rotation       Int              @default(0)
+  /// Estante do LD (Face A); também do LE quando `estanteIdB` é nulo (frente e verso da mesma estante).
+  estanteId      String?
+  /// Estante do LE (Face B) quando a gôndola junta duas estantes de costas (ex.: C no LE, D no LD).
+  estanteIdB     String?
+  faceAEnabled   Boolean          @default(true)
+  faceBEnabled   Boolean          @default(false)
+  colunaReversedA Boolean          @default(false)
+  colunaReversedB Boolean          @default(false)
+  /// Faixa de colunas atendida por lado (nulo = sem limite); uma estante pode ser dividida em partes com corredor no meio.
+  colunaMinA     Int?
+  colunaMaxA     Int?
+  colunaMinB     Int?
+  colunaMaxB     Int?
+  label          String?
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
+
+  tenant    Tenant             @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  floorPlan WarehouseFloorPlan @relation(fields: [floorPlanId], references: [id], onDelete: Cascade)
+  estante   WarehouseEstante?  @relation(fields: [estanteId], references: [id], onDelete: SetNull)
+  estanteB  WarehouseEstante?  @relation("FloorElementEstanteB", fields: [estanteIdB], references: [id], onDelete: SetNull)
+
+  @@index([tenantId])
+  @@index([floorPlanId])
+  @@index([estanteId])
+  @@index([estanteIdB])
+  @@map("warehouse_floor_elements")
 }
 
 // -----------------------------------------------------------------------------

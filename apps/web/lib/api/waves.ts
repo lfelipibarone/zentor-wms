@@ -131,6 +131,7 @@ export interface WaveSettings {
   maxWavesPerBatch: number;
   defaultPartitionStrategy: WavePartitionStrategy;
   proximityMaxDistance: number;
+  proximityMaxDistanceMeters: number;
   autoReleaseMarketplace: string | null;
 }
 

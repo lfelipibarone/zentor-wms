@@ -6,6 +6,8 @@ import {
   type RouteCoord,
 } from "./location-route.js";
 import type { OrderWithItems } from "./pick-wave-partition.js";
+import { getRouteEngine } from "./route-engine/index.js";
+import type { RoutableLocation, RouteEngine } from "./route-engine/types.js";
 
 export type PickLocationRef = {
   locationId: string;
@@ -23,7 +25,41 @@ export type OrderPickProfile = {
   coords: RouteCoord[];
   centroid: RouteCoord;
   routeHint: string;
+  /** Mapa físico: localização do pedido mais central (medoide) e a distância em metros do motor. */
+  routeAnchor?: RoutableLocation;
+  routeDistance?: (a: RoutableLocation, b: RoutableLocation) => number;
 };
+
+/** Localização que minimiza a soma das distâncias até as demais do pedido. */
+function medoid(engine: RouteEngine, locs: RoutableLocation[]): RoutableLocation | undefined {
+  if (locs.length <= 2) return locs[0];
+  let best = locs[0];
+  let bestSum = Infinity;
+  for (const a of locs) {
+    let sum = 0;
+    for (const b of locs) if (a !== b) sum += engine.distance(a, b);
+    if (sum < bestSum) {
+      bestSum = sum;
+      best = a;
+    }
+  }
+  return best;
+}
+
+export function profilesUsePhysicalDistance(profiles: Map<string, OrderPickProfile>): boolean {
+  for (const p of profiles.values()) if (p.routeDistance) return true;
+  return false;
+}
+
+/** Limite de proximidade na unidade dos perfis: metros (mapa físico) ou Manhattan (legado). */
+export function proximityLimitFor(
+  profiles: Map<string, OrderPickProfile>,
+  settings: { proximityMaxDistance: number; proximityMaxDistanceMeters?: number },
+): number {
+  return profilesUsePhysicalDistance(profiles)
+    ? (settings.proximityMaxDistanceMeters ?? 10)
+    : settings.proximityMaxDistance;
+}
 
 function formatRouteHint(coords: RouteCoord[], refs: PickLocationRef[]): string {
   if (refs.length === 0) return "—";
@@ -69,6 +105,11 @@ export async function buildOrderPickProfiles(
   orders: OrderWithItems[],
 ): Promise<Map<string, OrderPickProfile>> {
   const productIds = pendingProductIds(orders);
+  const engine = await getRouteEngine(tenantId);
+  const physical = engine.kind === "PHYSICAL";
+  const routeDistance = physical
+    ? (a: RoutableLocation, b: RoutableLocation) => engine.distance(a, b)
+    : undefined;
   const locations =
     productIds.length > 0
       ? await prisma.location.findMany({
@@ -84,6 +125,8 @@ export async function buildOrderPickProfiles(
             barcode: true,
             corridor: true,
             row: true,
+            estanteId: true,
+            face: true,
             currentQuantity: true,
           },
         })
@@ -115,6 +158,7 @@ export async function buildOrderPickProfiles(
     ];
     const refs: PickLocationRef[] = [];
     const coordList: RouteCoord[] = [];
+    const routeLocs: RoutableLocation[] = [];
     const locIdSet = new Set<string>();
 
     for (const it of pendingItems) {
@@ -136,6 +180,7 @@ export async function buildOrderPickProfiles(
           row: loc.row,
         });
         coordList.push(toRouteCoord(loc));
+        routeLocs.push(loc);
       }
     }
 
@@ -149,6 +194,9 @@ export async function buildOrderPickProfiles(
       coords: coordList,
       centroid,
       routeHint: formatRouteHint(coordList, refs),
+      ...(physical && routeLocs.length > 0
+        ? { routeAnchor: medoid(engine, routeLocs), routeDistance }
+        : {}),
     });
   }
 
@@ -164,12 +212,15 @@ export function sortOrdersByUrgency<T extends Order>(orders: T[]): T[] {
   return [...orders].sort((a, b) => orderUrgencyScore(b) - orderUrgencyScore(a));
 }
 
-/** Distância entre perfis (Manhattan + bônus se compartilham pick face). */
+/** Distância entre perfis (metros no mapa físico, senão Manhattan) com bônus se compartilham pick face. */
 export function profileProximityDistance(
   a: OrderPickProfile,
   b: OrderPickProfile,
 ): number {
-  let d = locationDistance(a.centroid, b.centroid);
+  const physical = a.routeDistance && a.routeAnchor && b.routeAnchor;
+  let d = physical
+    ? a.routeDistance!(a.routeAnchor!, b.routeAnchor!)
+    : locationDistance(a.centroid, b.centroid);
   const shared = a.pickLocationIds.some((id) => b.pickLocationIds.includes(id));
   if (shared) d = Math.max(0, d - 1);
   return d;

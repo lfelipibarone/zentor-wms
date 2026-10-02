@@ -3,22 +3,17 @@
 import { useEffect, useMemo, useState } from "react";
 import {
   updateWarehousePosition,
+  type LocationFace,
   type WarehouseLayoutLocation,
   type WarehouseSegment,
   type WarehouseProximityReference,
 } from "@/lib/api/warehouse";
 import { WarehouseSkuSearchSelect } from "@/components/warehouse/warehouse-sku-search-select";
+import { FaceToggle } from "@/components/warehouse/face-toggle";
 import {
   WarehouseFormStep,
   WarehouseTilePicker,
 } from "@/components/warehouse/warehouse-tile-picker";
-import {
-  WarehouseProximityReferencesEditor,
-  proximityReferencesFromRow,
-  serializeProximityReferences,
-  type WarehouseProximityReferenceDraft,
-} from "@/components/warehouse/warehouse-proximity-references-editor";
-
 export type WarehouseEditRow = {
   id: string;
   segment: WarehouseSegment;
@@ -34,6 +29,7 @@ export type WarehouseEditRow = {
   estanteId?: string;
   colunaId?: string;
   isPosition?: boolean;
+  face?: LocationFace;
   location?: WarehouseLayoutLocation;
   barcode?: string;
   locationType?: "PICK_FACE" | "PULMAO";
@@ -56,6 +52,7 @@ export function WarehouseLocationEditModal({
   const currentProduct = row.location?.product;
   const [code, setCode] = useState(row.code);
   const [name, setName] = useState(row.name ?? "");
+  const [face, setFace] = useState<LocationFace>(row.face ?? "A");
   const [active, setActive] = useState(row.active);
   const [barcode, setBarcode] = useState(row.barcode ?? "");
   const [type, setType] = useState<"PICK_FACE" | "PULMAO">(
@@ -69,19 +66,12 @@ export function WarehouseLocationEditModal({
   const [currentQuantity, setCurrentQuantity] = useState(
     String(row.location?.currentQuantity ?? 0),
   );
-  const [proximityReferences, setProximityReferences] = useState<
-    WarehouseProximityReferenceDraft[]
-  >(() => proximityReferencesFromRow(row));
   const [saving, setSaving] = useState(false);
   const [err, setErr] = useState<string | null>(null);
 
   useEffect(() => {
     setProductId(currentProduct?.id ?? "");
   }, [currentProduct?.id]);
-
-  useEffect(() => {
-    setProximityReferences(proximityReferencesFromRow(row));
-  }, [row]);
 
   const includeProduct = useMemo(
     () =>
@@ -119,6 +109,7 @@ export function WarehouseLocationEditModal({
         linhaCode: code.trim(),
         linhaName: name.trim() || null,
         linhaActive: active,
+        face,
         barcode: barcode.trim(),
         type,
         productId: productId || null,
@@ -126,7 +117,6 @@ export function WarehouseLocationEditModal({
         minThreshold: Number(minThreshold) || 0,
         currentQuantity: Number(currentQuantity) || 0,
         active,
-        proximityReferences: serializeProximityReferences(proximityReferences),
       });
       await onSaved();
     } catch (e) {
@@ -159,7 +149,7 @@ export function WarehouseLocationEditModal({
           <label className="block text-sm">
             Linha
             <span className="mt-0.5 block text-xs font-normal text-slate-500">
-              Nível do endereço físico (prateleira/posição na coluna).
+              Último nível do endereço (estante → coluna → linha).
             </span>
             <input
               className="mt-1 w-full rounded-lg border px-3 py-2 font-mono uppercase"
@@ -168,6 +158,8 @@ export function WarehouseLocationEditModal({
               placeholder="Linha"
             />
           </label>
+
+          <FaceToggle value={face} onChange={setFace} />
 
           <label className="block text-sm">
             Nome (opcional)
@@ -203,9 +195,10 @@ export function WarehouseLocationEditModal({
             />
           </WarehouseFormStep>
 
+          <WarehouseFormStep step={2} title="SKU associado">
           <div className="space-y-1">
             <WarehouseSkuSearchSelect
-              title="SKU (opcional)"
+              title="SKU nesta posição"
               value={productId}
               onChange={setProductId}
               includeProduct={includeProduct}
@@ -273,20 +266,6 @@ export function WarehouseLocationEditModal({
               </div>
             </div>
           ) : null}
-
-          <WarehouseFormStep step={2} title="Proximidade (opcional)">
-            {row.barracaoId ? (
-              <WarehouseProximityReferencesEditor
-                barracaoId={row.barracaoId}
-                excludeLinhaId={row.id}
-                value={proximityReferences}
-                onChange={setProximityReferences}
-              />
-            ) : (
-              <p className="text-sm text-slate-500">
-                Barracão não identificado para carregar opções de proximidade.
-              </p>
-            )}
           </WarehouseFormStep>
 
           <label className="flex items-center gap-2 text-sm">

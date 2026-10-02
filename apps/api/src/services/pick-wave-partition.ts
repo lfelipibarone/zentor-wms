@@ -5,6 +5,7 @@ import {
 } from "./order-proximity.js";
 import {
   profileProximityDistance,
+  proximityLimitFor,
   type OrderPickProfile,
 } from "./pick-wave-order-profile.js";
 import type { WaveSettings } from "./wave-settings.js";
@@ -22,6 +23,7 @@ export type WavePartitionSettings = {
   maxWavesPerBatch: number;
   strategy: WavePartitionStrategy;
   proximityMaxDistance: number;
+  proximityMaxDistanceMeters?: number;
 };
 
 export const BY_PRODUCT_MAX_DISTINCT_SKUS = 5;
@@ -255,7 +257,7 @@ function partitionOrdersByProximity(
   }
 
   const clusters = clusterOrdersByProximity(orders, profiles, {
-    maxDistance: settings.proximityMaxDistance,
+    maxDistance: proximityLimitFor(profiles, settings),
     maxClusters: settings.maxWavesPerBatch,
     maxOrdersPerCluster: Math.max(settings.minOrdersPerWave, 50),
   });
@@ -295,7 +297,7 @@ function partitionOrdersByProduct(
   const componentByOrderId = buildComponentIndex(
     eligible,
     profileMap,
-    settings.proximityMaxDistance,
+    proximityLimitFor(profileMap, settings),
   );
 
   const assigned = new Set<string>();
@@ -353,6 +355,7 @@ export function waveSettingsToPartition(
     maxWavesPerBatch?: number;
     defaultPartitionStrategy?: WavePartitionStrategy;
     proximityMaxDistance?: number;
+    proximityMaxDistanceMeters?: number;
   },
   strategyOverride?: WavePartitionStrategy,
 ): WavePartitionSettings {
@@ -362,6 +365,7 @@ export function waveSettingsToPartition(
     maxWavesPerBatch: settings.maxWavesPerBatch ?? 10,
     strategy: strategyOverride ?? settings.defaultPartitionStrategy ?? "BY_PRODUCT",
     proximityMaxDistance: settings.proximityMaxDistance ?? 2,
+    proximityMaxDistanceMeters: settings.proximityMaxDistanceMeters ?? 10,
   };
 }
 

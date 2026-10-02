@@ -399,12 +399,20 @@ export default function WaveSettingsPage() {
             </div>
             <NumberRow
               label="Distância máxima de proximidade"
+              description="Rota antiga: diferença de corredor + linha"
               value={settings.proximityMaxDistance}
               onChange={(v) => updateSetting("proximityMaxDistance", v)}
             />
+            <NumberRow
+              label="Distância máxima de proximidade (metros)"
+              description="Mapa físico: metros de caminhada entre os pedidos"
+              value={settings.proximityMaxDistanceMeters}
+              onChange={(v) => updateSetting("proximityMaxDistanceMeters", v)}
+            />
             <p className="text-xs text-muted-foreground">
-              Usada nos modos Proximidade e SKU compartilhado (vínculo por
-              localização no estoque de giro).
+              Usadas nos modos Proximidade e SKU compartilhado (vínculo por
+              localização no estoque de giro). Vale a distância do motor de
+              rota ativo em Gestão do barracão → Mapa do galpão.
             </p>
           </section>
 

@@ -1,4 +1,4 @@
-import { LocationType, Prisma } from "@prisma/client";
+import { LocationFace, LocationType, Prisma } from "@prisma/client";
 import { prisma } from "../lib/prisma.js";
 import { assertMaxPickFaceLocations } from "./location-rules.js";
 import { resumePausedOrdersAfterPickFace } from "./product-locations.js";
@@ -9,13 +9,15 @@ import {
 
 export interface LocationImportInput {
   barcode: string;
-  corridor: string;
+  /** Corredor de layouts antigos; vazio quando a planilha só traz a estante. */
+  corridor?: string;
   row: string;
   barracao?: string;
   setor?: string;
   estante?: string;
   coluna?: string;
   linha?: string;
+  face?: LocationFace;
   type: LocationType;
   productSku?: string;
   capacity: number;
@@ -49,6 +51,13 @@ function parseLocationType(raw: string): LocationType | null {
   return null;
 }
 
+function parseFace(raw: unknown): LocationFace | null {
+  const v = String(raw ?? "").trim().toUpperCase().normalize("NFD").replace(/\p{M}/gu, "");
+  if (!v || v === "A" || v === "LD" || v === "FRENTE") return LocationFace.A;
+  if (v === "B" || v === "LE" || v === "VERSO") return LocationFace.B;
+  return null;
+}
+
 function parseBool(raw: unknown): boolean | undefined {
   if (raw === null || raw === undefined || raw === "") return undefined;
   const v = String(raw).trim().toLowerCase();
@@ -69,7 +78,8 @@ export function normalizeImportRow(
 ): { data?: LocationImportInput; error?: LocationImportRowError } {
   const barcode = String(raw.barcode ?? "").trim().toUpperCase();
   const corridor = String(raw.corridor ?? "").trim();
-  const row = String(raw.row ?? "").trim();
+  const estante = String(raw.estante ?? "").trim();
+  const row = String(raw.linha ?? "").trim() || String(raw.row ?? "").trim();
   const typeRaw = String(raw.type ?? "").trim();
 
   if (!barcode) {
@@ -77,12 +87,12 @@ export function normalizeImportRow(
       error: { row: rowIndex, message: "Barcode obrigatório" },
     };
   }
-  if (!corridor || !row) {
+  if ((!estante && !corridor) || !row) {
     return {
       error: {
         row: rowIndex,
         barcode,
-        message: "Corredor e linha são obrigatórios",
+        message: "Estante e linha são obrigatórias",
       },
     };
   }
@@ -119,6 +129,17 @@ export function normalizeImportRow(
     };
   }
 
+  const face = parseFace(raw.face);
+  if (!face) {
+    return {
+      error: {
+        row: rowIndex,
+        barcode,
+        message: `Face inválida: "${String(raw.face)}". Use LD ou LE`,
+      },
+    };
+  }
+
   const currentQuantity = parseNumber(raw.currentQuantity, 0);
   const productSku = raw.productSku
     ? String(raw.productSku).trim()
@@ -131,13 +152,14 @@ export function normalizeImportRow(
   return {
     data: {
       barcode,
-      corridor,
+      corridor: corridor || undefined,
       row,
       barracao: optionalText("barracao"),
       setor: optionalText("setor"),
       estante: optionalText("estante"),
       coluna: optionalText("coluna"),
       linha: optionalText("linha"),
+      face,
       type,
       productSku: productSku || undefined,
       capacity: Math.floor(capacity),
@@ -216,21 +238,37 @@ export async function importLocations(
         linha: input.linha ?? input.row,
         estante: input.estante,
         coluna: input.coluna,
+        face: input.face,
       });
       const layout = await resolveLocationLayout(tenantId, layoutIds, {
         corridor: input.corridor,
         row: input.row,
       });
 
-      const existing = await prisma.location.findFirst({
+      const byBarcode = await prisma.location.findFirst({
         where: { tenantId, barcode: input.barcode },
-        select: { id: true },
+        select: { id: true, linhaId: true },
       });
+      const byAddress = layout.linhaId
+        ? await prisma.location.findFirst({
+            where: { tenantId, linhaId: layout.linhaId },
+            select: { id: true, barcode: true },
+          })
+        : null;
 
-      if (existing && mode === "createOnly") {
+      if ((byBarcode || byAddress) && mode === "createOnly") {
         result.skipped++;
         continue;
       }
+      if (byBarcode && byAddress && byBarcode.id !== byAddress.id) {
+        result.errors.push({
+          row: rowNum,
+          barcode: input.barcode,
+          message: `Endereço já ocupado pela etiqueta ${byAddress.barcode}`,
+        });
+        continue;
+      }
+      const existing = byBarcode ?? byAddress;
 
       const baseData = {
         corridor: layout.corridor,
@@ -241,6 +279,7 @@ export async function importLocations(
         estanteId: layout.estanteId,
         colunaId: layout.colunaId,
         linhaId: layout.linhaId,
+        face: input.face ?? LocationFace.A,
         type: input.type,
         capacity: input.capacity,
         minThreshold: input.minThreshold,
@@ -262,6 +301,7 @@ export async function importLocations(
           where: { id: existing.id },
           data: {
             ...baseData,
+            barcode: input.barcode,
             ...(input.currentQuantity !== undefined
               ? { currentQuantity: input.currentQuantity }
               : {}),

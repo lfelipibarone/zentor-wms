@@ -49,8 +49,9 @@ O WMS oferece três estratégias de particionamento em `pick-wave-partition.ts`:
 *   **Foco**: Minimizar a distância percorrida pelo operador entre as gôndolas.
 *   **Funcionamento**:
     1.  Gera um perfil de locais de gôndola (`OrderPickProfile`) para cada pedido pendente.
-    2.  Agrupa os pedidos em clusters físicos onde as localizações de coleta estão próximas na serpentine de rota do armazém.
-    3.  Usa o limite de distância configurado em `wave.proximityMaxDistance` para delimitar até onde um separador pode andar em uma única onda.
+    2.  Agrupa os pedidos em clusters físicos onde as localizações de coleta estão próximas na rota do armazém.
+    3.  Com o motor de rota **antigo** (`routing.engine = LEGACY`), a distância é a serpentina (estante/gôndola, linha) e o limite é `wave.proximityMaxDistance`.
+    4.  Com o motor **Mapa físico** (`routing.engine = PHYSICAL`), cada pedido ganha uma âncora (medoide das suas localizações) e a distância é o caminho real em metros na planta do barracão; o limite passa a ser `wave.partition.proximityMaxDistanceMeters` (padrão 10 m). Detalhes em `docs/superpowers/specs/2026-10-01-mapa-fisico-route-engine-design.md`.
 
 ### 3. Pedidos Monocanal / Item Único (`SINGLE_ITEM`)
 *   **Foco**: Separação expressa de pedidos de e-commerce que possuem exatamente **uma unidade de um único SKU**.
@@ -64,7 +65,7 @@ O WMS oferece três estratégias de particionamento em `pick-wave-partition.ts`:
 
 A linha de onda (`PickWaveLine`) consolida as quantidades agregadas dos produtos. A alocação física de qual gôndola o separador retirará o item é calculada no arquivo `pick-allocation.ts`:
 
-1.  Lista as gôndolas cadastradas como `PICK_FACE` do SKU, ordenadas pela sequência lógica de rota (serpentine do galpão).
+1.  Lista as gôndolas cadastradas como `PICK_FACE` do SKU, ordenadas pelo Route Engine do tenant (serpentina no modo antigo; caminho mais curto na planta no modo Mapa físico).
 2.  Aloca as quantidades em cada endereço usando o menor número de paradas, aplicando `min(saldo, restante)`.
 3.  Caso a soma das frentes de pick ativa seja menor que a necessária (ruptura de gôndola), o WMS sugere a gôndola de menor saldo e dispara um alerta de reabastecimento.
 

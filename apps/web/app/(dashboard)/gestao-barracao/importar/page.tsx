@@ -12,7 +12,7 @@ export default function GestaoBarracaoImportarPage() {
     <div>
       <PageHeader
         title="Importar posições"
-        description="Importe gôndolas e pulmões via planilha XLSX (hierarquia: barracão → setor → corredor → estante → coluna → linha)."
+        description="Importe gôndolas e pulmões via planilha XLSX (endereço: barracão → estante → coluna → linha). Se o código de barras for novo e o endereço já existir, a etiqueta da posição é atualizada."
       >
         <Link
           href="/gestao-barracao"

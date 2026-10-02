@@ -40,6 +40,7 @@ import {
   resolveLocationLayout,
 } from "../services/warehouse-layout.js";
 import { registerWarehouseRoutes } from "./warehouse.js";
+import { registerFloorPlanRoutes } from "./floor-plan.js";
 import {
   PickWaveError,
   addOrdersToWave,
@@ -121,6 +122,7 @@ const guard = (p: string) => createPermissionGuard(p);
 
 export async function webRoutes(app: FastifyInstance) {
   registerWarehouseRoutes(app, guard);
+  registerFloorPlanRoutes(app, guard);
 
   // --- Pesquisa rápida ---
   app.get<{ Querystring: { q?: string } }>(

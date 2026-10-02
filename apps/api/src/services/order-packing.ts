@@ -24,6 +24,7 @@ import {
   sortWavePackingLines,
 } from "./packing-queue-sort.js";
 import { listReplenishmentNeeds } from "./replenishment-queue.js";
+import { getRouteEngine } from "./route-engine/index.js";
 import { recordOrderStageChange } from "./order-stage-log.js";
 
 export class PackingSessionError extends Error {
@@ -89,7 +90,7 @@ const orderInclude = {
     orderBy: { lineNumber: "asc" as const },
     include: {
       pickLocation: {
-        select: { id: true, corridor: true, row: true, barcode: true },
+        select: { id: true, corridor: true, row: true, barcode: true, estanteId: true, face: true },
       },
       product: {
         select: {
@@ -130,6 +131,8 @@ type OrderRow = {
       corridor: string;
       row: string;
       barcode: string;
+      estanteId?: string | null;
+      face?: string | null;
     } | null;
     product: {
       id: string;
@@ -190,6 +193,7 @@ async function mapPackingOrder(
       quantityPicked: i.quantityPicked,
       pickLocation: i.pickLocation,
     })),
+    await getRouteEngine(order.tenantId),
   );
 
   const items = await Promise.all(
@@ -248,6 +252,8 @@ export async function listPackingQueue(tenantId: string) {
         pickLocation: i.pickLocation,
       })),
     })),
+    new Date(),
+    await getRouteEngine(tenantId),
   );
 
   const orderMap = new Map(orders.map((o) => [o.id, o]));
@@ -669,7 +675,7 @@ async function listWavePackingLinesInternal(tenantId: string) {
           },
         },
       },
-      pickLocation: { select: { corridor: true, row: true, barcode: true } },
+      pickLocation: { select: { corridor: true, row: true, barcode: true, estanteId: true, face: true } },
     },
   });
 
@@ -701,6 +707,7 @@ async function listWavePackingLinesInternal(tenantId: string) {
       collectionDeadline: l.collectionDeadline,
       pickLocation: l.pickLocation,
     })),
+    await getRouteEngine(tenantId),
   );
 
   return { lines: sorted };

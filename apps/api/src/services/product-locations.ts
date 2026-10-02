@@ -5,7 +5,7 @@ import { buildPaginationMeta } from "../lib/pagination.js";
 import { enrichOrderPriority } from "./marketplace-priority.js";
 import { findProductByBarcode } from "./location-stock.js";
 import { formatRouteLabel } from "./packing-queue-sort.js";
-import { sortLocationsByRoute } from "./location-route.js";
+import { getRouteEngine } from "./route-engine/index.js";
 import { resolvePickFaceForProduct } from "./pick-face-resolve.js";
 import { selectableProductWhere } from "./product-selectable.js";
 import { loadKitProductIds } from "./product-kit-filter.js";
@@ -320,7 +320,7 @@ export async function listProductLocations(
   const sorted =
     type === LocationType.PULMAO
       ? [...locations].sort((a, b) => b.currentQuantity - a.currentQuantity)
-      : sortLocationsByRoute(locations);
+      : (await getRouteEngine(tenantId)).sortByRoute(locations);
 
   let suggestedId: string | null = null;
   if (type === LocationType.PICK_FACE && sorted.length > 0) {

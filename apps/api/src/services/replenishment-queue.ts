@@ -1,7 +1,7 @@
 import { CargoTransferStatus, LocationType } from "@prisma/client";
 import { prisma } from "../lib/prisma.js";
 import { formatRouteLabel } from "./packing-queue-sort.js";
-import { sortLocationsByRoute } from "./location-route.js";
+import { getRouteEngine } from "./route-engine/index.js";
 
 export type ReplenishmentNeed = {
   id: string;
@@ -65,7 +65,7 @@ export async function listReplenishmentNeeds(
     (f) => f.currentQuantity <= f.minThreshold && f.product,
   );
 
-  const sorted = sortLocationsByRoute(lowFaces);
+  const sorted = (await getRouteEngine(tenantId)).sortByRoute(lowFaces);
 
   return sorted
     .filter((face) => !blockedFaceIds.has(face.id))

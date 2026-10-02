@@ -1,6 +1,6 @@
 import { Location, LocationType } from "@prisma/client";
 import { prisma } from "../lib/prisma.js";
-import { sortLocationsByRoute } from "./location-route.js";
+import { getRouteEngine, LegacyRouteEngine } from "./route-engine/index.js";
 
 export class PickFaceError extends Error {
   constructor(message: string) {
@@ -46,8 +46,8 @@ export async function resolvePickFaceForProduct(
   const tied = byQty.filter((l) => l.currentQuantity === minQty);
   if (tied.length === 1) return tied[0]!;
 
-  const sorted = sortLocationsByRoute(tied);
-  return sorted[0]!;
+  const engine = tenantId ? await getRouteEngine(tenantId) : new LegacyRouteEngine();
+  return engine.sortByRoute(tied)[0]!;
 }
 
 export async function suggestPickFaceDeposit(

@@ -12,7 +12,7 @@ function NovoPageHeader() {
 
   let title = "Nova localização";
   let description =
-    "Cadastre um endereço como pulmão ou estoque de giro, com barcode e SKU quando necessário.";
+    "Cadastre o endereço e a etiqueta da posição. O SKU é associado depois, na lista de localizações.";
 
   if (tipo === "pulmao" || tipo === "pulmão") {
     description = "Nova localização do tipo pulmão.";
@@ -21,7 +21,7 @@ function NovoPageHeader() {
     tipo === "sku" ||
     tipo === "estoque-de-giro"
   ) {
-    description = "Nova localização de estoque de giro com SKU.";
+    description = "Nova localização de estoque de giro.";
   }
 
   return (

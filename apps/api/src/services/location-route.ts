@@ -5,9 +5,6 @@ export type LocationLike = {
   corridor: string;
   row: string;
   id?: string;
-  proximityCorredorCode?: string | null;
-  proximityEstanteCode?: string | null;
-  proximityLinhaCode?: string | null;
 };
 
 function parseSegment(value: string): number {
@@ -24,16 +21,16 @@ function parseSegment(value: string): number {
   return hash;
 }
 
-/** Prioridade: proximidade explícita > corridor/row da posição. */
+/** Coluna de `Location.row` ("COLUNA-LINHA"); dados antigos sem hífen usam o valor inteiro. */
+export function colunaFromRow(row: string): string {
+  return row.split("-")[0]!.trim().toUpperCase();
+}
+
+/** A coluna é a posição ao longo da gôndola; a linha (altura) não entra na distância. */
 export function toRouteCoord(loc: LocationLike): RouteCoord {
-  const corridor = loc.proximityCorredorCode?.trim() || loc.corridor;
-  const row =
-    loc.proximityLinhaCode?.trim() ||
-    loc.proximityEstanteCode?.trim() ||
-    loc.row;
   return {
-    corridor: parseSegment(corridor),
-    row: parseSegment(row),
+    corridor: parseSegment(loc.corridor),
+    row: parseSegment(colunaFromRow(loc.row)),
   };
 }
 
@@ -159,17 +156,17 @@ export function sortPendingItemsByRoute<T extends ItemWithPickLocation>(
 }
 
 export function mapLocationForRoute(loc: {
+  id?: string;
   corridor: string;
   row: string;
-  proximityCorredor?: { code: string } | null;
-  proximityEstante?: { code: string } | null;
-  proximityLinha?: { code: string } | null;
-}): LocationLike {
+  estanteId?: string | null;
+  face?: string | null;
+}): LocationLike & { estanteId: string | null; face: string | null } {
   return {
+    id: loc.id,
     corridor: loc.corridor,
     row: loc.row,
-    proximityCorredorCode: loc.proximityCorredor?.code ?? null,
-    proximityEstanteCode: loc.proximityEstante?.code ?? null,
-    proximityLinhaCode: loc.proximityLinha?.code ?? null,
+    estanteId: loc.estanteId ?? null,
+    face: loc.face ?? null,
   };
 }
