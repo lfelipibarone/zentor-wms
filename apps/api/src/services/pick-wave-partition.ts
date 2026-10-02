@@ -15,7 +15,11 @@ export type OrderWithItems = Order & { items: OrderItem[] };
 export type WavePartitionStrategy =
   | "SINGLE_ITEM"
   | "PROXIMITY"
-  | "BY_PRODUCT";
+  | "BY_PRODUCT"
+  /** Um lote com todos os pedidos, dividido em partes por onda de aproximação. */
+  | "BY_APPROACH"
+  /** Um lote com todos os pedidos, um separador (onda personalizada). */
+  | "SINGLE_WAVE";
 
 export type WavePartitionSettings = {
   partitionEnabled: boolean;
@@ -154,6 +158,7 @@ export function partitionOrders(
   profiles?: Map<string, OrderPickProfile>,
 ): OrderWithItems[][] {
   if (orders.length === 0) return [];
+  if (strategy === "BY_APPROACH" || strategy === "SINGLE_WAVE") return [orders];
   if (!settings.partitionEnabled) return [orders];
 
   switch (strategy) {

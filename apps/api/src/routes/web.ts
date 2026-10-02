@@ -42,6 +42,7 @@ import {
 import { registerWarehouseRoutes } from "./warehouse.js";
 import { registerFloorPlanRoutes } from "./floor-plan.js";
 import { registerApproachWaveRoutes } from "./approach-waves.js";
+import type { WavePartitionStrategy } from "../services/pick-wave-partition.js";
 import {
   PickWaveError,
   addOrdersToWave,
@@ -545,11 +546,7 @@ export async function webRoutes(app: FastifyInstance) {
         return await previewWaveRelease(tenantWhere(request).tenantId, {
           orderIds,
           marketplace,
-          partitionStrategy: partitionStrategy as
-            | "SINGLE_ITEM"
-            | "PROXIMITY"
-            | "BY_PRODUCT"
-            | undefined,
+          partitionStrategy: partitionStrategy as WavePartitionStrategy | undefined,
         });
       } catch (e) {
         if (e instanceof PickWaveError) {
@@ -649,10 +646,7 @@ export async function webRoutes(app: FastifyInstance) {
               typeof body.marketplace === "string" ? body.marketplace : undefined,
             partitionStrategy:
               typeof body.partitionStrategy === "string"
-                ? (body.partitionStrategy as
-                    | "SINGLE_ITEM"
-                    | "PROXIMITY"
-                    | "BY_PRODUCT")
+                ? (body.partitionStrategy as WavePartitionStrategy)
                 : undefined,
           },
         );

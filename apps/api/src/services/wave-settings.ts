@@ -59,6 +59,8 @@ const STRATEGIES: WavePartitionStrategy[] = [
   "SINGLE_ITEM",
   "PROXIMITY",
   "BY_PRODUCT",
+  "BY_APPROACH",
+  "SINGLE_WAVE",
 ];
 
 const TIME_RE = /^([01]\d|2[0-3]):([0-5]\d)$/;
@@ -365,7 +367,7 @@ export const WAVE_SETTING_META = [
   {
     key: KEYS.defaultPartitionStrategy,
     label: "Modo padrão de formação de onda",
-    description: "SINGLE_ITEM, PROXIMITY ou BY_PRODUCT",
+    description: "SINGLE_ITEM, PROXIMITY, BY_PRODUCT, BY_APPROACH ou SINGLE_WAVE",
   },
   {
     key: KEYS.proximityMaxDistance,
