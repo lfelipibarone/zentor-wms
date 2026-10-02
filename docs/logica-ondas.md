@@ -126,3 +126,30 @@ Quando o operador identifica uma divergência física de estoque na gôndola dur
 3.  A API processa o ajuste (`adjustLocationQuantity`) e dispara a reconciliação automática de rotas (`reconcilePickTargetsAfterStockChange`).
 
 Para ver em detalhes como esse processo repara os pedidos e as ondas afetadas sem parar a operação, acesse o documento [[reabastecimento-estoque|Reabastecimento e Reconciliação]].
+
+---
+
+## Ondas de aproximação
+
+Áreas fixas de trabalho cadastradas no **Mapa do galpão → Ondas de aproximação**, separadas em **Picking** e **Packing**. Cada onda tem nome, cor, saída (clique numa célula livre) e paradas em ordem (clique no lado de uma gôndola ou parte; "de/até" define a faixa de colunas e o sentido, ex.: `E 14→8`). Duas ondas do mesmo tipo não podem ter a mesma coluna.
+
+### Picking
+
+- Modo **Por onda de aproximação** (`BY_APPROACH`): todos os pedidos liberados vão para um lote, dividido em **partes** (uma por área com coletas, mais "Sem área" para o que estiver fora das áreas).
+- Cada separador aceita uma parte no celular e vê as coletas na ordem das paradas.
+- Versões do app que não escolhem a parte recebem a parte do próprio separador ou a primeira livre.
+- Um pedido com itens em áreas diferentes é coletado pelas partes de cada área e se junta no packing.
+- Modo **Onda única** (`SINGLE_WAVE`): todos os pedidos escolhidos numa onda, sem divisão, com um separador. Serve para adiantar pedidos espalhados.
+- Ao anexar pedidos a uma onda `BY_APPROACH`, as linhas novas entram na parte da área (criada se faltar).
+
+### Packing
+
+- O packing confere o que o picking coletou, embala e imprime a etiqueta; não precisa ser quem separou.
+- Na tela do Packing, o seletor **Onda de aproximação** (lembrado no navegador da mesa) filtra a fila:
+  - pedidos vão para a área com mais unidades (empate: a primeira do cadastro);
+  - linhas de lote vão para a área da gôndola.
+- Dentro da área, a fila segue a urgência e depois a ordem das paradas.
+
+### Sem cadastro
+
+Nada muda. O modo `BY_APPROACH` avisa que é preciso cadastrar as ondas de picking.

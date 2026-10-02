@@ -52,6 +52,7 @@ API: `GET` e `PUT /api/warehouse/floor-plans/:barracaoId/approach-waves?kind=PIC
    - A lista mostra as partes, ex.: "Lote 14:30 · Onda 1 — 12 coletas".
    - O aceite, o cancelamento do aceite e o registro de coleta passam a ser por parte. Só o separador da parte coleta as linhas dela.
    - Lotes antigos, sem partes, continuam com aceite da onda inteira.
+   - Se o app não informar a parte, a API usa a parte do próprio separador ou a primeira livre.
 5. **Rota da parte:** o celular lista as coletas na ordem das paradas cadastradas. A primeira da lista é por onde começar; a saída marcada no mapa serve de referência visual no cadastro. Dentro de cada parada, segue a coluna no sentido `de → até`. A parte "Sem área" usa o motor de rota atual a partir do ponto de início da planta.
 6. **Packing do lote:** igual a hoje. As coletas de todas as partes caem na fila do packing, e as cestas de cada pedido são montadas pela triagem existente.
 
