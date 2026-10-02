@@ -89,7 +89,7 @@ export async function confirmSortAllocation(input: SortAllocationInput) {
     throw new PickWaveError("Onda não está ativa");
   }
   if (!input.webPacking) {
-    await assertWaveOperatorForMutation(line.waveId, input.userId);
+    await assertWaveOperatorForMutation(line.waveId, input.userId, line.partId);
   }
   if (line.quantityPicked < line.quantityTotal) {
     throw new PickWaveError("Conclua o pick na gôndola antes do packing");

@@ -24,8 +24,10 @@ import {
 import {
   PickWaveError,
   acceptPickWave,
+  acceptPickWavePart,
   releasePickWave,
   releasePickWaveAccept,
+  releasePickWavePartAccept,
   getCurrentReleasedWave,
   getOpenWave,
   getReleasedWaveById,
@@ -1190,11 +1192,35 @@ export async function mobileRoutes(app: FastifyInstance) {
   // Pick wave
   // ---------------------------------------------------------------------------
 
+  type ReleasedWave = NonNullable<Awaited<ReturnType<typeof getReleasedWaveById>>>;
+
+  /** Parte pedida; senão a minha com pendência, senão a primeira livre com pendência, senão a primeira. */
+  function pickWavePart(wave: ReleasedWave, userId: string, partId?: string) {
+    if (wave.parts.length === 0) return null;
+    if (partId) {
+      const part = wave.parts.find((p) => p.id === partId);
+      if (!part) throw new PickWaveError("Parte da onda não encontrada", 404);
+      return part;
+    }
+    const pending = (p: ReleasedWave["parts"][number]) =>
+      wave.lines.some((l) => l.partId === p.id && l.quantityPicked < l.quantityTotal);
+    return (
+      wave.parts.find((p) => p.acceptedById === userId && pending(p)) ??
+      wave.parts.find((p) => !p.acceptedById && pending(p)) ??
+      wave.parts[0]!
+    );
+  }
+
   function mapWaveMobilePayload(
-    wave: NonNullable<Awaited<ReturnType<typeof getReleasedWaveById>>>,
+    wave: ReleasedWave,
     userId: string,
+    part: ReturnType<typeof pickWavePart>,
   ) {
-    const canWork = !wave.acceptedById || wave.acceptedById === userId;
+    const owner = part
+      ? { id: part.acceptedById, name: part.acceptedBy?.name ?? null, at: part.acceptedAt }
+      : { id: wave.acceptedById, name: wave.acceptedBy?.name ?? null, at: wave.acceptedAt };
+    const lines = part ? wave.lines.filter((l) => l.partId === part.id) : wave.lines;
+    const canWork = !owner.id || owner.id === userId;
     const waveOrders = wave.orders.map((wo) => wo.order);
     let collectionDeadline: Date | null = null;
     for (const o of waveOrders) {
@@ -1219,17 +1245,18 @@ export async function mobileRoutes(app: FastifyInstance) {
         status: wave.status,
         releasedAt: wave.releasedAt,
         orderCount: wave.orders.length,
-        gondolaPasses: wave.lines.length,
+        gondolaPasses: lines.length,
         marketplaces,
-        acceptedById: wave.acceptedById,
-        acceptedByName: wave.acceptedBy?.name ?? null,
-        acceptedAt: wave.acceptedAt,
-        canAccept: !wave.acceptedById,
+        acceptedById: owner.id,
+        acceptedByName: owner.name,
+        acceptedAt: owner.at,
+        canAccept: !owner.id,
         canWork,
-        isMine: wave.acceptedById === userId,
+        isMine: owner.id === userId,
         collectionDeadline: collectionDeadline?.toISOString() ?? null,
+        part: part ? { id: part.id, name: part.name, color: part.color } : null,
       },
-      lines: canWork ? wave.lines.map(mapWaveLineSummary) : [],
+      lines: canWork ? lines.map(mapWaveLineSummary) : [],
     };
   }
 
@@ -1285,6 +1312,15 @@ export async function mobileRoutes(app: FastifyInstance) {
         acceptedByName: w.acceptedBy?.name ?? null,
         packingUrgency: urgency,
         collectionDeadline: collectionDeadline?.toISOString() ?? null,
+        parts: w.parts.map((p) => ({
+          id: p.id,
+          name: p.name,
+          color: p.color,
+          lineCount: p.lines.length,
+          pendingCount: p.lines.filter((l) => l.quantityPicked < l.quantityTotal).length,
+          acceptedById: p.acceptedById,
+          acceptedByName: p.acceptedBy?.name ?? null,
+        })),
       };
     });
     summaries.sort((a, b) => b.packingUrgency - a.packingUrgency);
@@ -1354,7 +1390,7 @@ export async function mobileRoutes(app: FastifyInstance) {
       return reply.status(404).send({ error: "Nenhuma onda ativa" });
     }
 
-    return mapWaveMobilePayload(wave, userId);
+    return mapWaveMobilePayload(wave, userId, pickWavePart(wave, userId));
   });
 
   app.post("/mobile/waves/current/accept", async (request, reply) => {
@@ -1371,8 +1407,8 @@ export async function mobileRoutes(app: FastifyInstance) {
     }
 
     try {
-      const result = await acceptPickWave(wave.id, userId);
-      return result;
+      const part = pickWavePart(wave, userId);
+      return part ? await acceptPickWavePart(part.id, userId) : await acceptPickWave(wave.id, userId);
     } catch (e) {
       if (e instanceof PickWaveError) {
         return reply.status(e.statusCode).send({ error: e.message });
@@ -1381,7 +1417,7 @@ export async function mobileRoutes(app: FastifyInstance) {
     }
   });
 
-  app.get<{ Params: { waveId: string } }>(
+  app.get<{ Params: { waveId: string }; Querystring: { partId?: string } }>(
     "/mobile/waves/:waveId",
     async (request, reply) => {
       const tenantId = request.authUser!.tenantId!;
@@ -1395,22 +1431,8 @@ export async function mobileRoutes(app: FastifyInstance) {
       if (!wave) {
         return reply.status(404).send({ error: "Onda não encontrada" });
       }
-      return mapWaveMobilePayload(wave, userId);
-    },
-  );
-
-  app.post<{ Params: { waveId: string } }>(
-    "/mobile/waves/:waveId/accept",
-    async (request, reply) => {
-      const tenantId = request.authUser!.tenantId!;
-      const enabled = await isWaveEnabled(tenantId);
-      if (!enabled) {
-        return reply.status(404).send({ error: "Separação em onda desabilitada" });
-      }
-
-      const userId = resolveUserId(request);
       try {
-        return await acceptPickWave(request.params.waveId, userId);
+        return mapWaveMobilePayload(wave, userId, pickWavePart(wave, userId, request.query.partId));
       } catch (e) {
         if (e instanceof PickWaveError) {
           return reply.status(e.statusCode).send({ error: e.message });
@@ -1420,7 +1442,33 @@ export async function mobileRoutes(app: FastifyInstance) {
     },
   );
 
-  app.post<{ Params: { waveId: string } }>(
+  app.post<{ Params: { waveId: string }; Querystring: { partId?: string } }>(
+    "/mobile/waves/:waveId/accept",
+    async (request, reply) => {
+      const tenantId = request.authUser!.tenantId!;
+      const enabled = await isWaveEnabled(tenantId);
+      if (!enabled) {
+        return reply.status(404).send({ error: "Separação em onda desabilitada" });
+      }
+
+      const userId = resolveUserId(request);
+      const wave = await getReleasedWaveById(tenantId, request.params.waveId);
+      if (!wave) {
+        return reply.status(404).send({ error: "Onda não encontrada" });
+      }
+      try {
+        const part = pickWavePart(wave, userId, request.query.partId);
+        return part ? await acceptPickWavePart(part.id, userId) : await acceptPickWave(wave.id, userId);
+      } catch (e) {
+        if (e instanceof PickWaveError) {
+          return reply.status(e.statusCode).send({ error: e.message });
+        }
+        throw e;
+      }
+    },
+  );
+
+  app.post<{ Params: { waveId: string }; Querystring: { partId?: string } }>(
     "/mobile/waves/:waveId/release",
     async (request, reply) => {
       const tenantId = request.authUser!.tenantId!;
@@ -1436,7 +1484,8 @@ export async function mobileRoutes(app: FastifyInstance) {
       }
 
       try {
-        return await releasePickWaveAccept(request.params.waveId, userId);
+        const part = pickWavePart(wave, userId, request.query.partId);
+        return part ? await releasePickWavePartAccept(part.id, userId) : await releasePickWaveAccept(wave.id, userId);
       } catch (e) {
         if (e instanceof PickWaveError) {
           return reply.status(e.statusCode).send({ error: e.message });
@@ -1460,7 +1509,8 @@ export async function mobileRoutes(app: FastifyInstance) {
     }
 
     try {
-      return await releasePickWaveAccept(wave.id, userId);
+      const part = pickWavePart(wave, userId);
+      return part ? await releasePickWavePartAccept(part.id, userId) : await releasePickWaveAccept(wave.id, userId);
     } catch (e) {
       if (e instanceof PickWaveError) {
         return reply.status(e.statusCode).send({ error: e.message });

@@ -932,6 +932,9 @@ export async function acceptPickWave(
   if (wave.status !== PickWaveStatus.RELEASED) {
     throw new PickWaveError("Onda não está disponível para aceite");
   }
+  if ((await prisma.pickWavePart.count({ where: { waveId } })) > 0) {
+    throw new PickWaveError("Esta onda é dividida por área — aceite uma das partes", 409);
+  }
   if (wave.acceptedById && wave.acceptedById !== userId) {
     throw new PickWaveError(
       "Esta onda já foi aceita por outro operador",
@@ -993,14 +996,63 @@ export async function releasePickWaveAccept(
   return { released: true };
 }
 
+export async function acceptPickWavePart(
+  partId: string,
+  userId: string,
+): Promise<{ waveId: string; partId: string; acceptedAt: string }> {
+  const part = await prisma.pickWavePart.findUnique({ where: { id: partId }, include: { wave: true } });
+  if (!part) throw new PickWaveError("Parte da onda não encontrada", 404);
+  if (part.wave.status !== PickWaveStatus.RELEASED) {
+    throw new PickWaveError("Onda não está disponível para aceite");
+  }
+  if (part.acceptedById === userId) {
+    return { waveId: part.waveId, partId, acceptedAt: part.acceptedAt!.toISOString() };
+  }
+  const acceptedAt = new Date();
+  const updated = await prisma.pickWavePart.updateMany({
+    where: { id: partId, acceptedById: null },
+    data: { acceptedById: userId, acceptedAt },
+  });
+  if (updated.count === 0) {
+    throw new PickWaveError("Esta parte já foi aceita por outro operador", 409);
+  }
+  return { waveId: part.waveId, partId, acceptedAt: acceptedAt.toISOString() };
+}
+
+export async function releasePickWavePartAccept(partId: string, userId: string): Promise<{ released: boolean }> {
+  const part = await prisma.pickWavePart.findUnique({
+    where: { id: partId },
+    include: { wave: true, lines: { select: { quantityPicked: true } } },
+  });
+  if (!part) throw new PickWaveError("Parte da onda não encontrada", 404);
+  if (part.wave.status !== PickWaveStatus.RELEASED) throw new PickWaveError("Onda não está disponível", 409);
+  if (!part.acceptedById) throw new PickWaveError("Parte não foi aceita", 409);
+  if (part.acceptedById !== userId) throw new PickWaveError("Esta parte foi aceita por outro operador", 403);
+  if (part.lines.some((l) => l.quantityPicked > 0)) {
+    throw new PickWaveError("Separação já iniciada — não é possível cancelar o aceite", 409);
+  }
+  await prisma.pickWavePart.update({ where: { id: partId }, data: { acceptedById: null, acceptedAt: null } });
+  return { released: true };
+}
+
 export async function assertWaveOperatorForMutation(
   waveId: string,
   userId: string,
+  partId?: string | null,
 ): Promise<void> {
   const wave = await prisma.pickWave.findUnique({ where: { id: waveId } });
   if (!wave) throw new PickWaveError("Onda não encontrada", 404);
   if (wave.status !== PickWaveStatus.RELEASED) {
     throw new PickWaveError("Onda não está ativa");
+  }
+  if (partId) {
+    const part = await prisma.pickWavePart.findUnique({ where: { id: partId } });
+    if (!part) throw new PickWaveError("Parte da onda não encontrada", 404);
+    if (!part.acceptedById) throw new PickWaveError("Aceite a parte da onda antes de registrar separação");
+    if (part.acceptedById !== userId) {
+      throw new PickWaveError("Esta parte está sendo executada por outro operador", 403);
+    }
+    return;
   }
   if (!wave.acceptedById) {
     throw new PickWaveError(
