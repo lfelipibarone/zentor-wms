@@ -29,8 +29,8 @@ function statusLabel(line: WaveLineSummary) {
 
 export function WavePickingPanel() {
   const { data, isLoading, error, refetch, isRefetching } = useCurrentWave();
-  const acceptWave = useAcceptWave(data?.wave.id);
-  const releaseWave = useReleaseWaveAccept(data?.wave.id);
+  const acceptWave = useAcceptWave(data?.wave.id, data?.wave.part?.id);
+  const releaseWave = useReleaseWaveAccept(data?.wave.id, data?.wave.part?.id);
 
   if (isLoading) {
     return (
@@ -59,6 +59,7 @@ export function WavePickingPanel() {
   }
 
   const { wave, lines } = data;
+  const waveTitle = wave.part ? `${wave.name} · ${wave.part.name}` : wave.name;
   const pending = lines.filter((l) => l.sortStatus !== "SORTED");
   const canReleaseWave =
     wave.canWork && lines.every((l) => l.quantityPicked === 0);
@@ -77,7 +78,7 @@ export function WavePickingPanel() {
   if (wave.canAccept) {
     return (
       <View style={styles.centered}>
-        <Text style={styles.waveName}>{wave.name}</Text>
+        <Text style={styles.waveName}>{waveTitle}</Text>
         <CollectionDeadlineRow deadline={wave.collectionDeadline} />
         <Text style={styles.waveMeta}>
           {wave.orderCount} pedidos · {wave.gondolaPasses} passagens na gôndola
@@ -92,7 +93,7 @@ export function WavePickingPanel() {
           web.
         </Text>
         <FactoryButton
-          label="Aceitar esta onda"
+          label={wave.part ? "Aceitar esta parte" : "Aceitar esta onda"}
           onPress={() => {
             void acceptWave.mutateAsync().catch((e) => {
               showErrorAlert(
@@ -114,9 +115,9 @@ export function WavePickingPanel() {
   if (!wave.canWork) {
     return (
       <View style={styles.centered}>
-        <Text style={styles.waveName}>{wave.name}</Text>
+        <Text style={styles.waveName}>{waveTitle}</Text>
         <Text style={styles.error}>
-          Onda aceita por {wave.acceptedByName ?? "outro operador"}.
+          {wave.part ? "Parte aceita por" : "Onda aceita por"} {wave.acceptedByName ?? "outro operador"}.
         </Text>
         <FactoryButton
           label="Atualizar"
@@ -129,7 +130,7 @@ export function WavePickingPanel() {
 
   const listHeader = (
     <View style={styles.listHeader}>
-      <Text style={styles.waveName}>{wave.name}</Text>
+      <Text style={styles.waveName}>{waveTitle}</Text>
       <CollectionDeadlineRow deadline={wave.collectionDeadline} />
       <Text style={styles.waveMeta}>
         {wave.orderCount} pedidos · {pending.length} linhas pendentes

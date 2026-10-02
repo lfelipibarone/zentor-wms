@@ -615,10 +615,11 @@ export const api = {
         packingUrgency: number;
         collectionDeadline: string | null;
         marketplaces?: string[];
+        parts: WavePartSummary[];
       }>;
     }>("/mobile/waves/released"),
 
-  getWaveById: (waveId: string) =>
+  getWaveById: (waveId: string, partId?: string | null) =>
     request<{
       wave: {
         id: string;
@@ -635,13 +636,14 @@ export const api = {
         isMine: boolean;
         collectionDeadline: string | null;
         marketplaces?: string[];
+        part: WavePartRef | null;
       };
       lines: WaveLineSummary[];
-    }>(`/mobile/waves/${waveId}`),
+    }>(`/mobile/waves/${waveId}${partQuery(partId)}`),
 
-  acceptWave: (waveId: string) =>
+  acceptWave: (waveId: string, partId?: string | null) =>
     request<{ waveId: string; acceptedAt: string }>(
-      `/mobile/waves/${waveId}/accept`,
+      `/mobile/waves/${waveId}/accept${partQuery(partId)}`,
       { method: "POST" },
     ),
 
@@ -662,6 +664,7 @@ export const api = {
         isMine: boolean;
         collectionDeadline: string | null;
         marketplaces?: string[];
+        part: WavePartRef | null;
       };
       lines: WaveLineSummary[];
     }>("/mobile/waves/current"),
@@ -672,9 +675,9 @@ export const api = {
       { method: "POST" },
     ),
 
-  releaseWaveAccept: (waveId: string) =>
+  releaseWaveAccept: (waveId: string, partId?: string | null) =>
     request<{ released: boolean }>(
-      `/mobile/waves/${waveId}/release`,
+      `/mobile/waves/${waveId}/release${partQuery(partId)}`,
       { method: "POST" },
     ),
 
@@ -957,6 +960,26 @@ export interface ReturnReceiptSessionDto {
   }>;
   totalUnits: number;
   hasItems: boolean;
+}
+
+export interface WavePartSummary {
+  id: string;
+  name: string;
+  color: string | null;
+  lineCount: number;
+  pendingCount: number;
+  acceptedById: string | null;
+  acceptedByName: string | null;
+}
+
+export interface WavePartRef {
+  id: string;
+  name: string;
+  color: string | null;
+}
+
+function partQuery(partId?: string | null) {
+  return partId ? `?partId=${encodeURIComponent(partId)}` : "";
 }
 
 export interface WaveLineSummary {

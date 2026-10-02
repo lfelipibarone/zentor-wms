@@ -27,16 +27,57 @@ function statusLabel(line: WaveLineSummary) {
   return "Pendente";
 }
 
+type WaveEntry = {
+  key: string;
+  waveId: string;
+  partId: string | null;
+  title: string;
+  color: string | null;
+  orderCount: number;
+  lineCount: number;
+  acceptedByName: string | null;
+  collectionDeadline: string | null;
+  marketplaces?: string[];
+};
+
 export default function WavePickingListScreen() {
   const released = useReleasedWaves();
-  const [selectedWaveId, setSelectedWaveId] = useState<string | null>(null);
+  const [selected, setSelected] = useState<{ waveId: string; partId: string | null } | null>(null);
 
   const waves = released.data?.waves ?? [];
-  const activeWaveId = selectedWaveId ?? waves[0]?.id ?? null;
+  const entries = waves.flatMap((w): WaveEntry[] =>
+    w.parts.length > 0
+      ? w.parts.map((p) => ({
+          key: `${w.id}:${p.id}`,
+          waveId: w.id,
+          partId: p.id,
+          title: `${w.name} · ${p.name}`,
+          color: p.color,
+          orderCount: w.orderCount,
+          lineCount: p.pendingCount,
+          acceptedByName: p.acceptedByName,
+          collectionDeadline: w.collectionDeadline,
+          marketplaces: w.marketplaces,
+        }))
+      : [
+          {
+            key: w.id,
+            waveId: w.id,
+            partId: null,
+            title: w.name,
+            color: null,
+            orderCount: w.orderCount,
+            lineCount: w.lineCount,
+            acceptedByName: w.acceptedByName,
+            collectionDeadline: w.collectionDeadline,
+            marketplaces: w.marketplaces,
+          },
+        ],
+  );
+  const active = selected ?? (entries[0] ? { waveId: entries[0].waveId, partId: entries[0].partId } : null);
 
-  const { data, isLoading, error, refetch, isRefetching } =
-    useWaveById(activeWaveId);
-  const acceptWave = useAcceptWave(activeWaveId);
+  const { data, isLoading, error, refetch, isRefetching } = useWaveById(active?.waveId ?? null, active?.partId);
+  const acceptWave = useAcceptWave(active?.waveId ?? null, active?.partId);
 
   if (released.isLoading) {
     return (
@@ -47,7 +88,7 @@ export default function WavePickingListScreen() {
     );
   }
 
-  if (released.error || waves.length === 0) {
+  if (released.error || entries.length === 0) {
     return (
       <View style={styles.centered}>
         <Text style={styles.error}>
@@ -64,7 +105,7 @@ export default function WavePickingListScreen() {
     );
   }
 
-  if (waves.length > 1 && !selectedWaveId) {
+  if (entries.length > 1 && !selected) {
     return (
       <View style={styles.container}>
         <Text style={styles.waveName}>Ondas liberadas</Text>
@@ -72,15 +113,15 @@ export default function WavePickingListScreen() {
           Escolha a onda para separar (ordenadas por urgência de coleta)
         </Text>
         <FlatList
-          data={waves}
-          keyExtractor={(w) => w.id}
+          data={entries}
+          keyExtractor={(e) => e.key}
           contentContainerStyle={styles.list}
           renderItem={({ item }) => (
             <Pressable
-              style={styles.card}
-              onPress={() => setSelectedWaveId(item.id)}
+              style={[styles.card, item.color ? { borderColor: item.color } : null]}
+              onPress={() => setSelected({ waveId: item.waveId, partId: item.partId })}
             >
-              <Text style={styles.sku}>{item.name}</Text>
+              <Text style={styles.sku}>{item.title}</Text>
               <CollectionDeadlineRow deadline={item.collectionDeadline} />
               <Text style={styles.location}>
                 {item.orderCount} pedidos · {item.lineCount} linhas
@@ -125,7 +166,7 @@ export default function WavePickingListScreen() {
         <FactoryButton
           label="Voltar"
           variant="secondary"
-          onPress={() => setSelectedWaveId(null)}
+          onPress={() => setSelected(null)}
         />
       </View>
     );
@@ -133,18 +174,19 @@ export default function WavePickingListScreen() {
 
   const { wave, lines } = data;
   const pending = lines.filter((l) => l.sortStatus !== "SORTED");
+  const waveTitle = wave.part ? `${wave.name} · ${wave.part.name}` : wave.name;
 
   if (wave.canAccept) {
     return (
       <View style={styles.centered}>
-        {waves.length > 1 ? (
+        {entries.length > 1 ? (
           <FactoryButton
             label="Trocar onda"
             variant="secondary"
-            onPress={() => setSelectedWaveId(null)}
+            onPress={() => setSelected(null)}
           />
         ) : null}
-        <Text style={styles.waveName}>{wave.name}</Text>
+        <Text style={styles.waveName}>{waveTitle}</Text>
         <CollectionDeadlineRow deadline={wave.collectionDeadline} />
         <Text style={styles.waveMeta}>
           {wave.orderCount} pedidos · {wave.gondolaPasses} passagens na gôndola
@@ -158,7 +200,7 @@ export default function WavePickingListScreen() {
           Mesmo SKU agrupado — pick consolidado; packing nas cestas no web.
         </Text>
         <FactoryButton
-          label="Aceitar esta onda"
+          label={wave.part ? "Aceitar esta parte" : "Aceitar esta onda"}
           onPress={() => {
             void acceptWave.mutateAsync().catch((e) => {
               showErrorAlert(
@@ -180,9 +222,9 @@ export default function WavePickingListScreen() {
   if (!wave.canWork) {
     return (
       <View style={styles.centered}>
-        <Text style={styles.waveName}>{wave.name}</Text>
+        <Text style={styles.waveName}>{waveTitle}</Text>
         <Text style={styles.error}>
-          Onda aceita por {wave.acceptedByName ?? "outro operador"}.
+          {wave.part ? "Parte aceita por" : "Onda aceita por"} {wave.acceptedByName ?? "outro operador"}.
         </Text>
         <FactoryButton
           label="Atualizar"
@@ -196,14 +238,14 @@ export default function WavePickingListScreen() {
   return (
     <View style={styles.container}>
       <View style={styles.header}>
-        {waves.length > 1 ? (
+        {entries.length > 1 ? (
           <FactoryButton
             label="Trocar onda"
             variant="secondary"
-            onPress={() => setSelectedWaveId(null)}
+            onPress={() => setSelected(null)}
           />
         ) : null}
-        <Text style={styles.waveName}>{wave.name}</Text>
+        <Text style={styles.waveName}>{waveTitle}</Text>
         <CollectionDeadlineRow deadline={wave.collectionDeadline} />
         <Text style={styles.waveMeta}>
           {wave.orderCount} pedidos · {wave.gondolaPasses} gôndolas ·{" "}
@@ -214,7 +256,9 @@ export default function WavePickingListScreen() {
             {wave.marketplaces.join(" · ")}
           </Text>
         ) : null}
-        <Text style={styles.acceptHint}>Você está executando esta onda</Text>
+        <Text style={styles.acceptHint}>
+          {wave.part ? "Você está executando esta parte" : "Você está executando esta onda"}
+        </Text>
       </View>
 
       <FlatList
