@@ -5,6 +5,7 @@ import {
 } from "./order-proximity.js";
 import {
   profileProximityDistance,
+  proximityLimitFor,
   type OrderPickProfile,
 } from "./pick-wave-order-profile.js";
 import type { WaveSettings } from "./wave-settings.js";
@@ -14,7 +15,11 @@ export type OrderWithItems = Order & { items: OrderItem[] };
 export type WavePartitionStrategy =
   | "SINGLE_ITEM"
   | "PROXIMITY"
-  | "BY_PRODUCT";
+  | "BY_PRODUCT"
+  /** Um lote com todos os pedidos, dividido em partes por onda de aproximação. */
+  | "BY_APPROACH"
+  /** Um lote com todos os pedidos, um separador (onda personalizada). */
+  | "SINGLE_WAVE";
 
 export type WavePartitionSettings = {
   partitionEnabled: boolean;
@@ -22,6 +27,7 @@ export type WavePartitionSettings = {
   maxWavesPerBatch: number;
   strategy: WavePartitionStrategy;
   proximityMaxDistance: number;
+  proximityMaxDistanceMeters?: number;
 };
 
 export const BY_PRODUCT_MAX_DISTINCT_SKUS = 5;
@@ -152,6 +158,7 @@ export function partitionOrders(
   profiles?: Map<string, OrderPickProfile>,
 ): OrderWithItems[][] {
   if (orders.length === 0) return [];
+  if (strategy === "BY_APPROACH" || strategy === "SINGLE_WAVE") return [orders];
   if (!settings.partitionEnabled) return [orders];
 
   switch (strategy) {
@@ -255,7 +262,7 @@ function partitionOrdersByProximity(
   }
 
   const clusters = clusterOrdersByProximity(orders, profiles, {
-    maxDistance: settings.proximityMaxDistance,
+    maxDistance: proximityLimitFor(profiles, settings),
     maxClusters: settings.maxWavesPerBatch,
     maxOrdersPerCluster: Math.max(settings.minOrdersPerWave, 50),
   });
@@ -295,7 +302,7 @@ function partitionOrdersByProduct(
   const componentByOrderId = buildComponentIndex(
     eligible,
     profileMap,
-    settings.proximityMaxDistance,
+    proximityLimitFor(profileMap, settings),
   );
 
   const assigned = new Set<string>();
@@ -353,6 +360,7 @@ export function waveSettingsToPartition(
     maxWavesPerBatch?: number;
     defaultPartitionStrategy?: WavePartitionStrategy;
     proximityMaxDistance?: number;
+    proximityMaxDistanceMeters?: number;
   },
   strategyOverride?: WavePartitionStrategy,
 ): WavePartitionSettings {
@@ -362,6 +370,7 @@ export function waveSettingsToPartition(
     maxWavesPerBatch: settings.maxWavesPerBatch ?? 10,
     strategy: strategyOverride ?? settings.defaultPartitionStrategy ?? "BY_PRODUCT",
     proximityMaxDistance: settings.proximityMaxDistance ?? 2,
+    proximityMaxDistanceMeters: settings.proximityMaxDistanceMeters ?? 10,
   };
 }
 

@@ -7,9 +7,20 @@ import {
 } from "@prisma/client";
 import { prisma } from "../lib/prisma.js";
 import {
-  pickNextItemByRoute,
-  sortPendingItemsByRoute,
-} from "./location-route.js";
+  getRouteEngine,
+  LegacyRouteEngine,
+  pickNextItemByEngine,
+  sortPendingItemsByEngine,
+} from "./route-engine/index.js";
+
+const putawayLocationSelect = {
+  id: true,
+  barcode: true,
+  corridor: true,
+  row: true,
+  estanteId: true,
+  face: true,
+} satisfies Prisma.LocationSelect;
 
 export async function listPutawayQueue(tenantId?: string) {
   const sessions = await prisma.purchaseReceiptSession.findMany({
@@ -71,9 +82,7 @@ async function ensurePutawaySession(purchaseReceiptId: string, userId: string) {
       include: {
         items: {
           include: {
-            location: {
-              select: { barcode: true, corridor: true, row: true },
-            },
+            location: { select: putawayLocationSelect },
           },
         },
         purchaseReceipt: { include: { items: true } },
@@ -99,7 +108,7 @@ async function ensurePutawaySession(purchaseReceiptId: string, userId: string) {
       },
     },
     include: {
-      items: { include: { location: { select: { barcode: true } } } },
+      items: { include: { location: { select: putawayLocationSelect } } },
       purchaseReceipt: { include: { items: true } },
     },
   });
@@ -145,17 +154,22 @@ async function formatPutaway(
     pickLocation: it.location ?? null,
   }));
 
+  const tenantId = session.purchaseReceipt?.tenantId;
+  const engine = tenantId ? await getRouteEngine(tenantId) : new LegacyRouteEngine();
+
+  // A carga sai conferida da área de recebimento; sem item guardado ainda, a rota parte de lá.
   const next =
-    pickNextItemByRoute(pendingWithLoc, isPending, lastStoredLoc) ??
+    pickNextItemByEngine(engine, pendingWithLoc, isPending, lastStoredLoc, "RECEIVING") ??
     session.items.find(isPending);
 
-  const routeQueue = sortPendingItemsByRoute(
+  const routeQueue = sortPendingItemsByEngine(
+    engine,
     pendingWithLoc,
     isPending,
     lastStoredLoc,
+    "RECEIVING",
   );
 
-  const tenantId = session.purchaseReceipt?.tenantId;
   let nextImageUrl: string | null = null;
   if (next && tenantId && next.productCode) {
     nextImageUrl = await resolveProductImageUrl(

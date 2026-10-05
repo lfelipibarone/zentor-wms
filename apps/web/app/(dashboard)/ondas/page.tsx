@@ -39,6 +39,8 @@ const PARTITION_STRATEGIES: Array<{
   value: WavePartitionStrategy;
   label: string;
 }> = [
+  { value: "BY_APPROACH", label: "Por onda de aproximação" },
+  { value: "SINGLE_WAVE", label: "Onda única (personalizada)" },
   { value: "SINGLE_ITEM", label: "Item único" },
   { value: "PROXIMITY", label: "Proximidade" },
   { value: "BY_PRODUCT", label: "SKU compartilhado" },
@@ -562,6 +564,15 @@ function ActiveTab({
                 {preview.orderCount} pedido(s) → {preview.gondolaPasses}{" "}
                 passagem(ns) na gôndola
               </p>
+              {preview.waves?.some((w) => w.parts?.length) ? (
+                <p>
+                  Partes:{" "}
+                  {preview.waves
+                    .flatMap((w) => w.parts ?? [])
+                    .map((p) => `${p.name} (${p.lineCount})`)
+                    .join(" · ")}
+                </p>
+              ) : null}
               {(preview.excludedOrderIds?.length ?? 0) > 0 ? (
                 <p className="text-amber-700">
                   {preview.excludedOrderIds!.length} pedido(s) excluído(s) —
@@ -857,6 +868,15 @@ function BuildTab({
                 {manualPreview.orderCount} pedido(s) →{" "}
                 {manualPreview.gondolaPasses} passagem(ns) na gôndola
               </p>
+              {manualPreview.waves?.some((w) => w.parts?.length) ? (
+                <p>
+                  Partes:{" "}
+                  {manualPreview.waves
+                    .flatMap((w) => w.parts ?? [])
+                    .map((p) => `${p.name} (${p.lineCount})`)
+                    .join(" · ")}
+                </p>
+              ) : null}
             </div>
           )}
           {manualPreview.lines.length > 0 ? (

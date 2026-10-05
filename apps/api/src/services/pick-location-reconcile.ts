@@ -53,18 +53,19 @@ export async function buildPickingSessionSlice(orderId: string) {
   });
   if (!order) return null;
 
-  const { pickNextItemByRoute, sortPendingItemsByRoute } = await import(
-    "./location-route.js"
+  const { getRouteEngine, pickNextItemByEngine, sortPendingItemsByEngine } = await import(
+    "./route-engine/index.js"
   );
+  const engine = await getRouteEngine(order.tenantId);
 
   const isPending = (i: (typeof order.items)[0]) =>
     i.quantityPicked < i.quantityOrdered;
 
   const nextItem =
-    pickNextItemByRoute(order.items, isPending, null) ??
+    pickNextItemByEngine(engine, order.items, isPending, null) ??
     order.items.find(isPending);
 
-  const routeQueue = sortPendingItemsByRoute(order.items, isPending, null);
+  const routeQueue = sortPendingItemsByEngine(engine, order.items, isPending, null);
 
   const mapLoc = (loc: (typeof order.items)[0]["pickLocation"]) =>
     loc

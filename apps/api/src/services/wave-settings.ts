@@ -18,6 +18,8 @@ export interface WaveSettings {
   maxWavesPerBatch: number;
   defaultPartitionStrategy: WavePartitionStrategy;
   proximityMaxDistance: number;
+  /** Limite de proximidade quando o motor de rota física está ativo. */
+  proximityMaxDistanceMeters: number;
   autoReleaseMarketplace: string | null;
 }
 
@@ -33,6 +35,7 @@ const DEFAULTS: WaveSettings = {
   maxWavesPerBatch: 10,
   defaultPartitionStrategy: "BY_PRODUCT",
   proximityMaxDistance: 2,
+  proximityMaxDistanceMeters: 10,
   autoReleaseMarketplace: null,
 };
 
@@ -48,6 +51,7 @@ const KEYS = {
   maxWavesPerBatch: "wave.partition.maxWavesPerBatch",
   defaultPartitionStrategy: "wave.partition.defaultStrategy",
   proximityMaxDistance: "wave.partition.proximityMaxDistance",
+  proximityMaxDistanceMeters: "wave.partition.proximityMaxDistanceMeters",
   autoReleaseMarketplace: "wave.autoRelease.marketplace",
 } as const;
 
@@ -55,6 +59,8 @@ const STRATEGIES: WavePartitionStrategy[] = [
   "SINGLE_ITEM",
   "PROXIMITY",
   "BY_PRODUCT",
+  "BY_APPROACH",
+  "SINGLE_WAVE",
 ];
 
 const TIME_RE = /^([01]\d|2[0-3]):([0-5]\d)$/;
@@ -119,6 +125,11 @@ function parseIntSafe(v: string | undefined, fallback: number): number {
   return Number.isFinite(n) && n > 0 ? Math.floor(n) : fallback;
 }
 
+function parsePositiveFloat(v: string | undefined, fallback: number): number {
+  const n = Number(v);
+  return Number.isFinite(n) && n > 0 ? n : fallback;
+}
+
 export async function getWaveSettings(tenantId: string): Promise<WaveSettings> {
   const rows = await prisma.systemSetting.findMany({
     where: { tenantId, key: { in: Object.values(KEYS) } },
@@ -160,6 +171,10 @@ export async function getWaveSettings(tenantId: string): Promise<WaveSettings> {
     proximityMaxDistance: parseIntSafe(
       map.get(KEYS.proximityMaxDistance),
       DEFAULTS.proximityMaxDistance,
+    ),
+    proximityMaxDistanceMeters: parsePositiveFloat(
+      map.get(KEYS.proximityMaxDistanceMeters),
+      DEFAULTS.proximityMaxDistanceMeters,
     ),
     autoReleaseMarketplace:
       map.get(KEYS.autoReleaseMarketplace)?.trim() || null,
@@ -274,6 +289,13 @@ export async function setWaveSettings(
     }
     updates.push({ key: KEYS.proximityMaxDistance, value: String(n) });
   }
+  if (patch.proximityMaxDistanceMeters !== undefined) {
+    const n = Number(patch.proximityMaxDistanceMeters);
+    if (!Number.isFinite(n) || n <= 0 || n > 1000) {
+      throw new Error("proximityMaxDistanceMeters deve ficar entre 0 e 1000");
+    }
+    updates.push({ key: KEYS.proximityMaxDistanceMeters, value: String(n) });
+  }
   if (patch.autoReleaseMarketplace !== undefined) {
     updates.push({
       key: KEYS.autoReleaseMarketplace,
@@ -345,12 +367,17 @@ export const WAVE_SETTING_META = [
   {
     key: KEYS.defaultPartitionStrategy,
     label: "Modo padrão de formação de onda",
-    description: "SINGLE_ITEM, PROXIMITY ou BY_PRODUCT",
+    description: "SINGLE_ITEM, PROXIMITY, BY_PRODUCT, BY_APPROACH ou SINGLE_WAVE",
   },
   {
     key: KEYS.proximityMaxDistance,
     label: "Distância máxima de proximidade",
     description: "Manhattan entre centróides no estoque de giro (modo proximidade)",
+  },
+  {
+    key: KEYS.proximityMaxDistanceMeters,
+    label: "Distância máxima de proximidade (mapa físico)",
+    description: "Metros de caminhada entre pedidos quando o motor de rota física está ativo",
   },
   {
     key: KEYS.autoReleaseMarketplace,

@@ -6,7 +6,7 @@ services:
     container_name: wms-postgres
     restart: unless-stopped
     ports:
-      - "5432:5432"
+      - "${WMS_PG_PORT:-5432}:5432"
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: admin

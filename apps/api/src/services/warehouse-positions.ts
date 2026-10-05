@@ -1,10 +1,11 @@
-import { LocationType } from "@prisma/client";
+import { LocationFace, LocationType } from "@prisma/client";
 import { prisma } from "../lib/prisma.js";
 import { assertMaxPickFaceLocations } from "./location-rules.js";
 import { resumePausedOrdersAfterPickFace } from "./product-locations.js";
 import {
   ensureWarehouseHierarchy,
   hasAnyAddressCode,
+  inheritGondolaParentCodes,
   normalizeWarehouseCode,
   resolveEffectiveAddressCodes,
   resolveLocationLayout,
@@ -22,6 +23,10 @@ function normalizeCode(code: string): string {
   return normalizeWarehouseCode(code);
 }
 
+export function parseLocationFace(face: unknown): LocationFace {
+  return String(face ?? "").trim().toUpperCase() === "B" ? LocationFace.B : LocationFace.A;
+}
+
 export interface CreateWarehousePositionInput {
   colunaId?: string;
   setorCode?: string;
@@ -30,6 +35,7 @@ export interface CreateWarehousePositionInput {
   colunaCode?: string;
   linhaCode?: string;
   linhaName?: string | null;
+  face?: LocationFace | "A" | "B";
   barcode: string;
   type: LocationType;
   productId?: string | null;
@@ -61,9 +67,17 @@ export async function createWarehousePosition(
   let corredorId = input.corredorId ?? null;
   let estanteId = input.estanteId ?? null;
 
+  const parents =
+    !colunaId && barracaoId
+      ? await inheritGondolaParentCodes(tenantId, barracaoId, {
+          setor: input.setorCode,
+          corredor: input.corredorCode,
+          estante: input.estanteCode,
+        })
+      : { setor: input.setorCode, corredor: input.corredorCode };
   const effectiveAddress = resolveEffectiveAddressCodes({
-    setorCode: input.setorCode,
-    corredorCode: input.corredorCode,
+    setorCode: parents.setor,
+    corredorCode: parents.corredor,
     estanteCode: input.estanteCode,
     colunaCode: input.colunaCode,
     linhaCode: input.linhaCode,
@@ -140,19 +154,23 @@ export async function createWarehousePosition(
   );
 
   const normalizedLinhaCode = normalizeCode(linhaCode);
+  const face = parseLocationFace(input.face);
 
   const existingLinha = await prisma.warehouseLinha.findFirst({
     where: {
       tenantId,
       colunaId: coluna.id,
       code: normalizedLinhaCode,
+      face,
     },
     include: { location: { select: { id: true, barcode: true } } },
   });
 
   if (existingLinha?.location) {
     throw new Error(
-      "Já existe uma posição nesta linha. Escolha outro código de linha ou edite a posição existente.",
+      face === LocationFace.B
+        ? "Já existe uma posição no LE desta coluna e linha. Escolha outra linha ou edite a posição existente."
+        : "Já existe uma posição no LD desta coluna e linha. Escolha outra linha ou edite a posição existente.",
     );
   }
 
@@ -172,6 +190,7 @@ export async function createWarehousePosition(
           tenantId,
           colunaId: coluna.id,
           code: normalizedLinhaCode,
+          face,
           name: input.linhaName?.trim() || null,
           active: input.active ?? true,
         },
@@ -206,6 +225,7 @@ export async function createWarehousePosition(
         estanteId: layoutWithLinha.estanteId,
         colunaId: layoutWithLinha.colunaId,
         linhaId: linha.id,
+        face,
         proximityCorredorId: layoutWithLinha.proximityCorredorId,
         proximityEstanteId: layoutWithLinha.proximityEstanteId,
         proximityLinhaId: layoutWithLinha.proximityLinhaId,
@@ -251,6 +271,7 @@ export interface UpdateWarehousePositionInput {
   linhaCode?: string;
   linhaName?: string | null;
   linhaActive?: boolean;
+  face?: LocationFace | "A" | "B";
   barcode?: string;
   type?: LocationType;
   productId?: string | null;
@@ -328,11 +349,26 @@ export async function updateWarehousePosition(
     proximityLinhaId: primaryProximity.proximityLinhaId,
   });
 
+  const face = input.face !== undefined ? parseLocationFace(input.face) : linha.face;
+  if (face !== linha.face || input.linhaCode !== undefined) {
+    const code = input.linhaCode !== undefined ? normalizeCode(input.linhaCode) : linha.code;
+    const clash = await prisma.warehouseLinha.findFirst({
+      where: { tenantId, colunaId: linha.colunaId, code, face, id: { not: linha.id } },
+      select: { id: true },
+    });
+    if (clash) {
+      throw new Error(
+        `Já existe uma posição na linha ${code} ${face === LocationFace.B ? "(LE)" : "(LD)"} desta coluna`,
+      );
+    }
+  }
+
   const updated = await prisma.$transaction(async (tx) => {
     if (
       input.linhaCode !== undefined ||
       input.linhaName !== undefined ||
-      input.linhaActive !== undefined
+      input.linhaActive !== undefined ||
+      face !== linha.face
     ) {
       await tx.warehouseLinha.update({
         where: { id: linha.id },
@@ -344,6 +380,7 @@ export async function updateWarehousePosition(
             ? { name: input.linhaName?.trim() || null }
             : {}),
           ...(input.linhaActive !== undefined ? { active: input.linhaActive } : {}),
+          face,
         },
       });
     }
@@ -352,7 +389,11 @@ export async function updateWarehousePosition(
       where: { id: location.id },
       data: {
         corridor: layout.corridor,
-        row: layout.row,
+        row:
+          input.linhaCode !== undefined
+            ? `${linha.coluna.code}-${normalizeCode(input.linhaCode)}`
+            : layout.row,
+        face,
         ...(input.barcode !== undefined
           ? { barcode: input.barcode.trim().toUpperCase() }
           : {}),

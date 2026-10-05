@@ -40,6 +40,9 @@ import {
   resolveLocationLayout,
 } from "../services/warehouse-layout.js";
 import { registerWarehouseRoutes } from "./warehouse.js";
+import { registerFloorPlanRoutes } from "./floor-plan.js";
+import { registerApproachWaveRoutes } from "./approach-waves.js";
+import type { WavePartitionStrategy } from "../services/pick-wave-partition.js";
 import {
   PickWaveError,
   addOrdersToWave,
@@ -121,6 +124,8 @@ const guard = (p: string) => createPermissionGuard(p);
 
 export async function webRoutes(app: FastifyInstance) {
   registerWarehouseRoutes(app, guard);
+  registerFloorPlanRoutes(app, guard);
+  registerApproachWaveRoutes(app, guard);
 
   // --- Pesquisa rápida ---
   app.get<{ Querystring: { q?: string } }>(
@@ -541,11 +546,7 @@ export async function webRoutes(app: FastifyInstance) {
         return await previewWaveRelease(tenantWhere(request).tenantId, {
           orderIds,
           marketplace,
-          partitionStrategy: partitionStrategy as
-            | "SINGLE_ITEM"
-            | "PROXIMITY"
-            | "BY_PRODUCT"
-            | undefined,
+          partitionStrategy: partitionStrategy as WavePartitionStrategy | undefined,
         });
       } catch (e) {
         if (e instanceof PickWaveError) {
@@ -645,10 +646,7 @@ export async function webRoutes(app: FastifyInstance) {
               typeof body.marketplace === "string" ? body.marketplace : undefined,
             partitionStrategy:
               typeof body.partitionStrategy === "string"
-                ? (body.partitionStrategy as
-                    | "SINGLE_ITEM"
-                    | "PROXIMITY"
-                    | "BY_PRODUCT")
+                ? (body.partitionStrategy as WavePartitionStrategy)
                 : undefined,
           },
         );
@@ -1763,10 +1761,19 @@ export async function webRoutes(app: FastifyInstance) {
     async (request) => listPackingQueue(tenantWhere(request).tenantId),
   );
 
-  app.get(
+  app.get<{ Querystring: { approachWaveId?: string } }>(
     "/api/packing/queue/unified",
     { preHandler: guard(Permission.SHIPPING_VIEW) },
-    async (request) => listUnifiedPackingQueue(tenantWhere(request).tenantId),
+    async (request, reply) => {
+      try {
+        return await listUnifiedPackingQueue(tenantWhere(request).tenantId, {
+          approachWaveId: request.query.approachWaveId?.trim() || undefined,
+        });
+      } catch (e) {
+        if (e instanceof PackingSessionError) return reply.status(e.statusCode).send({ error: e.message });
+        throw e;
+      }
+    },
   );
 
   app.post<{ Body: { barcode?: string } }>(

@@ -41,7 +41,7 @@ export async function confirmConsolidatedPick(input: ConsolidatedPickInput) {
   if (line.wave.status !== PickWaveStatus.RELEASED) {
     throw new PickWaveError("Onda não está ativa");
   }
-  await assertWaveOperatorForMutation(line.waveId, input.userId);
+  await assertWaveOperatorForMutation(line.waveId, input.userId, line.partId);
   if (line.sortStatus === PickWaveLineSortStatus.SORTED) {
     throw new PickWaveError("Linha já finalizada no packing");
   }

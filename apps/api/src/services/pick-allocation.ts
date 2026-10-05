@@ -1,6 +1,6 @@
 import { LocationType } from "@prisma/client";
 import { prisma } from "../lib/prisma.js";
-import { sortLocationsByRoute } from "./location-route.js";
+import { getRouteEngine } from "./route-engine/index.js";
 import { PickFaceError } from "./pick-face-resolve.js";
 
 export type PickSegment = {
@@ -43,7 +43,7 @@ export async function allocateQuantityAcrossPickFaces(
     );
   }
 
-  const sorted = sortLocationsByRoute(
+  const sorted = (await getRouteEngine(tenantId)).sortByRoute(
     [...locations].sort((a, b) => a.currentQuantity - b.currentQuantity),
   );
 

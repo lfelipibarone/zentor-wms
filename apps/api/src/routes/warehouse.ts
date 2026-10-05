@@ -17,6 +17,13 @@ import {
   listWarehouseProximityOptions,
 } from "../services/warehouse-layout-list.js";
 import { buildWarehouseSegmentSearchWhere } from "../services/warehouse-segment-search.js";
+import { generateEstantePositions } from "../services/estante-generator.js";
+import { resizeEstante, setEstanteFace } from "../services/estante-resize.js";
+import {
+  applyInventoryLayout,
+  planInventoryLayout,
+  type InventoryRowInput,
+} from "../services/inventory-layout.js";
 import { LocationType } from "@prisma/client";
 
 type Guard = (permission: string) => (
@@ -565,6 +572,7 @@ export function registerWarehouseRoutes(app: FastifyInstance, guard: Guard) {
       colunaCode?: string;
       linhaCode?: string;
       linhaName?: string | null;
+      face?: "A" | "B";
       barcode?: string;
       type?: LocationType;
       productId?: string | null;
@@ -601,6 +609,7 @@ export function registerWarehouseRoutes(app: FastifyInstance, guard: Guard) {
             colunaCode: b.colunaCode,
             linhaCode: b.linhaCode ?? "",
             linhaName: b.linhaName,
+            face: b.face,
             barcode: b.barcode ?? "",
             type: b.type ?? LocationType.PULMAO,
             productId: b.productId,
@@ -626,12 +635,162 @@ export function registerWarehouseRoutes(app: FastifyInstance, guard: Guard) {
     },
   );
 
+  app.post<{
+    Body: {
+      barracaoId?: string;
+      estanteCode?: string;
+      ld?: { colunas?: number; linhas?: number };
+      le?: { colunas?: number; linhas?: number } | null;
+      type?: LocationType;
+      capacity?: number;
+      minThreshold?: number;
+    };
+  }>(
+    "/api/warehouse/estantes/generate",
+    { preHandler: guard(Permission.REGISTERS_VIEW) },
+    async (request, reply) => {
+      const b = request.body ?? {};
+      const tenantId = tenantWhere(request).tenantId;
+      const barracao = b.barracaoId
+        ? await prisma.warehouseBarracao.findFirst({
+            where: { id: b.barracaoId, tenantId },
+            select: { id: true },
+          })
+        : null;
+      if (!barracao) return reply.status(400).send({ error: "Barracão inválido" });
+      if (b.type && b.type !== LocationType.PULMAO && b.type !== LocationType.PICK_FACE) {
+        return reply.status(400).send({ error: "Tipo inválido" });
+      }
+      try {
+        const result = await generateEstantePositions(tenantId, {
+          barracaoId: barracao.id,
+          estanteCode: b.estanteCode ?? "",
+          ld: { colunas: Number(b.ld?.colunas), linhas: Number(b.ld?.linhas) },
+          le: b.le ? { colunas: Number(b.le.colunas), linhas: Number(b.le.linhas) } : null,
+          type: b.type,
+          capacity: b.capacity != null ? Number(b.capacity) : undefined,
+          minThreshold: b.minThreshold != null ? Number(b.minThreshold) : undefined,
+        });
+        return reply.status(201).send(result);
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : "Erro ao gerar estante";
+        return reply.status(400).send({ error: msg });
+      }
+    },
+  );
+
+  app.patch<{
+    Params: { estanteId: string };
+    Body: {
+      ld?: { colunas?: number; linhas?: number };
+      le?: { colunas?: number; linhas?: number } | null;
+      name?: string | null;
+    };
+  }>(
+    "/api/warehouse/estantes/:estanteId/structure",
+    { preHandler: guard(Permission.REGISTERS_VIEW) },
+    async (request, reply) => {
+      const b = request.body ?? {};
+      try {
+        return await resizeEstante(tenantWhere(request).tenantId, request.params.estanteId, {
+          ld: { colunas: Number(b.ld?.colunas), linhas: Number(b.ld?.linhas) },
+          le: b.le ? { colunas: Number(b.le.colunas), linhas: Number(b.le.linhas) } : null,
+          name: b.name,
+        });
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : "Erro ao alterar estante";
+        return reply.status(msg.includes("não encontrad") ? 404 : 400).send({ error: msg });
+      }
+    },
+  );
+
+  app.patch<{ Params: { estanteId: string }; Body: { face?: string } }>(
+    "/api/warehouse/estantes/:estanteId/face",
+    { preHandler: guard(Permission.REGISTERS_VIEW) },
+    async (request, reply) => {
+      const face = request.body?.face;
+      if (face !== "A" && face !== "B") return reply.status(400).send({ error: "Lado inválido" });
+      try {
+        return await setEstanteFace(tenantWhere(request).tenantId, request.params.estanteId, face);
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : "Erro ao alterar lado";
+        return reply.status(msg.includes("não encontrad") ? 404 : 400).send({ error: msg });
+      }
+    },
+  );
+
+  const MAX_INVENTORY_ROWS = 20000;
+  const inventoryRows = (raw: unknown): InventoryRowInput[] | null => {
+    if (!Array.isArray(raw) || raw.length > MAX_INVENTORY_ROWS) return null;
+    return raw.map((r) => ({
+      address: String((r as { address?: unknown })?.address ?? ""),
+      sku: String((r as { sku?: unknown })?.sku ?? ""),
+    }));
+  };
+  const sideInput = (raw: unknown) => {
+    const s = raw as { colunas?: unknown; linhas?: unknown } | null | undefined;
+    if (!s || !(Number(s.colunas) > 0)) return null;
+    return { colunas: Math.floor(Number(s.colunas)), linhas: Math.floor(Number(s.linhas)) };
+  };
+
+  app.post<{ Body: { rows?: unknown } }>(
+    "/api/warehouse/inventory-layout/preview",
+    { preHandler: guard(Permission.REGISTERS_VIEW) },
+    async (request, reply) => {
+      const rows = inventoryRows(request.body?.rows);
+      if (!rows) return reply.status(400).send({ error: `Envie até ${MAX_INVENTORY_ROWS} linhas` });
+      const tenantId = tenantWhere(request).tenantId;
+      const plan = planInventoryLayout(rows);
+      const barracoes = await prisma.warehouseBarracao.findMany({
+        where: { tenantId },
+        select: { code: true },
+      });
+      const known = new Set(barracoes.map((b) => b.code.toUpperCase()));
+      const missingBarracoes = [...new Set(plan.estantes.map((e) => e.barracao))].filter(
+        (code) => !known.has(code),
+      );
+      return { ...plan, missingBarracoes };
+    },
+  );
+
+  app.post<{ Body: { rows?: unknown; estantes?: unknown } }>(
+    "/api/warehouse/inventory-layout/apply",
+    { preHandler: guard(Permission.REGISTERS_VIEW) },
+    async (request, reply) => {
+      const rows = inventoryRows(request.body?.rows);
+      if (!rows) return reply.status(400).send({ error: `Envie até ${MAX_INVENTORY_ROWS} linhas` });
+      if (!Array.isArray(request.body?.estantes)) {
+        return reply.status(400).send({ error: "Informe as estantes" });
+      }
+      const estantes = [];
+      for (const raw of request.body.estantes as Array<Record<string, unknown>>) {
+        const ld = sideInput(raw?.ld);
+        if (!ld || !(ld.linhas > 0)) {
+          return reply.status(400).send({ error: `Estante ${String(raw?.estante)}: LD inválido` });
+        }
+        estantes.push({
+          barracao: String(raw.barracao ?? "").toUpperCase(),
+          estante: String(raw.estante ?? "").toUpperCase(),
+          ld,
+          le: sideInput(raw.le),
+        });
+      }
+      try {
+        return await applyInventoryLayout(tenantWhere(request).tenantId, { rows, estantes });
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : "Erro ao importar layout";
+        return reply.status(400).send({ error: msg });
+      }
+    },
+  );
+
   app.patch<{
     Params: { linhaId: string };
     Body: {
       linhaCode?: string;
       linhaName?: string | null;
       linhaActive?: boolean;
+      face?: "A" | "B";
       barcode?: string;
       type?: LocationType;
       productId?: string | null;

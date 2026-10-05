@@ -3,22 +3,18 @@
 import { useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { DataState } from "@/components/ops/data-state";
-import { WarehouseSkuSearchSelect } from "@/components/warehouse/warehouse-sku-search-select";
 import { WarehouseAddressCodeField } from "@/components/warehouse/warehouse-address-code-field";
 import { WarehouseBarracaoCreateForm } from "@/components/warehouse/warehouse-barracao-create-form";
+import { FaceToggle } from "@/components/warehouse/face-toggle";
 import {
   WarehouseFormStep,
   WarehouseOptionPicker,
   type TileOption,
 } from "@/components/warehouse/warehouse-tile-picker";
 import {
-  WarehouseProximityReferencesEditor,
-  serializeProximityReferences,
-  type WarehouseProximityReferenceDraft,
-} from "@/components/warehouse/warehouse-proximity-references-editor";
-import {
   createWarehousePosition,
   fetchBarracoesList,
+  type LocationFace,
   type WarehouseBarracaoOption,
   type WarehouseSegment,
 } from "@/lib/api/warehouse";
@@ -29,13 +25,11 @@ import {
 
 const ADDRESS_LEVELS: Array<{
   title: string;
-  key: "setor" | "corredor" | "estante" | "coluna" | "linha";
+  key: "estante" | "coluna" | "linha";
   segment: WarehouseSegment;
-  parentKey?: "barracaoId" | "setorId" | "corredorId" | "estanteId" | "colunaId";
+  parentKey?: "estanteId" | "colunaId";
 }> = [
-  { title: "Setor", key: "setor", segment: "setores", parentKey: "barracaoId" },
-  { title: "Corredor", key: "corredor", segment: "corredores", parentKey: "setorId" },
-  { title: "Estante", key: "estante", segment: "estantes", parentKey: "corredorId" },
+  { title: "Estante", key: "estante", segment: "estantes" },
   { title: "Coluna", key: "coluna", segment: "colunas", parentKey: "estanteId" },
   { title: "Linha", key: "linha", segment: "linhas", parentKey: "colunaId" },
 ];
@@ -68,15 +62,9 @@ export function WarehouseAddForm() {
   const [estanteCode, setEstanteCode] = useState("");
   const [colunaCode, setColunaCode] = useState("");
   const [linhaCode, setLinhaCode] = useState("");
+  const [face, setFace] = useState<LocationFace>("A");
 
   const [barcode, setBarcode] = useState("");
-  const [productId, setProductId] = useState("");
-  const [capacity, setCapacity] = useState("100");
-  const [minThreshold, setMinThreshold] = useState("10");
-  const [currentQuantity, setCurrentQuantity] = useState("0");
-  const [proximityReferences, setProximityReferences] = useState<
-    WarehouseProximityReferenceDraft[]
-  >([]);
 
   const [positionType, setPositionType] = useState<"PICK_FACE" | "PULMAO" | null>(
     initialPositionType,
@@ -123,8 +111,6 @@ export function WarehouseAddForm() {
   }, [initialBarracaoId]);
 
   const addressValues = {
-    setor: setorCode,
-    corredor: corredorCode,
     estante: estanteCode,
     coluna: colunaCode,
     linha: linhaCode,
@@ -132,17 +118,13 @@ export function WarehouseAddForm() {
 
   const setAddressValue = (key: keyof typeof addressValues, value: string) => {
     const normalized = value.toUpperCase();
-    if (key === "setor") {
-      setSetorCode(normalized);
-      setSetorId("");
-    }
-    if (key === "corredor") {
-      setCorredorCode(normalized);
-      setCorredorId("");
-    }
     if (key === "estante") {
       setEstanteCode(normalized);
       setEstanteId("");
+      setSetorCode("");
+      setSetorId("");
+      setCorredorCode("");
+      setCorredorId("");
     }
     if (key === "coluna") {
       setColunaCode(normalized);
@@ -161,24 +143,21 @@ export function WarehouseAddForm() {
     if (hierarchy.corredorId) setCorredorId(hierarchy.corredorId);
     if (hierarchy.estanteId) setEstanteId(hierarchy.estanteId);
     if (hierarchy.colunaId) setColunaId(hierarchy.colunaId);
-    if (segment === "setores") setSetorCode(item.code.toUpperCase());
-    if (segment === "corredores") setCorredorCode(item.code.toUpperCase());
-    if (segment === "estantes") setEstanteCode(item.code.toUpperCase());
+    if (segment === "estantes") {
+      setEstanteCode(item.code.toUpperCase());
+      setCorredorCode(item.corredor?.code?.toUpperCase() ?? "");
+      setSetorCode(item.corredor?.setor?.code?.toUpperCase() ?? "");
+    }
     if (segment === "colunas") setColunaCode(item.code.toUpperCase());
     if (segment === "linhas") setLinhaCode(item.code.toUpperCase());
   };
 
   const parentIds = {
-    barracaoId,
-    setorId,
-    corredorId,
     estanteId,
     colunaId,
   };
 
   const selectedIds = {
-    setor: setorId,
-    corredor: corredorId,
     estante: estanteId,
     coluna: colunaId,
     linha: "",
@@ -193,13 +172,6 @@ export function WarehouseAddForm() {
       })),
     [barracoes],
   );
-
-  const fillPct = useMemo(() => {
-    const cap = Number(capacity);
-    const cur = Number(currentQuantity);
-    if (!Number.isFinite(cap) || cap <= 0 || !Number.isFinite(cur)) return null;
-    return Math.round((cur / cap) * 100);
-  }, [capacity, currentQuantity]);
 
   const validateAndSave = async () => {
     if (!positionType) {
@@ -239,13 +211,9 @@ export function WarehouseAddForm() {
         estanteCode: estanteCode.trim() || undefined,
         colunaCode: colunaCode.trim() || undefined,
         linhaCode: linhaCode.trim() || undefined,
+        face,
         barcode: barcode.trim(),
         type: positionType,
-        productId: productId || null,
-        capacity: Number(capacity) || 100,
-        minThreshold: Number(minThreshold) || 0,
-        currentQuantity: Number(currentQuantity) || 0,
-        proximityReferences: serializeProximityReferences(proximityReferences),
       });
       router.push("/gestao-barracao");
     } catch (e) {
@@ -343,9 +311,8 @@ export function WarehouseAddForm() {
 
             <WarehouseFormStep step={3} title="Endereço">
               <p className="mb-3 text-xs text-slate-500">
-                Endereço físico no barracão (setor, corredor, estante, coluna e linha).
-                Preencha apenas os níveis que usar — o código de barras da etiqueta é
-                informado no próximo passo.
+                Endereço físico: estante (a gôndola), coluna e linha — ex.: A-6-3 = estante A,
+                coluna 6, linha 3. O código de barras da etiqueta é informado no próximo passo.
               </p>
               <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
                 {ADDRESS_LEVELS.map(({ title, key, segment, parentKey }) => (
@@ -365,12 +332,12 @@ export function WarehouseAddForm() {
                   />
                 ))}
               </div>
+              <div className="mt-4">
+                <FaceToggle value={face} onChange={setFace} />
+              </div>
             </WarehouseFormStep>
 
-            <WarehouseFormStep
-              step={4}
-              title={isPulmao ? "Dados da localização (pulmão)" : "Dados da localização (estoque de giro)"}
-            >
+            <WarehouseFormStep step={4} title="Etiqueta">
               <div className="space-y-3 rounded-xl border bg-white p-4">
                 <label className="block text-sm">
                   Código de barras
@@ -384,86 +351,12 @@ export function WarehouseAddForm() {
                     placeholder="Ex.: etiqueta do pulmão ou estoque de giro"
                   />
                 </label>
-                <div className="space-y-1">
-                  <WarehouseSkuSearchSelect
-                    title="SKU (opcional)"
-                    value={productId}
-                    onChange={setProductId}
-                    placeholder="Buscar SKU ou nome…"
-                    emptyMessage="Nenhum produto encontrado"
-                  />
-                  {productId ? (
-                    <button
-                      type="button"
-                      onClick={() => setProductId("")}
-                      className="text-xs text-slate-500 underline hover:text-slate-700"
-                    >
-                      Cadastrar sem SKU
-                    </button>
-                  ) : null}
-                </div>
-                {productId ? (
-                  <div className="grid grid-cols-3 gap-2">
-                    <label className="block text-sm">
-                      Capacidade
-                      <input
-                        type="number"
-                        min={1}
-                        className="mt-1 w-full rounded-lg border px-3 py-2"
-                        value={capacity}
-                        onChange={(e) => setCapacity(e.target.value)}
-                      />
-                    </label>
-                    <label className="block text-sm">
-                      Mínimo
-                      <input
-                        type="number"
-                        min={0}
-                        className="mt-1 w-full rounded-lg border px-3 py-2"
-                        value={minThreshold}
-                        onChange={(e) => setMinThreshold(e.target.value)}
-                      />
-                    </label>
-                    <label className="block text-sm">
-                      Qtd atual
-                      <input
-                        type="number"
-                        min={0}
-                        className="mt-1 w-full rounded-lg border px-3 py-2"
-                        value={currentQuantity}
-                        onChange={(e) => setCurrentQuantity(e.target.value)}
-                      />
-                    </label>
-                  </div>
-                ) : null}
-                {fillPct != null && productId ? (
-                  <div>
-                    <div className="mb-1 flex justify-between text-xs text-slate-600">
-                      <span>Ocupação da posição</span>
-                      <span>{fillPct}%</span>
-                    </div>
-                    <div className="h-2 overflow-hidden rounded-full bg-slate-100">
-                      <div
-                        className={`h-full ${
-                          fillPct <= Number(minThreshold) ? "bg-amber-500" : "bg-teal-600"
-                        }`}
-                        style={{ width: `${Math.min(100, fillPct)}%` }}
-                      />
-                    </div>
-                  </div>
-                ) : null}
+                <p className="text-xs text-slate-500">
+                  A posição é cadastrada vazia. O SKU é associado depois, em Editar na lista de
+                  localizações.
+                </p>
               </div>
             </WarehouseFormStep>
-
-            {barracaoId ? (
-              <WarehouseFormStep step={5} title="Proximidade (opcional)">
-                <WarehouseProximityReferencesEditor
-                  barracaoId={barracaoId}
-                  value={proximityReferences}
-                  onChange={setProximityReferences}
-                />
-              </WarehouseFormStep>
-            ) : null}
           </>
         ) : (
           <p className="text-sm text-slate-500">

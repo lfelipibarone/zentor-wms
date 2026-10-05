@@ -24,7 +24,11 @@ import {
   sortWavePackingLines,
 } from "./packing-queue-sort.js";
 import { listReplenishmentNeeds } from "./replenishment-queue.js";
+import { getRouteEngine } from "./route-engine/index.js";
 import { recordOrderStageChange } from "./order-stage-log.js";
+import { loadApproachWaveDefs } from "./approach-waves/store.js";
+import { matchLocation, sequenceKeyIn, type ZoneLocation } from "./approach-waves/matching.js";
+import { NO_ZONE, packingZoneFor, sortByUrgencyThenSequence } from "./approach-waves/parts.js";
 
 export class PackingSessionError extends Error {
   constructor(
@@ -89,7 +93,7 @@ const orderInclude = {
     orderBy: { lineNumber: "asc" as const },
     include: {
       pickLocation: {
-        select: { id: true, corridor: true, row: true, barcode: true },
+        select: { id: true, corridor: true, row: true, barcode: true, estanteId: true, face: true },
       },
       product: {
         select: {
@@ -130,6 +134,8 @@ type OrderRow = {
       corridor: string;
       row: string;
       barcode: string;
+      estanteId?: string | null;
+      face?: string | null;
     } | null;
     product: {
       id: string;
@@ -190,6 +196,7 @@ async function mapPackingOrder(
       quantityPicked: i.quantityPicked,
       pickLocation: i.pickLocation,
     })),
+    await getRouteEngine(order.tenantId),
   );
 
   const items = await Promise.all(
@@ -248,6 +255,8 @@ export async function listPackingQueue(tenantId: string) {
         pickLocation: i.pickLocation,
       })),
     })),
+    new Date(),
+    await getRouteEngine(tenantId),
   );
 
   const orderMap = new Map(orders.map((o) => [o.id, o]));
@@ -259,12 +268,55 @@ export async function listPackingQueue(tenantId: string) {
   return { orders: result };
 }
 
-export async function listUnifiedPackingQueue(tenantId: string) {
+/** Filtro da fila por onda de aproximação do packing (`none` = fora de todas as áreas). */
+async function packingZoneFilter(tenantId: string, approachWaveId: string) {
+  const defs = await loadApproachWaveDefs(tenantId, "PACKING");
+  const def = approachWaveId === NO_ZONE ? null : defs.find((d) => d.id === approachWaveId) ?? null;
+  if (approachWaveId !== NO_ZONE && !def) {
+    throw new PackingSessionError("Onda de aproximação do packing não encontrada", 404);
+  }
+  const target = def?.id ?? null;
+  const key = (loc: ZoneLocation | null) => (def && loc ? sequenceKeyIn(def, loc) : null);
+  const minKey = (keys: Array<number | null>) => {
+    const valid = keys.filter((k): k is number => k != null);
+    return valid.length > 0 ? Math.min(...valid) : null;
+  };
+  return {
+    lines<T extends { waveUrgency: number; pickLocation: ZoneLocation }>(lines: T[]): T[] {
+      const own = lines.filter((l) => (matchLocation(defs, l.pickLocation)?.waveId ?? null) === target);
+      return sortByUrgencyThenSequence(own, (l) => l.waveUrgency, (l) => key(l.pickLocation));
+    },
+    orders<
+      T extends {
+        packingUrgency: number;
+        items: Array<{ quantityPicked: number; quantityOrdered: number; pickLocation: ZoneLocation | null }>;
+      },
+    >(orders: T[]): T[] {
+      const own = orders.filter(
+        (o) =>
+          packingZoneFor(
+            o.items.map((i) => ({ quantity: i.quantityPicked || i.quantityOrdered, location: i.pickLocation })),
+            defs,
+          ) === target,
+      );
+      return sortByUrgencyThenSequence(
+        own,
+        (o) => o.packingUrgency,
+        (o) => minKey(o.items.map((i) => key(i.pickLocation))),
+      );
+    },
+  };
+}
+
+export async function listUnifiedPackingQueue(tenantId: string, opts?: { approachWaveId?: string }) {
   const [waveRaw, ordersResult, replenishmentNeeds] = await Promise.all([
     listWavePackingLinesInternal(tenantId),
     listPackingQueue(tenantId),
     listReplenishmentNeeds(tenantId),
   ]);
+  const zone = opts?.approachWaveId ? await packingZoneFilter(tenantId, opts.approachWaveId) : null;
+  const waveLines = zone ? zone.lines(waveRaw.lines) : waveRaw.lines;
+  const queueOrders = zone ? zone.orders(ordersResult.orders) : ordersResult.orders;
 
   type WaveLineQueue = Omit<(typeof waveRaw.lines)[0], "collectionDeadline" | "pickLocation"> & {
     collectionDeadline: string | null;
@@ -276,7 +328,7 @@ export async function listUnifiedPackingQueue(tenantId: string) {
     | { kind: "replenishment"; sortKey: number; need: (typeof replenishmentNeeds)[0] }
   > = [];
 
-  for (const line of waveRaw.lines) {
+  for (const line of waveLines) {
     const { collectionDeadline, pickLocation: _pick, ...lineRest } = line;
     items.push({
       kind: "wave_line",
@@ -287,7 +339,7 @@ export async function listUnifiedPackingQueue(tenantId: string) {
       },
     });
   }
-  for (const order of ordersResult.orders) {
+  for (const order of queueOrders) {
     items.push({ kind: "order", sortKey: order.packingUrgency ?? 0, order });
   }
   for (const need of replenishmentNeeds) {
@@ -669,7 +721,7 @@ async function listWavePackingLinesInternal(tenantId: string) {
           },
         },
       },
-      pickLocation: { select: { corridor: true, row: true, barcode: true } },
+      pickLocation: { select: { corridor: true, row: true, barcode: true, estanteId: true, face: true } },
     },
   });
 
@@ -701,6 +753,7 @@ async function listWavePackingLinesInternal(tenantId: string) {
       collectionDeadline: l.collectionDeadline,
       pickLocation: l.pickLocation,
     })),
+    await getRouteEngine(tenantId),
   );
 
   return { lines: sorted };

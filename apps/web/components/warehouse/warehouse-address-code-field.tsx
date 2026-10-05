@@ -51,7 +51,7 @@ export function WarehouseAddressCodeField({
         compact
       />
       <label className="block text-xs text-slate-500">
-        Ou digite o {title.toLowerCase()}
+        Ou digite o código da {title.toLowerCase()}
         <input
           className="mt-1 w-full rounded-lg border px-3 py-2 font-mono uppercase disabled:bg-slate-50"
           value={code}

@@ -1,4 +1,4 @@
-import type { Prisma } from "@prisma/client";
+import { LocationFace, type Prisma } from "@prisma/client";
 import { prisma } from "../lib/prisma.js";
 
 export function normalizeWarehouseCode(code: string): string {
@@ -7,6 +7,13 @@ export function normalizeWarehouseCode(code: string): string {
 
 /** Código usado para níveis estruturais não informados pelo usuário. */
 export const WAREHOUSE_ADDRESS_PLACEHOLDER = "—";
+
+/** Código da gôndola: a estante, ou o corredor quando a estante não foi informada. */
+export function gondolaCode(estanteCode: string | null | undefined, corredorCode: string | null | undefined): string {
+  const estante = estanteCode?.trim();
+  if (estante && estante !== WAREHOUSE_ADDRESS_PLACEHOLDER) return estante;
+  return corredorCode?.trim() || estante || "";
+}
 
 type DbClient = Prisma.TransactionClient | typeof prisma;
 
@@ -172,6 +179,29 @@ export async function ensureWarehouseHierarchy(
   };
 }
 
+/**
+ * Endereço informado só pela estante: reaproveita setor/corredor da estante com esse código
+ * já cadastrada no barracão (layouts antigos), senão usa placeholder.
+ */
+export async function inheritGondolaParentCodes(
+  tenantId: string,
+  barracaoId: string,
+  codes: { setor?: string; corredor?: string; estante?: string },
+  client: DbClient = prisma,
+): Promise<{ setor?: string; corredor?: string }> {
+  const estanteCode = optionalNormalizedCode(codes.estante);
+  if (!estanteCode || codes.setor?.trim() || codes.corredor?.trim()) {
+    return { setor: codes.setor, corredor: codes.corredor };
+  }
+  const matches = await client.warehouseEstante.findMany({
+    where: { tenantId, code: estanteCode, corredor: { setor: { barracaoId } } },
+    select: { corredor: { select: { code: true, setor: { select: { code: true } } } } },
+    take: 2,
+  });
+  if (matches.length !== 1) return {};
+  return { setor: matches[0]!.corredor.setor.code, corredor: matches[0]!.corredor.code };
+}
+
 /** Resolve layout codes, creating missing structural levels (setor → coluna). */
 export async function resolveOrCreateLayoutCodes(
   tenantId: string,
@@ -182,6 +212,7 @@ export async function resolveOrCreateLayoutCodes(
     estante?: string;
     coluna?: string;
     linha?: string;
+    face?: LocationFace;
   },
 ): Promise<LocationLayoutInput> {
   const barracaoCode = codes.barracao?.trim();
@@ -194,9 +225,10 @@ export async function resolveOrCreateLayoutCodes(
   });
   if (!barracao) throw new Error(`Barracão não encontrado: ${barracaoCode}`);
 
+  const parents = await inheritGondolaParentCodes(tenantId, barracao.id, codes);
   const effective = resolveEffectiveAddressCodes({
-    setorCode: codes.setor,
-    corredorCode: codes.corredor,
+    setorCode: parents.setor,
+    corredorCode: parents.corredor,
     estanteCode: codes.estante,
     colunaCode: codes.coluna,
     linhaCode: codes.linha,
@@ -216,11 +248,13 @@ export async function resolveOrCreateLayoutCodes(
   let linhaId: string | null = null;
   if (effective.linhaCode) {
     const normalizedLinha = effective.linhaCode;
+    const face = codes.face ?? LocationFace.A;
     let linha = await prisma.warehouseLinha.findFirst({
       where: {
         tenantId,
         colunaId: hierarchy.colunaId,
         code: normalizedLinha,
+        face,
       },
     });
     if (!linha) {
@@ -229,6 +263,7 @@ export async function resolveOrCreateLayoutCodes(
           tenantId,
           colunaId: hierarchy.colunaId,
           code: normalizedLinha,
+          face,
           pickOrder: 0,
           active: true,
         },
@@ -428,18 +463,31 @@ export async function resolveLocationLayout(
     }
   }
 
-  const corridorFromLayout = corredor?.code ?? fallback?.corridor?.trim() ?? "";
-  const rowFromLayout = linha?.code ?? fallback?.row?.trim() ?? "";
+  const gondolaEstante =
+    estante ??
+    (ids.estanteId
+      ? await prisma.warehouseEstante.findFirst({ where: { id: ids.estanteId, tenantId } })
+      : null);
+  const gondolaCorredor =
+    corredor ??
+    (ids.corredorId
+      ? await prisma.warehouseCorredor.findFirst({ where: { id: ids.corredorId, tenantId } })
+      : null);
+  const gondola = gondolaCode(gondolaEstante?.code, gondolaCorredor?.code);
+
+  const gondolaColuna =
+    coluna ??
+    (ids.colunaId
+      ? await prisma.warehouseColuna.findFirst({ where: { id: ids.colunaId, tenantId } })
+      : null);
+  const linhaCode = linha?.code ?? fallback?.row?.trim() ?? "";
+
+  const corridorFromLayout = gondola || fallback?.corridor?.trim() || "";
+  const rowFromLayout =
+    gondolaColuna && linhaCode ? `${gondolaColuna.code}-${linhaCode}` : linhaCode;
 
   if (!corridorFromLayout || !rowFromLayout) {
-    if (coluna && linha) {
-      return {
-        ...ids,
-        corridor: corredor?.code ?? coluna.code,
-        row: linha.code,
-      };
-    }
-    throw new Error("Complete corredor, estante, coluna e linha");
+    throw new Error("Complete estante, coluna e linha");
   }
 
   return {

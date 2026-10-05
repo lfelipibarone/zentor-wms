@@ -215,3 +215,16 @@ describe("pick-wave-partition BY_PRODUCT", () => {
     assert.equal(withA?.length, 2);
   });
 });
+
+describe("pick-wave-partition BY_APPROACH e SINGLE_WAVE", () => {
+  it("mantêm todos os pedidos num lote só, mesmo sem vínculo e com partição ligada", () => {
+    const near = mockOrder("o1", ["p1"], { corridor: 1, row: 1 });
+    const far = mockOrder("o2", ["p2", "p3", "p4", "p5", "p6", "p7"], { corridor: 20, row: 30 });
+    for (const strategy of ["BY_APPROACH", "SINGLE_WAVE"] as const) {
+      const groups = partitionOrders([near, far], strategy, { ...baseSettings, strategy });
+      assert.deepEqual(groups.map((g) => g.map((o) => o.id)), [["o1", "o2"]]);
+      assert.deepEqual(getExcludedOrderIds([near, far], groups, strategy), []);
+      assert.deepEqual(getExcludedOrderDetails([near, far], groups, strategy), []);
+    }
+  });
+});

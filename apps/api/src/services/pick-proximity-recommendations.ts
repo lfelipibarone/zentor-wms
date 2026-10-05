@@ -14,6 +14,7 @@ export async function getPickProximityGroups(
 
   const clusters = await buildPickProximityGroups(tenantId, orders, {
     maxDistance: settings.proximityMaxDistance,
+    maxDistanceMeters: settings.proximityMaxDistanceMeters,
     maxGroups: opts?.limit ?? 10,
     maxOrdersPerGroup: 8,
   });

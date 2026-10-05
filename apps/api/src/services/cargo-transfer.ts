@@ -112,13 +112,13 @@ const transferInclude = {
     },
   },
   fromLocation: {
-    select: { id: true, barcode: true, corridor: true, row: true },
+    select: { id: true, barcode: true, corridor: true, row: true, estanteId: true, face: true },
   },
   toLocation: {
     select: { id: true, barcode: true, corridor: true, row: true },
   },
   targetPickFace: {
-    select: { id: true, barcode: true, corridor: true, row: true },
+    select: { id: true, barcode: true, corridor: true, row: true, estanteId: true, face: true },
   },
   withdrawnBy: { select: { id: true, name: true } },
 } as const;
@@ -367,12 +367,12 @@ export async function listPendingCargoTransfers(
     include: transferInclude,
   });
 
-  const { sortLocationsByRoute } = await import("./location-route.js");
+  const { getRouteEngine } = await import("./route-engine/index.js");
   const tagged = transfers.map((t) => {
     const anchor = t.targetPickFace ?? t.fromLocation;
     return { ...anchor, transferId: t.id };
   });
-  const sortedLocs = sortLocationsByRoute(tagged);
+  const sortedLocs = (await getRouteEngine(tenantId)).sortByRoute(tagged);
   const sorted = sortedLocs.map(
     (loc) => transfers.find((tr) => tr.id === loc.transferId)!,
   );

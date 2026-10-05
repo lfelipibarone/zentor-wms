@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { FileUp, Plus } from "lucide-react";
+import { FileSpreadsheet, FileUp, LayoutGrid, Map as MapIcon, Plus } from "lucide-react";
 import { DataState } from "@/components/ops/data-state";
 import { Pagination } from "@/components/ui/pagination";
 import { WarehouseLocationEditModal } from "@/components/warehouse/warehouse-location-edit-modal";
@@ -130,6 +130,32 @@ export function WarehouseLayoutEditor() {
           className="inline-flex items-center gap-1 rounded-lg border border-slate-300 px-3 py-2 text-sm font-semibold text-slate-700"
         >
           <FileUp className="h-4 w-4" /> Importar
+        </Link>
+        <Link
+          href="/gestao-barracao/inventario"
+          className="inline-flex items-center gap-1 rounded-lg border border-slate-300 px-3 py-2 text-sm font-semibold text-slate-700"
+        >
+          <FileSpreadsheet className="h-4 w-4" /> Planilha de inventário
+        </Link>
+        <Link
+          href={
+            barracaoFilter
+              ? `/gestao-barracao/mapa?barracaoId=${encodeURIComponent(barracaoFilter)}`
+              : "/gestao-barracao/mapa"
+          }
+          className="inline-flex items-center gap-1 rounded-lg border border-slate-300 px-3 py-2 text-sm font-semibold text-slate-700"
+        >
+          <MapIcon className="h-4 w-4" /> Mapa do galpão
+        </Link>
+        <Link
+          href={
+            barracaoFilter
+              ? `/gestao-barracao/lote?barracaoId=${encodeURIComponent(barracaoFilter)}`
+              : "/gestao-barracao/lote"
+          }
+          className="inline-flex items-center gap-1 rounded-lg border border-slate-300 px-3 py-2 text-sm font-semibold text-slate-700"
+        >
+          <LayoutGrid className="h-4 w-4" /> Gerar estante
         </Link>
         <Link
           href={novoHref}

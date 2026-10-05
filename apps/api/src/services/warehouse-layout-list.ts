@@ -1,6 +1,7 @@
-import type { LocationType, Prisma } from "@prisma/client";
+import type { LocationFace, LocationType, Prisma } from "@prisma/client";
 import { prisma } from "../lib/prisma.js";
 import { listLocationProximityReferencesByLocationIds } from "./location-proximity-references.js";
+import { gondolaCode } from "./warehouse-layout.js";
 
 const linhaPathInclude = {
   location: {
@@ -52,6 +53,7 @@ const linhaOrderBy = [
   { coluna: { estante: { code: "asc" as const } } },
   { coluna: { code: "asc" as const } },
   { code: "asc" as const },
+  { face: "asc" as const },
 ] satisfies Prisma.WarehouseLinhaOrderByWithRelationInput[];
 
 export interface WarehouseLayoutListRow {
@@ -70,6 +72,7 @@ export interface WarehouseLayoutListRow {
   estante: string;
   coluna: string;
   linha: string;
+  face: LocationFace;
   sku: string;
   capacity: number | null;
   minThreshold: number | null;
@@ -205,7 +208,7 @@ function mapLinha(
     id: linha.id,
     segment: "linhas",
     tipo: "Linha",
-    parentPath: `${barracao.code} / ${setor.code} / ${corredor.code} / ${estante.code} / ${coluna.code}`,
+    parentPath: `${barracao.code} / Estante ${gondolaCode(estante.code, corredor.code)} / Coluna ${coluna.code}`,
     code: linha.code,
     name: linha.name,
     ordem: linha.pickOrder,
@@ -217,6 +220,7 @@ function mapLinha(
     estante: estante.code,
     coluna: coluna.code,
     linha: linha.code,
+    face: linha.face,
     sku: loc?.product?.sku ?? "—",
     capacity,
     minThreshold: loc?.minThreshold ?? null,

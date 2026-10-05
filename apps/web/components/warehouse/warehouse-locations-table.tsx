@@ -109,8 +109,6 @@ export function WarehouseLocationsTable({
         <TableHeader>
           <TableRow>
             <TableHead>Barracão</TableHead>
-            <TableHead>Setor</TableHead>
-            <TableHead>Corredor</TableHead>
             <TableHead>Estante</TableHead>
             <TableHead>Coluna</TableHead>
             <TableHead>Linha</TableHead>
@@ -134,16 +132,37 @@ export function WarehouseLocationsTable({
             return (
               <TableRow key={row.id}>
                 <TableCell className="font-mono text-sm">{row.barracao}</TableCell>
-                <TableCell className="font-mono text-sm">{cellCode(row.setor)}</TableCell>
-                <TableCell className="font-mono text-sm">{cellCode(row.corredor)}</TableCell>
-                <TableCell className="font-mono text-sm">{cellCode(row.estante)}</TableCell>
+                <TableCell className="font-mono text-sm">
+                  {cellCode(row.estante !== EMPTY ? row.estante : row.corredor)}
+                </TableCell>
                 <TableCell className="font-mono text-sm">{cellCode(row.coluna)}</TableCell>
-                <TableCell className="font-mono text-sm">{cellCode(row.linha)}</TableCell>
+                <TableCell className="font-mono text-sm">
+                  {cellCode(row.linha)}
+                  <span
+                    className={`ml-1 rounded px-1 text-[10px] font-semibold ${
+                      row.face === "B" ? "bg-violet-100 text-violet-800" : "bg-cyan-100 text-cyan-800"
+                    }`}
+                  >
+                    {row.face === "B" ? "LE" : "LD"}
+                  </span>
+                </TableCell>
                 <TableCell className="text-sm">{tipoBadgeForRow(row)}</TableCell>
                 <TableCell className="font-mono text-sm">
                   {row.barcode ?? <span className="text-slate-400">{EMPTY}</span>}
                 </TableCell>
-                <TableCell className="font-mono text-sm">{row.sku}</TableCell>
+                <TableCell className="font-mono text-sm">
+                  {row.sku !== EMPTY ? (
+                    row.sku
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => onEdit(row)}
+                      className="font-sans text-xs font-medium text-[#0d9488] underline"
+                    >
+                      Associar SKU
+                    </button>
+                  )}
+                </TableCell>
                 <TableCell>
                   <StockCell
                     currentQuantity={row.currentQuantity}

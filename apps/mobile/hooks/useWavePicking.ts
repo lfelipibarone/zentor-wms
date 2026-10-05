@@ -9,10 +9,10 @@ export function useReleasedWaves() {
   });
 }
 
-export function useWaveById(waveId: string | null) {
+export function useWaveById(waveId: string | null, partId?: string | null) {
   return useQuery({
-    queryKey: ["wave", waveId],
-    queryFn: () => api.getWaveById(waveId!),
+    queryKey: ["wave", waveId, partId ?? null],
+    queryFn: () => api.getWaveById(waveId!, partId),
     enabled: !!waveId,
     retry: false,
   });
@@ -26,23 +26,23 @@ export function useCurrentWave() {
   });
 }
 
-export function useAcceptWave(waveId?: string | null) {
+export function useAcceptWave(waveId?: string | null, partId?: string | null) {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: () =>
-      waveId ? api.acceptWave(waveId) : api.acceptCurrentWave(),
+      waveId ? api.acceptWave(waveId, partId) : api.acceptCurrentWave(),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["wave"] });
     },
   });
 }
 
-export function useReleaseWaveAccept(waveId?: string | null) {
+export function useReleaseWaveAccept(waveId?: string | null, partId?: string | null) {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: () =>
       waveId
-        ? api.releaseWaveAccept(waveId)
+        ? api.releaseWaveAccept(waveId, partId)
         : api.releaseCurrentWaveAccept(),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["wave"] });

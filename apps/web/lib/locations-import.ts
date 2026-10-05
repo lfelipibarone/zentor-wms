@@ -2,13 +2,14 @@ import { apiFetch } from "@/lib/api/client";
 
 export interface ParsedLocationRow {
   barcode: string;
-  corridor: string;
+  corridor?: string;
   row: string;
   barracao?: string;
   setor?: string;
   estante?: string;
   coluna?: string;
   linha?: string;
+  face?: string;
   type: string;
   productSku?: string;
   capacity: number;
@@ -29,11 +30,10 @@ export type ImportMode = "upsert" | "createOnly";
 const TEMPLATE_HEADERS = [
   "barcode",
   "barracao",
-  "setor",
-  "corredor",
   "estante",
   "coluna",
   "linha",
+  "lado",
   "tipo",
   "sku_produto",
   "capacidade",
@@ -43,13 +43,12 @@ const TEMPLATE_HEADERS = [
 ] as const;
 
 const TEMPLATE_EXAMPLE = [
-  "GON-A-01",
+  "A-LD-6-3",
   "B1",
-  "S1",
   "A",
-  "E2",
-  "01",
-  "01",
+  "6",
+  "3",
+  "LD",
   "Gôndola",
   "SKU-001",
   100,
@@ -70,6 +69,8 @@ const HEADER_ALIASES: Record<string, keyof ParsedLocationRow | "skip"> = {
   estante: "estante",
   coluna: "coluna",
   linha: "linha",
+  face: "face",
+  lado: "face",
   corredor: "corridor",
   corridor: "corridor",
   fileira: "row",
@@ -174,15 +175,16 @@ export async function parseLocationsXlsx(file: File): Promise<{
     const raw = mapSheetRow(headerRow, line);
     const barcode = cellToString(raw.barcode).toUpperCase();
     const corridor = cellToString(raw.corridor);
-    const rowVal = cellToString(raw.row);
+    const estante = cellToString(raw.estante);
+    const rowVal = cellToString(raw.linha) || cellToString(raw.row);
     const type = cellToString(raw.type);
 
     if (!barcode) {
       parseErrors.push(`Linha ${i + 1}: barcode obrigatório`);
       continue;
     }
-    if (!corridor || !rowVal) {
-      parseErrors.push(`Linha ${i + 1} (${barcode}): corredor e linha obrigatórios`);
+    if ((!estante && !corridor) || !rowVal) {
+      parseErrors.push(`Linha ${i + 1} (${barcode}): estante e linha obrigatórias`);
       continue;
     }
     if (!type) {
@@ -195,13 +197,14 @@ export async function parseLocationsXlsx(file: File): Promise<{
 
     rows.push({
       barcode,
-      corridor,
+      corridor: corridor || undefined,
       row: rowVal,
       barracao: cellToString(raw.barracao) || undefined,
       setor: cellToString(raw.setor) || undefined,
-      estante: cellToString(raw.estante) || undefined,
+      estante: estante || undefined,
       coluna: cellToString(raw.coluna) || undefined,
       linha: cellToString(raw.linha) || undefined,
+      face: cellToString(raw.face) || undefined,
       type,
       productSku: cellToString(raw.productSku) || undefined,
       capacity,
@@ -241,8 +244,7 @@ export async function downloadLocationsTemplate(): Promise<void> {
     { wch: 8 },
     { wch: 8 },
     { wch: 10 },
-    { wch: 8 },
-    { wch: 10 },
+    { wch: 6 },
     { wch: 8 },
     { wch: 12 },
     { wch: 14 },
