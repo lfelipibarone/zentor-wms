@@ -40,6 +40,7 @@ function runCli(pkg: string, args: string[]) {
  * Aplica schema Prisma (+ seed se banco vazio) antes de aceitar tráfego.
  * Roda dentro do `node .../index.js` — independente de Docker/Nixpacks CMD.
  * Desligar: WMS_SKIP_DB_ENSURE=1
+ * Aceitar avisos de perda de dados do push (ex.: unique novo), só no deploy que precisar: WMS_DB_PUSH_ACCEPT_DATA_LOSS=1
  */
 export async function ensureDatabaseReady(): Promise<void> {
   if (
@@ -62,8 +63,23 @@ export async function ensureDatabaseReady(): Promise<void> {
     );
   }
 
+  const acceptDataLoss =
+    process.env.WMS_DB_PUSH_ACCEPT_DATA_LOSS === "1" ||
+    process.env.WMS_DB_PUSH_ACCEPT_DATA_LOSS === "true";
+  if (acceptDataLoss) {
+    console.warn(
+      "[ensure-db] WMS_DB_PUSH_ACCEPT_DATA_LOSS ligado — db push com --accept-data-loss; desligue após este deploy",
+    );
+  }
   console.log("[ensure-db] aplicando schema (prisma db push)...");
-  runCli("prisma", ["db", "push", "--skip-generate", "--schema", schemaPath]);
+  runCli("prisma", [
+    "db",
+    "push",
+    "--skip-generate",
+    ...(acceptDataLoss ? ["--accept-data-loss"] : []),
+    "--schema",
+    schemaPath,
+  ]);
 
   const forceFullSeed =
     process.env.WMS_FORCE_FULL_SEED === "1" ||
