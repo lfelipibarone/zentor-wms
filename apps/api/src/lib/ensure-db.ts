@@ -1,4 +1,4 @@
-import { execFileSync } from "node:child_process";
+import { execFileSync, spawnSync } from "node:child_process";
 import { createRequire } from "node:module";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -36,11 +36,60 @@ function runCli(pkg: string, args: string[]) {
   });
 }
 
+function runCliCaptured(pkg: string, args: string[]): { ok: boolean; output: string } {
+  const entry = resolvePackageCli(pkg);
+  const result = spawnSync(process.execPath, [entry, ...args], {
+    cwd: apiRoot,
+    env: process.env,
+    encoding: "utf8",
+  });
+  if (result.stdout) process.stdout.write(result.stdout);
+  if (result.stderr) process.stderr.write(result.stderr);
+  if (result.error) throw result.error;
+  return { ok: result.status === 0, output: `${result.stdout ?? ""}\n${result.stderr ?? ""}` };
+}
+
+/** Aviso do Prisma que não apaga dados: no máximo falha se houver duplicata. */
+const SAFE_PUSH_WARNING =
+  /^A unique constraint covering the columns `\[[^\]]+\]` on the table `[^`]+` will be added\./;
+
+function pushWarnings(output: string): string[] {
+  return output
+    .split("\n")
+    .map((l) => l.trim())
+    .filter((l) => l.startsWith("•"))
+    .map((l) => l.slice(1).trim());
+}
+
+/** `db push`; se os únicos avisos forem de unique novo, reaplica com --accept-data-loss. */
+function pushSchema(): void {
+  const args = ["db", "push", "--skip-generate", "--schema", schemaPath];
+  const first = runCliCaptured("prisma", args);
+  if (first.ok) return;
+
+  const warnings = pushWarnings(first.output);
+  const needsAccept = first.output.includes("--accept-data-loss");
+  if (needsAccept && warnings.length > 0 && warnings.every((w) => SAFE_PUSH_WARNING.test(w))) {
+    console.log(
+      `[ensure-db] ${warnings.length} aviso(s) só de unique novo (não apagam dados) — reaplicando com --accept-data-loss`,
+    );
+    const second = runCliCaptured("prisma", [...args, "--accept-data-loss"]);
+    if (second.ok) return;
+    throw new Error("[ensure-db] db push falhou ao criar unique novo — verifique valores duplicados na tabela indicada acima");
+  }
+
+  const unsafe = warnings.filter((w) => !SAFE_PUSH_WARNING.test(w));
+  throw new Error(
+    unsafe.length > 0
+      ? `[ensure-db] db push bloqueado por mudança destrutiva no schema:\n- ${unsafe.join("\n- ")}`
+      : "[ensure-db] db push falhou — veja a saída do Prisma acima",
+  );
+}
+
 /**
  * Aplica schema Prisma (+ seed se banco vazio) antes de aceitar tráfego.
  * Roda dentro do `node .../index.js` — independente de Docker/Nixpacks CMD.
  * Desligar: WMS_SKIP_DB_ENSURE=1
- * Aceitar avisos de perda de dados do push (ex.: unique novo), só no deploy que precisar: WMS_DB_PUSH_ACCEPT_DATA_LOSS=1
  */
 export async function ensureDatabaseReady(): Promise<void> {
   if (
@@ -63,39 +112,8 @@ export async function ensureDatabaseReady(): Promise<void> {
     );
   }
 
-  const acceptDataLossRaw = process.env.WMS_DB_PUSH_ACCEPT_DATA_LOSS;
-  const acceptDataLoss = ["1", "true", "yes", "on"].includes(
-    (acceptDataLossRaw ?? "").trim().replace(/^["']|["']$/g, "").toLowerCase(),
-  );
-  if (acceptDataLossRaw !== undefined && !acceptDataLoss) {
-    console.warn(
-      `[ensure-db] WMS_DB_PUSH_ACCEPT_DATA_LOSS=${JSON.stringify(acceptDataLossRaw)} não reconhecido — use 1`,
-    );
-  }
-  if (acceptDataLoss) {
-    console.warn(
-      "[ensure-db] WMS_DB_PUSH_ACCEPT_DATA_LOSS ligado — db push com --accept-data-loss; desligue após este deploy",
-    );
-  }
   console.log("[ensure-db] aplicando schema (prisma db push)...");
-  try {
-    runCli("prisma", [
-      "db",
-      "push",
-      "--skip-generate",
-      ...(acceptDataLoss ? ["--accept-data-loss"] : []),
-      "--schema",
-      schemaPath,
-    ]);
-  } catch (err) {
-    if (!acceptDataLoss) {
-      console.error(
-        "[ensure-db] db push falhou sem --accept-data-loss (variável WMS_DB_PUSH_ACCEPT_DATA_LOSS ausente neste processo). " +
-          "Se o aviso acima for seguro, defina WMS_DB_PUSH_ACCEPT_DATA_LOSS=1 nas variáveis de ambiente do serviço da API e reinicie.",
-      );
-    }
-    throw err;
-  }
+  pushSchema();
 
   const forceFullSeed =
     process.env.WMS_FORCE_FULL_SEED === "1" ||
