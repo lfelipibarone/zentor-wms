@@ -63,23 +63,39 @@ export async function ensureDatabaseReady(): Promise<void> {
     );
   }
 
-  const acceptDataLoss =
-    process.env.WMS_DB_PUSH_ACCEPT_DATA_LOSS === "1" ||
-    process.env.WMS_DB_PUSH_ACCEPT_DATA_LOSS === "true";
+  const acceptDataLossRaw = process.env.WMS_DB_PUSH_ACCEPT_DATA_LOSS;
+  const acceptDataLoss = ["1", "true", "yes", "on"].includes(
+    (acceptDataLossRaw ?? "").trim().replace(/^["']|["']$/g, "").toLowerCase(),
+  );
+  if (acceptDataLossRaw !== undefined && !acceptDataLoss) {
+    console.warn(
+      `[ensure-db] WMS_DB_PUSH_ACCEPT_DATA_LOSS=${JSON.stringify(acceptDataLossRaw)} não reconhecido — use 1`,
+    );
+  }
   if (acceptDataLoss) {
     console.warn(
       "[ensure-db] WMS_DB_PUSH_ACCEPT_DATA_LOSS ligado — db push com --accept-data-loss; desligue após este deploy",
     );
   }
   console.log("[ensure-db] aplicando schema (prisma db push)...");
-  runCli("prisma", [
-    "db",
-    "push",
-    "--skip-generate",
-    ...(acceptDataLoss ? ["--accept-data-loss"] : []),
-    "--schema",
-    schemaPath,
-  ]);
+  try {
+    runCli("prisma", [
+      "db",
+      "push",
+      "--skip-generate",
+      ...(acceptDataLoss ? ["--accept-data-loss"] : []),
+      "--schema",
+      schemaPath,
+    ]);
+  } catch (err) {
+    if (!acceptDataLoss) {
+      console.error(
+        "[ensure-db] db push falhou sem --accept-data-loss (variável WMS_DB_PUSH_ACCEPT_DATA_LOSS ausente neste processo). " +
+          "Se o aviso acima for seguro, defina WMS_DB_PUSH_ACCEPT_DATA_LOSS=1 nas variáveis de ambiente do serviço da API e reinicie.",
+      );
+    }
+    throw err;
+  }
 
   const forceFullSeed =
     process.env.WMS_FORCE_FULL_SEED === "1" ||
