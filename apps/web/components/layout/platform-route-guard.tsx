@@ -9,6 +9,7 @@ const ALLOWED_PREFIXES = ["/platform", "/login"];
 
 const OPERATIONAL_PREFIXES = [
   "/cadastros",
+  "/produtos",
   "/gestao-barracao",
   "/pedidos",
   "/ondas",

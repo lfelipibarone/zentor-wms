@@ -15,6 +15,7 @@ import {
   Users,
   Package,
   RotateCcw,
+  Tag,
 } from "lucide-react";
 
 export interface NavItem {
@@ -37,6 +38,12 @@ export const MAIN_NAV: NavItem[] = [
     label: "Cadastros",
     icon: ClipboardList,
     permission: Permission.REGISTERS_VIEW,
+  },
+  {
+    href: "/produtos",
+    label: "Produtos",
+    icon: Tag,
+    permission: Permission.PRODUCTS_MANAGE,
   },
   {
     href: "/gestao-barracao",

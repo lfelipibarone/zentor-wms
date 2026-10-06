@@ -41,6 +41,7 @@ import {
 } from "../services/warehouse-layout.js";
 import { registerWarehouseRoutes } from "./warehouse.js";
 import { registerFloorPlanRoutes } from "./floor-plan.js";
+import { registerProductRoutes } from "./products.js";
 import { registerApproachWaveRoutes } from "./approach-waves.js";
 import type { WavePartitionStrategy } from "../services/pick-wave-partition.js";
 import {
@@ -203,40 +204,7 @@ export async function webRoutes(app: FastifyInstance) {
   );
 
   // --- Produtos ---
-  app.get<{ Querystring: { q?: string; page?: string; pageSize?: string } }>(
-    "/api/products",
-    { preHandler: guard(Permission.PRODUCTS_MANAGE) },
-    async (request) => {
-      const q = request.query.q?.trim();
-      const { page, pageSize, skip, take } = parsePagination(request.query);
-      const tw = tenantWhere(request);
-      const where: Prisma.ProductWhereInput = await selectableProductWhere(
-        tw.tenantId,
-        {
-          ...tw,
-          ...(q
-            ? {
-                OR: [
-                  { sku: { contains: q, mode: "insensitive" } },
-                  { name: { contains: q, mode: "insensitive" } },
-                  { barcode: { contains: q, mode: "insensitive" } },
-                ],
-              }
-            : {}),
-        },
-      );
-      const [products, total] = await Promise.all([
-        prisma.product.findMany({
-          where,
-          orderBy: { sku: "asc" },
-          skip,
-          take,
-        }),
-        prisma.product.count({ where }),
-      ]);
-      return { products, pagination: buildPaginationMeta(total, page, pageSize) };
-    },
-  );
+  registerProductRoutes(app, guard);
 
   app.post<{
     Body: {
@@ -274,44 +242,6 @@ export async function webRoutes(app: FastifyInstance) {
       } catch {
         return reply.status(409).send({ error: "SKU ou código de barras já existe" });
       }
-    },
-  );
-
-  app.patch<{
-    Params: { id: string };
-    Body: {
-      name?: string;
-      barcode?: string;
-      requiresItemScan?: boolean;
-      active?: boolean;
-      imageUrl?: string | null;
-      unit?: string | null;
-      weight?: number | null;
-    };
-  }>(
-    "/api/products/:id",
-    { preHandler: guard(Permission.PRODUCTS_MANAGE) },
-    async (request, reply) => {
-      const b = request.body ?? {};
-      const product = await prisma.product.update({
-        where: { id: request.params.id },
-        data: {
-          ...(b.name !== undefined ? { name: b.name.trim() } : {}),
-          ...(b.barcode !== undefined
-            ? { barcode: b.barcode?.trim() || null }
-            : {}),
-          ...(b.requiresItemScan !== undefined
-            ? { requiresItemScan: b.requiresItemScan }
-            : {}),
-          ...(b.active !== undefined ? { active: b.active } : {}),
-          ...(b.imageUrl !== undefined
-            ? { imageUrl: b.imageUrl?.trim() || null }
-            : {}),
-          ...(b.unit !== undefined ? { unit: b.unit?.trim() || null } : {}),
-          ...(b.weight !== undefined ? { weight: b.weight } : {}),
-        },
-      });
-      return { product };
     },
   );
 
