@@ -30,10 +30,6 @@ export default function RootLayout() {
               options={{ headerShown: false }}
             />
             <Stack.Screen
-              name="correcao/index"
-              options={{ headerShown: false }}
-            />
-            <Stack.Screen
               name="ressuprimento/index"
               options={{ headerShown: false }}
             />
@@ -52,10 +48,6 @@ export default function RootLayout() {
             <Stack.Screen
               name="stocking/index"
               options={{ title: "Abastecer estoque" }}
-            />
-            <Stack.Screen
-              name="replenishment/index"
-              options={{ title: "Solicitar reabastecimento" }}
             />
             <Stack.Screen
               name="purchase-receipt"

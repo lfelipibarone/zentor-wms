@@ -34,14 +34,8 @@ export default function HomeScreen() {
         onPress={() => router.push("/atualizar-gondola")}
       />
       <Text style={styles.putawayHint}>
-        Leia o QR do produto e informe a % da gôndola
+        Leia o QR do produto ou a gôndola e informe a %
       </Text>
-
-      <FactoryButton
-        label="Correção"
-        variant="secondary"
-        onPress={() => router.push("/correcao")}
-      />
 
       <FactoryButton
         label="Ressuprimento"

@@ -22,7 +22,7 @@ function normalizeCode(code: string) {
   return code.trim().toUpperCase();
 }
 
-/** Lê o QR do produto, mostra a(s) gôndola(s) dele e grava a % que está. */
+/** Lê o QR do produto (ou o código da gôndola) e grava a % que a gôndola está. */
 export default function AtualizarGondolaScreen() {
   const [scannerOpen, setScannerOpen] = useState(false);
   const [codeDraft, setCodeDraft] = useState("");
@@ -44,12 +44,39 @@ export default function AtualizarGondolaScreen() {
     }
   };
 
-  const loadProduct = async (raw: string) => {
+  /** Aceita o código da gôndola ou o QR do produto. */
+  const loadCode = async (raw: string) => {
     const code = normalizeCode(raw);
     if (!code) return;
     setLoading(true);
     setMessage(null);
     try {
+      const loc = await api.getLocationByBarcode(code).catch((e) => {
+        if (e instanceof ApiError && e.status === 404) return null;
+        throw e;
+      });
+      if (loc) {
+        if (loc.type !== "PICK_FACE") {
+          showErrorAlert("Isso é um pulmão. A % do pulmão é informada na armazenagem e no ressuprimento.");
+          return;
+        }
+        if (!loc.product) {
+          showErrorAlert(`Gôndola ${loc.label} não tem SKU associado.`);
+          return;
+        }
+        const option: ProductLocationOption = {
+          id: loc.id,
+          barcode: loc.barcode,
+          label: loc.label,
+          fillPercent: loc.fillPercent,
+          minPercent: loc.minPercent,
+          isSuggested: true,
+        };
+        setProduct(loc.product);
+        setFaces([option]);
+        setFace(option);
+        return;
+      }
       const res = await api.listProductLocations(code, "PICK_FACE");
       setProduct(res.product);
       setFaces(res.locations);
@@ -58,7 +85,13 @@ export default function AtualizarGondolaScreen() {
         setMessage(`${res.product.sku} não tem gôndola cadastrada.`);
       }
     } catch (e) {
-      showErrorAlert(e instanceof ApiError ? e.message : "Produto não encontrado");
+      showErrorAlert(
+        e instanceof ApiError && e.status === 404
+          ? "Código não encontrado: não é gôndola nem produto cadastrado."
+          : e instanceof ApiError
+            ? e.message
+            : "Erro ao buscar o código",
+      );
     } finally {
       setLoading(false);
     }
@@ -87,7 +120,7 @@ export default function AtualizarGondolaScreen() {
   return (
     <ScreenShell scroll backToHome title="Atualizar gôndola">
       <Text style={styles.subtitle}>
-        Leia o QR do produto e informe a % que a gôndola dele está.
+        Leia o QR do produto ou o código da gôndola e informe a % que ela está.
       </Text>
 
       {message ? (
@@ -99,25 +132,25 @@ export default function AtualizarGondolaScreen() {
       {!product ? (
         <>
           <FactoryButton
-            label="Ler QR do produto"
+            label="Ler produto ou gôndola"
             onPress={() => setScannerOpen(true)}
             loading={loading}
           />
-          <Text style={styles.or}>ou digite o SKU / código</Text>
+          <Text style={styles.or}>ou digite o SKU / código da gôndola</Text>
           <TextInput
             style={styles.input}
             value={codeDraft}
             onChangeText={setCodeDraft}
-            placeholder="SKU / código de barras"
+            placeholder="SKU, EAN ou código da gôndola"
             autoCapitalize="characters"
-            onSubmitEditing={() => loadProduct(codeDraft)}
+            onSubmitEditing={() => loadCode(codeDraft)}
           />
           <FactoryButton
             label="Buscar"
             variant="secondary"
             disabled={!codeDraft.trim()}
             loading={loading}
-            onPress={() => loadProduct(codeDraft)}
+            onPress={() => loadCode(codeDraft)}
           />
         </>
       ) : (
@@ -174,21 +207,21 @@ export default function AtualizarGondolaScreen() {
             </>
           ) : null}
 
-          <FactoryButton label="Ler outro produto" variant="secondary" onPress={() => reset(true)} />
+          <FactoryButton label="Ler outro código" variant="secondary" onPress={() => reset(true)} />
         </>
       )}
 
       {!product && message?.includes("✓") ? (
-        <FactoryButton label="Ler próximo produto" onPress={() => reset(true)} />
+        <FactoryButton label="Ler próxima gôndola" onPress={() => reset(true)} />
       ) : null}
 
       <BarcodeScanner
         visible={scannerOpen}
-        title="QR do produto"
-        hint="Aponte para o QR / código de barras do produto"
+        title="Produto ou gôndola"
+        hint="Aponte para o QR do produto ou a etiqueta da gôndola"
         onScan={(code) => {
           setScannerOpen(false);
-          void loadProduct(code);
+          void loadCode(code);
         }}
         onClose={() => setScannerOpen(false)}
       />

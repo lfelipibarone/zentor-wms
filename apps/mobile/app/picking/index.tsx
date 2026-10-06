@@ -335,7 +335,7 @@ function OrdersQueuePanel({
             loading={refreshing}
           />
           <FactoryButton
-            label="Atualizar gôndola (QR do produto)"
+            label="Atualizar gôndola"
             variant="secondary"
             onPress={() => router.push("/atualizar-gondola")}
           />
