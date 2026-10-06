@@ -35,8 +35,8 @@ export type ReconcileOpts = {
   waveLineId?: string;
 };
 
-function formatLocation(loc: { corridor: string; row: string; barcode: string }) {
-  return `${loc.corridor}-${loc.row} · ${loc.barcode}`;
+function formatLocation(loc: { barcode: string }) {
+  return loc.barcode;
 }
 
 export function emptyFaceHint(loc: { fillPercent: number } | null | undefined): string | null {

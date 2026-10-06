@@ -62,9 +62,7 @@ export function scorePackingUrgency(
 export function formatRouteLabel(
   loc: LocationLike & { barcode?: string },
 ): string {
-  return loc.barcode
-    ? `${loc.corridor}-${loc.row} · ${loc.barcode}`
-    : `${loc.corridor}-${loc.row}`;
+  return loc.barcode || `${loc.corridor}-${loc.row}`;
 }
 
 /** Primeira gôndola na rota entre itens já separados. */

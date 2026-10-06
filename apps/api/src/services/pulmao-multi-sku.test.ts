@@ -28,7 +28,7 @@ test("armazenagem: item guardado em dois pulmões soma as guardas do mesmo pulm�
       ["P-02", 4],
     ],
   );
-  assert.equal(stored[0]!.label, "B1-P-1 · P-01");
+  assert.equal(stored[0]!.label, "P-01");
 });
 
 test("armazenagem: movimentação sem pulmão de destino é ignorada", () => {

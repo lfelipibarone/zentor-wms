@@ -1,4 +1,4 @@
-import { FloorElementType, LocationFace } from "@prisma/client";
+import { FloorElementType } from "@prisma/client";
 import { prisma } from "../lib/prisma.js";
 import {
   gondolaEstanteIds,
@@ -262,8 +262,8 @@ export async function validateAllFloorPlans(tenantId: string) {
   return { plans: results, ok: plans.length > 0 && results.every((r) => r.validation.ok) };
 }
 
-function locationLabel(loc: { corridor: string; row: string; face: LocationFace; barcode: string }) {
-  return `${loc.corridor}-${loc.row}${loc.face === LocationFace.B ? "-B" : ""} · ${loc.barcode}`;
+function locationLabel(loc: { barcode: string }) {
+  return loc.barcode;
 }
 
 export async function previewFloorPlanRoute(

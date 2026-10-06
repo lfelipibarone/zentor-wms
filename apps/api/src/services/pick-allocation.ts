@@ -9,8 +9,8 @@ export type PickSegment = {
   label: string;
 };
 
-function formatLocation(loc: { corridor: string; row: string; barcode: string }) {
-  return `${loc.corridor}-${loc.row} · ${loc.barcode}`;
+function formatLocation(loc: { barcode: string }) {
+  return loc.barcode;
 }
 
 /**
@@ -42,6 +42,6 @@ export async function allocateQuantityAcrossPickFaces(
 export function buildMultiGondolaHint(segments: PickSegment[]): string | null {
   if (segments.length <= 1) return null;
   return segments
-    .map((s) => `${s.quantity} un. em ${s.corridor}-${s.row}`)
+    .map((s) => `${s.quantity} un. em ${s.barcode}`)
     .join(" · ");
 }

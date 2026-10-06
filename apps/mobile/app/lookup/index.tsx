@@ -34,8 +34,7 @@ export default function LookupScreen() {
 
       {data ? (
         <View style={styles.result}>
-          <Text style={styles.location}>{data.label}</Text>
-          <Text style={styles.barcode}>{data.barcode}</Text>
+          <Text style={styles.location}>{data.barcode}</Text>
 
           {data.type === "PULMAO" ? (
             <>
@@ -113,11 +112,6 @@ const styles = StyleSheet.create({
     fontWeight: "900",
     color: theme.primary,
     textAlign: "center",
-  },
-  barcode: {
-    textAlign: "center",
-    color: theme.textMuted,
-    fontSize: typography.body,
   },
   divider: {
     textAlign: "center",

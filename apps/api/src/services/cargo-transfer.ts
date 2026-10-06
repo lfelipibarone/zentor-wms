@@ -18,12 +18,8 @@ export class CargoTransferError extends Error {
   }
 }
 
-function formatLocationLabel(loc: {
-  corridor: string;
-  row: string;
-  barcode: string;
-}) {
-  return `${loc.corridor}-${loc.row} (${loc.barcode})`;
+function formatLocationLabel(loc: { barcode: string }) {
+  return loc.barcode;
 }
 
 type TransferRow = {

@@ -322,9 +322,10 @@ export default function PickScreen() {
 
   const requiresScan = next.product?.requiresItemScan ?? false;
   const locLabel = next.pickLocation
-    ? (next.pickLocation.label ??
-      `${next.pickLocation.corridor}-${next.pickLocation.row}`)
-    : "—";
+    ? next.pickLocation.barcode ||
+      next.pickLocation.label ||
+      `${next.pickLocation.corridor}-${next.pickLocation.row}`
+    : "Sem endereço";
 
   return (
     <ScreenShell
@@ -351,9 +352,6 @@ export default function PickScreen() {
       <View style={styles.locationCard}>
         <Text style={styles.locLabel}>VÁ ATÉ</Text>
         <Text style={styles.locValue}>{locLabel}</Text>
-        <Text style={styles.locBarcode}>
-          {next.pickLocation?.barcode ?? "Sem barcode"}
-        </Text>
         {next.pickLocation?.fillPercent != null ? (
           <Text style={styles.locStock}>
             Gôndola: {formatPercent(next.pickLocation.fillPercent)}
@@ -563,12 +561,6 @@ const styles = StyleSheet.create({
     fontWeight: "900",
     color: theme.primaryText,
     textAlign: "center",
-  },
-  locBarcode: {
-    fontSize: typography.body,
-    color: theme.primaryText,
-    opacity: 0.8,
-    marginTop: spacing.xs,
   },
   locStock: {
     color: theme.primaryText,

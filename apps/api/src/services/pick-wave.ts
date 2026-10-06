@@ -34,8 +34,8 @@ import { getRouteEngine } from "./route-engine/index.js";
 import { loadApproachWaveDefs } from "./approach-waves/store.js";
 import { planWaveParts, sortBySequence, type PartPlan } from "./approach-waves/parts.js";
 
-function formatLocation(loc: { corridor: string; row: string; barcode: string }) {
-  return `${loc.corridor}-${loc.row} · ${loc.barcode}`;
+function formatLocation(loc: { barcode: string }) {
+  return loc.barcode;
 }
 
 export type WaveLineBuild = {

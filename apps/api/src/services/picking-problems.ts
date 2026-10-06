@@ -269,7 +269,7 @@ export async function listProblemWaves(tenantId: string) {
         id: l.id,
         sku: l.product.sku,
         locationBarcode: l.pickLocation.barcode,
-        routeLabel: `${l.pickLocation.corridor}-${l.pickLocation.row}`,
+        routeLabel: l.pickLocation.barcode,
         quantityPicked: l.quantityPicked,
         quantityTotal: l.quantityTotal,
         sortStatus: l.sortStatus,

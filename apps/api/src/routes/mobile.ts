@@ -61,8 +61,8 @@ import {
   storePutawayItem,
 } from "../services/putaway.js";
 
-function formatLocation(loc: { corridor: string; row: string; barcode: string }) {
-  return `${loc.corridor}-${loc.row} · ${loc.barcode}`;
+function formatLocation(loc: { barcode: string }) {
+  return loc.barcode;
 }
 
 export async function mobileRoutes(app: FastifyInstance) {
@@ -1099,7 +1099,7 @@ export async function mobileRoutes(app: FastifyInstance) {
             corridor: loc.corridor,
             row: loc.row,
             fillPercent: loc.fillPercent,
-            label: `${loc.corridor}-${loc.row}`,
+            label: loc.barcode,
           },
         };
       } catch (e) {

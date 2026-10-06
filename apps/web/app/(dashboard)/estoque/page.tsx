@@ -152,12 +152,7 @@ export default function EstoquePage() {
                     <TableCell>
                       {LOCATION_TYPE_LABEL[l.type] ?? l.type}
                     </TableCell>
-                    <TableCell className="font-mono text-sm">
-                      {l.corridor}-{l.row}
-                      <span className="block text-xs text-muted-foreground">
-                        {l.barcode}
-                      </span>
-                    </TableCell>
+                    <TableCell className="font-mono text-sm">{l.barcode}</TableCell>
                     <TableCell>
                       <PercentBar
                         percent={l.fillPercent}

@@ -18,8 +18,8 @@ export class LocationAdjustError extends Error {
   }
 }
 
-function formatLocation(loc: { corridor: string; row: string; barcode: string }) {
-  return `${loc.corridor}-${loc.row} · ${loc.barcode}`;
+function formatLocation(loc: { barcode: string }) {
+  return loc.barcode;
 }
 
 export type AdjustLocationInput = {

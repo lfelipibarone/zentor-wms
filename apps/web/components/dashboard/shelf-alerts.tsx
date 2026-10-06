@@ -59,12 +59,7 @@ export function ShelfAlerts({ alerts }: ShelfAlertsProps) {
                 const critical = row.fillPercent <= 0;
                 return (
                   <TableRow key={row.locationId}>
-                    <TableCell className="font-mono font-semibold">
-                      {row.corridor}-{row.row}
-                      <span className="block text-xs font-normal text-muted-foreground">
-                        {row.barcode}
-                      </span>
-                    </TableCell>
+                    <TableCell className="font-mono font-semibold">{row.barcode}</TableCell>
                     <TableCell>
                       <PercentBar percent={row.fillPercent} minPercent={row.minPercent} />
                     </TableCell>

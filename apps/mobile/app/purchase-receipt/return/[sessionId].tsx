@@ -172,7 +172,7 @@ export default function ReturnReceiptCheckScreen() {
               <View style={styles.locCard}>
                 <Text style={styles.locTitle}>{selectedPulmao.label}</Text>
                 <Text style={styles.locMeta}>
-                  {selectedPulmao.barcode} · ocupação {selectedPulmao.fillPercent}%
+                  Ocupação {selectedPulmao.fillPercent}%
                 </Text>
                 <PulmaoStockList stocks={selectedPulmao.stocks} />
               </View>
