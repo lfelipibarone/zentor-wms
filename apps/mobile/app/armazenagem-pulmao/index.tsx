@@ -4,6 +4,7 @@ import { BarcodeScanner } from "@/components/BarcodeScanner";
 import { FactoryButton } from "@/components/FactoryButton";
 import { QuantityInput } from "@/components/QuantityInput";
 import { ProductThumbnail } from "@/components/ProductThumbnail";
+import { PulmaoStockList } from "@/components/PulmaoStockList";
 import { ScreenShell } from "@/components/ScreenShell";
 import {
   api,
@@ -68,7 +69,7 @@ export default function ArmazenagemPulmaoScreen() {
 
   const confirmStock = async (qty: number) => {
     if (!pulmaoBarcode) return;
-    const code = productCode.trim() || pulmao?.product?.sku;
+    const code = productCode.trim();
     if (!code) {
       showErrorAlert("Informe o produto");
       return;
@@ -81,7 +82,7 @@ export default function ArmazenagemPulmaoScreen() {
         quantity: qty,
       });
       showInfoAlert(
-        `+${result.added} un. · saldo ${result.location.currentQuantity} em ${result.location.barcode}`,
+        `+${result.added} un. de ${result.location.product.sku} em ${result.location.barcode} · saldo do SKU ${result.location.productQuantity}`,
       );
       await loadPulmao(pulmaoBarcode);
       setProductCode("");
@@ -149,9 +150,7 @@ export default function ArmazenagemPulmaoScreen() {
               onPress={() => loadPulmao(loc.barcode)}
             >
               <Text style={styles.optionLabel}>{loc.label}</Text>
-              <Text style={styles.meta}>
-                {loc.currentQuantity}/{loc.capacity} un.
-              </Text>
+              <Text style={styles.meta}>{loc.currentQuantity} un. deste SKU</Text>
             </Pressable>
           ))}
         </>
@@ -159,21 +158,9 @@ export default function ArmazenagemPulmaoScreen() {
         <>
           <View style={styles.card}>
             <Text style={styles.locTitle}>{pulmao.label}</Text>
-            <Text style={styles.meta}>
-              Saldo: {pulmao.currentQuantity} / cap. {pulmao.capacity}
-            </Text>
-            {pulmao.product ? (
-              <View style={styles.productRow}>
-                <ProductThumbnail
-                  imageUrl={pulmao.product.imageUrl ?? searchProductImageUrl}
-                  alt={pulmao.product.name}
-                />
-                <View style={styles.productInfo}>
-                  <Text style={styles.sku}>Alocado: {pulmao.product.sku}</Text>
-                  <Text style={styles.productName}>{pulmao.product.name}</Text>
-                </View>
-              </View>
-            ) : searchProductImageUrl || productCode ? (
+            <Text style={styles.meta}>Saldo total: {pulmao.currentQuantity} un.</Text>
+            <PulmaoStockList stocks={pulmao.stocks} />
+            {searchProductImageUrl || productCode ? (
               <View style={styles.productRow}>
                 <ProductThumbnail
                   imageUrl={searchProductImageUrl}
@@ -198,11 +185,7 @@ export default function ArmazenagemPulmaoScreen() {
             placeholder="SKU / código de barras"
             autoCapitalize="characters"
           />
-          <QuantityInput
-            label="Quantidade"
-            max={pulmao.capacity - pulmao.currentQuantity}
-            onConfirm={confirmStock}
-          />
+          <QuantityInput label="Quantidade" onConfirm={confirmStock} />
           <FactoryButton label="Outra posição" variant="secondary" onPress={reset} />
         </>
       )}

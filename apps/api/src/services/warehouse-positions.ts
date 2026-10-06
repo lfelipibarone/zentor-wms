@@ -1,6 +1,10 @@
 import { LocationFace, LocationType } from "@prisma/client";
 import { prisma } from "../lib/prisma.js";
-import { assertMaxPickFaceLocations } from "./location-rules.js";
+import {
+  assertLocationTypeChange,
+  assertMaxPickFaceLocations,
+  assertPulmaoWithoutFixedSku,
+} from "./location-rules.js";
 import { resumePausedOrdersAfterPickFace } from "./product-locations.js";
 import {
   ensureWarehouseHierarchy,
@@ -147,6 +151,7 @@ export async function createWarehousePosition(
     { row: linhaCode },
   );
 
+  assertPulmaoWithoutFixedSku(input.type, input.productId);
   await assertMaxPickFaceLocations(
     tenantId,
     input.productId,
@@ -233,7 +238,7 @@ export async function createWarehousePosition(
         productId: input.productId || null,
         capacity: input.capacity,
         minThreshold: input.minThreshold ?? 0,
-        currentQuantity: input.currentQuantity ?? 0,
+        currentQuantity: input.type === LocationType.PULMAO ? 0 : (input.currentQuantity ?? 0),
         active: input.active ?? true,
       },
       include: {
@@ -304,8 +309,14 @@ export async function updateWarehousePosition(
   if (!location) throw new Error("Posição sem localização vinculada");
 
   const type = input.type ?? location.type;
+  assertLocationTypeChange(location, input.type);
+  assertPulmaoWithoutFixedSku(type, input.productId);
   const productId =
-    input.productId !== undefined ? input.productId : location.productId;
+    type === LocationType.PULMAO
+      ? null
+      : input.productId !== undefined
+        ? input.productId
+        : location.productId;
 
   await assertMaxPickFaceLocations(
     tenantId,
@@ -402,12 +413,14 @@ export async function updateWarehousePosition(
         proximityLinhaId: layout.proximityLinhaId,
         colunaId: layout.colunaId,
         ...(input.type !== undefined ? { type: input.type } : {}),
-        ...(input.productId !== undefined ? { productId: input.productId } : {}),
+        ...(input.productId !== undefined || type === LocationType.PULMAO
+          ? { productId }
+          : {}),
         ...(input.capacity !== undefined ? { capacity: input.capacity } : {}),
         ...(input.minThreshold !== undefined
           ? { minThreshold: input.minThreshold }
           : {}),
-        ...(input.currentQuantity !== undefined
+        ...(input.currentQuantity !== undefined && type !== LocationType.PULMAO
           ? { currentQuantity: input.currentQuantity }
           : {}),
         ...(input.active !== undefined ? { active: input.active } : {}),

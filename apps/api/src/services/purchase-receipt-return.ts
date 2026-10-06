@@ -7,6 +7,7 @@ import {
 } from "@prisma/client";
 import { prisma } from "../lib/prisma.js";
 import { findProductByBarcode } from "./location-stock.js";
+import { addPulmaoStock } from "./pulmao-inventory.js";
 
 export async function startReturnReceiptSession(params: {
   tenantId: string;
@@ -166,29 +167,23 @@ export async function completeReturnReceipt(params: {
           tenantId: session.tenantId,
           OR: [
             { sku: it.productCode ?? "" },
-            { barcode: it.barcode ?? undefined },
+            ...(it.barcode ? [{ barcode: it.barcode }] : []),
           ],
         },
       });
       if (!product) continue;
 
-      const newQty = Math.min(loc.capacity, loc.currentQuantity + qty);
-      const deposited = newQty - loc.currentQuantity;
-      if (deposited <= 0) continue;
-
-      await tx.location.update({
-        where: { id: loc.id },
-        data: {
-          currentQuantity: newQty,
-          productId: product.id,
-        },
-      });
+      await addPulmaoStock(
+        tx,
+        { tenantId: session.tenantId, locationId: loc.id, productId: product.id },
+        qty,
+      );
 
       await tx.inventoryMovement.create({
         data: {
           tenantId: session.tenantId,
           type: InventoryMovementType.ENTRY,
-          quantity: deposited,
+          quantity: qty,
           userId: params.userId,
           productId: product.id,
           toLocationId: loc.id,

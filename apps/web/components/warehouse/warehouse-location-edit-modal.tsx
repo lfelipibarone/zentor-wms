@@ -68,6 +68,7 @@ export function WarehouseLocationEditModal({
   );
   const [saving, setSaving] = useState(false);
   const [err, setErr] = useState<string | null>(null);
+  const isPulmao = type === "PULMAO";
 
   useEffect(() => {
     setProductId(currentProduct?.id ?? "");
@@ -112,10 +113,14 @@ export function WarehouseLocationEditModal({
         face,
         barcode: barcode.trim(),
         type,
-        productId: productId || null,
-        capacity: Number(capacity) || 100,
-        minThreshold: Number(minThreshold) || 0,
-        currentQuantity: Number(currentQuantity) || 0,
+        ...(isPulmao
+          ? { productId: null }
+          : {
+              productId: productId || null,
+              capacity: Number(capacity) || 100,
+              minThreshold: Number(minThreshold) || 0,
+              currentQuantity: Number(currentQuantity) || 0,
+            }),
         active,
       });
       await onSaved();
@@ -195,6 +200,17 @@ export function WarehouseLocationEditModal({
             />
           </WarehouseFormStep>
 
+          {isPulmao ? (
+            <WarehouseFormStep step={2} title="SKUs no pulmão">
+              <p className="rounded-lg bg-slate-50 px-3 py-2 text-sm text-slate-600">
+                O pulmão aceita vários SKUs e não tem SKU fixo. O saldo de cada SKU é
+                registrado na armazenagem pelo aplicativo.
+                <span className="mt-1 block font-semibold text-slate-800">
+                  Total guardado hoje: {row.location?.currentQuantity ?? 0} un.
+                </span>
+              </p>
+            </WarehouseFormStep>
+          ) : (
           <WarehouseFormStep step={2} title="SKU associado">
           <div className="space-y-1">
             <WarehouseSkuSearchSelect
@@ -267,6 +283,7 @@ export function WarehouseLocationEditModal({
             </div>
           ) : null}
           </WarehouseFormStep>
+          )}
 
           <label className="flex items-center gap-2 text-sm">
             <input

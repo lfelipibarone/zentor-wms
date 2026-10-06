@@ -15,6 +15,7 @@ import { LOCATION_TYPE_LABEL } from "@/lib/labels";
 import { Pagination } from "@/components/ui/pagination";
 import type { PaginationMeta } from "@/lib/pagination";
 import { fetchStockLocations } from "@/lib/api/operations";
+import { PulmaoStocksCell } from "@/components/ops/pulmao-stocks-cell";
 import { cn } from "@/lib/utils";
 
 type TypeFilter = "" | "PULMAO" | "PICK_FACE";
@@ -129,12 +130,15 @@ export default function EstoquePage() {
             </TableHeader>
             <TableBody>
               {locations.map((l) => {
+                const isPulmao = l.type === "PULMAO";
                 const available = l.capacity - l.currentQuantity;
-                const alert = l.currentQuantity <= l.minThreshold;
+                const alert = !isPulmao && l.currentQuantity <= l.minThreshold;
                 return (
                   <TableRow key={l.id} className={alert ? "bg-amber-50" : ""}>
                     <TableCell>
-                      {l.product ? (
+                      {isPulmao ? (
+                        <PulmaoStocksCell stocks={l.stocks} />
+                      ) : l.product ? (
                         <>
                           <span className="font-mono text-sm font-medium">
                             {l.product.sku}
@@ -160,15 +164,15 @@ export default function EstoquePage() {
                       {l.currentQuantity}
                     </TableCell>
                     <TableCell className="text-right tabular-nums">
-                      {available}
+                      {isPulmao ? "—" : available}
                     </TableCell>
                     <TableCell className="text-right tabular-nums">
-                      {l.capacity}
+                      {isPulmao ? "Sem limite" : l.capacity}
                     </TableCell>
                     <TableCell className="text-right tabular-nums">
-                      {l.minThreshold}
+                      {isPulmao ? "—" : l.minThreshold}
                     </TableCell>
-                    <TableCell>{alert ? "Repor" : "OK"}</TableCell>
+                    <TableCell>{isPulmao ? "—" : alert ? "Repor" : "OK"}</TableCell>
                   </TableRow>
                 );
               })}

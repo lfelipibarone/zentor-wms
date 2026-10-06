@@ -51,8 +51,8 @@ export function PulmaoLocationPicker({
       showErrorAlert("Bipe ou selecione uma posição de pulmão");
       return;
     }
-    if (productId && loc.product?.id && loc.product.id !== productId) {
-      showErrorAlert("Produto não corresponde a esta posição");
+    if (productId && !loc.stocks.some((s) => s.product.id === productId)) {
+      showErrorAlert(`Pulmão ${loc.barcode} não tem saldo deste produto`);
       return;
     }
     onSelect(loc);
@@ -144,9 +144,7 @@ export function PulmaoLocationPicker({
             {loc.label}
             {loc.isSuggested ? " ★" : ""}
           </Text>
-          <Text style={styles.meta}>
-            {loc.currentQuantity}/{loc.capacity} un.
-          </Text>
+          <Text style={styles.meta}>{loc.currentQuantity} un. deste SKU</Text>
         </Pressable>
       ))}
 

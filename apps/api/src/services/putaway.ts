@@ -7,6 +7,8 @@ import {
 } from "@prisma/client";
 import { prisma } from "../lib/prisma.js";
 import { findNfItemByScannedCode } from "./location-stock.js";
+import { formatRouteLabel } from "./packing-queue-sort.js";
+import { addPulmaoStock } from "./pulmao-inventory.js";
 import {
   getRouteEngine,
   LegacyRouteEngine,
@@ -22,6 +24,62 @@ const putawayLocationSelect = {
   estanteId: true,
   face: true,
 } satisfies Prisma.LocationSelect;
+
+export const putawayItemInclude = {
+  location: { select: putawayLocationSelect },
+  movements: {
+    where: { type: InventoryMovementType.ENTRY },
+    orderBy: { createdAt: "asc" },
+    select: { quantity: true, toLocation: { select: putawayLocationSelect } },
+  },
+} satisfies Prisma.PutawayItemInclude;
+
+type PutawayLocation = Prisma.LocationGetPayload<{ select: typeof putawayLocationSelect }>;
+
+export type PutawayStoredLocation = {
+  locationId: string;
+  barcode: string;
+  label: string;
+  quantity: number;
+};
+
+/** Pulmões onde o item foi guardado (na ordem da primeira guarda), somando as guardas no mesmo pulmão. */
+export function summarizeStoredLocations(
+  movements: Array<{ quantity: number; toLocation: PutawayLocation | null }>,
+): PutawayStoredLocation[] {
+  const byLocation = new Map<string, PutawayStoredLocation>();
+  for (const m of movements) {
+    if (!m.toLocation) continue;
+    const current = byLocation.get(m.toLocation.id);
+    if (current) {
+      current.quantity += m.quantity;
+    } else {
+      byLocation.set(m.toLocation.id, {
+        locationId: m.toLocation.id,
+        barcode: m.toLocation.barcode,
+        label: formatRouteLabel(m.toLocation),
+        quantity: m.quantity,
+      });
+    }
+  }
+  return [...byLocation.values()];
+}
+
+/** Pulmões do item; guardas de antes do vínculo com o item só registraram o último pulmão. */
+export function storedLocationsOf(
+  item: Prisma.PutawayItemGetPayload<{ include: typeof putawayItemInclude }>,
+): PutawayStoredLocation[] {
+  const stored = summarizeStoredLocations(item.movements);
+  if (stored.length === 0 && item.location && Number(item.quantityStored) > 0) {
+    stored.push({
+      locationId: item.location.id,
+      barcode: item.location.barcode,
+      label: formatRouteLabel(item.location),
+      quantity: Number(item.quantityStored),
+    });
+  }
+  return stored;
+}
 
 export async function listPutawayQueue(tenantId?: string) {
   const sessions = await prisma.purchaseReceiptSession.findMany({
@@ -81,11 +139,7 @@ async function ensurePutawaySession(purchaseReceiptId: string, userId: string) {
     return prisma.putawaySession.findUnique({
       where: { id: receipt.putaway.id },
       include: {
-        items: {
-          include: {
-            location: { select: putawayLocationSelect },
-          },
-        },
+        items: { include: putawayItemInclude },
         purchaseReceipt: { include: { items: true } },
       },
     });
@@ -109,7 +163,7 @@ async function ensurePutawaySession(purchaseReceiptId: string, userId: string) {
       },
     },
     include: {
-      items: { include: { location: { select: putawayLocationSelect } } },
+      items: { include: putawayItemInclude },
       purchaseReceipt: { include: { items: true } },
     },
   });
@@ -195,6 +249,7 @@ async function formatPutaway(
       quantityExpected: Number(it.quantityExpected),
       quantityStored: Number(it.quantityStored),
       locationBarcode: it.location?.barcode ?? null,
+      storedLocations: storedLocationsOf(it),
       completed: Number(it.quantityStored) >= Number(it.quantityExpected),
     })),
     nextItem: next
@@ -229,7 +284,7 @@ export async function getPutawaySession(sessionId: string) {
   const session = await prisma.putawaySession.findUnique({
     where: { id: sessionId },
     include: {
-      items: { include: { location: { select: { barcode: true } } } },
+      items: { include: putawayItemInclude },
       purchaseReceipt: { include: { items: true } },
     },
   });
@@ -249,16 +304,19 @@ export async function storePutawayItem(params: {
     where: { id: params.sessionId },
     include: {
       purchaseReceipt: { select: { tenantId: true } },
-      items: { include: { location: { select: { barcode: true } } } },
+      items: true,
     },
   });
   if (!session) throw new Error("Sessão não encontrada");
+  if (session.status === PutawaySessionStatus.COMPLETED) {
+    throw new Error("Armazenagem já finalizada");
+  }
   const tenantId = session.purchaseReceipt.tenantId;
 
   const location = await prisma.location.findFirst({
     where: {
       tenantId,
-      barcode: params.locationBarcode.trim(),
+      barcode: { equals: params.locationBarcode.trim(), mode: "insensitive" },
       type: LocationType.PULMAO,
       active: true,
     },
@@ -311,45 +369,41 @@ export async function storePutawayItem(params: {
 
   const storeStartedAt = new Date();
 
-  await prisma.$transaction([
-    prisma.putawayItem.update({
+  const productId = product.id;
+  await prisma.$transaction(async (tx) => {
+    await tx.putawayItem.update({
       where: { id: item.id },
       data: {
         quantityStored: { increment: qty },
         locationId: location.id,
       },
-    }),
-    prisma.location.update({
-      where: { id: location.id },
-      data: {
-        currentQuantity: { increment: qty },
-        productId: product.id,
-      },
-    }),
-    prisma.inventoryMovement.create({
+    });
+    await addPulmaoStock(tx, { tenantId, locationId: location.id, productId }, qty);
+    await tx.inventoryMovement.create({
       data: {
         tenantId,
         type: InventoryMovementType.ENTRY,
         quantity: qty,
         userId: params.userId,
-        productId: product.id,
+        productId,
         toLocationId: location.id,
         putawaySessionId: params.sessionId,
+        putawayItemId: item.id,
         purchaseReceiptSessionId: session.purchaseReceiptId,
         startedAt: storeStartedAt,
         completedAt: storeStartedAt,
         reference: session.purchaseReceiptId,
         notes: "Armazenagem pós-recebimento",
       },
-    }),
-    prisma.putawayTimeLog.create({
+    });
+    await tx.putawayTimeLog.create({
       data: {
         sessionId: params.sessionId,
         userId: params.userId,
         event: "STORE_ITEM",
       },
-    }),
-  ]);
+    });
+  });
 
   return getPutawaySession(params.sessionId);
 }

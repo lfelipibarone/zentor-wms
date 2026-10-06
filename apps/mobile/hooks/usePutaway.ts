@@ -48,9 +48,9 @@ export function useCompletePutaway(sessionId: string) {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: () => api.completePutaway(sessionId),
-    onSuccess: () => {
+    onSuccess: (data) => {
       qc.invalidateQueries({ queryKey: ["putaway-queue"] });
-      qc.invalidateQueries({ queryKey: ["putaway-session", sessionId] });
+      qc.setQueryData(["putaway-session", sessionId], data);
     },
   });
 }

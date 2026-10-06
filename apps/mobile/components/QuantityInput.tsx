@@ -10,7 +10,8 @@ import { theme, spacing, typography } from "@/lib/theme";
 
 interface QuantityInputProps {
   label: string;
-  max: number;
+  /** Sem máximo (ex.: pulmão, que não tem limite de unidades) */
+  max?: number;
   onConfirm: (qty: number) => void;
   loading?: boolean;
   /** Permite confirmar 0 (ex.: gôndola vazia na solicitação de reabastecimento). */
@@ -29,13 +30,13 @@ export function QuantityInput({
   const parsed = parseInt(value, 10);
   const valid =
     !Number.isNaN(parsed) &&
-    parsed <= max &&
+    (max === undefined || parsed <= max) &&
     (allowZero ? parsed >= 0 : parsed > 0);
 
   return (
     <View style={styles.wrap}>
       <Text style={styles.label}>{label}</Text>
-      <Text style={styles.hint}>Máximo: {max} un.</Text>
+      {max !== undefined ? <Text style={styles.hint}>Máximo: {max} un.</Text> : null}
       <TextInput
         style={styles.input}
         value={value}
@@ -46,7 +47,7 @@ export function QuantityInput({
         maxLength={6}
       />
       <View style={styles.quickRow}>
-        {[1, 5, 10].filter((n) => n <= max).map((n) => (
+        {[1, 5, 10].filter((n) => max === undefined || n <= max).map((n) => (
           <FactoryButton
             key={n}
             label={`+${n}`}
@@ -55,12 +56,14 @@ export function QuantityInput({
             style={styles.quickBtn}
           />
         ))}
-        <FactoryButton
-          label="MAX"
-          variant="secondary"
-          onPress={() => setValue(String(max))}
-          style={styles.quickBtn}
-        />
+        {max !== undefined ? (
+          <FactoryButton
+            label="MAX"
+            variant="secondary"
+            onPress={() => setValue(String(max))}
+            style={styles.quickBtn}
+          />
+        ) : null}
       </View>
       <FactoryButton
         label="Confirmar quantidade"

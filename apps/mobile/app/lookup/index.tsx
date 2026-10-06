@@ -2,6 +2,7 @@ import { useState } from "react";
 import { StyleSheet, Text, View } from "react-native";
 import { BarcodeScanner } from "@/components/BarcodeScanner";
 import { FactoryButton } from "@/components/FactoryButton";
+import { PulmaoStockList } from "@/components/PulmaoStockList";
 import { ScreenShell } from "@/components/ScreenShell";
 import { useLookupLocation } from "@/hooks/useLookup";
 import { theme, spacing, typography } from "@/lib/theme";
@@ -36,7 +37,12 @@ export default function LookupScreen() {
           <Text style={styles.location}>{data.label}</Text>
           <Text style={styles.barcode}>{data.barcode}</Text>
 
-          {data.product ? (
+          {data.type === "PULMAO" ? (
+            <>
+              <Text style={styles.divider}>— PULMÃO —</Text>
+              <PulmaoStockList stocks={data.stocks} />
+            </>
+          ) : data.product ? (
             <>
               <Text style={styles.divider}>— PRODUTO —</Text>
               <Text style={styles.sku}>{data.product.sku}</Text>
@@ -47,11 +53,15 @@ export default function LookupScreen() {
           )}
 
           <View style={styles.qtyBox}>
-            <Text style={styles.qtyLabel}>QUANTIDADE</Text>
-            <Text style={styles.qtyValue}>{data.currentQuantity}</Text>
-            <Text style={styles.qtySub}>
-              Cap: {data.capacity} · Mín: {data.minThreshold}
+            <Text style={styles.qtyLabel}>
+              {data.type === "PULMAO" ? "TOTAL NO PULMÃO" : "QUANTIDADE"}
             </Text>
+            <Text style={styles.qtyValue}>{data.currentQuantity}</Text>
+            {data.type !== "PULMAO" ? (
+              <Text style={styles.qtySub}>
+                Cap: {data.capacity} · Mín: {data.minThreshold}
+              </Text>
+            ) : null}
           </View>
 
           {data.needsReplenishment ? (

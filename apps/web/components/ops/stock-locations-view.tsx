@@ -15,6 +15,7 @@ import { LOCATION_TYPE_LABEL, MOVEMENT_TYPE_LABEL } from "@/lib/labels";
 import { Pagination } from "@/components/ui/pagination";
 import type { PaginationMeta } from "@/lib/pagination";
 import { fetchMovements, fetchStockLocations } from "@/lib/api/operations";
+import { PulmaoStocksCell } from "@/components/ops/pulmao-stocks-cell";
 
 type Tab = "balances" | "movements";
 
@@ -144,7 +145,8 @@ export function StockLocationsView({
               </TableHeader>
               <TableBody>
                 {locations.map((l) => {
-                  const alert = l.currentQuantity <= l.minThreshold;
+                  const isPulmao = l.type === "PULMAO";
+                  const alert = !isPulmao && l.currentQuantity <= l.minThreshold;
                   return (
                     <TableRow key={l.id} className={alert ? "bg-amber-50" : ""}>
                       <TableCell className="font-mono">{l.barcode}</TableCell>
@@ -152,10 +154,16 @@ export function StockLocationsView({
                         {LOCATION_TYPE_LABEL[l.type] ?? l.type}
                       </TableCell>
                       <TableCell>
-                        {l.currentQuantity} / {l.capacity}
+                        {isPulmao ? (
+                          <PulmaoStocksCell stocks={l.stocks} />
+                        ) : (
+                          <>
+                            {l.currentQuantity} / {l.capacity}
+                          </>
+                        )}
                       </TableCell>
-                      <TableCell>{l.minThreshold}</TableCell>
-                      <TableCell>{alert ? "Repor" : "OK"}</TableCell>
+                      <TableCell>{isPulmao ? "—" : l.minThreshold}</TableCell>
+                      <TableCell>{isPulmao ? "—" : alert ? "Repor" : "OK"}</TableCell>
                     </TableRow>
                   );
                 })}

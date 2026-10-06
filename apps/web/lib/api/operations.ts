@@ -56,12 +56,28 @@ export interface LocationRow {
   coluna: WarehouseRef | null;
   linha: WarehouseRef | null;
   type: string;
+  /** SKU da gôndola; pulmão não tem SKU fixo (ver `stocks`) */
   productId: string | null;
   product: { sku: string; name: string } | null;
+  /** No pulmão, total de todos os SKUs */
   currentQuantity: number;
   capacity: number;
   minThreshold: number;
   active: boolean;
+  /** SKUs com saldo no pulmão (vem no estoque) */
+  stocks?: PulmaoStockRow[];
+}
+
+export interface PulmaoStockRow {
+  product: { id: string; sku: string; name: string };
+  quantity: number;
+}
+
+export interface PutawayStoredLocation {
+  locationId: string;
+  barcode: string;
+  label: string;
+  quantity: number;
 }
 
 export function fetchOrders(params?: {
@@ -361,6 +377,8 @@ export type PurchaseReceiptItemDetail = {
   completed: boolean;
   suggestedLocation: string | null;
   putawayLocation: string | null;
+  /** Pulmões onde o item foi guardado */
+  putawayLocations: PutawayStoredLocation[];
 };
 
 export type PurchaseReceiptDetail = {
@@ -405,6 +423,7 @@ export type PurchaseReceiptDetail = {
       quantityExpected: number;
       quantityStored: number;
       locationBarcode: string | null;
+      storedLocations: PutawayStoredLocation[];
     }>;
   } | null;
 };

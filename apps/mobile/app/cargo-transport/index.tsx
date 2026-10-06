@@ -15,6 +15,7 @@ import { QuantityInput } from "@/components/QuantityInput";
 import { ScreenShell } from "@/components/ScreenShell";
 import { api, ApiError } from "@/lib/api";
 import type { LocationLookup, ReplenishmentNeed } from "@/lib/api";
+import { pulmaoQuantityOf, pulmaoStocksSummary } from "@/lib/pulmao";
 import { theme, spacing, typography } from "@/lib/theme";
 
 type Phase = "list" | "scan-pulmao" | "confirm-qty" | "done";
@@ -71,14 +72,15 @@ export default function CargoTransportScreen() {
         setMessage("Bipe um pulmão (estoque de reserva)");
         return;
       }
-      if (loc.product?.id && loc.product.id !== selected.productId) {
-        setMessage("Produto do pulmão não corresponde à necessidade");
+      const available = pulmaoQuantityOf(loc, selected.productId);
+      if (available <= 0) {
+        setMessage(`Pulmão ${loc.barcode} não tem ${selected.sku} (${pulmaoStocksSummary(loc)})`);
         return;
       }
       setPulmao(loc);
       setPhase("confirm-qty");
       setMessage(
-        `${selected.sku} · máx. ${Math.min(loc.currentQuantity, selected.deficit)} un.`,
+        `${selected.sku} · máx. ${Math.min(available, selected.deficit)} un.`,
       );
     } catch (e) {
       setMessage(e instanceof ApiError ? e.message : "Pulmão não encontrado");
@@ -89,8 +91,7 @@ export default function CargoTransportScreen() {
 
   const confirmWithdraw = async (qty: number) => {
     if (!selected || !pulmao) return;
-    const productCode =
-      pulmao.product?.barcode ?? pulmao.product?.sku ?? selected.sku;
+    const productCode = selected.sku;
     setLoading(true);
     setMessage(null);
     try {
@@ -169,9 +170,8 @@ export default function CargoTransportScreen() {
     );
   }
 
-  const maxQty = pulmao
-    ? Math.min(pulmao.currentQuantity, selected?.deficit ?? pulmao.currentQuantity)
-    : 0;
+  const pulmaoQty = pulmao && selected ? pulmaoQuantityOf(pulmao, selected.productId) : 0;
+  const maxQty = Math.min(pulmaoQty, selected?.deficit ?? pulmaoQty);
 
   return (
     <ScreenShell scroll backToHome>
@@ -206,7 +206,9 @@ export default function CargoTransportScreen() {
           <View style={styles.card}>
             <Text style={styles.cardLabel}>PULMÃO</Text>
             <Text style={styles.locTitle}>{pulmao.label}</Text>
-            <Text style={styles.meta}>Saldo: {pulmao.currentQuantity} un.</Text>
+            <Text style={styles.meta}>
+              Saldo de {selected?.sku}: {pulmaoQty} un.
+            </Text>
           </View>
           <Text style={styles.instruction}>Quantidade retirada</Text>
           <QuantityInput

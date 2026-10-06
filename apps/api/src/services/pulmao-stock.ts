@@ -1,6 +1,7 @@
 import { InventoryMovementType, LocationType } from "@prisma/client";
 import { prisma } from "../lib/prisma.js";
 import { findProductByBarcode, LocationStockError } from "./location-stock.js";
+import { addPulmaoStock, pulmaoStocksInclude } from "./pulmao-inventory.js";
 
 export async function stockPulmaoLocation(input: {
   tenantId: string;
@@ -22,7 +23,6 @@ export async function stockPulmaoLocation(input: {
   const barcode = input.locationBarcode.trim().toUpperCase();
   const location = await prisma.location.findFirst({
     where: { tenantId: input.tenantId, barcode, active: true },
-    include: { product: true },
   });
 
   if (!location) {
@@ -31,33 +31,19 @@ export async function stockPulmaoLocation(input: {
   if (location.type !== LocationType.PULMAO) {
     throw new LocationStockError("Informe uma posição de pulmão");
   }
-  if (location.productId && location.productId !== product.id) {
-    throw new LocationStockError(
-      `Pulmão alocado para ${location.product?.sku ?? "outro produto"}`,
+
+  const result = await prisma.$transaction(async (tx) => {
+    const productQuantity = await addPulmaoStock(
+      tx,
+      { tenantId: input.tenantId, locationId: location.id, productId: product.id },
+      quantity,
     );
-  }
-
-  const newQty = Math.min(location.currentQuantity + quantity, location.capacity);
-  const added = newQty - location.currentQuantity;
-  if (added <= 0) {
-    throw new LocationStockError("Pulmão já está na capacidade máxima");
-  }
-
-  const updated = await prisma.$transaction(async (tx) => {
-    const loc = await tx.location.update({
-      where: { id: location.id },
-      data: {
-        productId: product.id,
-        currentQuantity: newQty,
-      },
-      include: { product: true },
-    });
 
     await tx.inventoryMovement.create({
       data: {
         tenantId: input.tenantId,
         type: InventoryMovementType.ENTRY,
-        quantity: added,
+        quantity,
         userId: input.userId,
         productId: product.id,
         toLocationId: location.id,
@@ -65,17 +51,23 @@ export async function stockPulmaoLocation(input: {
       },
     });
 
-    return loc;
+    const loc = await tx.location.findUniqueOrThrow({
+      where: { id: location.id },
+      include: { stocks: pulmaoStocksInclude },
+    });
+    return { loc, productQuantity };
   });
 
   return {
     location: {
-      id: updated.id,
-      barcode: updated.barcode,
-      currentQuantity: updated.currentQuantity,
-      capacity: updated.capacity,
-      product: updated.product,
+      id: result.loc.id,
+      barcode: result.loc.barcode,
+      currentQuantity: result.loc.currentQuantity,
+      capacity: result.loc.capacity,
+      product,
+      productQuantity: result.productQuantity,
+      stocks: result.loc.stocks.map((s) => ({ product: s.product, quantity: s.quantity })),
     },
-    added,
+    added: quantity,
   };
 }

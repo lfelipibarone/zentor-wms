@@ -235,7 +235,12 @@ function positionRow(
     coluna: coluna.code,
     linha: linha.code,
     face: linha.face,
-    sku: loc?.product?.sku ?? EMPTY,
+    sku:
+      loc?.type === "PULMAO"
+        ? (current ?? 0) > 0
+          ? "Vários SKUs"
+          : EMPTY
+        : (loc?.product?.sku ?? EMPTY),
     capacity,
     minThreshold: loc?.minThreshold ?? null,
     currentQuantity: current,

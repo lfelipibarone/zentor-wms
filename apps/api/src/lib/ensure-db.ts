@@ -5,6 +5,7 @@ import { fileURLToPath } from "node:url";
 import { prisma } from "./prisma.js";
 import { ensureDefaultUsers } from "../services/ensure-default-users.js";
 import { ensureAllTenantsRolePermissions } from "../services/role-permissions.js";
+import { migrateLegacyPulmaoStock } from "../services/pulmao-inventory.js";
 
 /** apps/api — funciona a partir de dist/lib ou src/lib */
 const apiRoot = join(dirname(fileURLToPath(import.meta.url)), "../..");
@@ -148,6 +149,20 @@ export async function ensureDatabaseReady(): Promise<void> {
   } catch (err) {
     console.warn(
       "[ensure-db] falha ao garantir matrizes de cargo:",
+      err instanceof Error ? err.message : err,
+    );
+  }
+
+  try {
+    const pulmao = await migrateLegacyPulmaoStock(prisma);
+    if (pulmao.released > 0) {
+      console.log(
+        `[ensure-db] pulmões no formato multi-SKU: ${pulmao.released} liberados, ${pulmao.migrated} saldos copiados`,
+      );
+    }
+  } catch (err) {
+    console.warn(
+      "[ensure-db] falha ao migrar saldos de pulmão:",
       err instanceof Error ? err.message : err,
     );
   }

@@ -286,10 +286,7 @@ export default function PurchaseReceiptDetailPage() {
                     const isNext = detail.nextItem?.id === item.id;
                     const remaining =
                       item.quantityExpected - item.quantityChecked;
-                    const location =
-                      item.putawayLocation ??
-                      item.suggestedLocation ??
-                      "—";
+                    const location = item.suggestedLocation ?? "—";
                     return (
                       <TableRow
                         key={item.id}
@@ -321,7 +318,18 @@ export default function PurchaseReceiptDetailPage() {
                           {item.barcode ?? "—"}
                         </TableCell>
                         <TableCell className="font-mono text-xs">
-                          {location}
+                          {item.putawayLocations.length > 0 ? (
+                            <ul className="space-y-0.5">
+                              {item.putawayLocations.map((loc) => (
+                                <li key={loc.locationId} className="whitespace-nowrap">
+                                  {loc.barcode}{" "}
+                                  <span className="text-muted-foreground">· {loc.quantity} un.</span>
+                                </li>
+                              ))}
+                            </ul>
+                          ) : (
+                            location
+                          )}
                         </TableCell>
                         <TableCell className="text-right">
                           {item.quantityExpected}

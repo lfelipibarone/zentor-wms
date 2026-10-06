@@ -8,7 +8,10 @@ export interface ProductLocationSummary {
   id: string;
   barcode: string;
   type: ProductLocationType;
+  /** No pulmão, é o saldo só deste SKU */
   currentQuantity: number;
+  /** true quando o produto só tem saldo no pulmão (sem vínculo fixo) */
+  pulmaoStock?: boolean;
 }
 
 export interface ProductLocationDetail extends ProductLocationSummary {
@@ -91,7 +94,8 @@ export function unassignProductLocation(id: string, locationId: string) {
   });
 }
 
-export function searchLocations(q: string) {
+export function searchLocations(q: string, type?: ProductLocationType) {
   const sp = new URLSearchParams({ q, page: "1", pageSize: "10" });
+  if (type) sp.set("type", type);
   return apiFetch<{ locations: LocationOption[] }>(`/api/locations?${sp.toString()}`);
 }

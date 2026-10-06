@@ -42,7 +42,7 @@ export function ProductLocationsCard({
       return;
     }
     const t = setTimeout(() => {
-      searchLocations(q)
+      searchLocations(q, "PICK_FACE")
         .then((r) => setOptions(r.locations))
         .catch(() => setOptions([]))
         .finally(() => setSearchedQuery(q));
@@ -111,7 +111,7 @@ export function ProductLocationsCard({
             <div className="flex items-center gap-2">
               <input
                 autoFocus
-                placeholder="Endereço da posição, ex.: B1-H-3-7"
+                placeholder="Endereço da gôndola, ex.: B1-H-3-7"
                 className="w-full rounded-lg border px-3 py-2 font-mono text-sm"
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
@@ -196,17 +196,25 @@ export function ProductLocationsCard({
                       ) : null}
                     </TableCell>
                     <TableCell className="text-right tabular-nums">{l.currentQuantity}</TableCell>
-                    <TableCell className="text-right tabular-nums">{l.capacity}</TableCell>
-                    <TableCell className="text-right tabular-nums">{l.minThreshold}</TableCell>
+                    <TableCell className="text-right tabular-nums">
+                      {l.type === "PULMAO" ? "—" : l.capacity}
+                    </TableCell>
+                    <TableCell className="text-right tabular-nums">
+                      {l.type === "PULMAO" ? "—" : l.minThreshold}
+                    </TableCell>
                     <TableCell className="text-right">
-                      <button
-                        type="button"
-                        disabled={busy}
-                        onClick={() => unassign(l.id, l.barcode)}
-                        className="text-xs font-medium text-slate-500 hover:text-destructive disabled:opacity-40"
-                      >
-                        Desvincular
-                      </button>
+                      {l.type === "PULMAO" ? (
+                        <span className="text-xs text-muted-foreground">Saldo no pulmão</span>
+                      ) : (
+                        <button
+                          type="button"
+                          disabled={busy}
+                          onClick={() => unassign(l.id, l.barcode)}
+                          className="text-xs font-medium text-slate-500 hover:text-destructive disabled:opacity-40"
+                        >
+                          Desvincular
+                        </button>
+                      )}
                     </TableCell>
                   </TableRow>
                 ))}

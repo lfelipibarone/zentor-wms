@@ -1,8 +1,9 @@
 import type { FastifyInstance } from "fastify";
 import { formatMarketplace, productMatchesCode } from "@wms/shared";
-import { OrderStatus, OrderTimeLogEvent, InventoryMovementType } from "@prisma/client";
+import { OrderStatus, OrderTimeLogEvent, InventoryMovementType, LocationType } from "@prisma/client";
 import { requireMobileAccess } from "../lib/auth-guard.js";
 import { prisma } from "../lib/prisma.js";
+import { pulmaoStocksInclude } from "../services/pulmao-inventory.js";
 import { resolveUserId } from "../lib/user-context.js";
 import {
   LocationStockError,
@@ -684,10 +685,11 @@ export async function mobileRoutes(app: FastifyInstance) {
       const barcode = decodeURIComponent(request.params.barcode);
       const location = await prisma.location.findFirst({
         where: { tenantId, barcode, active: true },
-        include: { product: true },
+        include: { product: true, stocks: pulmaoStocksInclude },
       });
       if (!location) return reply.status(404).send({ error: "Localização não encontrada" });
 
+      const isPulmao = location.type === LocationType.PULMAO;
       return {
         id: location.id,
         corridor: location.corridor,
@@ -698,8 +700,12 @@ export async function mobileRoutes(app: FastifyInstance) {
         capacity: location.capacity,
         minThreshold: location.minThreshold,
         label: formatLocation(location),
-        product: location.product,
-        needsReplenishment: location.currentQuantity <= location.minThreshold,
+        product: isPulmao ? null : location.product,
+        stocks: isPulmao
+          ? location.stocks.map((s) => ({ product: s.product, quantity: s.quantity }))
+          : [],
+        needsReplenishment:
+          !isPulmao && location.currentQuantity <= location.minThreshold,
       };
     }
   );

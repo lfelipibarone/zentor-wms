@@ -187,8 +187,23 @@ export interface LocationLookup {
   capacity: number;
   minThreshold: number;
   label: string;
+  /** SKU da gôndola; pulmão vem sempre sem produto e usa `stocks` */
   product: Product | null;
+  /** SKUs com saldo no pulmão (maior saldo primeiro) */
+  stocks: PulmaoStock[];
   needsReplenishment: boolean;
+}
+
+export interface PulmaoStock {
+  product: Pick<Product, "id" | "sku" | "name" | "barcode" | "imageUrl">;
+  quantity: number;
+}
+
+export interface PutawayStoredLocation {
+  locationId: string;
+  barcode: string;
+  label: string;
+  quantity: number;
 }
 
 export interface RequestReplenishmentResult {
@@ -529,7 +544,18 @@ export const api = {
     productBarcode: string;
     quantity: number;
   }) =>
-    request<{ location: { barcode: string; currentQuantity: number }; added: number }>(
+    request<{
+      location: {
+        barcode: string;
+        /** Total do pulmão (todos os SKUs) */
+        currentQuantity: number;
+        product: Pick<Product, "id" | "sku" | "name">;
+        /** Saldo do SKU guardado neste pulmão */
+        productQuantity: number;
+        stocks: PulmaoStock[];
+      };
+      added: number;
+    }>(
       "/mobile/locations/pulmao/stock",
       { method: "POST", body: JSON.stringify(body) },
     ),
@@ -894,6 +920,8 @@ export interface PutawaySessionDto {
     quantityExpected: number;
     quantityStored: number;
     locationBarcode: string | null;
+    /** Pulmões onde o item foi guardado, com a quantidade em cada um */
+    storedLocations: PutawayStoredLocation[];
     completed: boolean;
   }>;
   nextItem: {

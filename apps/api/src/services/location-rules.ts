@@ -47,4 +47,25 @@ export async function assertMaxPickFaceLocations(
   }
 }
 
+/** Pulmão guarda vários SKUs (saldo em LocationStock); não aceita SKU fixo na posição. */
+export function assertPulmaoWithoutFixedSku(
+  type: LocationType,
+  productId: string | null | undefined,
+): void {
+  if (type === LocationType.PULMAO && productId) {
+    throw new LocationRuleError("Pulmão aceita vários SKUs e não tem SKU fixo");
+  }
+}
+
+/** Gôndola e pulmão guardam saldo de jeitos diferentes: só troca o tipo com a posição zerada. */
+export function assertLocationTypeChange(
+  location: { type: LocationType; currentQuantity: number; barcode: string },
+  nextType: LocationType | undefined,
+): void {
+  if (!nextType || nextType === location.type || location.currentQuantity <= 0) return;
+  throw new LocationRuleError(
+    `Posição ${location.barcode} tem ${location.currentQuantity} un.; zere o saldo antes de trocar o tipo`,
+  );
+}
+
 export { MAX_PICK_FACE_PER_PRODUCT };

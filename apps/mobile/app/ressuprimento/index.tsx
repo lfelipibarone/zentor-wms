@@ -23,6 +23,7 @@ import {
   type ReplenishmentNeed,
 } from "@/lib/api";
 import { showErrorAlert, showInfoAlert } from "@/lib/app-alert";
+import { pulmaoQuantityOf, pulmaoStocksSummary } from "@/lib/pulmao";
 import { theme, spacing, typography } from "@/lib/theme";
 
 function apiErr(e: unknown, fallback: string) {
@@ -124,6 +125,10 @@ export default function RessuprimentoScreen() {
         showErrorAlert("Selecione um pulmão");
         return;
       }
+      if (selected && pulmaoQuantityOf(full, selected.productId) <= 0) {
+        showErrorAlert(`Pulmão ${full.barcode} não tem ${selected.sku}`);
+        return;
+      }
       setPulmao(full);
       setPulmaoOptions([]);
     } catch (e) {
@@ -143,8 +148,8 @@ export default function RessuprimentoScreen() {
         showErrorAlert("Bipe um pulmão");
         return;
       }
-      if (loc.product?.id && loc.product.id !== selected.productId) {
-        showErrorAlert("Produto não corresponde");
+      if (pulmaoQuantityOf(loc, selected.productId) <= 0) {
+        showErrorAlert(`Pulmão ${loc.barcode} não tem ${selected.sku} (${pulmaoStocksSummary(loc)})`);
         return;
       }
       setPulmao(loc);
@@ -161,7 +166,7 @@ export default function RessuprimentoScreen() {
     try {
       const result = await api.withdrawCargoTransfer({
         fromLocationBarcode: pulmao.barcode,
-        productBarcode: pulmao.product?.sku ?? selected.sku,
+        productBarcode: selected.sku,
         quantity: qty,
         targetPickFaceId: selected.pickFaceId,
       });
@@ -357,9 +362,8 @@ export default function RessuprimentoScreen() {
   }
 
   if (phase === "withdraw" && selected) {
-    const maxQty = pulmao
-      ? Math.min(pulmao.currentQuantity, selected.deficit)
-      : selected.deficit;
+    const pulmaoQty = pulmao ? pulmaoQuantityOf(pulmao, selected.productId) : 0;
+    const maxQty = pulmao ? Math.min(pulmaoQty, selected.deficit) : selected.deficit;
 
     return (
       <ScreenShell scroll backToHome title="Retirar do pulmão">
@@ -367,7 +371,7 @@ export default function RessuprimentoScreen() {
           <Text style={styles.meta}>Gôndola alvo: {selected.routeLabel}</Text>
           <View style={styles.productRow}>
             <ProductThumbnail
-              imageUrl={selected.imageUrl ?? productImageUrl ?? pulmao?.product?.imageUrl}
+              imageUrl={selected.imageUrl ?? productImageUrl}
               alt={selected.productName}
             />
             <View style={styles.productInfo}>
@@ -418,7 +422,9 @@ export default function RessuprimentoScreen() {
           <>
             <View style={styles.card}>
               <Text style={styles.locTitle}>{pulmao.label}</Text>
-              <Text style={styles.meta}>Saldo: {pulmao.currentQuantity}</Text>
+              <Text style={styles.meta}>
+                Saldo de {selected.sku}: {pulmaoQty} un.
+              </Text>
             </View>
             <QuantityInput
               label={`Quantidade (máx. ${maxQty})`}

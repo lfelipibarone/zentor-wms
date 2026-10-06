@@ -27,7 +27,7 @@ enum UserRole {
 /// Tipo físico da localização no layout do armazém
 enum LocationType {
   PICK_FACE // Gôndola de separação (frente de picking)
-  PULMAO    // Estoque de reserva / reabastecimento
+  PULMAO // Estoque de reserva / reabastecimento
 }
 
 /// Lado da gôndola: A = frente, B = verso (acessado pelo corredor oposto)
@@ -92,12 +92,12 @@ enum PickWaveLineSortStatus {
 
 /// Tipos de movimentação de estoque (log imutável)
 enum InventoryMovementType {
-  ENTRY              // Entrada de mercadoria no armazém
-  EXIT               // Saída definitiva (expedição, perda, etc.)
-  TRANSFER           // Movimentação entre localizações (ex: PULMAO → PICK_FACE)
-  ADJUSTMENT         // Ajuste de inventário (contagem, correção)
-  PICK_ALLOCATION    // Reserva/baixa vinculada à separação de pedido
-  REPLENISHMENT      // Reabastecimento de pick face a partir do pulmão
+  ENTRY // Entrada de mercadoria no armazém
+  EXIT // Saída definitiva (expedição, perda, etc.)
+  TRANSFER // Movimentação entre localizações (ex: PULMAO → PICK_FACE)
+  ADJUSTMENT // Ajuste de inventário (contagem, correção)
+  PICK_ALLOCATION // Reserva/baixa vinculada à separação de pedido
+  REPLENISHMENT // Reabastecimento de pick face a partir do pulmão
 }
 
 /// Status da conexão OAuth com Tiny ERP v3
@@ -110,8 +110,8 @@ enum TinyConnectionStatus {
 
 /// Tipo de sessão no recebimento do caminhão
 enum PurchaseReceiptKind {
-  ENTRY   // NF de entrada (Tiny)
-  RETURN  // Devolução de cliente
+  ENTRY // NF de entrada (Tiny)
+  RETURN // Devolução de cliente
 }
 
 /// Status da sessão de recebimento/conferência de compra no WMS
@@ -158,30 +158,31 @@ model Tenant {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  users                   User[]
-  tinyConnections         TinyConnection[]
-  products                Product[]
-  locations               Location[]
-  warehouseBarracoes      WarehouseBarracao[]
-  warehouseSetores        WarehouseSetor[]
-  warehouseCorredores     WarehouseCorredor[]
-  warehouseEstantes       WarehouseEstante[]
-  warehouseColunas        WarehouseColuna[]
-  warehouseLinhas         WarehouseLinha[]
-  baskets                 Basket[]
-  orders                  Order[]
-  pickWaves               PickWave[]
-  purchaseReceiptSessions PurchaseReceiptSession[]
-  inventoryMovements      InventoryMovement[]
-  cargoTransfers          CargoTransfer[]
-  replenishmentAssignments ReplenishmentAssignment[]
-  integrationEventLogs    IntegrationEventLog[]
-  systemSettings          SystemSetting[]
+  users                       User[]
+  tinyConnections             TinyConnection[]
+  products                    Product[]
+  locations                   Location[]
+  locationStocks              LocationStock[]
+  warehouseBarracoes          WarehouseBarracao[]
+  warehouseSetores            WarehouseSetor[]
+  warehouseCorredores         WarehouseCorredor[]
+  warehouseEstantes           WarehouseEstante[]
+  warehouseColunas            WarehouseColuna[]
+  warehouseLinhas             WarehouseLinha[]
+  baskets                     Basket[]
+  orders                      Order[]
+  pickWaves                   PickWave[]
+  purchaseReceiptSessions     PurchaseReceiptSession[]
+  inventoryMovements          InventoryMovement[]
+  cargoTransfers              CargoTransfer[]
+  replenishmentAssignments    ReplenishmentAssignment[]
+  integrationEventLogs        IntegrationEventLog[]
+  systemSettings              SystemSetting[]
   locationProximityReferences LocationProximityReference[]
-  rolePermissions         TenantRolePermission[]
-  floorPlans              WarehouseFloorPlan[]
-  floorElements           WarehouseFloorElement[]
-  approachWaves           ApproachWave[]
+  rolePermissions             TenantRolePermission[]
+  floorPlans                  WarehouseFloorPlan[]
+  floorElements               WarehouseFloorElement[]
+  approachWaves               ApproachWave[]
 
   @@map("tenants")
 }
@@ -207,24 +208,24 @@ model TenantRolePermission {
 // -----------------------------------------------------------------------------
 
 model User {
-  id          String   @id @default(cuid())
-  email       String   @unique
-  name        String
-  password    String
-  role        UserRole @default(PICKER)
+  id              String   @id @default(cuid())
+  email           String   @unique
+  name            String
+  password        String
+  role            UserRole @default(PICKER)
   /// Permissões granulares do painel (chaves como web.access, users.manage)
-  permissions String[] @default([])
-  active      Boolean  @default(true)
+  permissions     String[] @default([])
+  active          Boolean  @default(true)
   /// Super-admin da plataforma (sem tenant; gerencia clientes)
-  isPlatformAdmin Boolean @default(false)
+  isPlatformAdmin Boolean  @default(false)
   /// Cliente ao qual o usuário pertence (null apenas para isPlatformAdmin)
-  tenantId    String?
+  tenantId        String?
   /// URL da foto de perfil (opcional)
-  avatarUrl   String?
+  avatarUrl       String?
   /// Token de integração Olist (por usuário)
-  olistToken  String?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  olistToken      String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
 
   tenant Tenant? @relation(fields: [tenantId], references: [id], onDelete: Restrict)
 
@@ -235,22 +236,22 @@ model User {
   inventoryMovements InventoryMovement[]
 
   /// Eventos de tempo registrados por este usuário
-  orderTimeLogs OrderTimeLog[]
+  orderTimeLogs  OrderTimeLog[]
   orderStageLogs OrderStageLog[]
 
-  notifications Notification[]
-  pushDevices   PushDevice[]
-  releasedWaves PickWave[] @relation("WaveReleasedBy")
-  acceptedWaves PickWave[] @relation("WaveAcceptedBy")
-  acceptedWaveParts PickWavePart[] @relation("WavePartAcceptedBy")
-  waveLinesPicked     PickWaveLine[]     @relation("WaveLinePickedBy")
-  waveAllocationsSorted PickWaveAllocation[] @relation("WaveAllocSortedBy")
-  purchaseReceiptSessions PurchaseReceiptSession[] @relation("PurchaseReceiptStartedBy")
-  purchaseReceiptTimeLogs PurchaseReceiptTimeLog[]
-  putawaySessions         PutawaySession[]         @relation("PutawayAssignedTo")
-  putawayTimeLogs         PutawayTimeLog[]
-  cargoTransfersWithdrawn CargoTransfer[]          @relation("CargoTransferWithdrawnBy")
-  cargoTransfersDeposited CargoTransfer[]          @relation("CargoTransferDepositedBy")
+  notifications            Notification[]
+  pushDevices              PushDevice[]
+  releasedWaves            PickWave[]                @relation("WaveReleasedBy")
+  acceptedWaves            PickWave[]                @relation("WaveAcceptedBy")
+  acceptedWaveParts        PickWavePart[]            @relation("WavePartAcceptedBy")
+  waveLinesPicked          PickWaveLine[]            @relation("WaveLinePickedBy")
+  waveAllocationsSorted    PickWaveAllocation[]      @relation("WaveAllocSortedBy")
+  purchaseReceiptSessions  PurchaseReceiptSession[]  @relation("PurchaseReceiptStartedBy")
+  purchaseReceiptTimeLogs  PurchaseReceiptTimeLog[]
+  putawaySessions          PutawaySession[]          @relation("PutawayAssignedTo")
+  putawayTimeLogs          PutawayTimeLog[]
+  cargoTransfersWithdrawn  CargoTransfer[]           @relation("CargoTransferWithdrawnBy")
+  cargoTransfersDeposited  CargoTransfer[]           @relation("CargoTransferDepositedBy")
   replenishmentAssignments ReplenishmentAssignment[] @relation("ReplenishmentAssignedTo")
   tinyConnections          TinyConnection[]
 
@@ -316,38 +317,39 @@ model SystemSetting {
 // -----------------------------------------------------------------------------
 
 model Product {
-  id                String  @id @default(cuid())
-  tenantId          String
-  sku               String
-  name              String
+  id               String   @id @default(cuid())
+  tenantId         String
+  sku              String
+  name             String
   /// Quando true, cada unidade deve ser bipada individualmente na separação.
   /// Quando false, o operador informa apenas a quantidade (ex: parafusos a granel).
-  requiresItemScan  Boolean @default(false)
-  barcode           String?
+  requiresItemScan Boolean  @default(false)
+  barcode          String?
   /// Conteúdo do QR da etiqueta quando difere do SKU (null = o QR é o próprio SKU)
-  qrCode            String?
+  qrCode           String?
   /// URL da imagem do produto (packing / catálogo)
-  imageUrl          String?
+  imageUrl         String?
   /// Unidade de medida (UN, CX, KG, etc.)
-  unit              String?
+  unit             String?
   /// Peso unitário em kg
-  weight            Decimal? @db.Decimal(12, 4)
+  weight           Decimal? @db.Decimal(12, 4)
   /// Fornecedor principal (sincronizado do Tiny: fornecedores[].nome)
-  supplierName      String?
+  supplierName     String?
   /// Saldo no ERP Tiny (estoque.quantidade) — referência, não é estoque WMS
-  erpStockQuantity  Decimal? @db.Decimal(12, 4)
+  erpStockQuantity Decimal? @db.Decimal(12, 4)
   /// Tipo no Tiny: K|S|V|F|M (Kit, Simples, Variações, Fabricado, Matéria Prima)
-  tinyTipo          String?
-  active            Boolean @default(true)
-  createdAt         DateTime @default(now())
-  updatedAt         DateTime @updatedAt
+  tinyTipo         String?
+  active           Boolean  @default(true)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
 
-  tenant            Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  locations         Location[]
-  orderItems        OrderItem[]
+  tenant             Tenant              @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  locations          Location[]
+  locationStocks     LocationStock[]
+  orderItems         OrderItem[]
   inventoryMovements InventoryMovement[]
-  pickWaveLines     PickWaveLine[]
-  cargoTransfers    CargoTransfer[]
+  pickWaveLines      PickWaveLine[]
+  cargoTransfers     CargoTransfer[]
 
   @@unique([tenantId, sku])
   @@unique([tenantId, barcode])
@@ -371,10 +373,10 @@ model WarehouseBarracao {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  tenant    Tenant           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  setores   WarehouseSetor[]
-  locations Location[]
-  floorPlan WarehouseFloorPlan?
+  tenant        Tenant              @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  setores       WarehouseSetor[]
+  locations     Location[]
+  floorPlan     WarehouseFloorPlan?
   approachWaves ApproachWave[]
 
   @@unique([tenantId, code])
@@ -405,21 +407,21 @@ model WarehouseSetor {
 }
 
 model WarehouseCorredor {
-  id       String   @id @default(cuid())
-  tenantId String
-  setorId  String
-  code     String
-  name     String?
-  pickOrder Int     @default(0)
-  active   Boolean  @default(true)
+  id        String   @id @default(cuid())
+  tenantId  String
+  setorId   String
+  code      String
+  name      String?
+  pickOrder Int      @default(0)
+  active    Boolean  @default(true)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  tenant   Tenant            @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  setor    WarehouseSetor    @relation(fields: [setorId], references: [id], onDelete: Cascade)
-  estantes WarehouseEstante[]
-  locations Location[]
-  proximityLocations Location[] @relation("LocationProximityCorredor")
+  tenant                     Tenant                       @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  setor                      WarehouseSetor               @relation(fields: [setorId], references: [id], onDelete: Cascade)
+  estantes                   WarehouseEstante[]
+  locations                  Location[]
+  proximityLocations         Location[]                   @relation("LocationProximityCorredor")
   proximityReferenceCorredor LocationProximityReference[] @relation("ProximityRefCorredor")
 
   @@unique([tenantId, setorId, code])
@@ -439,15 +441,15 @@ model WarehouseEstante {
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
 
-  tenant    Tenant              @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  corredor  WarehouseCorredor   @relation(fields: [corredorId], references: [id], onDelete: Cascade)
-  colunas   WarehouseColuna[]
-  locations Location[]
-  proximityLocations Location[] @relation("LocationProximityEstante")
+  tenant                    Tenant                       @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  corredor                  WarehouseCorredor            @relation(fields: [corredorId], references: [id], onDelete: Cascade)
+  colunas                   WarehouseColuna[]
+  locations                 Location[]
+  proximityLocations        Location[]                   @relation("LocationProximityEstante")
   proximityReferenceEstante LocationProximityReference[] @relation("ProximityRefEstante")
-  floorElements WarehouseFloorElement[]
-  floorElementsB WarehouseFloorElement[] @relation("FloorElementEstanteB")
-  approachStops ApproachWaveStop[]
+  floorElements             WarehouseFloorElement[]
+  floorElementsB            WarehouseFloorElement[]      @relation("FloorElementEstanteB")
+  approachStops             ApproachWaveStop[]
 
   @@unique([tenantId, corredorId, code])
   @@index([tenantId])
@@ -478,21 +480,21 @@ model WarehouseColuna {
 }
 
 model WarehouseLinha {
-  id        String   @id @default(cuid())
+  id        String       @id @default(cuid())
   tenantId  String
   colunaId  String
   code      String
   name      String?
   face      LocationFace @default(A)
-  pickOrder Int      @default(0)
-  active    Boolean  @default(true)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  pickOrder Int          @default(0)
+  active    Boolean      @default(true)
+  createdAt DateTime     @default(now())
+  updatedAt DateTime     @updatedAt
 
-  tenant    Tenant           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  coluna    WarehouseColuna  @relation(fields: [colunaId], references: [id], onDelete: Cascade)
-  location  Location?
-  proximityReferences Location[] @relation("LocationProximityLinha")
+  tenant                  Tenant                       @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  coluna                  WarehouseColuna              @relation(fields: [colunaId], references: [id], onDelete: Cascade)
+  location                Location?
+  proximityReferences     Location[]                   @relation("LocationProximityLinha")
   proximityReferenceLinha LocationProximityReference[] @relation("ProximityRefLinha")
 
   @@unique([tenantId, colunaId, code, face])
@@ -506,17 +508,17 @@ model WarehouseLinha {
 // -----------------------------------------------------------------------------
 
 model Location {
-  id              String       @id @default(cuid())
-  tenantId        String
+  id                  String       @id @default(cuid())
+  tenantId            String
   /// Corredor do galpão (ex: "A", "B", "01")
-  corridor        String
+  corridor            String
   /// Linha dentro do corredor (ex: "01", "02")
-  row             String
+  row                 String
   /// Código de barras físico da etiqueta da gôndola/pulmão
-  barcode         String
-  barracaoId      String?
-  setorId         String?
-  corredorId      String?
+  barcode             String
+  barracaoId          String?
+  setorId             String?
+  corredorId          String?
   estanteId           String?
   colunaId            String?
   linhaId             String?      @unique
@@ -526,29 +528,29 @@ model Location {
   /// Espelha WarehouseLinha.face; usado pelo Route Engine
   face                LocationFace @default(A)
   type                LocationType
-  /// Produto alocado nesta posição (opcional — pulmão pode estar vazio ou em transição)
-  productId       String?
-  /// Quantidade física atual nesta localização
-  currentQuantity Int          @default(0)
+  /// SKU da gôndola. Pulmão aceita vários SKUs: fica sempre nulo e o saldo por SKU está em LocationStock.
+  productId           String?
+  /// Quantidade física atual (no pulmão, soma de todos os SKUs de LocationStock)
+  currentQuantity     Int          @default(0)
   /// Capacidade máxima da posição
-  capacity        Int
+  capacity            Int
   /// Limite mínimo para disparar alerta de reabastecimento
-  minThreshold    Int          @default(0)
-  active          Boolean      @default(true)
-  createdAt       DateTime     @default(now())
-  updatedAt       DateTime     @updatedAt
+  minThreshold        Int          @default(0)
+  active              Boolean      @default(true)
+  createdAt           DateTime     @default(now())
+  updatedAt           DateTime     @updatedAt
 
-  tenant     Tenant              @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  product    Product?            @relation(fields: [productId], references: [id], onDelete: SetNull)
-  barracao   WarehouseBarracao?  @relation(fields: [barracaoId], references: [id], onDelete: SetNull)
-  setor      WarehouseSetor?     @relation(fields: [setorId], references: [id], onDelete: SetNull)
-  corredor   WarehouseCorredor?  @relation(fields: [corredorId], references: [id], onDelete: SetNull)
-  estante    WarehouseEstante?   @relation(fields: [estanteId], references: [id], onDelete: SetNull)
-  coluna     WarehouseColuna?    @relation(fields: [colunaId], references: [id], onDelete: SetNull)
-  linha      WarehouseLinha?     @relation(fields: [linhaId], references: [id], onDelete: SetNull)
+  tenant            Tenant             @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  product           Product?           @relation(fields: [productId], references: [id], onDelete: SetNull)
+  barracao          WarehouseBarracao? @relation(fields: [barracaoId], references: [id], onDelete: SetNull)
+  setor             WarehouseSetor?    @relation(fields: [setorId], references: [id], onDelete: SetNull)
+  corredor          WarehouseCorredor? @relation(fields: [corredorId], references: [id], onDelete: SetNull)
+  estante           WarehouseEstante?  @relation(fields: [estanteId], references: [id], onDelete: SetNull)
+  coluna            WarehouseColuna?   @relation(fields: [colunaId], references: [id], onDelete: SetNull)
+  linha             WarehouseLinha?    @relation(fields: [linhaId], references: [id], onDelete: SetNull)
   proximityCorredor WarehouseCorredor? @relation("LocationProximityCorredor", fields: [proximityCorredorId], references: [id], onDelete: SetNull)
   proximityEstante  WarehouseEstante?  @relation("LocationProximityEstante", fields: [proximityEstanteId], references: [id], onDelete: SetNull)
-  proximityLinha      WarehouseLinha?    @relation("LocationProximityLinha", fields: [proximityLinhaId], references: [id], onDelete: SetNull)
+  proximityLinha    WarehouseLinha?    @relation("LocationProximityLinha", fields: [proximityLinhaId], references: [id], onDelete: SetNull)
 
   /// Itens de pedido com pick sugerido nesta localização
   orderItemsPickFrom OrderItem[] @relation("OrderItemPickLocation")
@@ -559,13 +561,14 @@ model Location {
   /// Movimentações com esta localização como destino
   movementsTo InventoryMovement[] @relation("MovementToLocation")
 
-  pickWaveLines      PickWaveLine[]
-  putawayItems       PutawayItem[]
-  cargoTransfersFrom CargoTransfer[] @relation("CargoTransferFrom")
-  cargoTransfersTo   CargoTransfer[] @relation("CargoTransferTo")
-  cargoTransfersTarget CargoTransfer[] @relation("CargoTransferTargetFace")
+  pickWaveLines            PickWaveLine[]
+  putawayItems             PutawayItem[]
+  cargoTransfersFrom       CargoTransfer[]              @relation("CargoTransferFrom")
+  cargoTransfersTo         CargoTransfer[]              @relation("CargoTransferTo")
+  cargoTransfersTarget     CargoTransfer[]              @relation("CargoTransferTargetFace")
   replenishmentAssignments ReplenishmentAssignment[]
-  proximityReferenceRows LocationProximityReference[]
+  proximityReferenceRows   LocationProximityReference[]
+  stocks                   LocationStock[]
 
   @@unique([tenantId, barcode])
   @@index([tenantId])
@@ -575,6 +578,26 @@ model Location {
   @@index([barracaoId])
   @@index([setorId])
   @@map("locations")
+}
+
+/// Saldo de um SKU em um pulmão. Um pulmão guarda vários SKUs e um SKU pode estar em vários pulmões;
+/// a linha só existe enquanto houver saldo.
+model LocationStock {
+  id         String   @id @default(cuid())
+  tenantId   String
+  locationId String
+  productId  String
+  quantity   Int
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  tenant   Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  location Location @relation(fields: [locationId], references: [id], onDelete: Cascade)
+  product  Product  @relation(fields: [productId], references: [id], onDelete: Restrict)
+
+  @@unique([locationId, productId])
+  @@index([tenantId, productId])
+  @@map("location_stocks")
 }
 
 model LocationProximityReference {
@@ -629,31 +652,31 @@ model WarehouseFloorPlan {
 /// colunaReversedA/B invertem o sentido das linhas só na face correspondente.
 /// A gôndola representa uma estante do cadastro (estanteId).
 model WarehouseFloorElement {
-  id             String           @id @default(cuid())
-  tenantId       String
-  floorPlanId    String
-  type           FloorElementType
-  x              Int
-  y              Int
-  width          Int
-  height         Int
-  rotation       Int              @default(0)
+  id              String           @id @default(cuid())
+  tenantId        String
+  floorPlanId     String
+  type            FloorElementType
+  x               Int
+  y               Int
+  width           Int
+  height          Int
+  rotation        Int              @default(0)
   /// Estante do LD (Face A); também do LE quando `estanteIdB` é nulo (frente e verso da mesma estante).
-  estanteId      String?
+  estanteId       String?
   /// Estante do LE (Face B) quando a gôndola junta duas estantes de costas (ex.: C no LE, D no LD).
-  estanteIdB     String?
-  faceAEnabled   Boolean          @default(true)
-  faceBEnabled   Boolean          @default(false)
+  estanteIdB      String?
+  faceAEnabled    Boolean          @default(true)
+  faceBEnabled    Boolean          @default(false)
   colunaReversedA Boolean          @default(false)
   colunaReversedB Boolean          @default(false)
   /// Faixa de colunas atendida por lado (nulo = sem limite); uma estante pode ser dividida em partes com corredor no meio.
-  colunaMinA     Int?
-  colunaMaxA     Int?
-  colunaMinB     Int?
-  colunaMaxB     Int?
-  label          String?
-  createdAt      DateTime         @default(now())
-  updatedAt      DateTime         @updatedAt
+  colunaMinA      Int?
+  colunaMaxA      Int?
+  colunaMinB      Int?
+  colunaMaxB      Int?
+  label           String?
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
 
   tenant    Tenant             @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   floorPlan WarehouseFloorPlan @relation(fields: [floorPlanId], references: [id], onDelete: Cascade)
@@ -742,33 +765,33 @@ model Basket {
 // -----------------------------------------------------------------------------
 
 model Order {
-  id        String      @id @default(cuid())
-  tenantId  String
+  id          String      @id @default(cuid())
+  tenantId    String
   /// Identificador do pedido no ERP (chave de integração)
-  erpOrderId String
-  status    OrderStatus @default(PENDING)
-  priority  Int         @default(0)
+  erpOrderId  String
+  status      OrderStatus @default(PENDING)
+  priority    Int         @default(0)
   /// Prioridade informada pelo ERP (Tiny), normalizada 0–100 quando disponível
   erpPriority Int?
 
   /// Cesta física atrelada durante a separação (opcional até o início do picking)
-  basketId  String?
+  basketId         String?
   /// Operador responsável pela separação/expedição
   assignedPickerId String?
 
   /// Metadados de integração ERP
-  customerName  String?
-  shippingLabel String?
-  notes         String?
+  customerName       String?
+  shippingLabel      String?
+  notes              String?
   /// Horário limite de coleta (ex.: Mercado Livre)
   collectionDeadline DateTime?
   /// Marketplace de origem (ex.: MERCADO_LIVRE)
   marketplace        String?
   /// Origem do pedido (TINY, MANUAL, etc.)
-  erpSource          String?  @default("MANUAL")
+  erpSource          String?   @default("MANUAL")
 
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
   /// Data/hora em que o pedido foi marcado como expedido
   dispatchedAt DateTime?
 
@@ -795,16 +818,16 @@ model Order {
 }
 
 model OrderItem {
-  id        String @id @default(cuid())
-  orderId   String
+  id             String  @id @default(cuid())
+  orderId        String
   /// Vazio quando o SKU do ERP ainda não existe no cadastro WMS
-  productId String?
+  productId      String?
   /// SKU do ERP quando productId ainda não foi resolvido
-  erpSku    String?
+  erpSku         String?
   /// Descrição do item no ERP (quando productId ausente)
   erpDescription String?
   /// Número da linha no pedido ERP
-  lineNumber Int
+  lineNumber     Int
 
   quantityOrdered Int @default(0)
   quantityPicked  Int @default(0)
@@ -816,9 +839,9 @@ model OrderItem {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  order        Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
-  product      Product? @relation(fields: [productId], references: [id], onDelete: Restrict)
-  pickLocation Location? @relation("OrderItemPickLocation", fields: [pickLocationId], references: [id], onDelete: SetNull)
+  order           Order                @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  product         Product?             @relation(fields: [productId], references: [id], onDelete: Restrict)
+  pickLocation    Location?            @relation("OrderItemPickLocation", fields: [pickLocationId], references: [id], onDelete: SetNull)
   waveAllocations PickWaveAllocation[]
 
   @@unique([orderId, lineNumber])
@@ -836,8 +859,8 @@ model InventoryMovement {
   tenantId  String
   createdAt DateTime @default(now())
 
-  type      InventoryMovementType
-  quantity  Int
+  type     InventoryMovementType
+  quantity Int
 
   userId    String
   productId String
@@ -856,23 +879,26 @@ model InventoryMovement {
 
   cargoTransferId          String?
   putawaySessionId         String?
+  /// Item da armazenagem que gerou a entrada (um item pode ser guardado em vários pulmões)
+  putawayItemId            String?
   purchaseReceiptSessionId String?
   pickWaveLineId           String?
   startedAt                DateTime?
   completedAt              DateTime?
 
-  tenant       Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  user         User      @relation(fields: [userId], references: [id], onDelete: Restrict)
-  product      Product   @relation(fields: [productId], references: [id], onDelete: Restrict)
-  fromLocation Location? @relation("MovementFromLocation", fields: [fromLocationId], references: [id], onDelete: SetNull)
-  toLocation   Location? @relation("MovementToLocation", fields: [toLocationId], references: [id], onDelete: SetNull)
-  order        Order?    @relation(fields: [orderId], references: [id], onDelete: SetNull)
-  cargoTransfer CargoTransfer? @relation(fields: [cargoTransferId], references: [id], onDelete: SetNull)
-  putawaySession PutawaySession? @relation(fields: [putawaySessionId], references: [id], onDelete: SetNull)
-  purchaseReceiptSession PurchaseReceiptSession? @relation(fields: [purchaseReceiptSessionId], references: [id], onDelete: SetNull)
-  pickWaveLine PickWaveLine? @relation(fields: [pickWaveLineId], references: [id], onDelete: SetNull)
-  withdrawForCargoTransfer CargoTransfer? @relation("CargoWithdrawMovement")
-  depositForCargoTransfer  CargoTransfer? @relation("CargoDepositMovement")
+  tenant                   Tenant                  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  user                     User                    @relation(fields: [userId], references: [id], onDelete: Restrict)
+  product                  Product                 @relation(fields: [productId], references: [id], onDelete: Restrict)
+  fromLocation             Location?               @relation("MovementFromLocation", fields: [fromLocationId], references: [id], onDelete: SetNull)
+  toLocation               Location?               @relation("MovementToLocation", fields: [toLocationId], references: [id], onDelete: SetNull)
+  order                    Order?                  @relation(fields: [orderId], references: [id], onDelete: SetNull)
+  cargoTransfer            CargoTransfer?          @relation(fields: [cargoTransferId], references: [id], onDelete: SetNull)
+  putawaySession           PutawaySession?         @relation(fields: [putawaySessionId], references: [id], onDelete: SetNull)
+  putawayItem              PutawayItem?            @relation(fields: [putawayItemId], references: [id], onDelete: SetNull)
+  purchaseReceiptSession   PurchaseReceiptSession? @relation(fields: [purchaseReceiptSessionId], references: [id], onDelete: SetNull)
+  pickWaveLine             PickWaveLine?           @relation(fields: [pickWaveLineId], references: [id], onDelete: SetNull)
+  withdrawForCargoTransfer CargoTransfer?          @relation("CargoWithdrawMovement")
+  depositForCargoTransfer  CargoTransfer?          @relation("CargoDepositMovement")
 
   @@index([tenantId])
   @@index([createdAt])
@@ -882,6 +908,7 @@ model InventoryMovement {
   @@index([fromLocationId])
   @@index([toLocationId])
   @@index([cargoTransferId])
+  @@index([putawayItemId])
   @@map("inventory_movements")
 }
 
@@ -896,28 +923,28 @@ model CargoTransfer {
   productId String
   quantity  Int
 
-  fromLocationId String
-  toLocationId   String?
+  fromLocationId   String
+  toLocationId     String?
   targetPickFaceId String?
 
   withdrawnById String
-  withdrawnAt   DateTime @default(now())
+  withdrawnAt   DateTime  @default(now())
   depositedById String?
   depositedAt   DateTime?
 
   withdrawMovementId String? @unique
   depositMovementId  String? @unique
 
-  tenant         Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  product        Product   @relation(fields: [productId], references: [id], onDelete: Restrict)
-  fromLocation   Location  @relation("CargoTransferFrom", fields: [fromLocationId], references: [id], onDelete: Restrict)
-  toLocation     Location? @relation("CargoTransferTo", fields: [toLocationId], references: [id], onDelete: SetNull)
-  targetPickFace Location? @relation("CargoTransferTargetFace", fields: [targetPickFaceId], references: [id], onDelete: SetNull)
-  withdrawnBy    User      @relation("CargoTransferWithdrawnBy", fields: [withdrawnById], references: [id], onDelete: Restrict)
-  depositedBy    User?     @relation("CargoTransferDepositedBy", fields: [depositedById], references: [id], onDelete: SetNull)
-  withdrawMovement InventoryMovement? @relation("CargoWithdrawMovement", fields: [withdrawMovementId], references: [id], onDelete: SetNull)
-  depositMovement  InventoryMovement? @relation("CargoDepositMovement", fields: [depositMovementId], references: [id], onDelete: SetNull)
-  movements        InventoryMovement[]
+  tenant                  Tenant                   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  product                 Product                  @relation(fields: [productId], references: [id], onDelete: Restrict)
+  fromLocation            Location                 @relation("CargoTransferFrom", fields: [fromLocationId], references: [id], onDelete: Restrict)
+  toLocation              Location?                @relation("CargoTransferTo", fields: [toLocationId], references: [id], onDelete: SetNull)
+  targetPickFace          Location?                @relation("CargoTransferTargetFace", fields: [targetPickFaceId], references: [id], onDelete: SetNull)
+  withdrawnBy             User                     @relation("CargoTransferWithdrawnBy", fields: [withdrawnById], references: [id], onDelete: Restrict)
+  depositedBy             User?                    @relation("CargoTransferDepositedBy", fields: [depositedById], references: [id], onDelete: SetNull)
+  withdrawMovement        InventoryMovement?       @relation("CargoWithdrawMovement", fields: [withdrawMovementId], references: [id], onDelete: SetNull)
+  depositMovement         InventoryMovement?       @relation("CargoDepositMovement", fields: [depositMovementId], references: [id], onDelete: SetNull)
+  movements               InventoryMovement[]
   replenishmentAssignment ReplenishmentAssignment?
 
   @@index([tenantId, status])
@@ -975,22 +1002,22 @@ model OrderStageLog {
 // -----------------------------------------------------------------------------
 
 model PickWave {
-  id                 String         @id @default(cuid())
-  tenantId           String
-  name               String
-  status             PickWaveStatus @default(DRAFT)
-  marketplace        String?
-  partitionStrategy  String?
-  releasedAt         DateTime?
-  releasedById       String?
-  acceptedById       String?
-  acceptedAt         DateTime?
-  createdAt          DateTime       @default(now())
-  updatedAt          DateTime       @updatedAt
+  id                String         @id @default(cuid())
+  tenantId          String
+  name              String
+  status            PickWaveStatus @default(DRAFT)
+  marketplace       String?
+  partitionStrategy String?
+  releasedAt        DateTime?
+  releasedById      String?
+  acceptedById      String?
+  acceptedAt        DateTime?
+  createdAt         DateTime       @default(now())
+  updatedAt         DateTime       @updatedAt
 
-  tenant     Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  releasedBy User?  @relation("WaveReleasedBy", fields: [releasedById], references: [id], onDelete: SetNull)
-  acceptedBy User?  @relation("WaveAcceptedBy", fields: [acceptedById], references: [id], onDelete: SetNull)
+  tenant     Tenant          @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  releasedBy User?           @relation("WaveReleasedBy", fields: [releasedById], references: [id], onDelete: SetNull)
+  acceptedBy User?           @relation("WaveAcceptedBy", fields: [acceptedById], references: [id], onDelete: SetNull)
   orders     PickWaveOrder[]
   lines      PickWaveLine[]
   parts      PickWavePart[]
@@ -1069,30 +1096,30 @@ model TinyConnection {
 // -----------------------------------------------------------------------------
 
 model PurchaseReceiptSession {
-  id              String                       @id @default(cuid())
-  tenantId        String
-  kind            PurchaseReceiptKind          @default(ENTRY)
-  tinyNotaId      Int?
-  accessKey       String?
-  invoiceNumber   String?
-  supplierName    String?
+  id                  String                       @id @default(cuid())
+  tenantId            String
+  kind                PurchaseReceiptKind          @default(ENTRY)
+  tinyNotaId          Int?
+  accessKey           String?
+  invoiceNumber       String?
+  supplierName        String?
   /// Referência manual (ex.: pedido devolvido)
-  reference       String?
-  status          PurchaseReceiptSessionStatus @default(READY_TO_CHECK)
-  tinySyncStatus  String?
-  tinySyncMessage String?
-  startedById          String
-  startedAt            DateTime                     @default(now())
-  conferenceStartedAt  DateTime?
-  conferenceEndedAt    DateTime?
-  completedAt          DateTime?
-  updatedAt            DateTime                     @updatedAt
+  reference           String?
+  status              PurchaseReceiptSessionStatus @default(READY_TO_CHECK)
+  tinySyncStatus      String?
+  tinySyncMessage     String?
+  startedById         String
+  startedAt           DateTime                     @default(now())
+  conferenceStartedAt DateTime?
+  conferenceEndedAt   DateTime?
+  completedAt         DateTime?
+  updatedAt           DateTime                     @updatedAt
 
-  tenant    Tenant                    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  startedBy User                      @relation("PurchaseReceiptStartedBy", fields: [startedById], references: [id], onDelete: Restrict)
-  items     PurchaseReceiptItem[]
-  timeLogs  PurchaseReceiptTimeLog[]
-  putaway   PutawaySession?
+  tenant             Tenant                   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  startedBy          User                     @relation("PurchaseReceiptStartedBy", fields: [startedById], references: [id], onDelete: Restrict)
+  items              PurchaseReceiptItem[]
+  timeLogs           PurchaseReceiptTimeLog[]
+  putaway            PutawaySession?
   inventoryMovements InventoryMovement[]
 
   @@unique([tenantId, accessKey], map: "purchase_receipt_sessions_tenant_access_key")
@@ -1111,7 +1138,7 @@ model PurchaseReceiptTimeLog {
   createdAt DateTime @default(now())
 
   session PurchaseReceiptSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
-  user    User                    @relation(fields: [userId], references: [id], onDelete: Restrict)
+  user    User                   @relation(fields: [userId], references: [id], onDelete: Restrict)
 
   @@index([sessionId, createdAt])
   @@map("purchase_receipt_time_logs")
@@ -1127,10 +1154,10 @@ model PutawaySession {
   createdAt         DateTime             @default(now())
   updatedAt         DateTime             @updatedAt
 
-  purchaseReceipt PurchaseReceiptSession @relation(fields: [purchaseReceiptId], references: [id], onDelete: Cascade)
-  assignedTo      User?                  @relation("PutawayAssignedTo", fields: [assignedToId], references: [id], onDelete: SetNull)
-  items           PutawayItem[]
-  timeLogs        PutawayTimeLog[]
+  purchaseReceipt    PurchaseReceiptSession @relation(fields: [purchaseReceiptId], references: [id], onDelete: Cascade)
+  assignedTo         User?                  @relation("PutawayAssignedTo", fields: [assignedToId], references: [id], onDelete: SetNull)
+  items              PutawayItem[]
+  timeLogs           PutawayTimeLog[]
   inventoryMovements InventoryMovement[]
 
   @@index([status])
@@ -1160,10 +1187,12 @@ model PutawayItem {
   barcode          String?
   quantityExpected Decimal @db.Decimal(12, 3)
   quantityStored   Decimal @default(0) @db.Decimal(12, 3)
+  /// Último pulmão usado; todos os pulmões do item estão nas movimentações (putawayItemId)
   locationId       String?
 
-  session  PutawaySession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
-  location Location?      @relation(fields: [locationId], references: [id], onDelete: SetNull)
+  session   PutawaySession      @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  location  Location?           @relation(fields: [locationId], references: [id], onDelete: SetNull)
+  movements InventoryMovement[]
 
   @@index([sessionId])
   @@map("putaway_items")
@@ -1235,17 +1264,16 @@ model PickWaveLine {
   createdAt       DateTime               @default(now())
   updatedAt       DateTime               @updatedAt
 
-  wave         PickWave             @relation(fields: [waveId], references: [id], onDelete: Cascade)
-  part         PickWavePart?        @relation(fields: [partId], references: [id], onDelete: SetNull)
-  product      Product              @relation(fields: [productId], references: [id], onDelete: Restrict)
-  pickLocation Location             @relation(fields: [pickLocationId], references: [id], onDelete: Restrict)
-  pickedBy     User?                @relation("WaveLinePickedBy", fields: [pickedById], references: [id], onDelete: SetNull)
-  allocations  PickWaveAllocation[]
+  wave               PickWave             @relation(fields: [waveId], references: [id], onDelete: Cascade)
+  part               PickWavePart?        @relation(fields: [partId], references: [id], onDelete: SetNull)
+  product            Product              @relation(fields: [productId], references: [id], onDelete: Restrict)
+  pickLocation       Location             @relation(fields: [pickLocationId], references: [id], onDelete: Restrict)
+  pickedBy           User?                @relation("WaveLinePickedBy", fields: [pickedById], references: [id], onDelete: SetNull)
+  allocations        PickWaveAllocation[]
   inventoryMovements InventoryMovement[]
 
-  @@index([pickCompletedAt])
-
   @@unique([waveId, productId, pickLocationId])
+  @@index([pickCompletedAt])
   @@index([waveId, sortStatus])
   @@index([partId])
   @@map("pick_wave_lines")
@@ -1276,13 +1304,13 @@ model PickWaveAllocation {
 // -----------------------------------------------------------------------------
 
 model ReplenishmentAssignment {
-  id              String                       @id @default(cuid())
+  id              String                        @id @default(cuid())
   tenantId        String
   pickFaceId      String
   assignedToId    String
   status          ReplenishmentAssignmentStatus @default(OPEN)
-  cargoTransferId String?                      @unique
-  acceptedAt      DateTime                     @default(now())
+  cargoTransferId String?                       @unique
+  acceptedAt      DateTime                      @default(now())
   completedAt     DateTime?
 
   tenant        Tenant         @relation(fields: [tenantId], references: [id], onDelete: Cascade)

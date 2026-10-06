@@ -296,36 +296,31 @@ export async function listProductLocations(
     throw new ProductLocationsError("Produto não encontrado", 404);
   }
 
-  const locations = await prisma.location.findMany({
-    where: {
-      tenantId,
-      active: true,
-      type,
-      productId: product.id,
-      ...(type === LocationType.PULMAO ? { currentQuantity: { gt: 0 } } : {}),
-    },
-    include: {
-      product: {
-        select: {
-          id: true,
-          sku: true,
-          name: true,
-          barcode: true,
-          imageUrl: true,
-        },
-      },
-    },
-  });
-
+  // No pulmão, currentQuantity é o saldo deste SKU (o pulmão pode ter outros SKUs).
   const sorted =
     type === LocationType.PULMAO
-      ? [...locations].sort((a, b) => b.currentQuantity - a.currentQuantity)
-      : (await getRouteEngine(tenantId)).sortByRoute(locations);
+      ? (
+          await prisma.locationStock.findMany({
+            where: {
+              tenantId,
+              productId: product.id,
+              quantity: { gt: 0 },
+              location: { active: true, type: LocationType.PULMAO },
+            },
+            include: { location: true },
+            orderBy: { quantity: "desc" },
+          })
+        ).map((s) => ({ ...s.location, currentQuantity: s.quantity }))
+      : (await getRouteEngine(tenantId)).sortByRoute(
+          await prisma.location.findMany({
+            where: { tenantId, active: true, type, productId: product.id },
+          }),
+        );
 
   let suggestedId: string | null = null;
   if (type === LocationType.PICK_FACE && sorted.length > 0) {
-    const best = await resolvePickFaceForProduct(tenantId, product.id, 1);
-    suggestedId = best?.id ?? sorted[0]?.id ?? null;
+    const best = await resolvePickFaceForProduct(product.id, tenantId, 1);
+    suggestedId = best.id;
   } else if (type === LocationType.PULMAO && sorted.length > 0) {
     suggestedId = sorted[0]!.id;
   }

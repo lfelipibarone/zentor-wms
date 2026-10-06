@@ -282,6 +282,10 @@ export async function applyInventoryLayout(
       result.errors.push({ address: code, message: "Posição não criada (fora das dimensões da estante)" });
       continue;
     }
+    if (location.type === LocationType.PULMAO) {
+      result.errors.push({ address: code, message: `Pulmão não tem SKU fixo; ${sku} não associado` });
+      continue;
+    }
     if (location.productId === productId) {
       result.skus.unchanged++;
       continue;

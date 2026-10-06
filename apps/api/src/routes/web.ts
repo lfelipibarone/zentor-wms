@@ -35,6 +35,7 @@ import {
   resumePausedOrdersAfterPickFace,
 } from "../services/product-locations.js";
 import { selectableProductWhere } from "../services/product-selectable.js";
+import { addPulmaoStock, pulmaoStocksInclude } from "../services/pulmao-inventory.js";
 import {
   layoutInclude,
   resolveLocationLayout,
@@ -728,21 +729,28 @@ export async function webRoutes(app: FastifyInstance) {
       const where: Prisma.LocationWhereInput = {
         ...tenantWhere(request),
         ...(typeFilter ? { type: typeFilter } : {}),
-        ...(sku
-          ? {
-              product: {
-                sku: { contains: sku, mode: "insensitive" },
-              },
-            }
-          : {}),
-        ...(q
-          ? {
-              OR: [
-                { barcode: { contains: q, mode: "insensitive" } },
-                { corridor: { contains: q, mode: "insensitive" } },
-              ],
-            }
-          : {}),
+        AND: [
+          sku
+            ? {
+                OR: [
+                  { product: { sku: { contains: sku, mode: "insensitive" } } },
+                  {
+                    stocks: {
+                      some: { quantity: { gt: 0 }, product: { sku: { contains: sku, mode: "insensitive" } } },
+                    },
+                  },
+                ],
+              }
+            : {},
+          q
+            ? {
+                OR: [
+                  { barcode: { contains: q, mode: "insensitive" } },
+                  { corridor: { contains: q, mode: "insensitive" } },
+                ],
+              }
+            : {},
+        ],
       };
       const [locations, total] = await Promise.all([
         prisma.location.findMany({
@@ -831,7 +839,7 @@ export async function webRoutes(app: FastifyInstance) {
             proximityEstanteId: layout.proximityEstanteId,
             proximityLinhaId: layout.proximityLinhaId,
             type: b.type,
-            productId: b.productId || null,
+            productId: b.type === LocationType.PULMAO ? null : b.productId || null,
             capacity: b.capacity ?? 100,
             minThreshold: b.minThreshold ?? 0,
             currentQuantity: 0,
@@ -882,6 +890,11 @@ export async function webRoutes(app: FastifyInstance) {
         });
         if (!existing) {
           return reply.status(404).send({ error: "Localização não encontrada" });
+        }
+        if (existing.type === LocationType.PULMAO && request.body.productId) {
+          return reply
+            .status(400)
+            .send({ error: "Pulmão aceita vários SKUs e não tem SKU fixo" });
         }
         const productId =
           request.body.productId !== undefined
@@ -1126,20 +1139,27 @@ export async function webRoutes(app: FastifyInstance) {
               OR: [
                 { barcode: { contains: q, mode: "insensitive" } },
                 { product: { sku: { contains: q, mode: "insensitive" } } },
+                {
+                  stocks: {
+                    some: { quantity: { gt: 0 }, product: { sku: { contains: q, mode: "insensitive" } } },
+                  },
+                },
               ],
             }
           : { active: true }),
         ...(typeFilter ? { type: typeFilter } : {}),
       };
+      const stockInclude = { product: true, stocks: pulmaoStocksInclude } as const;
 
       if (lowOnly) {
         const all = await prisma.location.findMany({
           where: baseWhere,
-          include: { product: true },
+          include: stockInclude,
           orderBy: [{ corridor: "asc" }, { row: "asc" }],
         });
+        // Pulmão não tem mínimo por posição (vários SKUs, sem limite de unidades).
         const filtered = all.filter(
-          (l) => l.currentQuantity <= l.minThreshold,
+          (l) => l.type !== LocationType.PULMAO && l.currentQuantity <= l.minThreshold,
         );
         const slice = filtered.slice(skip, skip + take);
         return {
@@ -1151,7 +1171,7 @@ export async function webRoutes(app: FastifyInstance) {
       const [locations, total] = await Promise.all([
         prisma.location.findMany({
           where: baseWhere,
-          include: { product: true },
+          include: stockInclude,
           orderBy: [{ corridor: "asc" }, { row: "asc" }],
           skip,
           take,
@@ -1303,11 +1323,16 @@ export async function webRoutes(app: FastifyInstance) {
       if (!productId || !toLocationId || !quantity || quantity < 1) {
         return reply.status(400).send({ error: "Produto, local e quantidade são obrigatórios" });
       }
-      const loc = await prisma.location.findUnique({ where: { id: toLocationId } });
+      const loc = await prisma.location.findFirst({
+        where: { id: toLocationId, ...tenantWhere(request) },
+      });
       if (!loc) return reply.status(404).send({ error: "Localização não encontrada" });
+      if (loc.type === LocationType.PICK_FACE && loc.productId && loc.productId !== productId) {
+        return reply.status(400).send({ error: "Gôndola alocada para outro produto" });
+      }
 
-      const [movement] = await prisma.$transaction([
-        prisma.inventoryMovement.create({
+      const movement = await prisma.$transaction(async (tx) => {
+        const created = await tx.inventoryMovement.create({
           data: {
             tenantId: loc.tenantId,
             type: InventoryMovementType.ENTRY,
@@ -1322,12 +1347,17 @@ export async function webRoutes(app: FastifyInstance) {
             product: { select: { sku: true, name: true } },
             toLocation: { select: { barcode: true } },
           },
-        }),
-        prisma.location.update({
-          where: { id: toLocationId },
-          data: { currentQuantity: { increment: quantity }, productId },
-        }),
-      ]);
+        });
+        if (loc.type === LocationType.PULMAO) {
+          await addPulmaoStock(tx, { tenantId: loc.tenantId, locationId: loc.id, productId }, quantity);
+        } else {
+          await tx.location.update({
+            where: { id: toLocationId },
+            data: { currentQuantity: { increment: quantity }, productId },
+          });
+        }
+        return created;
+      });
 
       return reply.status(201).send({ receipt: movement });
     },

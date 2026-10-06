@@ -1,6 +1,7 @@
-import { InventoryMovementType } from "@prisma/client";
+import { InventoryMovementType, LocationType, type Product } from "@prisma/client";
 import { prisma } from "../lib/prisma.js";
 import { findProductByBarcode } from "./location-stock.js";
+import { getPulmaoStockQuantity, setPulmaoStock } from "./pulmao-inventory.js";
 import {
   reconcilePickTargetsAfterStockChange,
   type ReconcileResult,
@@ -50,6 +51,8 @@ export type AdjustLocationResult = {
       name: string;
       barcode: string | null;
     } | null;
+    /** Saldo do produto informado (no pulmão, só o do SKU contado) */
+    productQuantity: number;
   };
   previousQuantity: number;
   adjustmentDelta: number;
@@ -82,20 +85,34 @@ export async function adjustLocationQuantity(
     throw new LocationAdjustError("Localização não encontrada", 404);
   }
 
-  if (counted > location.capacity) {
+  const isPulmao = location.type === LocationType.PULMAO;
+
+  if (!isPulmao && counted > location.capacity) {
     throw new LocationAdjustError(
       `Quantidade excede a capacidade (${location.capacity})`,
     );
   }
 
-  if (input.productBarcode?.trim() && location.productId) {
+  let pulmaoProduct: Product | null = null;
+  if (isPulmao) {
+    if (!input.productBarcode?.trim()) {
+      throw new LocationAdjustError("Informe o produto contado neste pulmão");
+    }
+    pulmaoProduct = await findProductByBarcode(input.tenantId, input.productBarcode);
+    if (!pulmaoProduct) {
+      throw new LocationAdjustError("Produto não cadastrado", 404);
+    }
+  } else if (input.productBarcode?.trim() && location.productId) {
     const product = await findProductByBarcode(input.tenantId, input.productBarcode);
     if (!product || product.id !== location.productId) {
       throw new LocationAdjustError("Produto não corresponde a este endereço");
     }
   }
 
-  const previousQuantity = location.currentQuantity;
+  const productId = pulmaoProduct?.id ?? location.productId;
+  const previousQuantity = pulmaoProduct
+    ? await getPulmaoStockQuantity(prisma, location.id, pulmaoProduct.id)
+    : location.currentQuantity;
   const delta = counted - previousQuantity;
 
   const noteParts = [
@@ -109,19 +126,27 @@ export async function adjustLocationQuantity(
   const notes = noteParts.join("; ");
 
   await prisma.$transaction(async (tx) => {
-    await tx.location.update({
-      where: { id: location.id },
-      data: { currentQuantity: counted },
-    });
+    if (pulmaoProduct) {
+      await setPulmaoStock(
+        tx,
+        { tenantId: input.tenantId, locationId: location.id, productId: pulmaoProduct.id },
+        counted,
+      );
+    } else {
+      await tx.location.update({
+        where: { id: location.id },
+        data: { currentQuantity: counted },
+      });
+    }
 
-    if (delta !== 0 && location.productId) {
+    if (delta !== 0 && productId) {
       await tx.inventoryMovement.create({
         data: {
           tenantId: input.tenantId,
           type: InventoryMovementType.ADJUSTMENT,
           quantity: Math.abs(delta),
           userId: input.userId,
-          productId: location.productId,
+          productId,
           fromLocationId: delta < 0 ? location.id : undefined,
           toLocationId: delta > 0 ? location.id : undefined,
           orderId: input.orderId,
@@ -131,7 +156,6 @@ export async function adjustLocationQuantity(
     }
   });
 
-  const productId = location.productId;
   const reconciliation = productId
     ? await reconcilePickTargetsAfterStockChange(input.tenantId, productId, {
         adjustedLocationId: location.id,
@@ -150,6 +174,7 @@ export async function adjustLocationQuantity(
     where: { id: location.id },
     include: { product: true },
   });
+  const shownProduct = pulmaoProduct ?? updated!.product;
 
   return {
     location: {
@@ -162,14 +187,15 @@ export async function adjustLocationQuantity(
       capacity: updated!.capacity,
       minThreshold: updated!.minThreshold,
       label: formatLocation(updated!),
-      product: updated!.product
+      product: shownProduct
         ? {
-            id: updated!.product.id,
-            sku: updated!.product.sku,
-            name: updated!.product.name,
-            barcode: updated!.product.barcode,
+            id: shownProduct.id,
+            sku: shownProduct.sku,
+            name: shownProduct.name,
+            barcode: shownProduct.barcode,
           }
         : null,
+      productQuantity: pulmaoProduct ? counted : updated!.currentQuantity,
     },
     previousQuantity,
     adjustmentDelta: delta,

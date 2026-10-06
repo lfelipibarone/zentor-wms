@@ -11,6 +11,11 @@ import { parsePagination, buildPaginationMeta } from "../lib/pagination.js";
 import { assertResourceTenant } from "../lib/tenant-context.js";
 import { resolvePickFaceForProduct, PickFaceError } from "./pick-face-resolve.js";
 import { formatPurchaseReceiptSession } from "./tiny-purchase-receipt.js";
+import {
+  putawayItemInclude,
+  storedLocationsOf,
+  type PutawayStoredLocation,
+} from "./putaway.js";
 
 function durationMs(start: Date | null, end: Date | null): number | null {
   if (!start || !end) return null;
@@ -78,7 +83,7 @@ async function enrichReceiptItems(
   items: PurchaseReceiptItem[],
   putawayItems: Array<{
     receiptItemId: string | null;
-    location: { barcode: string } | null;
+    storedLocations: PutawayStoredLocation[];
   }>,
 ) {
   const codes = new Set<string>();
@@ -104,8 +109,8 @@ async function enrichReceiptItems(
   const lookup = buildProductLookup(products);
   const putawayByReceiptItem = new Map(
     putawayItems
-      .filter((p) => p.receiptItemId && p.location)
-      .map((p) => [p.receiptItemId!, p.location!.barcode]),
+      .filter((p) => p.receiptItemId && p.storedLocations.length > 0)
+      .map((p) => [p.receiptItemId!, p.storedLocations]),
   );
 
   const suggestedCache = new Map<string, string | null>();
@@ -136,7 +141,8 @@ async function enrichReceiptItems(
         quantityChecked: Number(it.quantityChecked),
         completed: Number(it.quantityChecked) >= Number(it.quantityExpected),
         suggestedLocation,
-        putawayLocation: putawayByReceiptItem.get(it.id) ?? null,
+        putawayLocation: putawayByReceiptItem.get(it.id)?.map((l) => l.barcode).join(", ") ?? null,
+        putawayLocations: putawayByReceiptItem.get(it.id) ?? [],
       };
     }),
   );
@@ -300,9 +306,7 @@ export async function getPurchaseReceiptDetailForWeb(
       putaway: {
         include: {
           assignedTo: { select: { name: true } },
-          items: {
-            include: { location: { select: { barcode: true } } },
-          },
+          items: { include: putawayItemInclude },
         },
       },
       timeLogs: {
@@ -314,7 +318,10 @@ export async function getPurchaseReceiptDetailForWeb(
   if (!s) return null;
   await assertResourceTenant(s.tenantId, tenantId);
 
-  const putawayItems = s.putaway?.items ?? [];
+  const putawayItems = (s.putaway?.items ?? []).map((pi) => ({
+    ...pi,
+    storedLocations: storedLocationsOf(pi),
+  }));
   const enrichedItems = await enrichReceiptItems(
     s.tenantId,
     s.items,
@@ -366,13 +373,14 @@ export async function getPurchaseReceiptDetailForWeb(
           operatorName: s.putaway.assignedTo?.name ?? null,
           startedAt: s.putaway.startedAt?.toISOString() ?? null,
           completedAt: s.putaway.completedAt?.toISOString() ?? null,
-          items: s.putaway.items.map((pi) => ({
+          items: putawayItems.map((pi) => ({
             id: pi.id,
             productCode: pi.productCode,
             description: pi.description,
             quantityExpected: Number(pi.quantityExpected),
             quantityStored: Number(pi.quantityStored),
             locationBarcode: pi.location?.barcode ?? null,
+            storedLocations: pi.storedLocations,
           })),
         }
       : null,

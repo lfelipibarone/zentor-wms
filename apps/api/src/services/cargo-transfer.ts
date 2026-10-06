@@ -5,6 +5,11 @@ import {
 } from "@prisma/client";
 import { prisma } from "../lib/prisma.js";
 import { findProductByBarcode } from "./location-stock.js";
+import {
+  addPulmaoStock,
+  getPulmaoStockQuantity,
+  removePulmaoStock,
+} from "./pulmao-inventory.js";
 
 export class CargoTransferError extends Error {
   constructor(
@@ -143,7 +148,6 @@ export async function withdrawCargoTransfer(input: {
       barcode: fromBarcode,
       active: true,
     },
-    include: { product: true },
   });
 
   if (!fromLoc) {
@@ -157,12 +161,13 @@ export async function withdrawCargoTransfer(input: {
   if (!product) {
     throw new CargoTransferError("Produto não cadastrado", 404);
   }
-  if (fromLoc.productId && fromLoc.productId !== product.id) {
-    throw new CargoTransferError("Produto não corresponde ao pulmão de origem");
+  const available = await getPulmaoStockQuantity(prisma, fromLoc.id, product.id);
+  if (available <= 0) {
+    throw new CargoTransferError(`Pulmão ${fromLoc.barcode} não tem saldo de ${product.sku}`);
   }
-  if (fromLoc.currentQuantity < quantity) {
+  if (available < quantity) {
     throw new CargoTransferError(
-      `Estoque insuficiente no pulmão (disponível: ${fromLoc.currentQuantity})`,
+      `Estoque insuficiente no pulmão (disponível: ${available})`,
     );
   }
 
@@ -216,14 +221,12 @@ export async function withdrawCargoTransfer(input: {
       },
     });
 
-    const newFromQty = fromLoc.currentQuantity - quantity;
-    await tx.location.update({
-      where: { id: fromLoc.id },
-      data: {
-        productId: product.id,
-        currentQuantity: newFromQty,
-      },
-    });
+    const newFromQty = await removePulmaoStock(
+      tx,
+      { tenantId: input.tenantId, locationId: fromLoc.id, productId: product.id },
+      quantity,
+      (left) => new CargoTransferError(`Estoque insuficiente no pulmão (disponível: ${left})`),
+    );
 
     const movement = await tx.inventoryMovement.create({
       data: {
@@ -300,12 +303,18 @@ export async function cancelCargoTransfer(
   }
 
   await prisma.$transaction(async (tx) => {
-    await tx.location.update({
-      where: { id: transfer.fromLocationId },
-      data: {
-        currentQuantity: transfer.fromLocation.currentQuantity + transfer.quantity,
-      },
-    });
+    if (transfer.fromLocation.type === LocationType.PULMAO) {
+      await addPulmaoStock(
+        tx,
+        { tenantId, locationId: transfer.fromLocationId, productId: transfer.productId },
+        transfer.quantity,
+      );
+    } else {
+      await tx.location.update({
+        where: { id: transfer.fromLocationId },
+        data: { currentQuantity: { increment: transfer.quantity } },
+      });
+    }
 
     await tx.inventoryMovement.create({
       data: {

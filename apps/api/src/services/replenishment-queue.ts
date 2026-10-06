@@ -20,6 +20,7 @@ export type ReplenishmentNeed = {
     id: string;
     barcode: string;
     label: string;
+    /** Saldo deste SKU no pulmão */
     currentQuantity: number;
   } | null;
 };
@@ -27,7 +28,7 @@ export type ReplenishmentNeed = {
 export async function listReplenishmentNeeds(
   tenantId: string,
 ): Promise<ReplenishmentNeed[]> {
-  const [faces, inTransit, pulmaos] = await Promise.all([
+  const [faces, inTransit, pulmaoStocks] = await Promise.all([
     prisma.location.findMany({
       where: {
         tenantId,
@@ -45,12 +46,14 @@ export async function listReplenishmentNeeds(
       where: { tenantId, status: CargoTransferStatus.IN_TRANSIT },
       select: { targetPickFaceId: true },
     }),
-    prisma.location.findMany({
+    prisma.locationStock.findMany({
       where: {
         tenantId,
-        active: true,
-        type: LocationType.PULMAO,
-        productId: { not: null },
+        quantity: { gt: 0 },
+        location: { active: true, type: LocationType.PULMAO },
+      },
+      include: {
+        location: { select: { id: true, barcode: true, corridor: true, row: true } },
       },
     }),
   ]);
@@ -60,6 +63,14 @@ export async function listReplenishmentNeeds(
       .map((t) => t.targetPickFaceId)
       .filter((id): id is string => id != null),
   );
+
+  const bestPulmaoByProduct = new Map<string, (typeof pulmaoStocks)[number]>();
+  for (const stock of pulmaoStocks) {
+    const best = bestPulmaoByProduct.get(stock.productId);
+    if (!best || stock.quantity > best.quantity) {
+      bestPulmaoByProduct.set(stock.productId, stock);
+    }
+  }
 
   const lowFaces = faces.filter(
     (f) => f.currentQuantity <= f.minThreshold && f.product,
@@ -78,10 +89,7 @@ export async function listReplenishmentNeeds(
         room || deficit || 1,
       );
 
-      const pulmaoCandidates = pulmaos
-        .filter((p) => p.productId === product.id && p.currentQuantity > 0)
-        .sort((a, b) => b.currentQuantity - a.currentQuantity);
-      const bestPulmao = pulmaoCandidates[0] ?? null;
+      const bestPulmao = bestPulmaoByProduct.get(product.id) ?? null;
 
       return {
         id: face.id,
@@ -98,10 +106,10 @@ export async function listReplenishmentNeeds(
         deficit: qtyNeeded,
         suggestedPulmao: bestPulmao
           ? {
-              id: bestPulmao.id,
-              barcode: bestPulmao.barcode,
-              label: formatRouteLabel(bestPulmao),
-              currentQuantity: bestPulmao.currentQuantity,
+              id: bestPulmao.location.id,
+              barcode: bestPulmao.location.barcode,
+              label: formatRouteLabel(bestPulmao.location),
+              currentQuantity: bestPulmao.quantity,
             }
           : null,
       };

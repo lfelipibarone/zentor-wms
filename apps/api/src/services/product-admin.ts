@@ -33,8 +33,32 @@ const locationDetailSelect = {
   barracao: { select: { code: true, name: true } },
 } satisfies Prisma.LocationSelect;
 
+const pulmaoStockWhere = {
+  quantity: { gt: 0 },
+  location: { active: true, type: LocationType.PULMAO },
+} satisfies Prisma.LocationStockWhereInput;
+
+/**
+ * Pulmões não têm SKU fixo: entram na lista de posições do produto enquanto tiverem saldo dele,
+ * com `currentQuantity` = saldo deste SKU.
+ */
+function mergePulmaoStocks<L extends { barcode: string }, P extends { locations: L[]; locationStocks: Array<{ quantity: number; location: L }> }>(
+  product: P,
+): Omit<P, "locationStocks"> & { locations: Array<L & { pulmaoStock: boolean }> } {
+  const { locationStocks, ...rest } = product;
+  return {
+    ...rest,
+    locations: [
+      ...product.locations.map((l) => ({ ...l, pulmaoStock: false })),
+      ...locationStocks.map((s) => ({ ...s.location, currentQuantity: s.quantity, pulmaoStock: true })),
+    ],
+  };
+}
+
 function missingWhere(missing?: ProductMissingFilter): Prisma.ProductWhereInput {
-  if (missing === "location") return { locations: { none: { active: true } } };
+  if (missing === "location") {
+    return { locations: { none: { active: true } }, locationStocks: { none: pulmaoStockWhere } };
+  }
   if (missing === "image") return { OR: [{ imageUrl: null }, { imageUrl: "" }] };
   if (missing === "barcode") return { OR: [{ barcode: null }, { barcode: "" }] };
   return {};
@@ -69,11 +93,19 @@ export async function listProductsForAdmin(
       take: opts.take,
       include: {
         locations: { where: { active: true }, select: locationSummarySelect, orderBy: { barcode: "asc" } },
+        locationStocks: {
+          where: pulmaoStockWhere,
+          select: { quantity: true, location: { select: locationSummarySelect } },
+          orderBy: { quantity: "desc" },
+        },
       },
     }),
     prisma.product.count({ where }),
   ]);
-  return { products, pagination: buildPaginationMeta(total, opts.page, opts.pageSize) };
+  return {
+    products: products.map(mergePulmaoStocks),
+    pagination: buildPaginationMeta(total, opts.page, opts.pageSize),
+  };
 }
 
 export async function getProductForAdmin(tenantId: string, productId: string) {
@@ -81,10 +113,15 @@ export async function getProductForAdmin(tenantId: string, productId: string) {
     where: { id: productId, tenantId },
     include: {
       locations: { select: locationDetailSelect, orderBy: [{ type: "asc" }, { barcode: "asc" }] },
+      locationStocks: {
+        where: pulmaoStockWhere,
+        select: { quantity: true, location: { select: locationDetailSelect } },
+        orderBy: { quantity: "desc" },
+      },
     },
   });
   if (!product) throw new ProductAdminError("Produto não encontrado", 404);
-  return product;
+  return mergePulmaoStocks(product);
 }
 
 const MAX_QR_CODE_LENGTH = 200;
@@ -147,6 +184,11 @@ export async function assignProductLocation(
   if (!product) throw new ProductAdminError("Produto não encontrado", 404);
   const location = await findTenantLocation(tenantId, input.locationId);
   if (!location.active) throw new ProductAdminError(`Posição ${location.barcode} está inativa`);
+  if (location.type === LocationType.PULMAO) {
+    throw new ProductAdminError(
+      `Pulmão ${location.barcode} aceita qualquer SKU; ele aparece no produto quando houver saldo guardado`,
+    );
+  }
   if (location.productId === productId) return { location, resumedOrderIds: [] as string[] };
 
   if (location.product) {
@@ -175,6 +217,9 @@ export async function assignProductLocation(
 
 export async function unassignProductLocation(tenantId: string, productId: string, locationId: string) {
   const location = await findTenantLocation(tenantId, locationId);
+  if (location.type === LocationType.PULMAO) {
+    throw new ProductAdminError("Pulmão não tem SKU fixo; o saldo sai pelo transporte ou ajuste");
+  }
   if (location.productId !== productId) {
     throw new ProductAdminError("Esta posição não é deste produto", 404);
   }

@@ -10,6 +10,8 @@ import {
 import { FactoryButton } from "@/components/FactoryButton";
 import { PulmaoLocationPicker } from "@/components/PulmaoLocationPicker";
 import { ProductThumbnail } from "@/components/ProductThumbnail";
+import { PulmaoStockList } from "@/components/PulmaoStockList";
+import { PutawaySummary } from "@/components/PutawaySummary";
 import { QuantityInput } from "@/components/QuantityInput";
 import { ScreenShell } from "@/components/ScreenShell";
 import {
@@ -34,6 +36,9 @@ export default function PutawaySessionScreen() {
   const [feedback, setFeedback] = useState<string | null>(null);
 
   const next = data?.nextItem;
+  const nextStored =
+    data?.items.find((it) => it.id === next?.id)?.storedLocations ?? [];
+  const finished = data?.session.status === "COMPLETED";
 
   useEffect(() => {
     setPhase("scan-location");
@@ -54,13 +59,14 @@ export default function PutawaySessionScreen() {
         locationBarcode: selectedLocation.barcode,
         quantity: qty,
       });
+      const storedMsg = `${qty} un. de ${next.productCode ?? "item"} guardadas em ${selectedLocation.label}`;
       setSelectedLocation(null);
       setPhase("scan-location");
       if (updated.allStored) {
-        setFeedback("Todos os itens armazenados ✓");
+        setFeedback(`${storedMsg}. Todos os itens armazenados ✓`);
       } else if (updated.nextItem) {
         setFeedback(
-          `Próximo: ${updated.nextItem.description ?? updated.nextItem.productCode}`,
+          `${storedMsg}. Próximo: ${updated.nextItem.description ?? updated.nextItem.productCode}`,
         );
       }
     } catch (e) {
@@ -71,9 +77,7 @@ export default function PutawaySessionScreen() {
   const handleComplete = async () => {
     try {
       await complete.mutateAsync();
-      Alert.alert("Armazenagem concluída", "Itens endereçados no pulmão.", [
-        { text: "OK", onPress: () => router.replace("/putaway") },
-      ]);
+      setFeedback(null);
     } catch (e) {
       Alert.alert(
         "Erro",
@@ -86,6 +90,15 @@ export default function PutawaySessionScreen() {
     return (
       <ScreenShell backToHome scroll title="Armazenagem">
         <ActivityIndicator size="large" color={theme.primary} />
+      </ScreenShell>
+    );
+  }
+
+  if (finished) {
+    return (
+      <ScreenShell backToHome scroll title="Armazenagem concluída" subtitle="Itens endereçados no pulmão">
+        <PutawaySummary items={data.items} />
+        <FactoryButton label="OK" onPress={() => router.replace("/putaway")} />
       </ScreenShell>
     );
   }
@@ -118,15 +131,24 @@ export default function PutawaySessionScreen() {
             <Text style={styles.productRemaining}>
               Faltam {next.remaining} un.
             </Text>
+            {nextStored.map((loc) => (
+              <Text key={loc.locationId} style={styles.storedLine}>
+                Já guardado: {loc.quantity} un. em {loc.label}
+              </Text>
+            ))}
           </View>
         </View>
       ) : null}
 
       {data.allStored ? (
-        <FactoryButton
-          label="Finalizar armazenagem"
-          onPress={handleComplete}
-        />
+        <>
+          <PutawaySummary items={data.items} title="Confira onde cada item foi guardado" />
+          <FactoryButton
+            label="Finalizar armazenagem"
+            onPress={handleComplete}
+            loading={complete.isPending}
+          />
+        </>
       ) : (
         <>
           {phase === "scan-location" ? (
@@ -144,10 +166,7 @@ export default function PutawaySessionScreen() {
             <>
               <View style={styles.locCard}>
                 <Text style={styles.locTitle}>{selectedLocation.label}</Text>
-                <Text style={styles.locMeta}>
-                  Saldo: {selectedLocation.currentQuantity} / cap.{" "}
-                  {selectedLocation.capacity}
-                </Text>
+                <PulmaoStockList stocks={selectedLocation.stocks} />
               </View>
               <Text style={styles.hint}>
                 2. Quantidade para {next.description ?? next.productCode}
@@ -189,6 +208,12 @@ const styles = StyleSheet.create({
     fontWeight: "800",
     fontSize: typography.caption,
     marginTop: 4,
+  },
+  storedLine: {
+    color: theme.text,
+    fontWeight: "700",
+    fontSize: typography.caption,
+    marginTop: 2,
   },
   locCard: {
     backgroundColor: theme.surface,

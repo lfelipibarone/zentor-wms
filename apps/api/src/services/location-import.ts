@@ -1,6 +1,10 @@
 import { LocationFace, LocationType, Prisma } from "@prisma/client";
 import { prisma } from "../lib/prisma.js";
-import { assertMaxPickFaceLocations } from "./location-rules.js";
+import {
+  assertLocationTypeChange,
+  assertMaxPickFaceLocations,
+  assertPulmaoWithoutFixedSku,
+} from "./location-rules.js";
 import { resumePausedOrdersAfterPickFace } from "./product-locations.js";
 import {
   resolveLocationLayout,
@@ -211,6 +215,7 @@ export async function importLocations(
     const rowNum = i + 2;
 
     try {
+      assertPulmaoWithoutFixedSku(input.type, input.productSku);
       let productId: string | null = null;
       if (input.productSku) {
         const key = input.productSku.toLowerCase();
@@ -245,14 +250,15 @@ export async function importLocations(
         row: input.row,
       });
 
+      const existingSelect = { id: true, barcode: true, type: true, currentQuantity: true } as const;
       const byBarcode = await prisma.location.findFirst({
         where: { tenantId, barcode: input.barcode },
-        select: { id: true, linhaId: true },
+        select: existingSelect,
       });
       const byAddress = layout.linhaId
         ? await prisma.location.findFirst({
             where: { tenantId, linhaId: layout.linhaId },
-            select: { id: true, barcode: true },
+            select: existingSelect,
           })
         : null;
 
@@ -283,10 +289,13 @@ export async function importLocations(
         type: input.type,
         capacity: input.capacity,
         minThreshold: input.minThreshold,
-        currentQuantity: input.currentQuantity ?? 0,
         active: input.active ?? true,
       };
+      // Saldo do pulmão vem de LocationStock (por SKU); a planilha só define saldo de gôndola.
+      const importedQuantity =
+        input.type === LocationType.PULMAO ? undefined : input.currentQuantity;
 
+      if (existing) assertLocationTypeChange(existing, input.type);
       if (productId && input.type === "PICK_FACE") {
         await assertMaxPickFaceLocations(
           tenantId,
@@ -302,8 +311,8 @@ export async function importLocations(
           data: {
             ...baseData,
             barcode: input.barcode,
-            ...(input.currentQuantity !== undefined
-              ? { currentQuantity: input.currentQuantity }
+            ...(importedQuantity !== undefined
+              ? { currentQuantity: importedQuantity }
               : {}),
             ...(input.active !== undefined ? { active: input.active } : {}),
             productId: input.productSku ? productId : undefined,
@@ -319,6 +328,7 @@ export async function importLocations(
             tenantId,
             barcode: input.barcode,
             ...baseData,
+            currentQuantity: importedQuantity ?? 0,
             productId,
           },
         });

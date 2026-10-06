@@ -11,6 +11,7 @@ import {
 import { BarcodeScanner } from "@/components/BarcodeScanner";
 import { FactoryButton } from "@/components/FactoryButton";
 import { PulmaoLocationPicker } from "@/components/PulmaoLocationPicker";
+import { PulmaoStockList } from "@/components/PulmaoStockList";
 import { ScreenShell } from "@/components/ScreenShell";
 import { api, ApiError, type LocationLookup } from "@/lib/api";
 import { theme, spacing, typography } from "@/lib/theme";
@@ -134,9 +135,9 @@ export default function ReturnReceiptCheckScreen() {
               <View style={styles.locCard}>
                 <Text style={styles.locTitle}>{selectedPulmao.label}</Text>
                 <Text style={styles.locMeta}>
-                  {selectedPulmao.barcode} · saldo{" "}
-                  {selectedPulmao.currentQuantity}
+                  {selectedPulmao.barcode} · total {selectedPulmao.currentQuantity} un.
                 </Text>
+                <PulmaoStockList stocks={selectedPulmao.stocks} />
               </View>
               <FactoryButton
                 label="Finalizar devolução"
