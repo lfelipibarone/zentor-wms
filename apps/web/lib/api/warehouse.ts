@@ -99,10 +99,16 @@ export function fetchFullWarehouseTree() {
   return apiFetch<{ trees: WarehouseTree[] }>("/api/warehouse/full-tree");
 }
 
+export type LayoutSituacao = "sem_sku" | "com_sku" | "vazia" | "abaixo_min" | "inativa";
+
 export function fetchWarehouseLayoutRows(params: {
   barracaoId: string;
   q?: string;
   tipo?: "pulmao" | "pick_face";
+  estanteId?: string;
+  colunaId?: string;
+  face?: LocationFace;
+  situacao?: LayoutSituacao;
   page?: number;
   pageSize?: number;
 }) {
@@ -110,12 +116,40 @@ export function fetchWarehouseLayoutRows(params: {
   sp.set("barracaoId", params.barracaoId);
   if (params.q?.trim()) sp.set("q", params.q.trim());
   if (params.tipo) sp.set("tipo", params.tipo);
+  if (params.estanteId) sp.set("estanteId", params.estanteId);
+  if (params.colunaId) sp.set("colunaId", params.colunaId);
+  if (params.face) sp.set("face", params.face);
+  if (params.situacao) sp.set("situacao", params.situacao);
   if (params.page) sp.set("page", String(params.page));
   sp.set("pageSize", String(params.pageSize ?? DEFAULT_PAGE_SIZE));
   return apiFetch<{
     rows: WarehouseLayoutListRow[];
     pagination: PaginationMeta;
   }>(`/api/warehouse/layout-rows?${sp}`);
+}
+
+export interface WarehouseLayoutEstante {
+  id: string;
+  label: string;
+  colunas: Array<{ id: string; code: string }>;
+  faces: LocationFace[];
+  total: number;
+  semSku: number;
+  vazia: number;
+  abaixoMin: number;
+  inativa: number;
+}
+
+export function fetchWarehouseLayoutEstantes(barracaoId: string) {
+  return apiFetch<{ estantes: WarehouseLayoutEstante[] }>(
+    `/api/warehouse/layout-estantes?${new URLSearchParams({ barracaoId })}`,
+  );
+}
+
+export function fetchWarehouseEstanteRows(estanteId: string) {
+  return apiFetch<{ rows: WarehouseLayoutListRow[] }>(
+    `/api/warehouse/estante-rows?${new URLSearchParams({ estanteId })}`,
+  );
 }
 
 export interface WarehouseLayoutListRow {

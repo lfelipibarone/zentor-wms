@@ -13,8 +13,11 @@ import {
   updateWarehousePosition,
 } from "../services/warehouse-positions.js";
 import {
+  listWarehouseEstanteRows,
+  listWarehouseLayoutEstantes,
   listWarehouseLayoutRows,
   listWarehouseProximityOptions,
+  parseLayoutSituacao,
 } from "../services/warehouse-layout-list.js";
 import { buildWarehouseSegmentSearchWhere } from "../services/warehouse-segment-search.js";
 import { generateEstantePositions } from "../services/estante-generator.js";
@@ -226,6 +229,10 @@ export function registerWarehouseRoutes(app: FastifyInstance, guard: Guard) {
       barracaoId?: string;
       q?: string;
       tipo?: string;
+      estanteId?: string;
+      colunaId?: string;
+      face?: string;
+      situacao?: string;
       page?: string;
       pageSize?: string;
     };
@@ -244,12 +251,17 @@ export function registerWarehouseRoutes(app: FastifyInstance, guard: Guard) {
       else if (tipoRaw === "pick_face" || tipoRaw === "estoque-de-giro") {
         locationType = "PICK_FACE";
       }
+      const faceRaw = request.query.face?.trim().toUpperCase();
       const { rows, total } = await listWarehouseLayoutRows(
         tenantWhere(request).tenantId,
         {
           barracaoId,
           q: request.query.q,
           locationType,
+          estanteId: request.query.estanteId?.trim() || undefined,
+          colunaId: request.query.colunaId?.trim() || undefined,
+          face: faceRaw === "A" || faceRaw === "B" ? faceRaw : undefined,
+          situacao: parseLayoutSituacao(request.query.situacao),
           skip,
           take,
         },
@@ -258,6 +270,38 @@ export function registerWarehouseRoutes(app: FastifyInstance, guard: Guard) {
         rows,
         pagination: buildPaginationMeta(total, page, pageSize),
       };
+    },
+  );
+
+  app.get<{ Querystring: { barracaoId?: string } }>(
+    "/api/warehouse/layout-estantes",
+    { preHandler: guard(Permission.REGISTERS_VIEW) },
+    async (request, reply) => {
+      const barracaoId = request.query.barracaoId?.trim();
+      if (!barracaoId) {
+        return reply.status(400).send({ error: "barracaoId obrigatório" });
+      }
+      const estantes = await listWarehouseLayoutEstantes(
+        tenantWhere(request).tenantId,
+        barracaoId,
+      );
+      return { estantes };
+    },
+  );
+
+  app.get<{ Querystring: { estanteId?: string } }>(
+    "/api/warehouse/estante-rows",
+    { preHandler: guard(Permission.REGISTERS_VIEW) },
+    async (request, reply) => {
+      const estanteId = request.query.estanteId?.trim();
+      if (!estanteId) {
+        return reply.status(400).send({ error: "estanteId obrigatório" });
+      }
+      const rows = await listWarehouseEstanteRows(
+        tenantWhere(request).tenantId,
+        estanteId,
+      );
+      return { rows };
     },
   );
 
