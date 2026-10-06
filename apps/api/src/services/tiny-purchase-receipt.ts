@@ -3,8 +3,8 @@ import {
   PutawaySessionStatus,
   Prisma,
 } from "@prisma/client";
-import { productMatchesCode } from "@wms/shared";
 import { prisma } from "../lib/prisma.js";
+import { findNfItemByScannedCode } from "./location-stock.js";
 import { getTinyApiClient, TinyApiError } from "./tiny-api-v3-client.js";
 import { logIntegrationEvent } from "./tiny-integration.js";
 
@@ -406,9 +406,7 @@ export async function scanPurchaseReceiptItem(params: {
     throw new Error("Conferência já finalizada");
   }
 
-  const item = session.items.find((it) =>
-    productMatchesCode({ sku: it.productCode ?? "", barcode: it.barcode }, params.barcode),
-  );
+  const item = await findNfItemByScannedCode(session.tenantId, session.items, params.barcode);
 
   if (!item) {
     throw new Error("Produto não pertence a esta nota");

@@ -24,6 +24,7 @@ export interface ProductBase {
   sku: string;
   name: string;
   barcode: string | null;
+  qrCode: string | null;
   imageUrl: string | null;
   unit: string | null;
   weight: string | null;
@@ -39,16 +40,6 @@ export interface ProductListItem extends ProductBase {
 
 export interface ProductDetail extends ProductBase {
   locations: ProductLocationDetail[];
-}
-
-export interface ProductUpdateInput {
-  name?: string;
-  barcode?: string | null;
-  imageUrl?: string | null;
-  unit?: string | null;
-  weight?: number | null;
-  requiresItemScan?: boolean;
-  active?: boolean;
 }
 
 export interface LocationOption {
@@ -80,10 +71,10 @@ export function fetchProduct(id: string) {
   return apiFetch<{ product: ProductDetail }>(`/api/products/${id}`);
 }
 
-export function updateProduct(id: string, body: ProductUpdateInput) {
-  return apiFetch<{ product: ProductBase }>(`/api/products/${id}`, {
-    method: "PATCH",
-    body: JSON.stringify(body),
+export function setProductQrCode(id: string, qrCode: string | null) {
+  return apiFetch<{ product: ProductBase }>(`/api/products/${id}/qr-code`, {
+    method: "PUT",
+    body: JSON.stringify({ qrCode }),
   });
 }
 

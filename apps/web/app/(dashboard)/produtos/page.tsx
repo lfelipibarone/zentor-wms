@@ -77,7 +77,7 @@ export default function ProdutosPage() {
     <div className="space-y-6">
       <PageHeader
         title="Produtos"
-        description="Dados, QR code, fotos e posições de cada SKU. O QR da etiqueta é o próprio SKU."
+        description="Dados, QR code, fotos e posições de cada SKU. Por padrão, o QR da etiqueta é o próprio SKU."
       />
 
       <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
@@ -85,7 +85,7 @@ export default function ProdutosPage() {
           <label className="text-xs font-medium text-muted-foreground">Pesquisar</label>
           <input
             type="search"
-            placeholder="SKU, nome ou EAN…"
+            placeholder="SKU, nome, EAN ou QR…"
             className="mt-1 w-full rounded-lg border px-3 py-2 text-sm"
             value={searchInput}
             onChange={(e) => setSearchInput(e.target.value)}

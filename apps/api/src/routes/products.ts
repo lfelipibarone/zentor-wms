@@ -8,10 +8,9 @@ import {
   getProductForAdmin,
   listProductsForAdmin,
   ProductAdminError,
+  setProductQrCode,
   unassignProductLocation,
-  updateProductForAdmin,
   type ProductMissingFilter,
-  type ProductUpdateInput,
 } from "../services/product-admin.js";
 
 type Guard = (permission: string) => (
@@ -53,15 +52,15 @@ export function registerProductRoutes(app: FastifyInstance, guard: Guard) {
     },
   );
 
-  app.patch<{ Params: { id: string }; Body: ProductUpdateInput }>(
-    "/api/products/:id",
+  app.put<{ Params: { id: string }; Body: { qrCode?: string | null } }>(
+    "/api/products/:id/qr-code",
     { preHandler: guard(Permission.PRODUCTS_MANAGE) },
     async (request, reply) => {
       try {
-        const product = await updateProductForAdmin(
+        const product = await setProductQrCode(
           tenantWhere(request).tenantId,
           request.params.id,
-          request.body ?? {},
+          request.body?.qrCode ?? null,
         );
         return { product };
       } catch (e) {

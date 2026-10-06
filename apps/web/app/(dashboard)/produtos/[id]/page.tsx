@@ -74,12 +74,12 @@ export default function ProdutoDetailPage() {
                     />
                   </CardContent>
                 </Card>
-                <ProductQrCard sku={product.sku} name={product.name} />
+                <ProductQrCard product={product} onSaved={reload} />
               </div>
 
               <div className="space-y-4">
                 <ProductLocationsCard product={product} onChanged={reload} />
-                <ProductDataCard product={product} onSaved={reload} />
+                <ProductDataCard product={product} />
               </div>
             </div>
           </>

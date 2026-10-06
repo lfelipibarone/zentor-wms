@@ -5,8 +5,8 @@ import {
   PutawaySessionStatus,
   PurchaseReceiptSessionStatus,
 } from "@prisma/client";
-import { productMatchesCode } from "@wms/shared";
 import { prisma } from "../lib/prisma.js";
+import { findNfItemByScannedCode } from "./location-stock.js";
 import {
   getRouteEngine,
   LegacyRouteEngine,
@@ -273,7 +273,7 @@ export async function storePutawayItem(params: {
     code &&
     item.barcode &&
     item.productCode &&
-    !productMatchesCode({ sku: item.productCode, barcode: item.barcode }, code)
+    !(await findNfItemByScannedCode(tenantId, [item], code))
   ) {
     throw new Error("Produto não confere com o item da NF");
   }

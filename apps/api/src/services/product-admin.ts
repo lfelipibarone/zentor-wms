@@ -54,6 +54,7 @@ export async function listProductsForAdmin(
               { sku: { contains: q, mode: "insensitive" } },
               { name: { contains: q, mode: "insensitive" } },
               { barcode: { contains: q, mode: "insensitive" } },
+              { qrCode: { contains: q, mode: "insensitive" } },
             ],
           }
         : {},
@@ -86,36 +87,42 @@ export async function getProductForAdmin(tenantId: string, productId: string) {
   return product;
 }
 
-export interface ProductUpdateInput {
-  name?: string;
-  barcode?: string | null;
-  requiresItemScan?: boolean;
-  active?: boolean;
-  imageUrl?: string | null;
-  unit?: string | null;
-  weight?: number | null;
-}
+const MAX_QR_CODE_LENGTH = 200;
 
-export async function updateProductForAdmin(tenantId: string, productId: string, b: ProductUpdateInput) {
-  const existing = await prisma.product.findFirst({ where: { id: productId, tenantId }, select: { id: true } });
-  if (!existing) throw new ProductAdminError("Produto não encontrado", 404);
-  if (b.name !== undefined && !b.name.trim()) throw new ProductAdminError("Nome é obrigatório");
-  try {
-    return await prisma.product.update({
-      where: { id: productId },
-      data: {
-        ...(b.name !== undefined ? { name: b.name.trim() } : {}),
-        ...(b.barcode !== undefined ? { barcode: b.barcode?.trim() || null } : {}),
-        ...(b.requiresItemScan !== undefined ? { requiresItemScan: b.requiresItemScan } : {}),
-        ...(b.active !== undefined ? { active: b.active } : {}),
-        ...(b.imageUrl !== undefined ? { imageUrl: b.imageUrl?.trim() || null } : {}),
-        ...(b.unit !== undefined ? { unit: b.unit?.trim() || null } : {}),
-        ...(b.weight !== undefined ? { weight: b.weight } : {}),
+/** Troca o conteúdo do QR da etiqueta. Vazio ou igual ao SKU volta para o padrão (o SKU). */
+export async function setProductQrCode(tenantId: string, productId: string, raw: string | null) {
+  const product = await prisma.product.findFirst({
+    where: { id: productId, tenantId },
+    select: { id: true, sku: true },
+  });
+  if (!product) throw new ProductAdminError("Produto não encontrado", 404);
+
+  const trimmed = raw?.trim() ?? "";
+  if (trimmed.length > MAX_QR_CODE_LENGTH) {
+    throw new ProductAdminError(`QR code com no máximo ${MAX_QR_CODE_LENGTH} caracteres`);
+  }
+  const qrCode = trimmed && trimmed.toUpperCase() !== product.sku.toUpperCase() ? trimmed : null;
+
+  if (qrCode) {
+    const same = { equals: qrCode, mode: "insensitive" as const };
+    const clash = await prisma.product.findFirst({
+      where: {
+        tenantId,
+        id: { not: productId },
+        OR: [{ sku: same }, { barcode: same }, { qrCode: same }],
       },
+      select: { sku: true },
     });
+    if (clash) {
+      throw new ProductAdminError(`O código ${qrCode} já identifica o produto ${clash.sku}`, 409);
+    }
+  }
+
+  try {
+    return await prisma.product.update({ where: { id: productId }, data: { qrCode } });
   } catch (e) {
     if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === "P2002") {
-      throw new ProductAdminError("Este código de barras já está em outro produto", 409);
+      throw new ProductAdminError(`O código ${qrCode} já está em outro produto`, 409);
     }
     throw e;
   }
