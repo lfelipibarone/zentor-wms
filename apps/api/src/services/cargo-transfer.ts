@@ -153,8 +153,8 @@ export async function withdrawCargoTransfer(input: {
     throw new CargoTransferError("Origem deve ser um pulmão");
   }
 
-  const product = await findProductByBarcode(input.productBarcode);
-  if (!product || product.tenantId !== input.tenantId) {
+  const product = await findProductByBarcode(input.tenantId, input.productBarcode);
+  if (!product) {
     throw new CargoTransferError("Produto não cadastrado", 404);
   }
   if (fromLoc.productId && fromLoc.productId !== product.id) {
@@ -442,7 +442,7 @@ export async function depositCargoTransfer(input: {
   }
 
   if (input.productBarcode?.trim()) {
-    const product = await findProductByBarcode(input.productBarcode);
+    const product = await findProductByBarcode(input.tenantId, input.productBarcode);
     if (!product || product.id !== transfer.productId) {
       throw new CargoTransferError("Produto não confere com o transporte");
     }

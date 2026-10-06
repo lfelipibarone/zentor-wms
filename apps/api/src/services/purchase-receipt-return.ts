@@ -6,21 +6,7 @@ import {
   PurchaseReceiptSessionStatus,
 } from "@prisma/client";
 import { prisma } from "../lib/prisma.js";
-
-async function findProductByBarcode(tenantId: string, barcode: string) {
-  const code = barcode.trim();
-  return prisma.product.findFirst({
-    where: {
-      tenantId,
-      active: true,
-      OR: [
-        { barcode: code },
-        { barcode: { equals: code, mode: "insensitive" } },
-        { sku: { equals: code, mode: "insensitive" } },
-      ],
-    },
-  });
-}
+import { findProductByBarcode } from "./location-stock.js";
 
 export async function startReturnReceiptSession(params: {
   tenantId: string;

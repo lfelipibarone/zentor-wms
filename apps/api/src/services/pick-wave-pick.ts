@@ -3,9 +3,9 @@ import {
   PickWaveLineSortStatus,
   PickWaveStatus,
 } from "@prisma/client";
+import { productMatchesCode } from "@wms/shared";
 import { prisma } from "../lib/prisma.js";
 import { PickWaveError, assertWaveOperatorForMutation } from "./pick-wave.js";
-import { findProductByBarcode } from "./location-stock.js";
 import {
   ensurePickingEndLog,
   ensurePickingStartLog,
@@ -51,11 +51,8 @@ export async function confirmConsolidatedPick(input: ConsolidatedPickInput) {
     throw new PickWaveError("Gôndola incorreta para esta linha");
   }
 
-  if (input.productBarcode) {
-    const product = await findProductByBarcode(input.productBarcode);
-    if (!product || product.id !== line.productId) {
-      throw new PickWaveError("Produto não corresponde à linha da onda");
-    }
+  if (input.productBarcode && !productMatchesCode(line.product, input.productBarcode)) {
+    throw new PickWaveError("Produto não corresponde à linha da onda");
   }
 
   const remainingLine = line.quantityTotal - line.quantityPicked;

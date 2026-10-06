@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { router, useLocalSearchParams } from "expo-router";
+import { productMatchesCode } from "@wms/shared";
 import {
   ActivityIndicator,
   Alert,
@@ -148,9 +149,8 @@ export default function PickScreen() {
     setScannerOpen(false);
     if (!next) return;
 
-    const expected = next.product?.barcode;
-    if (expected && barcode !== expected) {
-      setFeedback(`Produto incorreto. Esperado: ${expected}`);
+    if (next.product && !productMatchesCode(next.product, barcode)) {
+      setFeedback(`Produto incorreto. Esperado: ${next.product.sku}`);
       return;
     }
 

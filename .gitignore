@@ -16,3 +16,6 @@ Thumbs.db
 *.tsbuildinfo
 apps/api/prisma/migrations
 .db-backups
+/*.xls
+/*.xlsx
+~$*

@@ -1,5 +1,5 @@
 import type { FastifyInstance } from "fastify";
-import { formatMarketplace } from "@wms/shared";
+import { formatMarketplace, productMatchesCode } from "@wms/shared";
 import { OrderStatus, OrderTimeLogEvent, InventoryMovementType } from "@prisma/client";
 import { requireMobileAccess } from "../lib/auth-guard.js";
 import { prisma } from "../lib/prisma.js";
@@ -835,7 +835,7 @@ export async function mobileRoutes(app: FastifyInstance) {
         return reply.status(400).send({ error: "Reabastecimento apenas em gôndolas" });
       }
 
-      if (productBarcode && location.product?.barcode !== productBarcode) {
+      if (productBarcode && !(location.product && productMatchesCode(location.product, productBarcode))) {
         return reply
           .status(400)
           .send({ error: "Produto não corresponde à gôndola" });

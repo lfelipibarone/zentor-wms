@@ -3,6 +3,7 @@ import {
   LocationType,
   type Product,
 } from "@prisma/client";
+import { productMatchesCode } from "@wms/shared";
 import { prisma } from "../lib/prisma.js";
 
 export class LocationStockError extends Error {
@@ -15,7 +16,9 @@ export class LocationStockError extends Error {
   }
 }
 
+/** Produto bipado: aceita EAN, SKU ou QR cadastrado, sem diferenciar maiúsculas. */
 export async function findProductByBarcode(
+  tenantId: string,
   barcode: string,
 ): Promise<Product | null> {
   const trimmed = barcode.trim();
@@ -23,13 +26,30 @@ export async function findProductByBarcode(
 
   return prisma.product.findFirst({
     where: {
+      tenantId,
       active: true,
       OR: [
         { barcode: { equals: trimmed, mode: "insensitive" } },
         { sku: { equals: trimmed, mode: "insensitive" } },
+        { qrCode: { equals: trimmed, mode: "insensitive" } },
       ],
     },
   });
+}
+
+/** Item da NF bipado: compara com o código/EAN da nota e, se não bater, com o cadastro (QR trocado). */
+export async function findNfItemByScannedCode<
+  T extends { productCode: string | null; barcode: string | null },
+>(tenantId: string, items: T[], code: string): Promise<T | undefined> {
+  const direct = items.find((it) =>
+    productMatchesCode({ sku: it.productCode ?? "", barcode: it.barcode }, code),
+  );
+  if (direct) return direct;
+  const product = await findProductByBarcode(tenantId, code);
+  if (!product) return undefined;
+  return items.find(
+    (it) => productMatchesCode(product, it.productCode) || productMatchesCode(product, it.barcode),
+  );
 }
 
 export interface StockLocationInput {
@@ -77,7 +97,7 @@ export async function stockLocation(
     throw new LocationStockError("Abastecimento apenas em gôndolas (pick face)");
   }
 
-  const product = await findProductByBarcode(productBarcode);
+  const product = await findProductByBarcode(location.tenantId, productBarcode);
   if (!product) {
     throw new LocationStockError("Produto não cadastrado");
   }

@@ -4,6 +4,7 @@ import {
   Prisma,
 } from "@prisma/client";
 import { prisma } from "../lib/prisma.js";
+import { findNfItemByScannedCode } from "./location-stock.js";
 import { getTinyApiClient, TinyApiError } from "./tiny-api-v3-client.js";
 import { logIntegrationEvent } from "./tiny-integration.js";
 
@@ -405,12 +406,7 @@ export async function scanPurchaseReceiptItem(params: {
     throw new Error("Conferência já finalizada");
   }
 
-  const code = params.barcode.trim();
-  const item = session.items.find(
-    (it) =>
-      (it.barcode && it.barcode === code) ||
-      (it.productCode && it.productCode === code),
-  );
+  const item = await findNfItemByScannedCode(session.tenantId, session.items, params.barcode);
 
   if (!item) {
     throw new Error("Produto não pertence a esta nota");

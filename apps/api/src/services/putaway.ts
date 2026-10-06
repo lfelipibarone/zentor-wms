@@ -6,6 +6,7 @@ import {
   PurchaseReceiptSessionStatus,
 } from "@prisma/client";
 import { prisma } from "../lib/prisma.js";
+import { findNfItemByScannedCode } from "./location-stock.js";
 import {
   getRouteEngine,
   LegacyRouteEngine,
@@ -268,15 +269,13 @@ export async function storePutawayItem(params: {
   if (!item) throw new Error("Item não encontrado");
 
   const code = params.productBarcode?.trim() ?? "";
-  if (code) {
-    if (
-      item.barcode &&
-      item.barcode !== code &&
-      item.productCode &&
-      item.productCode !== code
-    ) {
-      throw new Error("Produto não confere com o item da NF");
-    }
+  if (
+    code &&
+    item.barcode &&
+    item.productCode &&
+    !(await findNfItemByScannedCode(tenantId, [item], code))
+  ) {
+    throw new Error("Produto não confere com o item da NF");
   }
 
   const sku = item.productCode ?? code;

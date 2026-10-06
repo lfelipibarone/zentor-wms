@@ -79,6 +79,7 @@ export interface Product {
   imageUrl?: string | null;
   requiresItemScan: boolean;
   barcode: string | null;
+  qrCode?: string | null;
   supplierName?: string | null;
   erpStockQuantity?: number | null;
   active: boolean;

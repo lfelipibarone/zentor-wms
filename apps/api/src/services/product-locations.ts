@@ -291,7 +291,7 @@ export async function listProductLocations(
   productCode: string,
   type: LocationType,
 ) {
-  const product = await findProductByBarcode(productCode);
+  const product = await findProductByBarcode(tenantId, productCode);
   if (!product) {
     throw new ProductLocationsError("Produto não encontrado", 404);
   }

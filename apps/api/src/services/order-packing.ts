@@ -7,7 +7,7 @@ import {
 } from "@prisma/client";
 import { prisma } from "../lib/prisma.js";
 import { notifyUsersWithPermission } from "./notifications.js";
-import { Permission } from "@wms/shared";
+import { Permission, productMatchesCode } from "@wms/shared";
 import { getWaveLineDetail } from "./pick-wave.js";
 import { confirmSortAllocation } from "./pick-wave-sort.js";
 import {
@@ -487,16 +487,7 @@ export async function scanPackingItem(
   });
   if (!order) throw new Error("Pedido não encontrado");
 
-  const code = barcode.trim();
-  const item = order.items.find((i) => {
-    const product = i.product;
-    if (!product) return false;
-    return (
-      product.sku === code ||
-      product.barcode === code ||
-      product.barcode?.toUpperCase() === code.toUpperCase()
-    );
-  });
+  const item = order.items.find((i) => i.product && productMatchesCode(i.product, barcode));
   if (!item) throw new Error("Produto não pertence ao pedido");
 
   await applyPackingQuantity(orderId, item.id, quantity);
