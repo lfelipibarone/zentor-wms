@@ -5,6 +5,7 @@ import {
   PutawaySessionStatus,
   PurchaseReceiptSessionStatus,
 } from "@prisma/client";
+import { productMatchesCode } from "@wms/shared";
 import { prisma } from "../lib/prisma.js";
 import {
   getRouteEngine,
@@ -268,15 +269,13 @@ export async function storePutawayItem(params: {
   if (!item) throw new Error("Item não encontrado");
 
   const code = params.productBarcode?.trim() ?? "";
-  if (code) {
-    if (
-      item.barcode &&
-      item.barcode !== code &&
-      item.productCode &&
-      item.productCode !== code
-    ) {
-      throw new Error("Produto não confere com o item da NF");
-    }
+  if (
+    code &&
+    item.barcode &&
+    item.productCode &&
+    !productMatchesCode({ sku: item.productCode, barcode: item.barcode }, code)
+  ) {
+    throw new Error("Produto não confere com o item da NF");
   }
 
   const sku = item.productCode ?? code;

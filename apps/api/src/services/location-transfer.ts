@@ -70,7 +70,7 @@ export async function transferPulmaoToPickFace(
     throw new LocationTransferError("Destino deve ser uma gôndola (pick face)");
   }
 
-  const product = await findProductByBarcode(input.productBarcode);
+  const product = await findProductByBarcode(fromLoc.tenantId, input.productBarcode);
   if (!product) {
     throw new LocationTransferError("Produto não cadastrado");
   }

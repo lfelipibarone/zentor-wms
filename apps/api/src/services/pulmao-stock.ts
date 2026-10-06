@@ -14,7 +14,7 @@ export async function stockPulmaoLocation(input: {
     throw new LocationStockError("Quantidade inválida");
   }
 
-  const product = await findProductByBarcode(input.productBarcode);
+  const product = await findProductByBarcode(input.tenantId, input.productBarcode);
   if (!product) {
     throw new LocationStockError("Produto não cadastrado", 404);
   }

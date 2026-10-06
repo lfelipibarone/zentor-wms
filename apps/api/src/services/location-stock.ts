@@ -15,7 +15,9 @@ export class LocationStockError extends Error {
   }
 }
 
+/** Produto bipado: aceita EAN ou SKU (o QR da etiqueta é o SKU), sem diferenciar maiúsculas. */
 export async function findProductByBarcode(
+  tenantId: string,
   barcode: string,
 ): Promise<Product | null> {
   const trimmed = barcode.trim();
@@ -23,6 +25,7 @@ export async function findProductByBarcode(
 
   return prisma.product.findFirst({
     where: {
+      tenantId,
       active: true,
       OR: [
         { barcode: { equals: trimmed, mode: "insensitive" } },
@@ -77,7 +80,7 @@ export async function stockLocation(
     throw new LocationStockError("Abastecimento apenas em gôndolas (pick face)");
   }
 
-  const product = await findProductByBarcode(productBarcode);
+  const product = await findProductByBarcode(location.tenantId, productBarcode);
   if (!product) {
     throw new LocationStockError("Produto não cadastrado");
   }

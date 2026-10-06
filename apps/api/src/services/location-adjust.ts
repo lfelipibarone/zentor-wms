@@ -89,7 +89,7 @@ export async function adjustLocationQuantity(
   }
 
   if (input.productBarcode?.trim() && location.productId) {
-    const product = await findProductByBarcode(input.productBarcode);
+    const product = await findProductByBarcode(input.tenantId, input.productBarcode);
     if (!product || product.id !== location.productId) {
       throw new LocationAdjustError("Produto não corresponde a este endereço");
     }

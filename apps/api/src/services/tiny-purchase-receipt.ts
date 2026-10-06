@@ -3,6 +3,7 @@ import {
   PutawaySessionStatus,
   Prisma,
 } from "@prisma/client";
+import { productMatchesCode } from "@wms/shared";
 import { prisma } from "../lib/prisma.js";
 import { getTinyApiClient, TinyApiError } from "./tiny-api-v3-client.js";
 import { logIntegrationEvent } from "./tiny-integration.js";
@@ -405,11 +406,8 @@ export async function scanPurchaseReceiptItem(params: {
     throw new Error("Conferência já finalizada");
   }
 
-  const code = params.barcode.trim();
-  const item = session.items.find(
-    (it) =>
-      (it.barcode && it.barcode === code) ||
-      (it.productCode && it.productCode === code),
+  const item = session.items.find((it) =>
+    productMatchesCode({ sku: it.productCode ?? "", barcode: it.barcode }, params.barcode),
   );
 
   if (!item) {
