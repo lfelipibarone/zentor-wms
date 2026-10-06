@@ -74,10 +74,10 @@ export interface WarehouseLayoutListRow {
   linha: string;
   face: LocationFace;
   sku: string;
-  capacity: number | null;
-  minThreshold: number | null;
-  currentQuantity: number | null;
-  fillPct: number | null;
+  /** % mínima da gôndola */
+  minPercent: number | null;
+  /** % atual (no pulmão, soma das % dos SKUs) */
+  fillPercent: number | null;
   isPosition: boolean;
   setorId: string;
   corredorId: string;
@@ -89,9 +89,8 @@ export interface WarehouseLayoutListRow {
     id: string;
     type: LocationType;
     barcode: string;
-    capacity: number;
-    minThreshold: number;
-    currentQuantity: number;
+    minPercent: number;
+    fillPercent: number;
     proximityCorredorId?: string | null;
     proximityEstanteId?: string | null;
     proximityLinhaId?: string | null;
@@ -197,12 +196,6 @@ function mapLinha(
   const proximityReferences = loc
     ? proximityReferencesByLocationId.get(loc.id) ?? []
     : [];
-  const capacity = loc?.capacity ?? null;
-  const current = loc?.currentQuantity ?? null;
-  const fillPct =
-    capacity != null && current != null && capacity > 0
-      ? Math.round((current / capacity) * 100)
-      : null;
 
   return {
     id: linha.id,
@@ -222,10 +215,8 @@ function mapLinha(
     linha: linha.code,
     face: linha.face,
     sku: loc?.product?.sku ?? "—",
-    capacity,
-    minThreshold: loc?.minThreshold ?? null,
-    currentQuantity: current,
-    fillPct,
+    minPercent: loc?.minPercent ?? null,
+    fillPercent: loc?.fillPercent ?? null,
     isPosition: true,
     setorId: setor.id,
     corredorId: corredor.id,
@@ -238,9 +229,8 @@ function mapLinha(
           id: loc.id,
           type: loc.type,
           barcode: loc.barcode,
-          capacity: loc.capacity,
-          minThreshold: loc.minThreshold,
-          currentQuantity: loc.currentQuantity,
+          minPercent: loc.minPercent,
+          fillPercent: loc.fillPercent,
           proximityCorredorId: loc.proximityCorredorId,
           proximityEstanteId: loc.proximityEstanteId,
           proximityLinhaId: loc.proximityLinhaId,

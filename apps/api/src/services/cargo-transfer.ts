@@ -5,11 +5,8 @@ import {
 } from "@prisma/client";
 import { prisma } from "../lib/prisma.js";
 import { findProductByBarcode } from "./location-stock.js";
-import {
-  addPulmaoStock,
-  getPulmaoStockQuantity,
-  removePulmaoStock,
-} from "./pulmao-inventory.js";
+import { getPulmaoSkuPercent, setPulmaoSkuPercent } from "./pulmao-inventory.js";
+import { parsePercent, StockPercentError } from "./stock-percent.js";
 
 export class CargoTransferError extends Error {
   constructor(
@@ -128,24 +125,38 @@ const transferInclude = {
   withdrawnBy: { select: { id: true, name: true } },
 } as const;
 
+function parseTransferPercent(value: unknown, label: string): number {
+  try {
+    return parsePercent(value, label);
+  } catch (e) {
+    if (e instanceof StockPercentError) throw new CargoTransferError(e.message);
+    throw e;
+  }
+}
+
 export async function withdrawCargoTransfer(input: {
   tenantId: string;
   userId: string;
   fromLocationBarcode: string;
   productBarcode: string;
-  quantity: number;
+  /** % que o SKU ainda ocupa no pulmão depois da retirada */
+  remainingPercent?: unknown;
+  /** O SKU acabou no pulmão (sai da lista) */
+  skuFinished?: boolean;
+  /** Unidades levadas (opcional) */
+  quantity?: number;
   targetPickFaceId?: string;
 }) {
-  const quantity = Math.floor(Number(input.quantity));
-  if (quantity <= 0) {
-    throw new CargoTransferError("Quantidade inválida");
-  }
+  const quantity = Math.max(0, Math.floor(Number(input.quantity ?? 0)) || 0);
+  const remainingPercent = input.skuFinished
+    ? 0
+    : parseTransferPercent(input.remainingPercent, "% que ficou do SKU no pulmão");
 
-  const fromBarcode = input.fromLocationBarcode.trim().toUpperCase();
+  const fromBarcode = input.fromLocationBarcode.trim();
   const fromLoc = await prisma.location.findFirst({
     where: {
       tenantId: input.tenantId,
-      barcode: fromBarcode,
+      barcode: { equals: fromBarcode, mode: "insensitive" },
       active: true,
     },
   });
@@ -161,14 +172,9 @@ export async function withdrawCargoTransfer(input: {
   if (!product) {
     throw new CargoTransferError("Produto não cadastrado", 404);
   }
-  const available = await getPulmaoStockQuantity(prisma, fromLoc.id, product.id);
-  if (available <= 0) {
-    throw new CargoTransferError(`Pulmão ${fromLoc.barcode} não tem saldo de ${product.sku}`);
-  }
-  if (available < quantity) {
-    throw new CargoTransferError(
-      `Estoque insuficiente no pulmão (disponível: ${available})`,
-    );
+  const previousPercent = await getPulmaoSkuPercent(prisma, fromLoc.id, product.id);
+  if (previousPercent <= 0) {
+    throw new CargoTransferError(`Pulmão ${fromLoc.barcode} não tem ${product.sku}`);
   }
 
   let targetPickFaceId: string | null = input.targetPickFaceId ?? null;
@@ -216,16 +222,16 @@ export async function withdrawCargoTransfer(input: {
         quantity,
         fromLocationId: fromLoc.id,
         targetPickFaceId,
+        fromPercentBefore: previousPercent,
         withdrawnById: input.userId,
         withdrawnAt,
       },
     });
 
-    const newFromQty = await removePulmaoStock(
+    const { fillPercent } = await setPulmaoSkuPercent(
       tx,
       { tenantId: input.tenantId, locationId: fromLoc.id, productId: product.id },
-      quantity,
-      (left) => new CargoTransferError(`Estoque insuficiente no pulmão (disponível: ${left})`),
+      remainingPercent,
     );
 
     const movement = await tx.inventoryMovement.create({
@@ -233,6 +239,8 @@ export async function withdrawCargoTransfer(input: {
         tenantId: input.tenantId,
         type: InventoryMovementType.TRANSFER,
         quantity,
+        percentBefore: previousPercent,
+        percentAfter: remainingPercent,
         userId: input.userId,
         productId: product.id,
         fromLocationId: fromLoc.id,
@@ -240,7 +248,10 @@ export async function withdrawCargoTransfer(input: {
         cargoTransferId: transfer.id,
         startedAt: withdrawnAt,
         completedAt: withdrawnAt,
-        notes: "Transporte de carga — retirada do pulmão",
+        notes:
+          remainingPercent === 0
+            ? "Transporte de carga — retirada do pulmão (SKU acabou)"
+            : "Transporte de carga — retirada do pulmão",
       },
     });
 
@@ -258,7 +269,9 @@ export async function withdrawCargoTransfer(input: {
       transfer: mapCargoTransferSummary(full),
       fromLocation: {
         barcode: fromLoc.barcode,
-        currentQuantity: newFromQty,
+        /** % do SKU que ficou no pulmão (0 = acabou) */
+        skuPercent: remainingPercent,
+        fillPercent,
       },
     };
   });
@@ -303,17 +316,16 @@ export async function cancelCargoTransfer(
   }
 
   await prisma.$transaction(async (tx) => {
-    if (transfer.fromLocation.type === LocationType.PULMAO) {
-      await addPulmaoStock(
+    let percentBefore: number | null = null;
+    let percentAfter: number | null = null;
+    if (transfer.fromLocation.type === LocationType.PULMAO && transfer.fromPercentBefore != null) {
+      const restored = await setPulmaoSkuPercent(
         tx,
         { tenantId, locationId: transfer.fromLocationId, productId: transfer.productId },
-        transfer.quantity,
+        transfer.fromPercentBefore,
       );
-    } else {
-      await tx.location.update({
-        where: { id: transfer.fromLocationId },
-        data: { currentQuantity: { increment: transfer.quantity } },
-      });
+      percentBefore = restored.previous;
+      percentAfter = transfer.fromPercentBefore;
     }
 
     await tx.inventoryMovement.create({
@@ -321,6 +333,8 @@ export async function cancelCargoTransfer(
         tenantId,
         type: InventoryMovementType.TRANSFER,
         quantity: transfer.quantity,
+        percentBefore,
+        percentAfter,
         userId,
         productId: transfer.productId,
         toLocationId: transfer.fromLocationId,
@@ -406,8 +420,10 @@ export async function depositCargoTransfer(input: {
   transferId: string;
   toLocationBarcode: string;
   productBarcode?: string;
-  quantity?: number;
+  /** % que a gôndola ficou depois de abastecer */
+  percent: unknown;
 }) {
+  const percent = parseTransferPercent(input.percent, "% que a gôndola ficou");
   const transfer = await prisma.cargoTransfer.findFirst({
     where: {
       id: input.transferId,
@@ -425,11 +441,11 @@ export async function depositCargoTransfer(input: {
     throw new CargoTransferError("Transporte não encontrado ou já concluído", 404);
   }
 
-  const toBarcode = input.toLocationBarcode.trim().toUpperCase();
+  const toBarcode = input.toLocationBarcode.trim();
   const toLoc = await prisma.location.findFirst({
     where: {
       tenantId: input.tenantId,
-      barcode: toBarcode,
+      barcode: { equals: toBarcode, mode: "insensitive" },
       active: true,
     },
   });
@@ -457,20 +473,6 @@ export async function depositCargoTransfer(input: {
     }
   }
 
-  const qty =
-    input.quantity != null ? Math.floor(input.quantity) : transfer.quantity;
-  if (qty !== transfer.quantity) {
-    throw new CargoTransferError(
-      `Informe a quantidade total do transporte (${transfer.quantity})`,
-    );
-  }
-
-  const newToQty = Math.min(toLoc.currentQuantity + qty, toLoc.capacity);
-  const deposited = newToQty - toLoc.currentQuantity;
-  if (deposited <= 0) {
-    throw new CargoTransferError("Gôndola já está na capacidade máxima");
-  }
-
   const depositedAt = new Date();
 
   const result = await prisma.$transaction(async (tx) => {
@@ -478,7 +480,7 @@ export async function depositCargoTransfer(input: {
       where: { id: toLoc.id },
       data: {
         productId: transfer.productId,
-        currentQuantity: newToQty,
+        fillPercent: percent,
       },
     });
 
@@ -486,7 +488,9 @@ export async function depositCargoTransfer(input: {
       data: {
         tenantId: input.tenantId,
         type: InventoryMovementType.REPLENISHMENT,
-        quantity: deposited,
+        quantity: transfer.quantity,
+        percentBefore: toLoc.fillPercent,
+        percentAfter: percent,
         userId: input.userId,
         productId: transfer.productId,
         fromLocationId: transfer.fromLocationId,
@@ -514,7 +518,7 @@ export async function depositCargoTransfer(input: {
       transfer: mapCargoTransferSummary(updated),
       toLocation: {
         barcode: toLoc.barcode,
-        currentQuantity: newToQty,
+        fillPercent: percent,
       },
     };
   });

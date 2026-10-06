@@ -1,15 +1,13 @@
 import { useState } from "react";
 import {
   ActivityIndicator,
-  Pressable,
   StyleSheet,
   Text,
-  TextInput,
   View,
 } from "react-native";
 import { BarcodeScanner } from "@/components/BarcodeScanner";
 import { FactoryButton } from "@/components/FactoryButton";
-import { QuantityInput } from "@/components/QuantityInput";
+import { PercentInput } from "@/components/PercentInput";
 import { ScreenShell } from "@/components/ScreenShell";
 import {
   useLocationByBarcode,
@@ -18,8 +16,6 @@ import {
 import { ApiError } from "@/lib/api";
 import { theme, spacing, typography } from "@/lib/theme";
 
-type InputMode = "UNITS" | "PERCENT";
-
 function normalizeBarcode(code: string) {
   return code.trim().toUpperCase();
 }
@@ -27,9 +23,7 @@ function normalizeBarcode(code: string) {
 export default function RequestReplenishmentScreen() {
   const [barcode, setBarcode] = useState<string | null>(null);
   const [scannerOpen, setScannerOpen] = useState(false);
-  const [inputMode, setInputMode] = useState<InputMode>("UNITS");
   const [message, setMessage] = useState<string | null>(null);
-  const [percentDraft, setPercentDraft] = useState("50");
 
   const { data: location, isLoading, error, refetch } =
     useLocationByBarcode(barcode);
@@ -47,53 +41,23 @@ export default function RequestReplenishmentScreen() {
     request.reset();
   };
 
-  const submitUnits = async (qty: number) => {
+  const submitPercent = async (percent: number) => {
     if (!barcode) return;
     setMessage(null);
     try {
-      const result = await request.mutateAsync({
-        inputMode: "UNITS",
-        value: qty,
-      });
+      const result = await request.mutateAsync({ percent });
       setMessage(result.message);
       await refetch();
     } catch (e) {
       setMessage(e instanceof ApiError ? e.message : "Erro ao solicitar");
     }
   };
-
-  const submitPercent = async () => {
-    if (!barcode || !location) return;
-    const pct = Math.min(100, Math.max(0, Math.floor(Number(percentDraft) || 0)));
-    setMessage(null);
-    try {
-      const result = await request.mutateAsync({
-        inputMode: "PERCENT",
-        value: pct,
-      });
-      setMessage(result.message);
-      await refetch();
-    } catch (e) {
-      setMessage(e instanceof ApiError ? e.message : "Erro ao solicitar");
-    }
-  };
-
-  const percentPreview =
-    location && inputMode === "PERCENT"
-      ? Math.min(
-          location.capacity,
-          Math.round((location.capacity * Math.min(100, Math.max(0, Number(percentDraft) || 0))) / 100),
-        )
-      : null;
-
-  const canSubmit =
-    location?.type === "PICK_FACE" && location.product && !request.isPending;
 
   return (
     <ScreenShell scroll title="Solicitar reabastecimento">
       <Text style={styles.subtitle}>
-        Informe o que há na gôndola (unidades ou % da posição). A fila de
-        transporte de carga usa o saldo atualizado.
+        Informe a % que a gôndola está. A fila de
+        transporte de carga usa a % atualizada.
       </Text>
 
       {!barcode ? (
@@ -131,80 +95,21 @@ export default function RequestReplenishmentScreen() {
           )}
           <View style={styles.meta}>
             <Text style={styles.metaText}>
-              Saldo: {location.currentQuantity} · Cap: {location.capacity} · Mín:{" "}
-              {location.minThreshold}
+              Gôndola: {location.fillPercent}% · Mínimo: {location.minPercent}%
             </Text>
           </View>
 
           {location.type === "PICK_FACE" && location.product ? (
             <>
-              <View style={styles.modeRow}>
-                <Pressable
-                  onPress={() => setInputMode("UNITS")}
-                  style={[
-                    styles.modeBtn,
-                    inputMode === "UNITS" && styles.modeBtnActive,
-                  ]}
-                >
-                  <Text
-                    style={[
-                      styles.modeBtnText,
-                      inputMode === "UNITS" && styles.modeBtnTextActive,
-                    ]}
-                  >
-                    Unidades
-                  </Text>
-                </Pressable>
-                <Pressable
-                  onPress={() => setInputMode("PERCENT")}
-                  style={[
-                    styles.modeBtn,
-                    inputMode === "PERCENT" && styles.modeBtnActive,
-                  ]}
-                >
-                  <Text
-                    style={[
-                      styles.modeBtnText,
-                      inputMode === "PERCENT" && styles.modeBtnTextActive,
-                    ]}
-                  >
-                    % posição
-                  </Text>
-                </Pressable>
-              </View>
-
-              {inputMode === "UNITS" ? (
-                <QuantityInput
-                  label="Quantidade na gôndola"
-                  max={location.capacity}
-                  allowZero
-                  loading={request.isPending}
-                  onConfirm={submitUnits}
-                />
-              ) : (
-                <View style={styles.percentBlock}>
-                  <Text style={styles.percentLabel}>
-                    Preenchimento da posição (0–100%)
-                  </Text>
-                  <TextInput
-                    style={styles.percentInput}
-                    keyboardType="number-pad"
-                    value={percentDraft}
-                    onChangeText={setPercentDraft}
-                    maxLength={3}
-                  />
-                  {percentPreview != null ? (
-                    <Text style={styles.preview}>
-                      ≈ {percentPreview} un. de {location.capacity}
-                    </Text>
-                  ) : null}
-                  <FactoryButton
-                    label="Solicitar reabastecimento"
-                    onPress={() => void submitPercent()}
-                    disabled={!canSubmit}
-                  />
-                </View>
-              )}
+              <PercentInput
+                label="Quanto tem na gôndola?"
+                hint={`Até ${location.minPercent}% entra na fila de ressuprimento.`}
+                initialValue={location.fillPercent}
+                resetKey={location.id}
+                confirmLabel="Salvar %"
+                loading={request.isPending}
+                onConfirm={(pct) => void submitPercent(pct)}
+              />
             </>
           ) : null}
         </View>
@@ -279,37 +184,6 @@ const styles = StyleSheet.create({
     textAlign: "center",
     color: theme.textMuted,
     fontSize: typography.caption,
-  },
-  modeRow: { flexDirection: "row", gap: spacing.sm, marginTop: spacing.md },
-  modeBtn: {
-    flex: 1,
-    paddingVertical: spacing.sm,
-    borderRadius: 12,
-    borderWidth: 2,
-    borderColor: theme.border,
-    alignItems: "center",
-  },
-  modeBtnActive: {
-    borderColor: theme.primary,
-    backgroundColor: theme.primary,
-  },
-  modeBtnText: { fontWeight: "700", color: theme.text },
-  modeBtnTextActive: { color: "#fff" },
-  percentBlock: { marginTop: spacing.md, gap: spacing.sm },
-  percentLabel: { fontWeight: "700", color: theme.text },
-  percentInput: {
-    borderWidth: 2,
-    borderColor: theme.border,
-    borderRadius: 12,
-    padding: spacing.md,
-    fontSize: typography.title,
-    fontWeight: "800",
-    textAlign: "center",
-  },
-  preview: {
-    textAlign: "center",
-    color: theme.textMuted,
-    fontSize: typography.body,
   },
   feedback: {
     marginTop: spacing.md,

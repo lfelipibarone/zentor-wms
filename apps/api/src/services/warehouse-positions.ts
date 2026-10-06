@@ -1,5 +1,6 @@
 import { LocationFace, LocationType } from "@prisma/client";
 import { prisma } from "../lib/prisma.js";
+import { DEFAULT_MIN_PERCENT, parsePercent } from "./stock-percent.js";
 import {
   assertLocationTypeChange,
   assertMaxPickFaceLocations,
@@ -27,6 +28,11 @@ function normalizeCode(code: string): string {
   return normalizeWarehouseCode(code);
 }
 
+
+function clampPercent(value: number | undefined, fallback: number): number {
+  return value === undefined || value === null ? fallback : parsePercent(value);
+}
+
 export function parseLocationFace(face: unknown): LocationFace {
   return String(face ?? "").trim().toUpperCase() === "B" ? LocationFace.B : LocationFace.A;
 }
@@ -43,9 +49,12 @@ export interface CreateWarehousePositionInput {
   barcode: string;
   type: LocationType;
   productId?: string | null;
-  capacity: number;
-  minThreshold?: number;
-  currentQuantity?: number;
+  /** Capacidade em unidades (só informativa) */
+  capacity?: number;
+  /** % mínima da gôndola */
+  minPercent?: number;
+  /** % atual da gôndola */
+  fillPercent?: number;
   active?: boolean;
   barracaoId?: string | null;
   setorId?: string | null;
@@ -63,7 +72,10 @@ export async function createWarehousePosition(
 ) {
   const barcode = input.barcode?.trim().toUpperCase();
   if (!barcode) throw new Error("Código de barras obrigatório");
-  if (input.capacity < 1) throw new Error("Capacidade deve ser maior que zero");
+  const capacity = input.capacity ?? 100;
+  if (capacity < 1) throw new Error("Capacidade deve ser maior que zero");
+  const minPercent = clampPercent(input.minPercent, DEFAULT_MIN_PERCENT);
+  const fillPercent = clampPercent(input.fillPercent, 0);
 
   let colunaId = input.colunaId?.trim() || "";
   let barracaoId = input.barracaoId ?? null;
@@ -236,9 +248,9 @@ export async function createWarehousePosition(
         proximityLinhaId: layoutWithLinha.proximityLinhaId,
         type: input.type,
         productId: input.productId || null,
-        capacity: input.capacity,
-        minThreshold: input.minThreshold ?? 0,
-        currentQuantity: input.type === LocationType.PULMAO ? 0 : (input.currentQuantity ?? 0),
+        capacity,
+        minPercent,
+        fillPercent: input.type === LocationType.PULMAO ? 0 : fillPercent,
         active: input.active ?? true,
       },
       include: {
@@ -281,8 +293,8 @@ export interface UpdateWarehousePositionInput {
   type?: LocationType;
   productId?: string | null;
   capacity?: number;
-  minThreshold?: number;
-  currentQuantity?: number;
+  minPercent?: number;
+  fillPercent?: number;
   active?: boolean;
   proximityCorredorId?: string | null;
   proximityEstanteId?: string | null;
@@ -417,11 +429,11 @@ export async function updateWarehousePosition(
           ? { productId }
           : {}),
         ...(input.capacity !== undefined ? { capacity: input.capacity } : {}),
-        ...(input.minThreshold !== undefined
-          ? { minThreshold: input.minThreshold }
+        ...(input.minPercent !== undefined
+          ? { minPercent: clampPercent(input.minPercent, DEFAULT_MIN_PERCENT) }
           : {}),
-        ...(input.currentQuantity !== undefined && type !== LocationType.PULMAO
-          ? { currentQuantity: input.currentQuantity }
+        ...(input.fillPercent !== undefined && type !== LocationType.PULMAO
+          ? { fillPercent: clampPercent(input.fillPercent, 0) }
           : {}),
         ...(input.active !== undefined ? { active: input.active } : {}),
       },

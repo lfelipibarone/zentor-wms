@@ -12,6 +12,7 @@ import { PulmaoLocationPicker } from "@/components/PulmaoLocationPicker";
 import { ProductThumbnail } from "@/components/ProductThumbnail";
 import { PulmaoStockList } from "@/components/PulmaoStockList";
 import { PutawaySummary } from "@/components/PutawaySummary";
+import { PercentInput } from "@/components/PercentInput";
 import { QuantityInput } from "@/components/QuantityInput";
 import { ScreenShell } from "@/components/ScreenShell";
 import {
@@ -22,7 +23,7 @@ import {
 import { ApiError, type LocationLookup } from "@/lib/api";
 import { theme, spacing, typography } from "@/lib/theme";
 
-type Phase = "scan-location" | "confirm-qty";
+type Phase = "scan-location" | "confirm-qty" | "confirm-pct";
 
 export default function PutawaySessionScreen() {
   const { sessionId } = useLocalSearchParams<{ sessionId: string }>();
@@ -34,6 +35,7 @@ export default function PutawaySessionScreen() {
     null,
   );
   const [feedback, setFeedback] = useState<string | null>(null);
+  const [pendingQty, setPendingQty] = useState<number | null>(null);
 
   const next = data?.nextItem;
   const nextStored =
@@ -43,7 +45,15 @@ export default function PutawaySessionScreen() {
   useEffect(() => {
     setPhase("scan-location");
     setSelectedLocation(null);
+    setPendingQty(null);
   }, [next?.id]);
+
+  const currentSkuPercent =
+    selectedLocation && next?.productCode
+      ? selectedLocation.stocks.find(
+          (st) => st.product.sku.toUpperCase() === next.productCode!.toUpperCase(),
+        )?.percent ?? null
+      : null;
 
   const handleLocationSelect = (loc: LocationLookup) => {
     setSelectedLocation(loc);
@@ -51,16 +61,24 @@ export default function PutawaySessionScreen() {
     setFeedback(`Local ${loc.label} — informe a quantidade`);
   };
 
-  const handleConfirmQty = async (qty: number) => {
-    if (!next || !selectedLocation) return;
+  const handleConfirmQty = (qty: number) => {
+    setPendingQty(qty);
+    setPhase("confirm-pct");
+  };
+
+  const handleConfirmPercent = async (pulmaoPercent: number) => {
+    if (!next || !selectedLocation || pendingQty == null) return;
+    const qty = pendingQty;
     try {
       const updated = await store.mutateAsync({
         itemId: next.id,
         locationBarcode: selectedLocation.barcode,
         quantity: qty,
+        pulmaoPercent,
       });
-      const storedMsg = `${qty} un. de ${next.productCode ?? "item"} guardadas em ${selectedLocation.label}`;
+      const storedMsg = `${qty} un. de ${next.productCode ?? "item"} guardadas em ${selectedLocation.label} (SKU ocupa ${pulmaoPercent}%)`;
       setSelectedLocation(null);
+      setPendingQty(null);
       setPhase("scan-location");
       if (updated.allStored) {
         setFeedback(`${storedMsg}. Todos os itens armazenados ✓`);
@@ -166,23 +184,53 @@ export default function PutawaySessionScreen() {
             <>
               <View style={styles.locCard}>
                 <Text style={styles.locTitle}>{selectedLocation.label}</Text>
+                <Text style={styles.locMeta}>Ocupação: {selectedLocation.fillPercent}%</Text>
                 <PulmaoStockList stocks={selectedLocation.stocks} />
               </View>
-              <Text style={styles.hint}>
-                2. Quantidade para {next.description ?? next.productCode}
-              </Text>
-              <QuantityInput
-                label="Unidades a armazenar"
-                max={next.remaining}
-                loading={store.isPending}
-                onConfirm={handleConfirmQty}
-              />
+              {phase === "confirm-qty" ? (
+                <>
+                  <Text style={styles.hint}>
+                    2. Quantidade para {next.description ?? next.productCode}
+                  </Text>
+                  <QuantityInput
+                    label="Unidades a armazenar"
+                    max={next.remaining}
+                    onConfirm={handleConfirmQty}
+                  />
+                </>
+              ) : (
+                <>
+                  <Text style={styles.hint}>
+                    3. {pendingQty} un. de {next.productCode} — quanto o SKU ocupa no pulmão?
+                  </Text>
+                  <PercentInput
+                    label="% do SKU neste pulmão"
+                    hint={
+                      currentSkuPercent != null
+                        ? `Antes ocupava ${currentSkuPercent}%. Informe o total depois de guardar.`
+                        : "Informe quanto este SKU ocupa do pulmão depois de guardar."
+                    }
+                    initialValue={currentSkuPercent}
+                    resetKey={`${selectedLocation.id}-${next.id}`}
+                    minPercent={1}
+                    confirmLabel="Guardar"
+                    loading={store.isPending}
+                    onConfirm={handleConfirmPercent}
+                  />
+                  <FactoryButton
+                    label="Corrigir quantidade"
+                    variant="secondary"
+                    onPress={() => setPhase("confirm-qty")}
+                  />
+                </>
+              )}
               <FactoryButton
                 label="Trocar local"
                 variant="secondary"
                 onPress={() => {
                   setPhase("scan-location");
                   setSelectedLocation(null);
+                  setPendingQty(null);
                 }}
               />
             </>

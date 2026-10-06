@@ -6,6 +6,7 @@ import { prisma } from "./prisma.js";
 import { ensureDefaultUsers } from "../services/ensure-default-users.js";
 import { ensureAllTenantsRolePermissions } from "../services/role-permissions.js";
 import { migrateLegacyPulmaoStock } from "../services/pulmao-inventory.js";
+import { convertStockToPercent } from "../services/stock-percent.js";
 
 /** apps/api — funciona a partir de dist/lib ou src/lib */
 const apiRoot = join(dirname(fileURLToPath(import.meta.url)), "../..");
@@ -163,6 +164,18 @@ export async function ensureDatabaseReady(): Promise<void> {
   } catch (err) {
     console.warn(
       "[ensure-db] falha ao migrar saldos de pulmão:",
+      err instanceof Error ? err.message : err,
+    );
+  }
+
+  try {
+    const pct = await convertStockToPercent(prisma);
+    if (pct.converted > 0) {
+      console.log(`[ensure-db] estoque convertido para %: ${pct.converted} tenant(s)`);
+    }
+  } catch (err) {
+    console.warn(
+      "[ensure-db] falha ao converter estoque para %:",
       err instanceof Error ? err.message : err,
     );
   }

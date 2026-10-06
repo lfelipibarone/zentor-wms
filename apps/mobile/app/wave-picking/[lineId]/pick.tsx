@@ -12,7 +12,9 @@ import { CollectionDeadlineRow } from "@/components/CollectionDeadlineRow";
 import { ScreenShell } from "@/components/ScreenShell";
 import { useAdjustLocationStock } from "@/hooks/useAdjustLocationStock";
 import { useWaveLine, useWaveLinePick } from "@/hooks/useWavePicking";
+import { showErrorAlert } from "@/lib/app-alert";
 import { ApiError } from "@/lib/api";
+import { formatPercent } from "@/lib/percent";
 import { theme, spacing, typography } from "@/lib/theme";
 
 export default function WavePickScreen() {
@@ -26,6 +28,8 @@ export default function WavePickScreen() {
   );
   const [locationOk, setLocationOk] = useState(false);
   const [adjustOpen, setAdjustOpen] = useState(false);
+  /** Coleta da linha concluída: o separador precisa informar a % da gôndola */
+  const [afterPickOpen, setAfterPickOpen] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
 
   const line = data?.line;
@@ -43,23 +47,23 @@ export default function WavePickScreen() {
   const adjustContext: AdjustStockContext = {
     locationId: line.pickLocation.id,
     locationLabel: line.pickLocation.label,
-    systemQuantity: line.pickLocation.currentQuantity,
-    capacity: line.pickLocation.capacity ?? 9999,
+    currentPercent: line.pickLocation.fillPercent,
     productBarcode: line.product.barcode,
+    productName: line.product.name,
     waveLineId: lineId,
   };
 
-  const handleAdjustStock = async (countedQuantity: number, reason: string) => {
+  const handleAdjustStock = async (percent: number, reason: string) => {
     try {
       const result = await adjustStock.mutateAsync({
         locationId: line.pickLocation.id,
-        countedQuantity,
+        percent,
         productBarcode: line.product.barcode,
         reason,
         waveLineId: lineId,
       });
       setAdjustOpen(false);
-      setMessage(`Estoque ajustado: ${result.location.currentQuantity} un.`);
+      setMessage(`Gôndola ajustada: ${formatPercent(result.location.fillPercent)}`);
 
       const waveUpdate = result.reconciliation.waveLines.find(
         (w) => w.waveLineId === lineId,
@@ -93,11 +97,27 @@ export default function WavePickScreen() {
         `Pick registrado: ${result.quantityPicked}/${result.quantityTotal}`,
       );
       if (result.readyForSort) {
-        setMessage("Pick concluído — finalize o packing no painel web.");
-        router.replace("/picking");
+        setMessage("Pick concluído — informe a % que ficou na gôndola.");
+        setAfterPickOpen(true);
       }
     } catch (e) {
       setMessage(e instanceof ApiError ? e.message : "Erro no pick");
+    }
+  };
+
+  const handleAfterPickPercent = async (percent: number, reason: string) => {
+    try {
+      await adjustStock.mutateAsync({
+        locationId: line.pickLocation.id,
+        percent,
+        productBarcode: line.product.barcode,
+        reason,
+        waveLineId: lineId,
+      });
+      setAfterPickOpen(false);
+      router.replace("/picking");
+    } catch (e) {
+      showErrorAlert(e instanceof ApiError ? e.message : "Erro ao salvar a % da gôndola");
     }
   };
 
@@ -108,9 +128,9 @@ export default function WavePickScreen() {
       <Text style={styles.name}>{line.product.name}</Text>
       <Text style={styles.loc}>{line.pickLocation.label}</Text>
       <Text style={styles.stock}>
-        Sistema: {line.pickLocation.currentQuantity} un.
-        {line.pickLocation.capacity != null
-          ? ` · cap. ${line.pickLocation.capacity}`
+        Gôndola: {formatPercent(line.pickLocation.fillPercent)}
+        {line.pickLocation.minPercent != null
+          ? ` · mín. ${formatPercent(line.pickLocation.minPercent)}`
           : ""}
       </Text>
       <Text style={styles.qty}>
@@ -118,7 +138,7 @@ export default function WavePickScreen() {
       </Text>
 
       <FactoryButton
-        label="Corrigir estoque na gôndola"
+        label="Corrigir % da gôndola"
         variant="secondary"
         onPress={() => setAdjustOpen(true)}
       />
@@ -159,9 +179,16 @@ export default function WavePickScreen() {
       {message ? <Text style={styles.message}>{message}</Text> : null}
 
       {line.sortStatus === "PICKED" ? (
-        <Text style={styles.message}>
-          Pick concluído — finalize o packing no painel web.
-        </Text>
+        <>
+          <Text style={styles.message}>
+            Pick concluído — finalize o packing no painel web.
+          </Text>
+          <FactoryButton
+            label="Informar % da gôndola"
+            variant="secondary"
+            onPress={() => setAfterPickOpen(true)}
+          />
+        </>
       ) : null}
 
       <BarcodeScanner
@@ -194,6 +221,13 @@ export default function WavePickScreen() {
         context={adjustContext}
         onSubmit={handleAdjustStock}
         onClose={() => setAdjustOpen(false)}
+      />
+      <AdjustStockModal
+        visible={afterPickOpen}
+        mode="after-pick"
+        loading={adjustStock.isPending}
+        context={adjustContext}
+        onSubmit={handleAfterPickPercent}
       />
     </ScreenShell>
   );

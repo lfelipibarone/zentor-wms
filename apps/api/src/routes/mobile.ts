@@ -4,6 +4,8 @@ import { OrderStatus, OrderTimeLogEvent, InventoryMovementType, LocationType } f
 import { requireMobileAccess } from "../lib/auth-guard.js";
 import { prisma } from "../lib/prisma.js";
 import { pulmaoStocksInclude } from "../services/pulmao-inventory.js";
+import { needsReplenishment } from "../services/stock-percent.js";
+import { emptyFaceHint } from "../services/pick-location-reconcile.js";
 import { resolveUserId } from "../lib/user-context.js";
 import {
   LocationStockError,
@@ -11,7 +13,7 @@ import {
 } from "../services/location-stock.js";
 import {
   LocationAdjustError,
-  adjustLocationQuantity,
+  adjustLocationPercent,
 } from "../services/location-adjust.js";
 import { requestReplenishmentFromPickFace } from "../services/replenishment-request.js";
 import {
@@ -388,9 +390,8 @@ export async function mobileRoutes(app: FastifyInstance) {
               row: loc.row,
               barcode: loc.barcode,
               label: formatLocation(loc),
-              currentQuantity: loc.currentQuantity,
-              capacity: loc.capacity,
-              minThreshold: loc.minThreshold,
+              fillPercent: loc.fillPercent,
+              minPercent: loc.minPercent,
             }
           : null;
 
@@ -466,9 +467,8 @@ export async function mobileRoutes(app: FastifyInstance) {
                     row: item.pickLocation.row,
                     barcode: "",
                     label: `${item.pickLocation.corridor}-${item.pickLocation.row}`,
-                    currentQuantity: 0,
-                    capacity: 0,
-                    minThreshold: 0,
+                    fillPercent: 0,
+                    minPercent: 0,
                   }
                 : null,
           };
@@ -482,11 +482,7 @@ export async function mobileRoutes(app: FastifyInstance) {
               remaining,
               product: nextOrderItem.product,
               pickLocation: mapPickLoc(nextOrderItem.pickLocation),
-              stockMismatchHint:
-                nextOrderItem.pickLocation &&
-                nextOrderItem.pickLocation.currentQuantity < remaining
-                  ? `Saldo na gôndola (${nextOrderItem.pickLocation.currentQuantity}) menor que o pendente (${remaining})`
-                  : null,
+              stockMismatchHint: emptyFaceHint(nextOrderItem.pickLocation),
             }
           : null,
         allPicked: !nextOrderItem,
@@ -557,13 +553,8 @@ export async function mobileRoutes(app: FastifyInstance) {
           data: { quantityPicked: newPicked },
         });
 
+        // estoque da gôndola é em %: a coleta não desconta; o app pede a % ao terminar o item
         if (pickedDelta > 0 && item.pickLocationId) {
-          await tx.location.update({
-            where: { id: item.pickLocationId },
-            data: {
-              currentQuantity: { decrement: pickedDelta },
-            },
-          });
           if (item.productId) {
             await tx.inventoryMovement.create({
               data: {
@@ -583,6 +574,13 @@ export async function mobileRoutes(app: FastifyInstance) {
       return {
         quantityPicked: newPicked,
         completed: newPicked >= item.quantityOrdered,
+        location: item.pickLocation
+          ? {
+              id: item.pickLocation.id,
+              fillPercent: item.pickLocation.fillPercent,
+              minPercent: item.pickLocation.minPercent,
+            }
+          : null,
       };
     }
   );
@@ -696,41 +694,42 @@ export async function mobileRoutes(app: FastifyInstance) {
         row: location.row,
         barcode: location.barcode,
         type: location.type,
-        currentQuantity: location.currentQuantity,
-        capacity: location.capacity,
-        minThreshold: location.minThreshold,
+        fillPercent: location.fillPercent,
+        minPercent: location.minPercent,
         label: formatLocation(location),
         product: isPulmao ? null : location.product,
         stocks: isPulmao
-          ? location.stocks.map((s) => ({ product: s.product, quantity: s.quantity }))
+          ? location.stocks.map((s) => ({ product: s.product, percent: s.percent }))
           : [],
         needsReplenishment:
-          !isPulmao && location.currentQuantity <= location.minThreshold,
+          !isPulmao &&
+          location.productId != null &&
+          needsReplenishment(location.fillPercent, location.minPercent),
       };
     }
   );
 
-  app.post<{
-    Params: { locationId: string };
-    Body: {
-      countedQuantity?: number;
-      productBarcode?: string;
-      reason?: string;
-      orderId?: string;
-      itemId?: string;
-      waveLineId?: string;
-    };
-  }>(
+  type AdjustPercentBody = {
+    percent?: number;
+    productBarcode?: string;
+    reason?: string;
+    orderId?: string;
+    itemId?: string;
+    waveLineId?: string;
+  };
+
+  /** Gôndola: % que ela ficou. Pulmão: % do SKU informado (0 = acabou, sai da lista). */
+  app.post<{ Params: { locationId: string }; Body: AdjustPercentBody }>(
     "/mobile/locations/:locationId/adjust-quantity",
     async (request, reply) => {
       const tenantId = request.authUser!.tenantId!;
       const userId = resolveUserId(request);
       try {
-        return await adjustLocationQuantity({
+        return await adjustLocationPercent({
           tenantId,
           userId,
           locationId: request.params.locationId,
-          countedQuantity: Number(request.body?.countedQuantity),
+          percent: request.body?.percent,
           productBarcode: request.body?.productBarcode,
           reason: request.body?.reason,
           orderId: request.body?.orderId,
@@ -746,27 +745,17 @@ export async function mobileRoutes(app: FastifyInstance) {
     },
   );
 
-  app.post<{
-    Params: { barcode: string };
-    Body: {
-      countedQuantity?: number;
-      productBarcode?: string;
-      reason?: string;
-      orderId?: string;
-      itemId?: string;
-      waveLineId?: string;
-    };
-  }>(
+  app.post<{ Params: { barcode: string }; Body: AdjustPercentBody }>(
     "/mobile/locations/barcode/:barcode/adjust-quantity",
     async (request, reply) => {
       const tenantId = request.authUser!.tenantId!;
       const userId = resolveUserId(request);
       try {
-        return await adjustLocationQuantity({
+        return await adjustLocationPercent({
           tenantId,
           userId,
           barcode: decodeURIComponent(request.params.barcode),
-          countedQuantity: Number(request.body?.countedQuantity),
+          percent: request.body?.percent,
           productBarcode: request.body?.productBarcode,
           reason: request.body?.reason,
           orderId: request.body?.orderId,
@@ -784,29 +773,18 @@ export async function mobileRoutes(app: FastifyInstance) {
 
   app.post<{
     Params: { barcode: string };
-    Body: { inputMode?: string; value?: number };
+    Body: { percent?: number };
   }>(
     "/mobile/locations/barcode/:barcode/request-replenishment",
     async (request, reply) => {
       const tenantId = request.authUser!.tenantId!;
       const userId = resolveUserId(request);
-      const inputMode = request.body?.inputMode;
-      const value = Number(request.body?.value);
-      if (inputMode !== "UNITS" && inputMode !== "PERCENT") {
-        return reply.status(400).send({
-          error: 'inputMode deve ser "UNITS" ou "PERCENT"',
-        });
-      }
-      if (!Number.isFinite(value)) {
-        return reply.status(400).send({ error: "value obrigatório" });
-      }
       try {
         return await requestReplenishmentFromPickFace({
           tenantId,
           userId,
           barcode: decodeURIComponent(request.params.barcode),
-          inputMode,
-          value,
+          percent: request.body?.percent,
         });
       } catch (e) {
         if (e instanceof LocationAdjustError) {
@@ -817,76 +795,41 @@ export async function mobileRoutes(app: FastifyInstance) {
     },
   );
 
+  /** Abastece a gôndola (já com SKU) informando a % que ela ficou. */
   app.post<{
     Params: { locationId: string };
-    Body: { quantity: number; productBarcode?: string };
+    Body: { percent?: number; productBarcode?: string };
   }>(
     "/mobile/locations/:locationId/replenish",
     async (request, reply) => {
       const userId = resolveUserId(request);
-      const { locationId } = request.params;
-      const quantity = Number(request.body?.quantity ?? 0);
-      const productBarcode = request.body?.productBarcode?.trim();
-
-      if (quantity <= 0) {
-        return reply.status(400).send({ error: "Quantidade inválida" });
-      }
-
       const location = await prisma.location.findUnique({
-        where: { id: locationId },
+        where: { id: request.params.locationId },
         include: { product: true },
       });
       if (!location) return reply.status(404).send({ error: "Gôndola não encontrada" });
-      if (location.type !== "PICK_FACE") {
-        return reply.status(400).send({ error: "Reabastecimento apenas em gôndolas" });
+      if (!location.product) {
+        return reply.status(400).send({ error: "Gôndola sem SKU associado" });
       }
-
-      if (productBarcode && !(location.product && productMatchesCode(location.product, productBarcode))) {
-        return reply
-          .status(400)
-          .send({ error: "Produto não corresponde à gôndola" });
-      }
-
-      const newQty = Math.min(
-        location.currentQuantity + quantity,
-        location.capacity
-      );
-      const added = newQty - location.currentQuantity;
-
-      if (added <= 0) {
-        return reply.status(400).send({ error: "Gôndola já está na capacidade máxima" });
-      }
-
-      await prisma.$transaction(async (tx) => {
-        await tx.location.update({
-          where: { id: locationId },
-          data: { currentQuantity: newQty },
+      try {
+        return await stockLocation({
+          locationId: location.id,
+          productBarcode: request.body?.productBarcode?.trim() || location.product.sku,
+          percent: request.body?.percent,
+          userId,
         });
-        if (location.productId) {
-          await tx.inventoryMovement.create({
-            data: {
-              tenantId: location.tenantId,
-              type: InventoryMovementType.REPLENISHMENT,
-              quantity: added,
-              userId,
-              productId: location.productId,
-              toLocationId: locationId,
-              notes: "Reabastecimento via mobile",
-            },
-          });
+      } catch (e) {
+        if (e instanceof LocationStockError) {
+          return reply.status(e.statusCode).send({ error: e.message });
         }
-      });
-
-      return {
-        currentQuantity: newQty,
-        added,
-      };
+        throw e;
+      }
     }
   );
 
   app.post<{
     Params: { locationId: string };
-    Body: { productBarcode?: string; quantity?: number };
+    Body: { productBarcode?: string; percent?: number };
   }>(
     "/mobile/locations/:locationId/stock",
     async (request, reply) => {
@@ -897,7 +840,7 @@ export async function mobileRoutes(app: FastifyInstance) {
         const result = await stockLocation({
           locationId: request.params.locationId,
           productBarcode,
-          quantity: request.body?.quantity,
+          percent: request.body?.percent,
           userId,
         });
         return result;
@@ -910,41 +853,41 @@ export async function mobileRoutes(app: FastifyInstance) {
     },
   );
 
+  /** Retirada + depósito numa chamada só (fluxo antigo). */
   app.post<{
     Body: {
       fromLocationBarcode?: string;
       toLocationBarcode?: string;
       productBarcode?: string;
-      quantity?: number;
+      remainingPercent?: number;
+      skuFinished?: boolean;
+      percent?: number;
     };
   }>("/mobile/replenishment/transfer", async (request, reply) => {
     const tenantId = request.authUser!.tenantId!;
     const userId = resolveUserId(request);
     try {
-      const from = request.body?.fromLocationBarcode ?? "";
-      const to = request.body?.toLocationBarcode ?? "";
       const productBarcode = request.body?.productBarcode ?? "";
-      const quantity = Number(request.body?.quantity ?? 0);
       const withdrawn = await withdrawCargoTransfer({
         tenantId,
         userId,
-        fromLocationBarcode: from,
+        fromLocationBarcode: request.body?.fromLocationBarcode ?? "",
         productBarcode,
-        quantity,
+        remainingPercent: request.body?.remainingPercent,
+        skuFinished: request.body?.skuFinished,
       });
       const deposited = await depositCargoTransfer({
         tenantId,
         userId,
         transferId: withdrawn.transfer.id,
-        toLocationBarcode: to,
+        toLocationBarcode: request.body?.toLocationBarcode ?? "",
         productBarcode,
-        quantity,
+        percent: request.body?.percent,
       });
       return {
         transfer: deposited.transfer,
         fromLocation: withdrawn.fromLocation,
         toLocation: deposited.toLocation,
-        transferred: quantity,
         legacy: true,
       };
     } catch (e) {
@@ -1041,7 +984,7 @@ export async function mobileRoutes(app: FastifyInstance) {
   );
 
   app.post<{
-    Body: { locationBarcode?: string; productBarcode?: string; quantity?: number };
+    Body: { locationBarcode?: string; productBarcode?: string; percent?: number };
   }>("/mobile/locations/pulmao/stock", async (request, reply) => {
     const tenantId = request.authUser!.tenantId!;
     const userId = resolveUserId(request);
@@ -1052,7 +995,7 @@ export async function mobileRoutes(app: FastifyInstance) {
         userId,
         locationBarcode: request.body?.locationBarcode ?? "",
         productBarcode: request.body?.productBarcode ?? "",
-        quantity: Number(request.body?.quantity ?? 0),
+        percent: request.body?.percent,
       });
     } catch (e) {
       if (e instanceof LocationStockError) {
@@ -1066,6 +1009,10 @@ export async function mobileRoutes(app: FastifyInstance) {
     Body: {
       fromLocationBarcode?: string;
       productBarcode?: string;
+      /** % que o SKU ainda ocupa no pulmão */
+      remainingPercent?: number;
+      /** SKU acabou no pulmão (sai da lista) */
+      skuFinished?: boolean;
       quantity?: number;
       targetPickFaceId?: string;
     };
@@ -1078,6 +1025,8 @@ export async function mobileRoutes(app: FastifyInstance) {
         userId,
         fromLocationBarcode: request.body?.fromLocationBarcode ?? "",
         productBarcode: request.body?.productBarcode ?? "",
+        remainingPercent: request.body?.remainingPercent,
+        skuFinished: request.body?.skuFinished === true,
         quantity: Number(request.body?.quantity ?? 0),
         targetPickFaceId: request.body?.targetPickFaceId,
       });
@@ -1138,11 +1087,7 @@ export async function mobileRoutes(app: FastifyInstance) {
         const { suggestPickFaceDeposit } = await import(
           "../services/pick-face-resolve.js"
         );
-        const loc = await suggestPickFaceDeposit(
-          tenantId,
-          transfer.product.id,
-          transfer.quantity,
-        );
+        const loc = await suggestPickFaceDeposit(tenantId, transfer.product.id);
         if (!loc) {
           return reply.status(404).send({
             error: "Nenhum endereço de estoque de giro disponível",
@@ -1153,8 +1098,7 @@ export async function mobileRoutes(app: FastifyInstance) {
             barcode: loc.barcode,
             corridor: loc.corridor,
             row: loc.row,
-            currentQuantity: loc.currentQuantity,
-            capacity: loc.capacity,
+            fillPercent: loc.fillPercent,
             label: `${loc.corridor}-${loc.row}`,
           },
         };
@@ -1172,7 +1116,8 @@ export async function mobileRoutes(app: FastifyInstance) {
     Body: {
       toLocationBarcode?: string;
       productBarcode?: string;
-      quantity?: number;
+      /** % que a gôndola ficou depois de abastecer */
+      percent?: number;
     };
   }>("/mobile/cargo-transfers/:id/deposit", async (request, reply) => {
     const tenantId = request.authUser!.tenantId!;
@@ -1184,7 +1129,7 @@ export async function mobileRoutes(app: FastifyInstance) {
         transferId: request.params.id,
         toLocationBarcode: request.body?.toLocationBarcode ?? "",
         productBarcode: request.body?.productBarcode,
-        quantity: request.body?.quantity,
+        percent: request.body?.percent,
       });
     } catch (e) {
       if (e instanceof CargoTransferError) {
@@ -1800,7 +1745,10 @@ export async function mobileRoutes(app: FastifyInstance) {
 
   app.post<{
     Params: { sessionId: string };
-    Body: { pulmaoLocationBarcode?: string };
+    Body: {
+      pulmaoLocationBarcode?: string;
+      percents?: Array<{ itemId: string; percent: number }>;
+    };
   }>(
     "/mobile/purchase-receipts/return/:sessionId/complete",
     async (request, reply) => {
@@ -1817,6 +1765,7 @@ export async function mobileRoutes(app: FastifyInstance) {
           sessionId: request.params.sessionId,
           userId,
           pulmaoLocationBarcode,
+          percents: request.body?.percents ?? [],
         });
       } catch (e) {
         const message =
@@ -1877,6 +1826,8 @@ export async function mobileRoutes(app: FastifyInstance) {
       locationBarcode?: string;
       productBarcode?: string;
       quantity?: number;
+      /** % que o SKU ocupa no pulmão depois de guardar */
+      pulmaoPercent?: number;
     };
   }>("/mobile/putaway/:sessionId/store", async (request, reply) => {
     const userId = resolveUserId(request);
@@ -1891,6 +1842,7 @@ export async function mobileRoutes(app: FastifyInstance) {
         locationBarcode,
         productBarcode: productBarcode?.trim() || undefined,
         quantity: Number(request.body?.quantity ?? 1),
+        pulmaoPercent: request.body?.pulmaoPercent,
         userId,
       });
     } catch (e) {

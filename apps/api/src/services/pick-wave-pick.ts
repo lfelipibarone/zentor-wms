@@ -62,12 +62,6 @@ export async function confirmConsolidatedPick(input: ConsolidatedPickInput) {
     );
   }
 
-  if (line.pickLocation.currentQuantity < quantity) {
-    throw new PickWaveError(
-      `Estoque insuficiente na gôndola (disponível: ${line.pickLocation.currentQuantity})`,
-    );
-  }
-
   let toAllocate = quantity;
   const allocationUpdates: { id: string; addPick: number; addSorted: number }[] =
     [];
@@ -110,11 +104,6 @@ export async function confirmConsolidatedPick(input: ConsolidatedPickInput) {
         : line.sortStatus;
 
   await prisma.$transaction(async (tx) => {
-    await tx.location.update({
-      where: { id: line.pickLocationId },
-      data: { currentQuantity: { decrement: quantity } },
-    });
-
     for (const upd of allocationUpdates) {
       const alloc = line.allocations.find((a) => a.id === upd.id)!;
       const newPicked = alloc.orderItem.quantityPicked + upd.addPick;
@@ -190,7 +179,9 @@ export async function confirmConsolidatedPick(input: ConsolidatedPickInput) {
     sortStatus: updated!.sortStatus,
     readyForSort: updated!.sortStatus === PickWaveLineSortStatus.PICKED,
     location: {
-      currentQuantity: updated!.pickLocation.currentQuantity,
+      id: updated!.pickLocation.id,
+      fillPercent: updated!.pickLocation.fillPercent,
+      minPercent: updated!.pickLocation.minPercent,
     },
   };
 }

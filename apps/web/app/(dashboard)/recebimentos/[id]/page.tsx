@@ -38,6 +38,8 @@ export default function PurchaseReceiptDetailPage() {
   const [scanQty, setScanQty] = useState("1");
   const [lineQty, setLineQty] = useState<Record<string, string>>({});
   const [pulmaoBarcode, setPulmaoBarcode] = useState("");
+  /** Devolução: % que cada SKU passa a ocupar no pulmão (por item) */
+  const [returnPercents, setReturnPercents] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
@@ -137,9 +139,20 @@ export default function PurchaseReceiptDetailPage() {
           setSaving(false);
           return;
         }
+        const toStore = detail.items.filter((it) => it.quantityChecked > 0);
+        const percents = toStore.map((it) => ({
+          itemId: it.id,
+          percent: Number(returnPercents[it.id]),
+        }));
+        if (percents.some((p) => !Number.isInteger(p.percent) || p.percent < 1 || p.percent > 100)) {
+          setMessage("Informe a % de cada SKU no pulmão (1 a 100)");
+          setSaving(false);
+          return;
+        }
         const res = await completeReturnReceipt(
           sessionId,
           pulmaoBarcode.trim(),
+          percents,
         );
         applyDetail(res.detail);
       } else {
@@ -261,6 +274,33 @@ export default function PurchaseReceiptDetailPage() {
                   onChange={(e) => setPulmaoBarcode(e.target.value)}
                   placeholder="Ex: PUL-01-A"
                 />
+                <p className="mt-4 text-sm font-medium">
+                  Quanto cada SKU ocupa no pulmão depois de guardar?
+                </p>
+                <ul className="mt-2 space-y-2">
+                  {detail.items
+                    .filter((it) => it.quantityChecked > 0)
+                    .map((it) => (
+                      <li key={it.id} className="flex items-center gap-3 text-sm">
+                        <span className="w-40 truncate font-mono">{it.sku ?? it.description}</span>
+                        <span className="w-24 text-muted-foreground">
+                          {it.quantityChecked} un.
+                        </span>
+                        <input
+                          type="number"
+                          min={1}
+                          max={100}
+                          className="w-20 rounded-lg border px-2 py-1 text-right tabular-nums"
+                          value={returnPercents[it.id] ?? ""}
+                          onChange={(e) =>
+                            setReturnPercents((prev) => ({ ...prev, [it.id]: e.target.value }))
+                          }
+                          placeholder="%"
+                        />
+                        <span className="text-muted-foreground">%</span>
+                      </li>
+                    ))}
+                </ul>
               </div>
             ) : null}
 

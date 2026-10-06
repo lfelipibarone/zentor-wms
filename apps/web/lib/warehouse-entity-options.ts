@@ -43,9 +43,8 @@ export interface WarehouseLayoutLocation {
   id: string;
   type: "PICK_FACE" | "PULMAO";
   barcode: string;
-  capacity: number;
-  minThreshold: number;
-  currentQuantity: number;
+  minPercent: number;
+  fillPercent: number;
   product?: { sku: string; name: string } | null;
   proximityCorredorId?: string | null;
   proximityEstanteId?: string | null;

@@ -21,28 +21,27 @@ const locationSummarySelect = {
   id: true,
   barcode: true,
   type: true,
-  currentQuantity: true,
+  fillPercent: true,
 } satisfies Prisma.LocationSelect;
 
 const locationDetailSelect = {
   ...locationSummarySelect,
   face: true,
-  capacity: true,
-  minThreshold: true,
+  minPercent: true,
   active: true,
   barracao: { select: { code: true, name: true } },
 } satisfies Prisma.LocationSelect;
 
 const pulmaoStockWhere = {
-  quantity: { gt: 0 },
+  percent: { gt: 0 },
   location: { active: true, type: LocationType.PULMAO },
 } satisfies Prisma.LocationStockWhereInput;
 
 /**
- * Pulmões não têm SKU fixo: entram na lista de posições do produto enquanto tiverem saldo dele,
- * com `currentQuantity` = saldo deste SKU.
+ * Pulmões não têm SKU fixo: entram na lista de posições do produto enquanto o SKU estiver neles,
+ * com `fillPercent` = % deste SKU no pulmão.
  */
-function mergePulmaoStocks<L extends { barcode: string }, P extends { locations: L[]; locationStocks: Array<{ quantity: number; location: L }> }>(
+function mergePulmaoStocks<L extends { barcode: string }, P extends { locations: L[]; locationStocks: Array<{ percent: number; location: L }> }>(
   product: P,
 ): Omit<P, "locationStocks"> & { locations: Array<L & { pulmaoStock: boolean }> } {
   const { locationStocks, ...rest } = product;
@@ -50,7 +49,7 @@ function mergePulmaoStocks<L extends { barcode: string }, P extends { locations:
     ...rest,
     locations: [
       ...product.locations.map((l) => ({ ...l, pulmaoStock: false })),
-      ...locationStocks.map((s) => ({ ...s.location, currentQuantity: s.quantity, pulmaoStock: true })),
+      ...locationStocks.map((s) => ({ ...s.location, fillPercent: s.percent, pulmaoStock: true })),
     ],
   };
 }
@@ -95,8 +94,8 @@ export async function listProductsForAdmin(
         locations: { where: { active: true }, select: locationSummarySelect, orderBy: { barcode: "asc" } },
         locationStocks: {
           where: pulmaoStockWhere,
-          select: { quantity: true, location: { select: locationSummarySelect } },
-          orderBy: { quantity: "desc" },
+          select: { percent: true, location: { select: locationSummarySelect } },
+          orderBy: { percent: "desc" },
         },
       },
     }),
@@ -115,8 +114,8 @@ export async function getProductForAdmin(tenantId: string, productId: string) {
       locations: { select: locationDetailSelect, orderBy: [{ type: "asc" }, { barcode: "asc" }] },
       locationStocks: {
         where: pulmaoStockWhere,
-        select: { quantity: true, location: { select: locationDetailSelect } },
-        orderBy: { quantity: "desc" },
+        select: { percent: true, location: { select: locationDetailSelect } },
+        orderBy: { percent: "desc" },
       },
     },
   });
@@ -192,9 +191,9 @@ export async function assignProductLocation(
   if (location.productId === productId) return { location, resumedOrderIds: [] as string[] };
 
   if (location.product) {
-    if (location.currentQuantity > 0) {
+    if (location.fillPercent > 0) {
       throw new ProductAdminError(
-        `Posição ${location.barcode} tem ${location.currentQuantity} un. de ${location.product.sku}; transfira ou zere antes`,
+        `Posição ${location.barcode} está com ${location.fillPercent}% de ${location.product.sku}; esvazie (0%) antes`,
       );
     }
     if (!input.replace) {
@@ -218,14 +217,14 @@ export async function assignProductLocation(
 export async function unassignProductLocation(tenantId: string, productId: string, locationId: string) {
   const location = await findTenantLocation(tenantId, locationId);
   if (location.type === LocationType.PULMAO) {
-    throw new ProductAdminError("Pulmão não tem SKU fixo; o saldo sai pelo transporte ou ajuste");
+    throw new ProductAdminError("Pulmão não tem SKU fixo; o SKU sai pelo transporte ou pela correção");
   }
   if (location.productId !== productId) {
     throw new ProductAdminError("Esta posição não é deste produto", 404);
   }
-  if (location.currentQuantity > 0) {
+  if (location.fillPercent > 0) {
     throw new ProductAdminError(
-      `Posição ${location.barcode} ainda tem ${location.currentQuantity} un.; transfira ou zere antes`,
+      `Posição ${location.barcode} ainda está com ${location.fillPercent}%; esvazie (0%) antes`,
     );
   }
   await prisma.location.update({ where: { id: location.id }, data: { productId: null } });

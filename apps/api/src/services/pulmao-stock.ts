@@ -1,18 +1,26 @@
 import { InventoryMovementType, LocationType } from "@prisma/client";
 import { prisma } from "../lib/prisma.js";
 import { findProductByBarcode, LocationStockError } from "./location-stock.js";
-import { addPulmaoStock, pulmaoStocksInclude } from "./pulmao-inventory.js";
+import { pulmaoStocksInclude, setPulmaoSkuPercent } from "./pulmao-inventory.js";
+import { parsePercent, StockPercentError } from "./stock-percent.js";
 
+/** Entrada avulsa: guarda um SKU no pulmão informando a % que ele passa a ocupar. */
 export async function stockPulmaoLocation(input: {
   tenantId: string;
   userId: string;
   locationBarcode: string;
   productBarcode: string;
-  quantity: number;
+  percent: unknown;
 }) {
-  const quantity = Math.floor(Number(input.quantity));
-  if (quantity <= 0) {
-    throw new LocationStockError("Quantidade inválida");
+  let percent: number;
+  try {
+    percent = parsePercent(input.percent, "% do SKU no pulmão");
+  } catch (e) {
+    if (e instanceof StockPercentError) throw new LocationStockError(e.message);
+    throw e;
+  }
+  if (percent <= 0) {
+    throw new LocationStockError("Informe quanto o SKU ocupa no pulmão (mínimo 1%)");
   }
 
   const product = await findProductByBarcode(input.tenantId, input.productBarcode);
@@ -20,9 +28,12 @@ export async function stockPulmaoLocation(input: {
     throw new LocationStockError("Produto não cadastrado", 404);
   }
 
-  const barcode = input.locationBarcode.trim().toUpperCase();
   const location = await prisma.location.findFirst({
-    where: { tenantId: input.tenantId, barcode, active: true },
+    where: {
+      tenantId: input.tenantId,
+      barcode: { equals: input.locationBarcode.trim(), mode: "insensitive" },
+      active: true,
+    },
   });
 
   if (!location) {
@@ -32,18 +43,20 @@ export async function stockPulmaoLocation(input: {
     throw new LocationStockError("Informe uma posição de pulmão");
   }
 
-  const result = await prisma.$transaction(async (tx) => {
-    const productQuantity = await addPulmaoStock(
+  const loc = await prisma.$transaction(async (tx) => {
+    const { previous } = await setPulmaoSkuPercent(
       tx,
       { tenantId: input.tenantId, locationId: location.id, productId: product.id },
-      quantity,
+      percent,
     );
 
     await tx.inventoryMovement.create({
       data: {
         tenantId: input.tenantId,
         type: InventoryMovementType.ENTRY,
-        quantity,
+        quantity: 0,
+        percentBefore: previous,
+        percentAfter: percent,
         userId: input.userId,
         productId: product.id,
         toLocationId: location.id,
@@ -51,23 +64,20 @@ export async function stockPulmaoLocation(input: {
       },
     });
 
-    const loc = await tx.location.findUniqueOrThrow({
+    return tx.location.findUniqueOrThrow({
       where: { id: location.id },
       include: { stocks: pulmaoStocksInclude },
     });
-    return { loc, productQuantity };
   });
 
   return {
     location: {
-      id: result.loc.id,
-      barcode: result.loc.barcode,
-      currentQuantity: result.loc.currentQuantity,
-      capacity: result.loc.capacity,
+      id: loc.id,
+      barcode: loc.barcode,
+      fillPercent: loc.fillPercent,
       product,
-      productQuantity: result.productQuantity,
-      stocks: result.loc.stocks.map((s) => ({ product: s.product, quantity: s.quantity })),
+      productPercent: percent,
+      stocks: loc.stocks.map((s) => ({ product: s.product, percent: s.percent })),
     },
-    added: quantity,
   };
 }

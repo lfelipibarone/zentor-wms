@@ -11,14 +11,17 @@ import { router } from "expo-router";
 import { useFocusEffect } from "expo-router";
 import { BarcodeScanner } from "@/components/BarcodeScanner";
 import { FactoryButton } from "@/components/FactoryButton";
-import { QuantityInput } from "@/components/QuantityInput";
+import {
+  PulmaoWithdrawPercent,
+  type PulmaoWithdrawResult,
+} from "@/components/PulmaoWithdrawPercent";
 import { ScreenShell } from "@/components/ScreenShell";
 import { api, ApiError } from "@/lib/api";
 import type { LocationLookup, ReplenishmentNeed } from "@/lib/api";
-import { pulmaoQuantityOf, pulmaoStocksSummary } from "@/lib/pulmao";
+import { pulmaoPercentOf, pulmaoStocksSummary } from "@/lib/pulmao";
 import { theme, spacing, typography } from "@/lib/theme";
 
-type Phase = "list" | "scan-pulmao" | "confirm-qty" | "done";
+type Phase = "list" | "scan-pulmao" | "confirm-pct" | "done";
 
 function normalizeBarcode(code: string) {
   return code.trim().toUpperCase();
@@ -57,7 +60,7 @@ export default function CargoTransportScreen() {
     setPulmao(null);
     setPhase("scan-pulmao");
     setMessage(
-      `Gôndola alvo: ${need.routeLabel} · repor ~${need.deficit} un.`,
+      `Gôndola alvo: ${need.routeLabel} · está em ${need.fillPercent}% (mín. ${need.minPercent}%)`,
     );
   };
 
@@ -72,16 +75,14 @@ export default function CargoTransportScreen() {
         setMessage("Bipe um pulmão (estoque de reserva)");
         return;
       }
-      const available = pulmaoQuantityOf(loc, selected.productId);
+      const available = pulmaoPercentOf(loc, selected.productId);
       if (available <= 0) {
         setMessage(`Pulmão ${loc.barcode} não tem ${selected.sku} (${pulmaoStocksSummary(loc)})`);
         return;
       }
       setPulmao(loc);
-      setPhase("confirm-qty");
-      setMessage(
-        `${selected.sku} · máx. ${Math.min(available, selected.deficit)} un.`,
-      );
+      setPhase("confirm-pct");
+      setMessage(null);
     } catch (e) {
       setMessage(e instanceof ApiError ? e.message : "Pulmão não encontrado");
     } finally {
@@ -89,7 +90,7 @@ export default function CargoTransportScreen() {
     }
   };
 
-  const confirmWithdraw = async (qty: number) => {
+  const confirmWithdraw = async ({ remainingPercent, skuFinished }: PulmaoWithdrawResult) => {
     if (!selected || !pulmao) return;
     const productCode = selected.sku;
     setLoading(true);
@@ -98,11 +99,16 @@ export default function CargoTransportScreen() {
       const result = await api.withdrawCargoTransfer({
         fromLocationBarcode: pulmao.barcode,
         productBarcode: productCode,
-        quantity: qty,
+        remainingPercent,
+        skuFinished,
         targetPickFaceId: selected.pickFaceId,
       });
       setMessage(
-        `Retirado ${result.transfer.quantity} un. Vá em Abastecer estoque → gôndola ${selected.routeLabel}.`,
+        `${
+          result.fromLocation.skuPercent === 0
+            ? `${productCode} saiu do pulmão ${result.fromLocation.barcode}.`
+            : `${productCode} ficou com ${result.fromLocation.skuPercent}% no pulmão.`
+        } Vá em Abastecer estoque → gôndola ${selected.routeLabel}.`,
       );
       setPhase("done");
     } catch (e) {
@@ -143,17 +149,17 @@ export default function CargoTransportScreen() {
                 <Text style={styles.sku}>{item.sku}</Text>
                 <Text style={styles.name}>{item.productName}</Text>
                 <Text style={styles.meta}>
-                  Gôndola {item.routeLabel} · {item.currentQuantity}/
-                  {item.minThreshold} un.
+                  Gôndola {item.routeLabel} · {item.fillPercent}% (mín.{" "}
+                  {item.minPercent}%)
                 </Text>
-                <Text style={styles.deficit}>Repor ~{item.deficit} un.</Text>
+                <Text style={styles.deficit}>Falta {item.percentToFill}% para encher</Text>
                 {item.suggestedPulmao ? (
                   <Text style={styles.pulmao}>
-                    Pulmão: {item.suggestedPulmao.label} (
-                    {item.suggestedPulmao.currentQuantity} un.)
+                    Pulmão: {item.suggestedPulmao.label} ({item.suggestedPulmao.percent}%
+                    deste SKU)
                   </Text>
                 ) : (
-                  <Text style={styles.warn}>Sem pulmão com saldo</Text>
+                  <Text style={styles.warn}>Sem pulmão com este SKU</Text>
                 )}
               </Pressable>
             )}
@@ -170,8 +176,7 @@ export default function CargoTransportScreen() {
     );
   }
 
-  const pulmaoQty = pulmao && selected ? pulmaoQuantityOf(pulmao, selected.productId) : 0;
-  const maxQty = Math.min(pulmaoQty, selected?.deficit ?? pulmaoQty);
+  const pulmaoPct = pulmao && selected ? pulmaoPercentOf(pulmao, selected.productId) : 0;
 
   return (
     <ScreenShell scroll backToHome>
@@ -180,7 +185,7 @@ export default function CargoTransportScreen() {
           <Text style={styles.badge}>Gôndola alvo</Text>
           <Text style={styles.locTitle}>{selected.routeLabel}</Text>
           <Text style={styles.meta}>
-            {selected.sku} · repor ~{selected.deficit} un.
+            {selected.sku} · gôndola em {selected.fillPercent}%
           </Text>
         </View>
       ) : null}
@@ -201,19 +206,17 @@ export default function CargoTransportScreen() {
         </>
       ) : null}
 
-      {pulmao && phase === "confirm-qty" ? (
+      {pulmao && selected && phase === "confirm-pct" ? (
         <>
           <View style={styles.card}>
             <Text style={styles.cardLabel}>PULMÃO</Text>
             <Text style={styles.locTitle}>{pulmao.label}</Text>
-            <Text style={styles.meta}>
-              Saldo de {selected?.sku}: {pulmaoQty} un.
-            </Text>
           </View>
-          <Text style={styles.instruction}>Quantidade retirada</Text>
-          <QuantityInput
-            label={`Quantidade (máx. ${maxQty})`}
-            max={maxQty}
+          <PulmaoWithdrawPercent
+            sku={selected.sku}
+            pulmaoLabel={pulmao.label}
+            currentPercent={pulmaoPct}
+            loading={loading}
             onConfirm={confirmWithdraw}
           />
         </>

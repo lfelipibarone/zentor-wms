@@ -22,6 +22,7 @@ import {
   type ProductListItem,
   type ProductMissingFilter,
 } from "@/lib/api/products";
+import { PercentBar } from "@/components/ops/percent-bar";
 import { cn } from "@/lib/utils";
 
 const FILTERS: { value: ProductMissingFilter | ""; label: string }[] = [
@@ -125,7 +126,7 @@ export default function ProdutosPage() {
                 <TableHead>Produto</TableHead>
                 <TableHead>EAN</TableHead>
                 <TableHead>Posições</TableHead>
-                <TableHead className="text-right">Estoque WMS</TableHead>
+                <TableHead>Gôndola</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -167,7 +168,7 @@ export default function ProdutosPage() {
                             key={l.id}
                             barcode={l.barcode}
                             type={l.type}
-                            quantity={l.currentQuantity}
+                            percent={l.fillPercent}
                           />
                         ))}
                       </div>
@@ -175,8 +176,16 @@ export default function ProdutosPage() {
                       <span className="text-sm text-amber-700">Sem posição</span>
                     )}
                   </TableCell>
-                  <TableCell className="text-right tabular-nums">
-                    {p.locations.reduce((s, l) => s + l.currentQuantity, 0)}
+                  <TableCell>
+                    {(() => {
+                      const faces = p.locations.filter((l) => l.type === "PICK_FACE");
+                      if (faces.length === 0) {
+                        return <span className="text-sm text-muted-foreground">—</span>;
+                      }
+                      return (
+                        <PercentBar percent={Math.min(...faces.map((l) => l.fillPercent))} />
+                      );
+                    })()}
                   </TableCell>
                 </TableRow>
               ))}

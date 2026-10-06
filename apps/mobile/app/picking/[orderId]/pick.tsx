@@ -29,6 +29,7 @@ import {
 } from "@/hooks/usePicking";
 import { showErrorAlert } from "@/lib/app-alert";
 import { api, ApiError } from "@/lib/api";
+import { formatPercent } from "@/lib/percent";
 import { theme, spacing, typography } from "@/lib/theme";
 import { OrderStatus } from "@wms/shared";
 
@@ -57,6 +58,8 @@ export default function PickScreen() {
   );
   const [problemOpen, setProblemOpen] = useState(false);
   const [adjustOpen, setAdjustOpen] = useState(false);
+  /** Gôndola do item recém-concluído: o separador precisa informar a % */
+  const [afterPick, setAfterPick] = useState<AdjustStockContext | null>(null);
   const [feedback, setFeedback] = useState<string | null>(null);
 
   const next = session?.nextItem;
@@ -84,20 +87,20 @@ export default function PickScreen() {
       ? {
           locationId: next.pickLocation.id,
           locationLabel: next.pickLocation.label,
-          systemQuantity: next.pickLocation.currentQuantity ?? 0,
-          capacity: next.pickLocation.capacity ?? 9999,
+          currentPercent: next.pickLocation.fillPercent ?? 0,
           productBarcode: next.product?.barcode ?? null,
+          productName: next.product?.name ?? null,
           orderId,
           itemId: next.id,
         }
       : null;
 
-  const handleAdjustStock = async (countedQuantity: number, reason: string) => {
+  const handleAdjustStock = async (percent: number, reason: string) => {
     if (!adjustContext) return;
     try {
       const result = await adjustStock.mutateAsync({
         locationId: adjustContext.locationId,
-        countedQuantity,
+        percent,
         productBarcode: adjustContext.productBarcode,
         reason,
         orderId,
@@ -110,11 +113,11 @@ export default function PickScreen() {
       );
       if (changed) {
         setFeedback(
-          `Estoque ajustado. Novo endereço: ${changed.newLocationBarcode}`,
+          `Gôndola ajustada. Novo endereço: ${changed.newLocationBarcode}`,
         );
         resetItemFlow();
       } else {
-        setFeedback(`Estoque ajustado: ${result.location.currentQuantity} un.`);
+        setFeedback(`Gôndola ajustada: ${formatPercent(result.location.fillPercent)}`);
       }
 
       if (result.reconciliation.warnings.length > 0) {
@@ -166,8 +169,15 @@ export default function PickScreen() {
 
   const confirmPick = async (qty: number) => {
     if (!itemId) return;
+    const pickedContext = adjustContext;
     try {
       const result = await pickItem.mutateAsync({ itemId, quantity: qty });
+      if (result.completed && pickedContext) {
+        setAfterPick({
+          ...pickedContext,
+          currentPercent: result.location?.fillPercent ?? pickedContext.currentPercent,
+        });
+      }
       await refetch();
       resetItemFlow();
       if (result.completed) {
@@ -177,6 +187,45 @@ export default function PickScreen() {
       setFeedback(e instanceof ApiError ? e.message : "Erro ao registrar pick");
     }
   };
+
+  const handleAfterPickPercent = async (percent: number, reason: string) => {
+    if (!afterPick) return;
+    try {
+      const result = await adjustStock.mutateAsync({
+        locationId: afterPick.locationId,
+        percent,
+        productBarcode: afterPick.productBarcode,
+        reason,
+        orderId,
+        itemId: afterPick.itemId,
+      });
+      setAfterPick(null);
+      setFeedback(
+        result.location.needsReplenishment
+          ? `Gôndola em ${formatPercent(percent)} — enviada para reposição ✓`
+          : `Gôndola em ${formatPercent(percent)} ✓`,
+      );
+      if (result.reconciliation.warnings.length > 0) {
+        Alert.alert(
+          "Rotas atualizadas",
+          result.reconciliation.warnings.slice(0, 3).join("\n"),
+        );
+      }
+      await refetch();
+    } catch (e) {
+      showErrorAlert(e instanceof ApiError ? e.message : "Erro ao salvar a % da gôndola");
+    }
+  };
+
+  const afterPickModal = (
+    <AdjustStockModal
+      visible={afterPick !== null}
+      mode="after-pick"
+      loading={adjustStock.isPending}
+      context={afterPick}
+      onSubmit={handleAfterPickPercent}
+    />
+  );
 
   const handleCompleteOrder = async () => {
     try {
@@ -247,10 +296,12 @@ export default function PickScreen() {
         <Text style={styles.doneText}>
           Todos os itens foram separados. Envie a cesta para conferência.
         </Text>
+        {feedback ? <Text style={[styles.feedback, styles.feedbackOk]}>{feedback}</Text> : null}
         <FactoryButton
           label="Finalizar — Aguardando conferência"
           variant="success"
           loading={completePicking.isPending}
+          disabled={afterPick !== null}
           onPress={handleCompleteOrder}
         />
         <FactoryButton
@@ -264,6 +315,7 @@ export default function PickScreen() {
           onSubmit={handleReport}
           onClose={() => setProblemOpen(false)}
         />
+        {afterPickModal}
       </ScreenShell>
     );
   }
@@ -302,11 +354,11 @@ export default function PickScreen() {
         <Text style={styles.locBarcode}>
           {next.pickLocation?.barcode ?? "Sem barcode"}
         </Text>
-        {next.pickLocation?.currentQuantity != null ? (
+        {next.pickLocation?.fillPercent != null ? (
           <Text style={styles.locStock}>
-            Sistema: {next.pickLocation.currentQuantity} un.
-            {next.pickLocation.capacity != null
-              ? ` · cap. ${next.pickLocation.capacity}`
+            Gôndola: {formatPercent(next.pickLocation.fillPercent)}
+            {next.pickLocation.minPercent != null
+              ? ` · mín. ${formatPercent(next.pickLocation.minPercent)}`
               : ""}
           </Text>
         ) : null}
@@ -317,7 +369,7 @@ export default function PickScreen() {
 
       {adjustContext ? (
         <FactoryButton
-          label="Corrigir estoque na gôndola"
+          label="Corrigir % da gôndola"
           variant="secondary"
           onPress={() => setAdjustOpen(true)}
         />
@@ -482,6 +534,7 @@ export default function PickScreen() {
         onSubmit={handleAdjustStock}
         onClose={() => setAdjustOpen(false)}
       />
+      {afterPickModal}
     </ScreenShell>
   );
 }

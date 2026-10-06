@@ -1,12 +1,8 @@
-import { useEffect, useState } from "react";
-import {
-  Modal,
-  StyleSheet,
-  Text,
-  TextInput,
-  View,
-} from "react-native";
+import { useState } from "react";
+import { Modal, ScrollView, StyleSheet, Text, View } from "react-native";
 import { FactoryButton } from "./FactoryButton";
+import { PercentInput } from "./PercentInput";
+import { formatPercent } from "@/lib/percent";
 import { theme, spacing, typography } from "@/lib/theme";
 
 const REASON_PRESETS = [
@@ -19,9 +15,10 @@ const REASON_PRESETS = [
 export type AdjustStockContext = {
   locationId: string;
   locationLabel: string;
-  systemQuantity: number;
-  capacity: number;
+  /** % registrada hoje */
+  currentPercent: number;
   productBarcode?: string | null;
+  productName?: string | null;
   orderId?: string;
   itemId?: string;
   waveLineId?: string;
@@ -31,81 +28,85 @@ interface AdjustStockModalProps {
   visible: boolean;
   loading?: boolean;
   context: AdjustStockContext | null;
-  onSubmit: (countedQuantity: number, reason: string) => void;
-  onClose: () => void;
+  /**
+   * Após a coleta: não dá para cancelar e não pede motivo.
+   * Correção manual: pede motivo e permite cancelar.
+   */
+  mode?: "correction" | "after-pick";
+  onSubmit: (percent: number, reason: string) => void;
+  onClose?: () => void;
 }
 
 export function AdjustStockModal({
   visible,
   loading,
   context,
+  mode = "correction",
   onSubmit,
   onClose,
 }: AdjustStockModalProps) {
-  const [counted, setCounted] = useState("");
   const [reason, setReason] = useState("Contagem física");
-
-  useEffect(() => {
-    if (visible && context) {
-      setCounted(String(context.systemQuantity));
-      setReason("Contagem física");
-    }
-  }, [visible, context?.locationId, context?.systemQuantity]);
-
-  const parsed = parseInt(counted, 10);
-  const valid =
-    context &&
-    !Number.isNaN(parsed) &&
-    parsed >= 0 &&
-    parsed <= context.capacity;
+  const afterPick = mode === "after-pick";
 
   return (
     <Modal visible={visible} transparent animationType="fade">
       <View style={styles.overlay}>
-        <View style={styles.card}>
-          <Text style={styles.title}>Corrigir estoque no endereço</Text>
-          {context ? (
-            <>
-              <Text style={styles.subtitle}>{context.locationLabel}</Text>
-              <Text style={styles.systemQty}>
-                Sistema: {context.systemQuantity} un. (cap. {context.capacity})
-              </Text>
-            </>
-          ) : null}
+        <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled">
+          <View style={styles.card}>
+            <Text style={styles.title}>
+              {afterPick ? "Quanto ficou na gôndola?" : "Corrigir % da gôndola"}
+            </Text>
+            {context ? (
+              <>
+                <Text style={styles.subtitle}>{context.locationLabel}</Text>
+                {context.productName ? (
+                  <Text style={styles.product} numberOfLines={2}>
+                    {context.productName}
+                  </Text>
+                ) : null}
+                <Text style={styles.systemQty}>
+                  Registrado: {formatPercent(context.currentPercent)}
+                </Text>
+              </>
+            ) : null}
 
-          <Text style={styles.fieldLabel}>Quantidade contada</Text>
-          <TextInput
-            style={styles.input}
-            value={counted}
-            onChangeText={setCounted}
-            keyboardType="number-pad"
-            placeholder="0"
-            placeholderTextColor={theme.textMuted}
-          />
+            <PercentInput
+              label={afterPick ? "Olhe a gôndola e informe a %" : "% atual da gôndola"}
+              hint={afterPick ? "0% = gôndola vazia. Obrigatório para seguir." : undefined}
+              initialValue={afterPick ? null : context?.currentPercent ?? null}
+              resetKey={`${context?.locationId}-${visible}`}
+              confirmLabel={afterPick ? "Salvar e seguir" : "Confirmar ajuste"}
+              loading={loading}
+              onConfirm={(pct) => onSubmit(pct, afterPick ? "Após coleta" : reason)}
+            >
+              {afterPick ? null : (
+                <View style={styles.presets}>
+                  {REASON_PRESETS.map((p) => (
+                    <FactoryButton
+                      key={p}
+                      label={p}
+                      variant={reason === p ? "primary" : "secondary"}
+                      onPress={() => setReason(p)}
+                      style={styles.presetBtn}
+                    />
+                  ))}
+                </View>
+              )}
+            </PercentInput>
 
-          <View style={styles.presets}>
-            {REASON_PRESETS.map((p) => (
+            {!afterPick && onClose ? (
               <FactoryButton
-                key={p}
-                label={p}
-                variant={reason === p ? "primary" : "secondary"}
-                onPress={() => setReason(p)}
-                style={styles.presetBtn}
+                label="Cancelar"
+                variant="secondary"
+                onPress={onClose}
+                style={styles.cancelBtn}
               />
-            ))}
+            ) : null}
+            <Text style={styles.footerHint}>
+              Abaixo da % mínima, a gôndola entra na fila de reposição.
+            </Text>
           </View>
-
-          <FactoryButton
-            label="Confirmar ajuste"
-            loading={loading}
-            disabled={!valid}
-            onPress={() => valid && onSubmit(parsed, reason)}
-          />
-          <FactoryButton label="Cancelar" variant="secondary" onPress={onClose} />
-          <Text style={styles.footerHint}>
-            Após confirmar, rotas de pick do SKU serão recalculadas automaticamente.
-          </Text>
-        </View>
+        </ScrollView>
       </View>
     </Modal>
   );
@@ -115,6 +116,9 @@ const styles = StyleSheet.create({
   overlay: {
     flex: 1,
     backgroundColor: "rgba(0,0,0,0.5)",
+  },
+  scroll: {
+    flexGrow: 1,
     justifyContent: "center",
     padding: spacing.lg,
   },
@@ -134,27 +138,18 @@ const styles = StyleSheet.create({
     color: theme.info,
     marginBottom: spacing.xs,
   },
+  product: {
+    color: theme.text,
+    fontWeight: "600",
+    marginBottom: spacing.xs,
+  },
   systemQty: {
     color: theme.textMuted,
     marginBottom: spacing.md,
   },
-  fieldLabel: {
-    fontWeight: "700",
-    color: theme.text,
-    marginBottom: spacing.xs,
-  },
-  input: {
-    borderWidth: 2,
-    borderColor: theme.border,
-    borderRadius: 12,
-    padding: spacing.md,
-    fontSize: 24,
-    fontWeight: "800",
-    color: theme.text,
-    marginBottom: spacing.md,
-  },
-  presets: { gap: spacing.xs, marginBottom: spacing.md },
+  presets: { gap: spacing.xs },
   presetBtn: { marginBottom: 0 },
+  cancelBtn: { marginTop: spacing.sm },
   footerHint: {
     fontSize: typography.caption,
     color: theme.textMuted,

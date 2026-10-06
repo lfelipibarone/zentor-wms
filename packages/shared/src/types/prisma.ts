@@ -94,9 +94,11 @@ export interface Location {
   barcode: string;
   type: LocationType;
   productId: string | null;
-  currentQuantity: number;
+  /** Ocupação em % (no pulmão, soma das % dos SKUs) */
+  fillPercent: number;
   capacity: number;
-  minThreshold: number;
+  /** % mínima da gôndola */
+  minPercent: number;
   active: boolean;
   createdAt: Date;
   updatedAt: Date;
@@ -214,9 +216,9 @@ export interface CreateLocationInput {
   barcode: string;
   type: LocationType;
   productId?: string;
-  capacity: number;
-  minThreshold?: number;
-  currentQuantity?: number;
+  capacity?: number;
+  minPercent?: number;
+  fillPercent?: number;
 }
 
 export interface CreateBasketInput {
@@ -284,7 +286,7 @@ export const LocationTypeLabel: Record<LocationType, string> = {
 
 /** Verifica se a localização está abaixo do limite de reabastecimento */
 export function isBelowReplenishmentThreshold(location: Location): boolean {
-  return location.currentQuantity <= location.minThreshold;
+  return location.fillPercent <= location.minPercent;
 }
 
 /** Verifica se o item do pedido foi totalmente separado */

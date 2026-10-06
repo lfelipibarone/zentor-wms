@@ -10,16 +10,20 @@ import {
 import { useFocusEffect } from "expo-router";
 import { BarcodeScanner } from "@/components/BarcodeScanner";
 import { FactoryButton } from "@/components/FactoryButton";
-import { QuantityInput } from "@/components/QuantityInput";
+import { PercentInput } from "@/components/PercentInput";
 import { ScreenShell } from "@/components/ScreenShell";
 import { api, ApiError } from "@/lib/api";
 import type { CargoTransferSummary } from "@/lib/api";
 import { theme, spacing, typography } from "@/lib/theme";
 
-type Phase = "list" | "scan-gondola" | "confirm-qty" | "done";
+type Phase = "list" | "scan-gondola" | "confirm-pct" | "done";
 
 function normalizeBarcode(code: string) {
   return code.trim().toUpperCase();
+}
+
+function qtyPrefix(t: CargoTransferSummary) {
+  return t.quantity > 0 ? `${t.quantity} un. · ` : "";
 }
 
 function formatAgo(seconds: number) {
@@ -62,11 +66,11 @@ export default function StockingScreen() {
     setPhase("scan-gondola");
     if (t.targetPickFace) {
       setMessage(
-        `${t.product.sku} · ${t.quantity} un. · Bipe a gôndola ${t.targetPickFace.label}`,
+        `${t.product.sku} · ${qtyPrefix(t)}Bipe a gôndola ${t.targetPickFace.label}`,
       );
     } else {
       setMessage(
-        `${t.product.sku} · ${t.quantity} un. do ${t.fromLocation.label}`,
+        `${t.product.sku} · ${qtyPrefix(t)}do ${t.fromLocation.label}`,
       );
       try {
         const { suggested } = await api.suggestCargoTransferFace(t.id);
@@ -91,8 +95,8 @@ export default function StockingScreen() {
         return;
       }
       setToBarcode(loc.barcode);
-      setPhase("confirm-qty");
-      setMessage(`Gôndola ${loc.label}. Confirme ${selected.quantity} un.`);
+      setPhase("confirm-pct");
+      setMessage(`Gôndola ${loc.label} (estava em ${loc.fillPercent}%).`);
     } catch (e) {
       setMessage(e instanceof ApiError ? e.message : "Gôndola não encontrada");
     } finally {
@@ -100,7 +104,7 @@ export default function StockingScreen() {
     }
   };
 
-  const confirmDeposit = async () => {
+  const confirmDeposit = async (percent: number) => {
     if (!selected || !toBarcode) return;
     setLoading(true);
     setMessage(null);
@@ -108,11 +112,9 @@ export default function StockingScreen() {
       const result = await api.depositCargoTransfer(selected.id, {
         toLocationBarcode: toBarcode,
         productBarcode: selected.product.barcode ?? selected.product.sku,
-        quantity: selected.quantity,
+        percent,
       });
-      setMessage(
-        `Abastecido ${result.transfer.quantity} un. na gôndola (saldo: ${result.toLocation.currentQuantity})`,
-      );
+      setMessage(`Gôndola ${result.toLocation.barcode} abastecida: ${result.toLocation.fillPercent}% ✓`);
       setPhase("done");
     } catch (e) {
       setMessage(e instanceof ApiError ? e.message : "Erro ao abastecer");
@@ -153,7 +155,7 @@ export default function StockingScreen() {
                 <Text style={styles.cardTitle}>{item.product.sku}</Text>
                 <Text style={styles.meta}>{item.product.name}</Text>
                 <Text style={styles.meta}>
-                  {item.quantity} un. · de {item.fromLocation.label}
+                  {qtyPrefix(item)}de {item.fromLocation.label}
                 </Text>
                 {item.targetPickFace ? (
                   <Text style={styles.target}>
@@ -185,7 +187,7 @@ export default function StockingScreen() {
         <View style={styles.card}>
           <Text style={styles.cardTitle}>{selected.product.sku}</Text>
           <Text style={styles.meta}>
-            {selected.quantity} un. · origem {selected.fromLocation.label}
+            {qtyPrefix(selected)}origem {selected.fromLocation.label}
           </Text>
         </View>
       ) : null}
@@ -201,22 +203,16 @@ export default function StockingScreen() {
         </>
       ) : null}
 
-      {phase === "confirm-qty" && selected ? (
-        <>
-          <Text style={styles.instruction}>
-            Gôndola {toBarcode} — confirme a quantidade
-          </Text>
-          <QuantityInput
-            label={`Quantidade (${selected.quantity})`}
-            max={selected.quantity}
-            onConfirm={confirmDeposit}
-          />
-          <FactoryButton
-            label="Bipar produto (+1)"
-            variant="secondary"
-            onPress={() => setScannerOpen(true)}
-          />
-        </>
+      {phase === "confirm-pct" && selected ? (
+        <PercentInput
+          label={`Gôndola ${toBarcode} — quanto ficou?`}
+          hint="Depois de abastecer, informe a % da gôndola."
+          initialValue={100}
+          resetKey={selected.id}
+          confirmLabel="Confirmar abastecimento"
+          loading={loading}
+          onConfirm={confirmDeposit}
+        />
       ) : null}
 
       {phase === "done" ? (

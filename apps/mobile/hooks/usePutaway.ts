@@ -37,6 +37,7 @@ export function useStorePutawayItem(sessionId: string) {
       locationBarcode: string;
       productBarcode?: string;
       quantity?: number;
+      pulmaoPercent: number;
     }) => api.storePutawayItem(sessionId, body),
     onSuccess: (data) => {
       qc.setQueryData(["putaway-session", sessionId], data);

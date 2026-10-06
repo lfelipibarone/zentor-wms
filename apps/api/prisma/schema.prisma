@@ -528,14 +528,14 @@ model Location {
   /// Espelha WarehouseLinha.face; usado pelo Route Engine
   face                LocationFace @default(A)
   type                LocationType
-  /// SKU da gôndola. Pulmão aceita vários SKUs: fica sempre nulo e o saldo por SKU está em LocationStock.
+  /// SKU da gôndola. Pulmão aceita vários SKUs: fica sempre nulo e a % de cada SKU está em LocationStock.
   productId           String?
-  /// Quantidade física atual (no pulmão, soma de todos os SKUs de LocationStock)
-  currentQuantity     Int          @default(0)
-  /// Capacidade máxima da posição
+  /// Ocupação em % (0–100), informada pelo operador. No pulmão, soma das % dos SKUs (pode passar de 100).
+  fillPercent         Int          @default(0) @map("currentQuantity")
+  /// Capacidade em unidades (só informativa; o estoque é controlado em %)
   capacity            Int
-  /// Limite mínimo para disparar alerta de reabastecimento
-  minThreshold        Int          @default(0)
+  /// % mínima da gôndola; abaixo ou igual entra no ressuprimento
+  minPercent          Int          @default(20) @map("minThreshold")
   active              Boolean      @default(true)
   createdAt           DateTime     @default(now())
   updatedAt           DateTime     @updatedAt
@@ -580,14 +580,15 @@ model Location {
   @@map("locations")
 }
 
-/// Saldo de um SKU em um pulmão. Um pulmão guarda vários SKUs e um SKU pode estar em vários pulmões;
-/// a linha só existe enquanto houver saldo.
+/// SKU guardado em um pulmão. Um pulmão guarda vários SKUs e um SKU pode estar em vários pulmões;
+/// a linha só existe enquanto o SKU estiver no pulmão.
 model LocationStock {
   id         String   @id @default(cuid())
   tenantId   String
   locationId String
   productId  String
-  quantity   Int
+  /// % do pulmão ocupada por este SKU (1–100)
+  percent    Int      @map("quantity")
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
 
@@ -860,7 +861,12 @@ model InventoryMovement {
   createdAt DateTime @default(now())
 
   type     InventoryMovementType
+  /// Unidades movimentadas (0 quando só a % foi informada)
   quantity Int
+
+  /// % da posição antes/depois (estoque controlado em %)
+  percentBefore Int?
+  percentAfter  Int?
 
   userId    String
   productId String
@@ -921,11 +927,14 @@ model CargoTransfer {
   tenantId  String
   status    CargoTransferStatus @default(IN_TRANSIT)
   productId String
+  /// Unidades levadas (opcional; 0 quando não informado)
   quantity  Int
 
   fromLocationId   String
   toLocationId     String?
   targetPickFaceId String?
+  /// % do SKU no pulmão antes da retirada (para desfazer ao cancelar)
+  fromPercentBefore Int?
 
   withdrawnById String
   withdrawnAt   DateTime  @default(now())

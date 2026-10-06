@@ -577,8 +577,8 @@ export function registerWarehouseRoutes(app: FastifyInstance, guard: Guard) {
       type?: LocationType;
       productId?: string | null;
       capacity?: number;
-      minThreshold?: number;
-      currentQuantity?: number;
+      minPercent?: number;
+      fillPercent?: number;
       active?: boolean;
       barracaoId?: string | null;
       setorId?: string | null;
@@ -614,8 +614,8 @@ export function registerWarehouseRoutes(app: FastifyInstance, guard: Guard) {
             type: b.type ?? LocationType.PULMAO,
             productId: b.productId,
             capacity: b.capacity ?? 100,
-            minThreshold: b.minThreshold ?? 0,
-            currentQuantity: b.currentQuantity ?? 0,
+            minPercent: b.minPercent,
+            fillPercent: b.fillPercent,
             active: b.active,
             barracaoId: b.barracaoId,
             setorId: b.setorId,
@@ -643,7 +643,7 @@ export function registerWarehouseRoutes(app: FastifyInstance, guard: Guard) {
       le?: { colunas?: number; linhas?: number } | null;
       type?: LocationType;
       capacity?: number;
-      minThreshold?: number;
+      minPercent?: number;
     };
   }>(
     "/api/warehouse/estantes/generate",
@@ -669,7 +669,7 @@ export function registerWarehouseRoutes(app: FastifyInstance, guard: Guard) {
           le: b.le ? { colunas: Number(b.le.colunas), linhas: Number(b.le.linhas) } : null,
           type: b.type,
           capacity: b.capacity != null ? Number(b.capacity) : undefined,
-          minThreshold: b.minThreshold != null ? Number(b.minThreshold) : undefined,
+          minPercent: b.minPercent != null ? Number(b.minPercent) : undefined,
         });
         return reply.status(201).send(result);
       } catch (e) {
@@ -795,8 +795,8 @@ export function registerWarehouseRoutes(app: FastifyInstance, guard: Guard) {
       type?: LocationType;
       productId?: string | null;
       capacity?: number;
-      minThreshold?: number;
-      currentQuantity?: number;
+      minPercent?: number;
+      fillPercent?: number;
       active?: boolean;
       proximityCorredorId?: string | null;
       proximityEstanteId?: string | null;

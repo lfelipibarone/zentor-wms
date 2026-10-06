@@ -8,16 +8,15 @@ export interface ProductLocationSummary {
   id: string;
   barcode: string;
   type: ProductLocationType;
-  /** No pulmão, é o saldo só deste SKU */
-  currentQuantity: number;
+  /** Gôndola: % atual. Pulmão: % só deste SKU. */
+  fillPercent: number;
   /** true quando o produto só tem saldo no pulmão (sem vínculo fixo) */
   pulmaoStock?: boolean;
 }
 
 export interface ProductLocationDetail extends ProductLocationSummary {
   face: "A" | "B";
-  capacity: number;
-  minThreshold: number;
+  minPercent: number;
   active: boolean;
   barracao: { code: string; name: string } | null;
 }
@@ -49,7 +48,7 @@ export interface LocationOption {
   id: string;
   barcode: string;
   type: ProductLocationType;
-  currentQuantity: number;
+  fillPercent: number;
   active: boolean;
   product: { sku: string; name: string } | null;
 }

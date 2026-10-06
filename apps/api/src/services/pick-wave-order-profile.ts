@@ -127,7 +127,7 @@ export async function buildOrderPickProfiles(
             row: true,
             estanteId: true,
             face: true,
-            currentQuantity: true,
+            fillPercent: true,
           },
         })
       : [];
@@ -140,7 +140,11 @@ export async function buildOrderPickProfiles(
     facesByProduct.set(loc.productId, list);
   }
   for (const list of facesByProduct.values()) {
-    list.sort((a, b) => a.currentQuantity - b.currentQuantity);
+    // mesma regra do pick: gôndolas com produto primeiro, a mais vazia antes
+    list.sort(
+      (a, b) =>
+        Number(a.fillPercent <= 0) - Number(b.fillPercent <= 0) || a.fillPercent - b.fillPercent,
+    );
   }
 
   const result = new Map<string, OrderPickProfile>();

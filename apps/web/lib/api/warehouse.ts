@@ -23,8 +23,10 @@ export interface WarehouseLayoutLocation {
   type: "PICK_FACE" | "PULMAO";
   barcode: string;
   capacity: number;
-  minThreshold: number;
-  currentQuantity: number;
+  /** % mínima antes de repor */
+  minPercent: number;
+  /** % atual (no pulmão, soma das % dos SKUs) */
+  fillPercent: number;
   proximityCorredorId?: string | null;
   proximityEstanteId?: string | null;
   proximityLinhaId?: string | null;
@@ -134,10 +136,8 @@ export interface WarehouseLayoutListRow {
   linha: string;
   face?: LocationFace;
   sku: string;
-  capacity: number | null;
-  minThreshold: number | null;
-  currentQuantity: number | null;
-  fillPct: number | null;
+  minPercent: number | null;
+  fillPercent: number | null;
   isPosition: boolean;
   setorId?: string;
   corredorId?: string;
@@ -294,9 +294,8 @@ export function updateWarehousePosition(
     linhaCode?: string;
     linhaName?: string | null;
     productId?: string | null;
-    capacity?: number;
-    minThreshold?: number;
-    currentQuantity?: number;
+    minPercent?: number;
+    fillPercent?: number;
   },
 ) {
   return apiFetch<{ location: WarehouseLayoutLocation }>(

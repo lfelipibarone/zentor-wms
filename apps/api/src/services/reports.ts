@@ -6,6 +6,7 @@ import {
   type Prisma,
 } from "@prisma/client";
 import { prisma } from "../lib/prisma.js";
+import { needsReplenishment, percentToFill } from "./stock-percent.js";
 import { PACKING_ISSUE_TYPE_LABEL, type PackingIssueType } from "./order-packing.js";
 import { marketplaceWhereClause } from "./marketplace-filter.js";
 import { marketplaceDisplayLabel } from "./marketplace-priority.js";
@@ -801,7 +802,9 @@ async function buildLowStockReport(tenantId: string): Promise<ReportResult> {
     orderBy: [{ corridor: "asc" }, { row: "asc" }],
   });
 
-  const low = locations.filter((l) => l.currentQuantity <= l.minThreshold);
+  const low = locations.filter(
+    (l) => l.productId && needsReplenishment(l.fillPercent, l.minPercent),
+  );
 
   const rows = low.map((l) => ({
     local: l.barcode,
@@ -809,10 +812,9 @@ async function buildLowStockReport(tenantId: string): Promise<ReportResult> {
     linha: l.row,
     sku: l.product?.sku ?? null,
     produto: l.product?.name ?? null,
-    quantidadeAtual: l.currentQuantity,
-    minimo: l.minThreshold,
-    capacidade: l.capacity,
-    deficit: l.minThreshold - l.currentQuantity,
+    percentualAtual: l.fillPercent,
+    minimo: l.minPercent,
+    faltaEncher: percentToFill(l.fillPercent),
   }));
 
   return {
@@ -826,10 +828,9 @@ async function buildLowStockReport(tenantId: string): Promise<ReportResult> {
       { key: "linha", header: "Linha" },
       { key: "sku", header: "SKU" },
       { key: "produto", header: "Produto" },
-      { key: "quantidadeAtual", header: "Qtd atual" },
-      { key: "minimo", header: "Mínimo" },
-      { key: "capacidade", header: "Capacidade" },
-      { key: "deficit", header: "Déficit" },
+      { key: "percentualAtual", header: "% atual" },
+      { key: "minimo", header: "% mínima" },
+      { key: "faltaEncher", header: "% para encher" },
     ],
     rows,
     totalRows: rows.length,
@@ -903,7 +904,7 @@ export async function getReportsSummary(
   ]);
 
   const lowStock = locationsLow.filter(
-    (l) => l.currentQuantity <= l.minThreshold,
+    (l) => l.productId && needsReplenishment(l.fillPercent, l.minPercent),
   );
 
   const pickerIds = topPickers.map((p) => p.userId);
@@ -949,8 +950,8 @@ export async function getReportsSummary(
     lowStock: lowStock.slice(0, 10).map((l) => ({
       barcode: l.barcode,
       sku: l.product?.sku,
-      currentQuantity: l.currentQuantity,
-      minThreshold: l.minThreshold,
+      fillPercent: l.fillPercent,
+      minPercent: l.minPercent,
     })),
   };
 }

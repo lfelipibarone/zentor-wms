@@ -14,6 +14,7 @@ import {
   WarehouseFormStep,
   WarehouseTilePicker,
 } from "@/components/warehouse/warehouse-tile-picker";
+import { PercentBar } from "@/components/ops/percent-bar";
 export type WarehouseEditRow = {
   id: string;
   segment: WarehouseSegment;
@@ -59,13 +60,8 @@ export function WarehouseLocationEditModal({
     row.locationType ?? "PICK_FACE",
   );
   const [productId, setProductId] = useState(currentProduct?.id ?? "");
-  const [capacity, setCapacity] = useState(String(row.location?.capacity ?? 100));
-  const [minThreshold, setMinThreshold] = useState(
-    String(row.location?.minThreshold ?? 0),
-  );
-  const [currentQuantity, setCurrentQuantity] = useState(
-    String(row.location?.currentQuantity ?? 0),
-  );
+  const [minPercent, setMinPercent] = useState(String(row.location?.minPercent ?? 20));
+  const [fillPercent, setFillPercent] = useState(String(row.location?.fillPercent ?? 0));
   const [saving, setSaving] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const isPulmao = type === "PULMAO";
@@ -86,12 +82,11 @@ export function WarehouseLocationEditModal({
     [currentProduct],
   );
 
-  const fillPct = useMemo(() => {
-    const cap = Number(capacity);
-    const cur = Number(currentQuantity);
-    if (!Number.isFinite(cap) || cap <= 0 || !Number.isFinite(cur)) return null;
-    return Math.round((cur / cap) * 100);
-  }, [capacity, currentQuantity]);
+  const fillValue = Number(fillPercent);
+  const percentsValid = [minPercent, fillPercent].every((v) => {
+    const n = Number(v);
+    return v.trim() !== "" && Number.isInteger(n) && n >= 0 && n <= 100;
+  });
 
   const save = async () => {
     if (!code.trim()) {
@@ -100,6 +95,10 @@ export function WarehouseLocationEditModal({
     }
     if (!barcode.trim()) {
       setErr("Código de barras obrigatório");
+      return;
+    }
+    if (!isPulmao && productId && !percentsValid) {
+      setErr("% mínima e % atual devem ser inteiros de 0 a 100");
       return;
     }
 
@@ -117,9 +116,9 @@ export function WarehouseLocationEditModal({
           ? { productId: null }
           : {
               productId: productId || null,
-              capacity: Number(capacity) || 100,
-              minThreshold: Number(minThreshold) || 0,
-              currentQuantity: Number(currentQuantity) || 0,
+              ...(productId
+                ? { minPercent: Number(minPercent), fillPercent: Number(fillPercent) }
+                : {}),
             }),
         active,
       });
@@ -203,10 +202,10 @@ export function WarehouseLocationEditModal({
           {isPulmao ? (
             <WarehouseFormStep step={2} title="SKUs no pulmão">
               <p className="rounded-lg bg-slate-50 px-3 py-2 text-sm text-slate-600">
-                O pulmão aceita vários SKUs e não tem SKU fixo. O saldo de cada SKU é
-                registrado na armazenagem pelo aplicativo.
+                O pulmão aceita vários SKUs e não tem SKU fixo. A % de cada SKU é
+                registrada na armazenagem pelo aplicativo.
                 <span className="mt-1 block font-semibold text-slate-800">
-                  Total guardado hoje: {row.location?.currentQuantity ?? 0} un.
+                  Ocupação hoje: {row.location?.fillPercent ?? 0}% (soma dos SKUs)
                 </span>
               </p>
             </WarehouseFormStep>
@@ -232,54 +231,36 @@ export function WarehouseLocationEditModal({
           </div>
 
           {productId ? (
-            <div className="grid grid-cols-3 gap-2">
+            <div className="grid grid-cols-2 gap-2">
               <label className="block text-sm">
-                Capacidade
-                <input
-                  type="number"
-                  min={1}
-                  className="mt-1 w-full rounded-lg border px-3 py-2"
-                  value={capacity}
-                  onChange={(e) => setCapacity(e.target.value)}
-                />
-              </label>
-              <label className="block text-sm">
-                Mínimo
+                % mínima (repor)
                 <input
                   type="number"
                   min={0}
+                  max={100}
                   className="mt-1 w-full rounded-lg border px-3 py-2"
-                  value={minThreshold}
-                  onChange={(e) => setMinThreshold(e.target.value)}
+                  value={minPercent}
+                  onChange={(e) => setMinPercent(e.target.value)}
                 />
               </label>
               <label className="block text-sm">
-                Qtd atual
+                % atual
                 <input
                   type="number"
                   min={0}
+                  max={100}
                   className="mt-1 w-full rounded-lg border px-3 py-2"
-                  value={currentQuantity}
-                  onChange={(e) => setCurrentQuantity(e.target.value)}
+                  value={fillPercent}
+                  onChange={(e) => setFillPercent(e.target.value)}
                 />
               </label>
             </div>
           ) : null}
 
-          {fillPct != null && productId ? (
+          {productId && Number.isFinite(fillValue) ? (
             <div>
-              <div className="mb-1 flex justify-between text-xs text-slate-600">
-                <span>Ocupação</span>
-                <span>{fillPct}%</span>
-              </div>
-              <div className="h-2 overflow-hidden rounded-full bg-slate-100">
-                <div
-                  className={`h-full ${
-                    fillPct <= Number(minThreshold) ? "bg-amber-500" : "bg-teal-600"
-                  }`}
-                  style={{ width: `${Math.min(100, fillPct)}%` }}
-                />
-              </div>
+              <div className="mb-1 text-xs text-slate-600">Ocupação</div>
+              <PercentBar percent={fillValue} minPercent={Number(minPercent)} />
             </div>
           ) : null}
           </WarehouseFormStep>

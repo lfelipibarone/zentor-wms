@@ -59,10 +59,9 @@ export interface LocationRow {
   /** SKU da gôndola; pulmão não tem SKU fixo (ver `stocks`) */
   productId: string | null;
   product: { sku: string; name: string } | null;
-  /** No pulmão, total de todos os SKUs */
-  currentQuantity: number;
-  capacity: number;
-  minThreshold: number;
+  /** Gôndola: % atual. Pulmão: soma das % dos SKUs. */
+  fillPercent: number;
+  minPercent: number;
   active: boolean;
   /** SKUs com saldo no pulmão (vem no estoque) */
   stocks?: PulmaoStockRow[];
@@ -70,7 +69,8 @@ export interface LocationRow {
 
 export interface PulmaoStockRow {
   product: { id: string; sku: string; name: string };
-  quantity: number;
+  /** % do pulmão ocupada pelo SKU */
+  percent: number;
 }
 
 export interface PutawayStoredLocation {
@@ -310,6 +310,9 @@ export function fetchMovements(
       id: string;
       type: string;
       quantity: number;
+      /** % do endereço antes/depois (null em movimentos antigos) */
+      percentBefore: number | null;
+      percentAfter: number | null;
       createdAt: string;
       reference: string | null;
       notes: string | null;
@@ -639,12 +642,16 @@ export function scanReturnReceiptItem(
   );
 }
 
-export function completeReturnReceipt(id: string, pulmaoLocationBarcode: string) {
+export function completeReturnReceipt(
+  id: string,
+  pulmaoLocationBarcode: string,
+  percents: Array<{ itemId: string; percent: number }>,
+) {
   return apiFetch<{ detail: PurchaseReceiptDetail }>(
     `/api/purchase-receipts/return/${id}/complete`,
     {
       method: "POST",
-      body: JSON.stringify({ pulmaoLocationBarcode }),
+      body: JSON.stringify({ pulmaoLocationBarcode, percents }),
     },
   );
 }
@@ -657,6 +664,8 @@ export function fetchReceipts(page?: number, pageSize?: number) {
     receipts: Array<{
       id: string;
       quantity: number;
+      percentBefore: number | null;
+      percentAfter: number | null;
       createdAt: string;
       reference: string | null;
       notes: string | null;
@@ -738,15 +747,16 @@ export type ReplenishmentNeedSummary = {
   productId: string;
   sku: string;
   productName: string;
-  currentQuantity: number;
-  minThreshold: number;
-  capacity: number;
-  deficit: number;
+  fillPercent: number;
+  minPercent: number;
+  /** Pontos de % que faltam para encher */
+  percentToFill: number;
   suggestedPulmao: {
     id: string;
     barcode: string;
     label: string;
-    currentQuantity: number;
+    /** % deste SKU no pulmão */
+    percent: number;
   } | null;
 };
 

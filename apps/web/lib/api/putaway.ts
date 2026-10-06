@@ -52,6 +52,8 @@ export function storePutawayItem(
     locationBarcode: string;
     productBarcode?: string;
     quantity: number;
+    /** % que o SKU passa a ocupar no pulmão */
+    pulmaoPercent: number;
   },
 ) {
   return apiFetch<PutawaySessionView>(`/api/putaway/${sessionId}/store`, {

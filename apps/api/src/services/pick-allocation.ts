@@ -1,7 +1,4 @@
-import { LocationType } from "@prisma/client";
-import { prisma } from "../lib/prisma.js";
-import { getRouteEngine } from "./route-engine/index.js";
-import { PickFaceError } from "./pick-face-resolve.js";
+import { resolvePickFaceForProduct } from "./pick-face-resolve.js";
 
 export type PickSegment = {
   locationId: string;
@@ -17,76 +14,29 @@ function formatLocation(loc: { corridor: string; row: string; barcode: string })
 }
 
 /**
- * Distribui quantidade entre gôndolas de giro (menor saldo primeiro na rota).
- * Se saldo total < necessário, completa na face de menor saldo e marca shortfall.
+ * Gôndola de onde sai a quantidade do pedido. O estoque da gôndola é controlado em %, então
+ * não há como dividir unidades entre gôndolas: tudo sai da gôndola escolhida para pick.
  */
 export async function allocateQuantityAcrossPickFaces(
   productId: string,
   tenantId: string,
   quantityNeeded: number,
-): Promise<{ segments: PickSegment[]; shortfall: number }> {
+): Promise<{ segments: PickSegment[] }> {
   const qty = Math.max(0, Math.floor(quantityNeeded));
-  if (qty === 0) return { segments: [], shortfall: 0 };
-
-  const locations = await prisma.location.findMany({
-    where: {
-      tenantId,
-      type: LocationType.PICK_FACE,
-      active: true,
-      productId,
-    },
-  });
-
-  if (locations.length === 0) {
-    throw new PickFaceError(
-      "Nenhum endereço de estoque de giro ativo para este produto.",
-    );
-  }
-
-  const sorted = (await getRouteEngine(tenantId)).sortByRoute(
-    [...locations].sort((a, b) => a.currentQuantity - b.currentQuantity),
-  );
-
-  const segments: PickSegment[] = [];
-  let remaining = qty;
-  let totalAvailable = 0;
-
-  for (const loc of sorted) {
-    if (remaining <= 0) break;
-    const take = Math.min(loc.currentQuantity, remaining);
-    if (take <= 0) continue;
-    totalAvailable += loc.currentQuantity;
-    segments.push({
-      locationId: loc.id,
-      barcode: loc.barcode,
-      corridor: loc.corridor,
-      row: loc.row,
-      quantity: take,
-      label: formatLocation(loc),
-    });
-    remaining -= take;
-  }
-
-  if (remaining > 0) {
-    const fallback = sorted[0]!;
-    const existing = segments.find((s) => s.locationId === fallback.id);
-    if (existing) {
-      existing.quantity += remaining;
-    } else {
-      segments.push({
-        locationId: fallback.id,
-        barcode: fallback.barcode,
-        corridor: fallback.corridor,
-        row: fallback.row,
-        quantity: remaining,
-        label: formatLocation(fallback),
-      });
-    }
-    const shortfall = Math.max(0, qty - totalAvailable);
-    return { segments, shortfall };
-  }
-
-  return { segments, shortfall: 0 };
+  if (qty === 0) return { segments: [] };
+  const loc = await resolvePickFaceForProduct(productId, tenantId, "pick");
+  return {
+    segments: [
+      {
+        locationId: loc.id,
+        barcode: loc.barcode,
+        corridor: loc.corridor,
+        row: loc.row,
+        quantity: qty,
+        label: formatLocation(loc),
+      },
+    ],
+  };
 }
 
 export function buildMultiGondolaHint(segments: PickSegment[]): string | null {

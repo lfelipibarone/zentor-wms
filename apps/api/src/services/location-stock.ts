@@ -5,6 +5,7 @@ import {
 } from "@prisma/client";
 import { productMatchesCode } from "@wms/shared";
 import { prisma } from "../lib/prisma.js";
+import { parsePercent, StockPercentError } from "./stock-percent.js";
 
 export class LocationStockError extends Error {
   constructor(
@@ -55,28 +56,32 @@ export async function findNfItemByScannedCode<
 export interface StockLocationInput {
   locationId: string;
   productBarcode: string;
-  quantity?: number;
+  /** % que a gôndola ficou depois de abastecer */
+  percent: unknown;
   userId: string;
 }
 
 export interface StockLocationResult {
   location: {
     id: string;
-    currentQuantity: number;
-    capacity: number;
-    minThreshold: number;
+    fillPercent: number;
+    minPercent: number;
     product: Product | null;
   };
-  added: number;
+  previousPercent: number;
   movementType: "ENTRY" | "REPLENISHMENT";
 }
 
+/** Abastecimento direto da gôndola: grava a % que ela ficou (e associa o SKU se estava livre). */
 export async function stockLocation(
   input: StockLocationInput,
 ): Promise<StockLocationResult> {
-  const quantity = Math.floor(Number(input.quantity ?? 1));
-  if (quantity <= 0) {
-    throw new LocationStockError("Quantidade inválida");
+  let percent: number;
+  try {
+    percent = parsePercent(input.percent, "% que a gôndola ficou");
+  } catch (e) {
+    if (e instanceof StockPercentError) throw new LocationStockError(e.message);
+    throw e;
   }
 
   const productBarcode = input.productBarcode.trim();
@@ -109,13 +114,6 @@ export async function stockLocation(
     );
   }
 
-  const newQty = Math.min(location.currentQuantity + quantity, location.capacity);
-  const added = newQty - location.currentQuantity;
-
-  if (added <= 0) {
-    throw new LocationStockError("Gôndola já está na capacidade máxima");
-  }
-
   const movementType = !location.productId
     ? InventoryMovementType.ENTRY
     : InventoryMovementType.REPLENISHMENT;
@@ -125,7 +123,7 @@ export async function stockLocation(
       where: { id: input.locationId },
       data: {
         productId: product.id,
-        currentQuantity: newQty,
+        fillPercent: percent,
       },
       include: { product: true },
     });
@@ -134,7 +132,9 @@ export async function stockLocation(
       data: {
         tenantId: location.tenantId,
         type: movementType,
-        quantity: added,
+        quantity: 0,
+        percentBefore: location.fillPercent,
+        percentAfter: percent,
         userId: input.userId,
         productId: product.id,
         toLocationId: input.locationId,
@@ -151,12 +151,11 @@ export async function stockLocation(
   return {
     location: {
       id: updated.id,
-      currentQuantity: updated.currentQuantity,
-      capacity: updated.capacity,
-      minThreshold: updated.minThreshold,
+      fillPercent: updated.fillPercent,
+      minPercent: updated.minPercent,
       product: updated.product,
     },
-    added,
+    previousPercent: location.fillPercent,
     movementType:
       movementType === InventoryMovementType.ENTRY ? "ENTRY" : "REPLENISHMENT",
   };

@@ -23,10 +23,10 @@ export type LayoutRow = WarehouseEditRow & {
   coluna: string;
   linha: string;
   sku: string;
-  capacity: number | null;
-  minThreshold: number | null;
-  currentQuantity: number | null;
-  fillPct: number | null;
+  /** % mínima da gôndola */
+  minPercent: number | null;
+  /** % atual (no pulmão, soma das % dos SKUs) */
+  fillPercent: number | null;
   isPosition: boolean;
 };
 
@@ -76,10 +76,8 @@ export function flattenWarehouseTrees(trees: WarehouseTree[]): LayoutRow[] {
       coluna: EMPTY,
       linha: EMPTY,
       sku: EMPTY,
-      capacity: null,
-      minThreshold: null,
-      currentQuantity: null,
-      fillPct: null,
+      minPercent: null,
+      fillPercent: null,
       isPosition: false,
     });
 
@@ -102,10 +100,8 @@ export function flattenWarehouseTrees(trees: WarehouseTree[]): LayoutRow[] {
         coluna: EMPTY,
         linha: EMPTY,
         sku: EMPTY,
-        capacity: null,
-        minThreshold: null,
-        currentQuantity: null,
-        fillPct: null,
+        minPercent: null,
+        fillPercent: null,
         isPosition: false,
       });
 
@@ -128,10 +124,8 @@ export function flattenWarehouseTrees(trees: WarehouseTree[]): LayoutRow[] {
           coluna: EMPTY,
           linha: EMPTY,
           sku: EMPTY,
-          capacity: null,
-          minThreshold: null,
-          currentQuantity: null,
-          fillPct: null,
+          minPercent: null,
+          fillPercent: null,
           isPosition: false,
         });
 
@@ -154,10 +148,8 @@ export function flattenWarehouseTrees(trees: WarehouseTree[]): LayoutRow[] {
             coluna: EMPTY,
             linha: EMPTY,
             sku: EMPTY,
-            capacity: null,
-            minThreshold: null,
-            currentQuantity: null,
-            fillPct: null,
+            minPercent: null,
+            fillPercent: null,
             isPosition: false,
           });
 
@@ -180,10 +172,8 @@ export function flattenWarehouseTrees(trees: WarehouseTree[]): LayoutRow[] {
               coluna: coluna.code,
               linha: EMPTY,
               sku: EMPTY,
-              capacity: null,
-              minThreshold: null,
-              currentQuantity: null,
-              fillPct: null,
+              minPercent: null,
+              fillPercent: null,
               isPosition: false,
             });
 
@@ -210,12 +200,7 @@ function positionRow(
   linha: WarehouseLinhaNode,
 ): LayoutRow {
   const loc = linha.location;
-  const capacity = loc?.capacity ?? null;
-  const current = loc?.currentQuantity ?? null;
-  const fillPct =
-    capacity != null && current != null && capacity > 0
-      ? Math.round((current / capacity) * 100)
-      : null;
+  const current = loc?.fillPercent ?? null;
 
   return {
     id: linha.id,
@@ -241,10 +226,8 @@ function positionRow(
           ? "Vários SKUs"
           : EMPTY
         : (loc?.product?.sku ?? EMPTY),
-    capacity,
-    minThreshold: loc?.minThreshold ?? null,
-    currentQuantity: current,
-    fillPct,
+    minPercent: loc?.minPercent ?? null,
+    fillPercent: current,
     isPosition: true,
     location: loc ?? undefined,
     barcode: loc?.barcode,

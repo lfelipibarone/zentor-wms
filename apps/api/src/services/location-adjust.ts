@@ -1,11 +1,12 @@
-import { InventoryMovementType, LocationType, type Product } from "@prisma/client";
+import { LocationType, type Product } from "@prisma/client";
 import { prisma } from "../lib/prisma.js";
 import { findProductByBarcode } from "./location-stock.js";
-import { getPulmaoStockQuantity, setPulmaoStock } from "./pulmao-inventory.js";
+import { getPulmaoSkuPercent, setPulmaoSkuPercent } from "./pulmao-inventory.js";
 import {
   reconcilePickTargetsAfterStockChange,
   type ReconcileResult,
 } from "./pick-location-reconcile.js";
+import { needsReplenishment, parsePercent, recordPercentMovement, StockPercentError } from "./stock-percent.js";
 
 export class LocationAdjustError extends Error {
   constructor(
@@ -26,7 +27,8 @@ export type AdjustLocationInput = {
   userId: string;
   locationId?: string;
   barcode?: string;
-  countedQuantity: number;
+  /** Gôndola: % que ela ficou. Pulmão: % que o SKU ocupa (0 = acabou, sai da lista). */
+  percent: unknown;
   productBarcode?: string;
   reason?: string;
   orderId?: string;
@@ -41,9 +43,10 @@ export type AdjustLocationResult = {
     type: string;
     corridor: string;
     row: string;
-    currentQuantity: number;
-    capacity: number;
-    minThreshold: number;
+    /** Gôndola: % atual. Pulmão: ocupação total (soma dos SKUs). */
+    fillPercent: number;
+    minPercent: number;
+    needsReplenishment: boolean;
     label: string;
     product: {
       id: string;
@@ -51,20 +54,22 @@ export type AdjustLocationResult = {
       name: string;
       barcode: string | null;
     } | null;
-    /** Saldo do produto informado (no pulmão, só o do SKU contado) */
-    productQuantity: number;
+    /** % do produto informado (no pulmão, só a do SKU) */
+    productPercent: number;
   };
-  previousQuantity: number;
-  adjustmentDelta: number;
+  previousPercent: number;
   reconciliation: ReconcileResult;
 };
 
-export async function adjustLocationQuantity(
+export async function adjustLocationPercent(
   input: AdjustLocationInput,
 ): Promise<AdjustLocationResult> {
-  const counted = Math.floor(Number(input.countedQuantity));
-  if (!Number.isFinite(counted) || counted < 0) {
-    throw new LocationAdjustError("Quantidade contada inválida");
+  let percent: number;
+  try {
+    percent = parsePercent(input.percent);
+  } catch (e) {
+    if (e instanceof StockPercentError) throw new LocationAdjustError(e.message);
+    throw e;
   }
 
   const location = input.locationId
@@ -75,7 +80,7 @@ export async function adjustLocationQuantity(
     : await prisma.location.findFirst({
         where: {
           tenantId: input.tenantId,
-          barcode: input.barcode?.trim(),
+          barcode: { equals: input.barcode?.trim(), mode: "insensitive" },
           active: true,
         },
         include: { product: true },
@@ -87,106 +92,91 @@ export async function adjustLocationQuantity(
 
   const isPulmao = location.type === LocationType.PULMAO;
 
-  if (!isPulmao && counted > location.capacity) {
-    throw new LocationAdjustError(
-      `Quantidade excede a capacidade (${location.capacity})`,
-    );
-  }
-
   let pulmaoProduct: Product | null = null;
   if (isPulmao) {
     if (!input.productBarcode?.trim()) {
-      throw new LocationAdjustError("Informe o produto contado neste pulmão");
+      throw new LocationAdjustError("Informe o produto deste pulmão");
     }
     pulmaoProduct = await findProductByBarcode(input.tenantId, input.productBarcode);
     if (!pulmaoProduct) {
       throw new LocationAdjustError("Produto não cadastrado", 404);
     }
-  } else if (input.productBarcode?.trim() && location.productId) {
-    const product = await findProductByBarcode(input.tenantId, input.productBarcode);
-    if (!product || product.id !== location.productId) {
-      throw new LocationAdjustError("Produto não corresponde a este endereço");
+  } else {
+    if (!location.productId) {
+      throw new LocationAdjustError("Gôndola sem SKU associado");
+    }
+    if (input.productBarcode?.trim()) {
+      const product = await findProductByBarcode(input.tenantId, input.productBarcode);
+      if (!product || product.id !== location.productId) {
+        throw new LocationAdjustError("Produto não corresponde a este endereço");
+      }
     }
   }
 
-  const productId = pulmaoProduct?.id ?? location.productId;
-  const previousQuantity = pulmaoProduct
-    ? await getPulmaoStockQuantity(prisma, location.id, pulmaoProduct.id)
-    : location.currentQuantity;
-  const delta = counted - previousQuantity;
+  const productId = (pulmaoProduct?.id ?? location.productId)!;
+  const previousPercent = pulmaoProduct
+    ? await getPulmaoSkuPercent(prisma, location.id, pulmaoProduct.id)
+    : location.fillPercent;
 
-  const noteParts = [
-    "Mobile count correction",
-    `was=${previousQuantity}`,
-    `counted=${counted}`,
-  ];
-  if (input.reason?.trim()) noteParts.push(`reason=${input.reason.trim()}`);
+  const noteParts: string[] = [];
+  if (input.reason?.trim()) noteParts.push(input.reason.trim());
   if (input.orderId) noteParts.push(`orderId=${input.orderId}`);
   if (input.waveLineId) noteParts.push(`waveLineId=${input.waveLineId}`);
-  const notes = noteParts.join("; ");
 
   await prisma.$transaction(async (tx) => {
     if (pulmaoProduct) {
-      await setPulmaoStock(
+      await setPulmaoSkuPercent(
         tx,
         { tenantId: input.tenantId, locationId: location.id, productId: pulmaoProduct.id },
-        counted,
+        percent,
       );
     } else {
       await tx.location.update({
         where: { id: location.id },
-        data: { currentQuantity: counted },
+        data: { fillPercent: percent },
       });
     }
-
-    if (delta !== 0 && productId) {
-      await tx.inventoryMovement.create({
-        data: {
-          tenantId: input.tenantId,
-          type: InventoryMovementType.ADJUSTMENT,
-          quantity: Math.abs(delta),
-          userId: input.userId,
-          productId,
-          fromLocationId: delta < 0 ? location.id : undefined,
-          toLocationId: delta > 0 ? location.id : undefined,
-          orderId: input.orderId,
-          notes,
-        },
-      });
-    }
+    await recordPercentMovement(tx, {
+      tenantId: input.tenantId,
+      userId: input.userId,
+      productId,
+      locationId: location.id,
+      before: previousPercent,
+      after: percent,
+      reference: "Atualização de %",
+      notes: noteParts.join("; ") || null,
+      orderId: input.orderId ?? null,
+      pickWaveLineId: input.waveLineId ?? null,
+    });
   });
 
-  const reconciliation = productId
-    ? await reconcilePickTargetsAfterStockChange(input.tenantId, productId, {
-        adjustedLocationId: location.id,
-        orderId: input.orderId,
-        itemId: input.itemId,
-        waveLineId: input.waveLineId,
-      })
-    : {
-        pulmaoOnly: false,
-        orderItems: [],
-        waveLines: [],
-        warnings: ["Local sem produto — nenhuma rota de pick recalculada"],
-      };
+  const reconciliation =
+    !isPulmao && ((percent <= 0) !== (previousPercent <= 0) || input.orderId)
+      ? await reconcilePickTargetsAfterStockChange(input.tenantId, productId, {
+          adjustedLocationId: location.id,
+          orderId: input.orderId,
+          itemId: input.itemId,
+          waveLineId: input.waveLineId,
+        })
+      : { pulmaoOnly: isPulmao, orderItems: [], waveLines: [], warnings: [] };
 
-  const updated = await prisma.location.findUnique({
+  const updated = await prisma.location.findUniqueOrThrow({
     where: { id: location.id },
     include: { product: true },
   });
-  const shownProduct = pulmaoProduct ?? updated!.product;
+  const shownProduct = pulmaoProduct ?? updated.product;
 
   return {
     location: {
-      id: updated!.id,
-      barcode: updated!.barcode,
-      type: updated!.type,
-      corridor: updated!.corridor,
-      row: updated!.row,
-      currentQuantity: updated!.currentQuantity,
-      capacity: updated!.capacity,
-      minThreshold: updated!.minThreshold,
-      label: formatLocation(updated!),
+      id: updated.id,
+      barcode: updated.barcode,
+      type: updated.type,
+      corridor: updated.corridor,
+      row: updated.row,
+      fillPercent: updated.fillPercent,
+      minPercent: updated.minPercent,
+      needsReplenishment: !isPulmao && needsReplenishment(updated.fillPercent, updated.minPercent),
+      label: formatLocation(updated),
       product: shownProduct
         ? {
             id: shownProduct.id,
@@ -195,10 +185,9 @@ export async function adjustLocationQuantity(
             barcode: shownProduct.barcode,
           }
         : null,
-      productQuantity: pulmaoProduct ? counted : updated!.currentQuantity,
+      productPercent: percent,
     },
-    previousQuantity,
-    adjustmentDelta: delta,
+    previousPercent,
     reconciliation,
   };
 }

@@ -1,6 +1,6 @@
 import type { DashboardProductivity } from "@/lib/types/dashboard";
 
-/** Mock alinhado ao schema Prisma (OrderStatus, Location minThreshold) */
+/** Mock alinhado ao schema Prisma (OrderStatus, Location minPercent) */
 export const mockDashboardProductivity: DashboardProductivity = {
   updatedAt: new Date().toISOString(),
   kpis: {
@@ -40,9 +40,8 @@ export const mockDashboardProductivity: DashboardProductivity = {
       barcode: "LOC-A02-01",
       productSku: "MOT-220V",
       productName: "Motor 220V",
-      currentQuantity: 2,
-      minThreshold: 2,
-      capacity: 10,
+      fillPercent: 15,
+      minPercent: 20,
     },
   ],
   stageMetrics: {

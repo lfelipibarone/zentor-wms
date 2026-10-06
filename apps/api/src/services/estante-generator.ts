@@ -1,5 +1,6 @@
 import { LocationFace, LocationType } from "@prisma/client";
 import { prisma } from "../lib/prisma.js";
+import { DEFAULT_MIN_PERCENT } from "./stock-percent.js";
 import {
   ensureWarehouseHierarchy,
   gondolaCode,
@@ -28,7 +29,8 @@ export interface GenerateEstanteInput {
   le?: EstanteSideInput | null;
   type?: LocationType;
   capacity?: number;
-  minThreshold?: number;
+  /** % mínima das gôndolas geradas */
+  minPercent?: number;
   /**
    * Etiqueta no padrão do galpão BARRACAO-ESTANTE-COLUNA-LINHA (ex.: B1-D-12-7).
    * Posições já existentes com outra etiqueta passam a usar esta, se estiver livre.
@@ -138,7 +140,7 @@ export async function generateEstantePositions(
   }
   const capacity = Math.floor(input.capacity ?? 100);
   if (!(capacity >= 1)) throw new Error("Capacidade deve ser maior que zero");
-  const minThreshold = Math.max(0, Math.floor(input.minThreshold ?? 0));
+  const minPercent = Math.min(100, Math.max(0, Math.floor(input.minPercent ?? DEFAULT_MIN_PERCENT)));
   const type = input.type ?? LocationType.PULMAO;
 
   const parents = await inheritGondolaParentCodes(tenantId, input.barracaoId, {
@@ -227,8 +229,8 @@ export async function generateEstantePositions(
             face: pos.face,
             type,
             capacity,
-            minThreshold,
-            currentQuantity: 0,
+            minPercent,
+            fillPercent: 0,
             active: true,
           },
         });

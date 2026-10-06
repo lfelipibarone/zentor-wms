@@ -57,14 +57,14 @@ export function assertPulmaoWithoutFixedSku(
   }
 }
 
-/** Gôndola e pulmão guardam saldo de jeitos diferentes: só troca o tipo com a posição zerada. */
+/** Gôndola e pulmão guardam estoque de jeitos diferentes: só troca o tipo com a posição vazia (0%). */
 export function assertLocationTypeChange(
-  location: { type: LocationType; currentQuantity: number; barcode: string },
+  location: { type: LocationType; fillPercent: number; barcode: string },
   nextType: LocationType | undefined,
 ): void {
-  if (!nextType || nextType === location.type || location.currentQuantity <= 0) return;
+  if (!nextType || nextType === location.type || location.fillPercent <= 0) return;
   throw new LocationRuleError(
-    `Posição ${location.barcode} tem ${location.currentQuantity} un.; zere o saldo antes de trocar o tipo`,
+    `Posição ${location.barcode} está com ${location.fillPercent}%; esvazie (0%) antes de trocar o tipo`,
   );
 }
 

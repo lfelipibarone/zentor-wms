@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Pressable, StyleSheet, Text, TextInput, View } from "react-native";
 import { BarcodeScanner } from "@/components/BarcodeScanner";
 import { FactoryButton } from "@/components/FactoryButton";
-import { QuantityInput } from "@/components/QuantityInput";
+import { PercentInput } from "@/components/PercentInput";
 import { ProductThumbnail } from "@/components/ProductThumbnail";
 import { PulmaoStockList } from "@/components/PulmaoStockList";
 import { ScreenShell } from "@/components/ScreenShell";
@@ -67,7 +67,7 @@ export default function ArmazenagemPulmaoScreen() {
     }
   };
 
-  const confirmStock = async (qty: number) => {
+  const confirmStock = async (percent: number) => {
     if (!pulmaoBarcode) return;
     const code = productCode.trim();
     if (!code) {
@@ -79,10 +79,10 @@ export default function ArmazenagemPulmaoScreen() {
       const result = await api.stockPulmao({
         locationBarcode: pulmaoBarcode,
         productBarcode: code,
-        quantity: qty,
+        percent,
       });
       showInfoAlert(
-        `+${result.added} un. de ${result.location.product.sku} em ${result.location.barcode} · saldo do SKU ${result.location.productQuantity}`,
+        `${result.location.product.sku} ocupa ${result.location.productPercent}% de ${result.location.barcode} · pulmão em ${result.location.fillPercent}%`,
       );
       await loadPulmao(pulmaoBarcode);
       setProductCode("");
@@ -150,7 +150,7 @@ export default function ArmazenagemPulmaoScreen() {
               onPress={() => loadPulmao(loc.barcode)}
             >
               <Text style={styles.optionLabel}>{loc.label}</Text>
-              <Text style={styles.meta}>{loc.currentQuantity} un. deste SKU</Text>
+              <Text style={styles.meta}>{loc.fillPercent}% deste SKU no pulmão</Text>
             </Pressable>
           ))}
         </>
@@ -158,7 +158,7 @@ export default function ArmazenagemPulmaoScreen() {
         <>
           <View style={styles.card}>
             <Text style={styles.locTitle}>{pulmao.label}</Text>
-            <Text style={styles.meta}>Saldo total: {pulmao.currentQuantity} un.</Text>
+            <Text style={styles.meta}>Ocupação total: {pulmao.fillPercent}%</Text>
             <PulmaoStockList stocks={pulmao.stocks} />
             {searchProductImageUrl || productCode ? (
               <View style={styles.productRow}>
@@ -185,7 +185,17 @@ export default function ArmazenagemPulmaoScreen() {
             placeholder="SKU / código de barras"
             autoCapitalize="characters"
           />
-          <QuantityInput label="Quantidade" onConfirm={confirmStock} />
+          <PercentInput
+            label="Quanto este SKU ocupa no pulmão?"
+            hint={
+              productCode.trim()
+                ? "Informe a % total do SKU neste pulmão depois de guardar."
+                : "Bipe ou digite o produto primeiro."
+            }
+            minPercent={1}
+            loading={loading}
+            onConfirm={confirmStock}
+          />
           <FactoryButton label="Outra posição" variant="secondary" onPress={reset} />
         </>
       )}

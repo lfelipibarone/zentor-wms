@@ -88,7 +88,7 @@ export function LocationImportModal({
         </h2>
         <p className="mt-1 text-sm text-muted-foreground">
           Envie uma planilha com corredor, linha, barcode, tipo (Gôndola ou
-          Pulmão), SKU do produto, capacidade e estoque mínimo. Linhas com o
+          Pulmão), SKU do produto, % mínima e % atual da gôndola. Linhas com o
           mesmo barcode podem ser atualizadas.
         </p>
 

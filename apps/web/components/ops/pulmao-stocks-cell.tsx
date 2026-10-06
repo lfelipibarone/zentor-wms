@@ -1,6 +1,6 @@
 import type { PulmaoStockRow } from "@/lib/api/operations";
 
-/** SKUs guardados no pulmão com o saldo de cada um. */
+/** SKUs guardados no pulmão com a % que cada um ocupa. */
 export function PulmaoStocksCell({ stocks }: { stocks: PulmaoStockRow[] | undefined }) {
   if (!stocks || stocks.length === 0) {
     return <span className="text-sm text-muted-foreground">Vazio</span>;
@@ -11,7 +11,7 @@ export function PulmaoStocksCell({ stocks }: { stocks: PulmaoStockRow[] | undefi
         <li key={s.product.id} className="flex items-baseline gap-2 text-sm">
           <span className="whitespace-nowrap font-mono font-medium">{s.product.sku}</span>
           <span className="whitespace-nowrap tabular-nums text-muted-foreground">
-            {s.quantity} un.
+            {s.percent}%
           </span>
         </li>
       ))}

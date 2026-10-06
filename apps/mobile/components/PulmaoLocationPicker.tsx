@@ -144,7 +144,7 @@ export function PulmaoLocationPicker({
             {loc.label}
             {loc.isSuggested ? " ★" : ""}
           </Text>
-          <Text style={styles.meta}>{loc.currentQuantity} un. deste SKU</Text>
+          <Text style={styles.meta}>{loc.fillPercent}% deste SKU no pulmão</Text>
         </Pressable>
       ))}
 

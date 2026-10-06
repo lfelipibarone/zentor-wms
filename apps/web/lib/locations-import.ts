@@ -12,9 +12,10 @@ export interface ParsedLocationRow {
   face?: string;
   type: string;
   productSku?: string;
-  capacity: number;
-  minThreshold: number;
-  currentQuantity?: number;
+  /** % mínima da gôndola (padrão 20) */
+  minPercent?: number;
+  /** % atual da gôndola */
+  fillPercent?: number;
   active?: boolean;
 }
 
@@ -36,9 +37,8 @@ const TEMPLATE_HEADERS = [
   "lado",
   "tipo",
   "sku_produto",
-  "capacidade",
-  "minimo",
-  "quantidade",
+  "minimo_pct",
+  "ocupacao_pct",
   "ativo",
 ] as const;
 
@@ -51,8 +51,7 @@ const TEMPLATE_EXAMPLE = [
   "LD",
   "Gôndola",
   "SKU-001",
-  100,
-  10,
+  20,
   0,
   "sim",
 ];
@@ -84,18 +83,15 @@ const HEADER_ALIASES: Record<string, keyof ParsedLocationRow | "skip"> = {
   produto: "productSku",
   product_sku: "productSku",
   sku_do_produto: "productSku",
-  capacidade: "capacity",
-  capacity: "capacity",
-  cap: "capacity",
-  minimo: "minThreshold",
-  minimo_reabastecimento: "minThreshold",
-  min_threshold: "minThreshold",
-  min: "minThreshold",
-  quantidade: "currentQuantity",
-  qtd: "currentQuantity",
-  quantidade_atual: "currentQuantity",
-  current_quantity: "currentQuantity",
-  estoque: "currentQuantity",
+  minimo_pct: "minPercent",
+  minimo_percentual: "minPercent",
+  minimo: "minPercent",
+  min_percent: "minPercent",
+  ocupacao_pct: "fillPercent",
+  ocupacao: "fillPercent",
+  percentual: "fillPercent",
+  percentual_atual: "fillPercent",
+  fill_percent: "fillPercent",
   ativo: "active",
   active: "active",
   status: "active",
@@ -192,8 +188,15 @@ export async function parseLocationsXlsx(file: File): Promise<{
       continue;
     }
 
-    const capacity = cellToNumber(raw.capacity) ?? 100;
-    const minThreshold = cellToNumber(raw.minThreshold) ?? 0;
+    const minPercent = cellToNumber(raw.minPercent);
+    const fillPercent = cellToNumber(raw.fillPercent);
+    const badPercent = [minPercent, fillPercent].some(
+      (v) => v != null && (!Number.isInteger(v) || v < 0 || v > 100),
+    );
+    if (badPercent) {
+      parseErrors.push(`Linha ${i + 1} (${barcode}): % deve ser um inteiro de 0 a 100`);
+      continue;
+    }
 
     rows.push({
       barcode,
@@ -207,9 +210,8 @@ export async function parseLocationsXlsx(file: File): Promise<{
       face: cellToString(raw.face) || undefined,
       type,
       productSku: cellToString(raw.productSku) || undefined,
-      capacity,
-      minThreshold,
-      currentQuantity: cellToNumber(raw.currentQuantity),
+      minPercent,
+      fillPercent,
       active:
         raw.active === undefined || raw.active === ""
           ? undefined

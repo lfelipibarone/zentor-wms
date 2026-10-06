@@ -5,12 +5,12 @@ export function useAdjustLocationStock() {
   return useMutation({
     mutationFn: (params: {
       locationId: string;
-      countedQuantity: number;
+      percent: number;
       productBarcode?: string | null;
       reason?: string;
       orderId?: string;
       itemId?: string;
       waveLineId?: string;
-    }) => api.adjustLocationQuantity(params),
+    }) => api.adjustLocationPercent(params),
   });
 }

@@ -8,7 +8,8 @@ import {
 import { prisma } from "../lib/prisma.js";
 import { findNfItemByScannedCode } from "./location-stock.js";
 import { formatRouteLabel } from "./packing-queue-sort.js";
-import { addPulmaoStock } from "./pulmao-inventory.js";
+import { setPulmaoSkuPercent } from "./pulmao-inventory.js";
+import { parsePercent } from "./stock-percent.js";
 import {
   getRouteEngine,
   LegacyRouteEngine,
@@ -298,8 +299,13 @@ export async function storePutawayItem(params: {
   locationBarcode: string;
   productBarcode?: string;
   quantity: number;
+  /** % que o SKU ocupa no pulmão depois de guardar */
+  pulmaoPercent: unknown;
   userId: string;
 }) {
+  const pulmaoPercent = parsePercent(params.pulmaoPercent, "% do SKU no pulmão");
+  if (pulmaoPercent <= 0) throw new Error("Informe quanto o SKU ocupa no pulmão (mínimo 1%)");
+
   const session = await prisma.putawaySession.findUnique({
     where: { id: params.sessionId },
     include: {
@@ -378,12 +384,18 @@ export async function storePutawayItem(params: {
         locationId: location.id,
       },
     });
-    await addPulmaoStock(tx, { tenantId, locationId: location.id, productId }, qty);
+    const { previous } = await setPulmaoSkuPercent(
+      tx,
+      { tenantId, locationId: location.id, productId },
+      pulmaoPercent,
+    );
     await tx.inventoryMovement.create({
       data: {
         tenantId,
         type: InventoryMovementType.ENTRY,
         quantity: qty,
+        percentBefore: previous,
+        percentAfter: pulmaoPercent,
         userId: params.userId,
         productId,
         toLocationId: location.id,

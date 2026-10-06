@@ -276,7 +276,7 @@ export async function applyInventoryLayout(
 
     const location = await prisma.location.findFirst({
       where: { tenantId, barcode: code },
-      select: { id: true, type: true, productId: true, currentQuantity: true, active: true },
+      select: { id: true, type: true, productId: true, fillPercent: true, active: true },
     });
     if (!location) {
       result.errors.push({ address: code, message: "Posição não criada (fora das dimensões da estante)" });
@@ -290,8 +290,8 @@ export async function applyInventoryLayout(
       result.skus.unchanged++;
       continue;
     }
-    if (location.productId && location.currentQuantity > 0) {
-      result.errors.push({ address: code, message: `Posição tem saldo de outro SKU; ${sku} não associado` });
+    if (location.productId && location.fillPercent > 0) {
+      result.errors.push({ address: code, message: `Posição tem estoque de outro SKU; ${sku} não associado` });
       continue;
     }
     try {

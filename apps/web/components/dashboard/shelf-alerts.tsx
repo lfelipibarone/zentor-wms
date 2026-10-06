@@ -15,6 +15,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { PercentBar } from "@/components/ops/percent-bar";
 import type { ShelfAlertItem } from "@/lib/types/dashboard";
 
 interface ShelfAlertsProps {
@@ -41,22 +42,21 @@ export function ShelfAlerts({ alerts }: ShelfAlertsProps) {
           <TableHeader>
             <TableRow>
               <TableHead>Localização</TableHead>
-              <TableHead className="text-right">Atual</TableHead>
+              <TableHead>Gôndola</TableHead>
               <TableHead className="text-right">Mínimo</TableHead>
-              <TableHead className="text-right">Capacidade</TableHead>
               <TableHead>Status</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {alerts.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={5} className="text-center text-muted-foreground">
+                <TableCell colSpan={4} className="text-center text-muted-foreground">
                   Nenhum alerta no momento
                 </TableCell>
               </TableRow>
             ) : (
               alerts.map((row) => {
-                const critical = row.currentQuantity === 0;
+                const critical = row.fillPercent <= 0;
                 return (
                   <TableRow key={row.locationId}>
                     <TableCell className="font-mono font-semibold">
@@ -65,14 +65,11 @@ export function ShelfAlerts({ alerts }: ShelfAlertsProps) {
                         {row.barcode}
                       </span>
                     </TableCell>
-                    <TableCell className="text-right font-bold tabular-nums">
-                      {row.currentQuantity}
+                    <TableCell>
+                      <PercentBar percent={row.fillPercent} minPercent={row.minPercent} />
                     </TableCell>
                     <TableCell className="text-right tabular-nums text-muted-foreground">
-                      {row.minThreshold}
-                    </TableCell>
-                    <TableCell className="text-right tabular-nums text-muted-foreground">
-                      {row.capacity}
+                      {row.minPercent}%
                     </TableCell>
                     <TableCell>
                       <Badge variant={critical ? "destructive" : "warning"}>

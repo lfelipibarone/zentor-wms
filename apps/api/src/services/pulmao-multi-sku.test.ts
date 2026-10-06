@@ -41,12 +41,12 @@ test("pulmão não aceita SKU fixo; gôndola aceita", () => {
   assert.doesNotThrow(() => assertPulmaoWithoutFixedSku(LocationType.PICK_FACE, "prod-1"));
 });
 
-test("troca de tipo só com a posição zerada", () => {
-  const cheio = { type: LocationType.PULMAO, currentQuantity: 12, barcode: "P-01" };
-  assert.throws(() => assertLocationTypeChange(cheio, LocationType.PICK_FACE), /zere o saldo/);
+test("troca de tipo só com a posição vazia (0%)", () => {
+  const cheio = { type: LocationType.PULMAO, fillPercent: 40, barcode: "P-01" };
+  assert.throws(() => assertLocationTypeChange(cheio, LocationType.PICK_FACE), /esvazie/);
   assert.doesNotThrow(() => assertLocationTypeChange(cheio, LocationType.PULMAO));
   assert.doesNotThrow(() => assertLocationTypeChange(cheio, undefined));
   assert.doesNotThrow(() =>
-    assertLocationTypeChange({ ...cheio, currentQuantity: 0 }, LocationType.PICK_FACE),
+    assertLocationTypeChange({ ...cheio, fillPercent: 0 }, LocationType.PICK_FACE),
   );
 });

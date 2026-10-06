@@ -35,7 +35,13 @@ import {
   resumePausedOrdersAfterPickFace,
 } from "../services/product-locations.js";
 import { selectableProductWhere } from "../services/product-selectable.js";
-import { addPulmaoStock, pulmaoStocksInclude } from "../services/pulmao-inventory.js";
+import { pulmaoStocksInclude, setPulmaoSkuPercent } from "../services/pulmao-inventory.js";
+import {
+  DEFAULT_MIN_PERCENT,
+  needsReplenishment,
+  parsePercent,
+  StockPercentError,
+} from "../services/stock-percent.js";
 import {
   layoutInclude,
   resolveLocationLayout,
@@ -196,7 +202,7 @@ export async function webRoutes(app: FastifyInstance) {
           corridor: l.corridor,
           row: l.row,
           type: l.type,
-          currentQuantity: l.currentQuantity,
+          fillPercent: l.fillPercent,
           productSku: l.product?.sku ?? null,
           productName: l.product?.name ?? null,
         })),
@@ -736,7 +742,7 @@ export async function webRoutes(app: FastifyInstance) {
                   { product: { sku: { contains: sku, mode: "insensitive" } } },
                   {
                     stocks: {
-                      some: { quantity: { gt: 0 }, product: { sku: { contains: sku, mode: "insensitive" } } },
+                      some: { percent: { gt: 0 }, product: { sku: { contains: sku, mode: "insensitive" } } },
                     },
                   },
                 ],
@@ -786,7 +792,7 @@ export async function webRoutes(app: FastifyInstance) {
       type?: LocationType;
       productId?: string;
       capacity?: number;
-      minThreshold?: number;
+      minPercent?: number;
     };
   }>(
     "/api/locations",
@@ -841,8 +847,8 @@ export async function webRoutes(app: FastifyInstance) {
             type: b.type,
             productId: b.type === LocationType.PULMAO ? null : b.productId || null,
             capacity: b.capacity ?? 100,
-            minThreshold: b.minThreshold ?? 0,
-            currentQuantity: 0,
+            minPercent: b.minPercent != null ? parsePercent(b.minPercent, "% mínima") : DEFAULT_MIN_PERCENT,
+            fillPercent: 0,
           },
           include: layoutInclude,
         });
@@ -877,7 +883,7 @@ export async function webRoutes(app: FastifyInstance) {
       proximityEstanteId?: string | null;
       proximityLinhaId?: string | null;
       capacity?: number;
-      minThreshold?: number;
+      minPercent?: number;
       active?: boolean;
     };
   }>(
@@ -924,7 +930,10 @@ export async function webRoutes(app: FastifyInstance) {
         let updateData: Prisma.LocationUncheckedUpdateInput = {
           productId: request.body.productId,
           capacity: request.body.capacity,
-          minThreshold: request.body.minThreshold,
+          minPercent:
+            request.body.minPercent != null
+              ? parsePercent(request.body.minPercent, "% mínima")
+              : undefined,
           active: request.body.active,
         };
         if (hasLayoutChange) {
@@ -1141,7 +1150,7 @@ export async function webRoutes(app: FastifyInstance) {
                 { product: { sku: { contains: q, mode: "insensitive" } } },
                 {
                   stocks: {
-                    some: { quantity: { gt: 0 }, product: { sku: { contains: q, mode: "insensitive" } } },
+                    some: { percent: { gt: 0 }, product: { sku: { contains: q, mode: "insensitive" } } },
                   },
                 },
               ],
@@ -1157,9 +1166,12 @@ export async function webRoutes(app: FastifyInstance) {
           include: stockInclude,
           orderBy: [{ corridor: "asc" }, { row: "asc" }],
         });
-        // Pulmão não tem mínimo por posição (vários SKUs, sem limite de unidades).
+        // Pulmão não tem % mínima (vários SKUs).
         const filtered = all.filter(
-          (l) => l.type !== LocationType.PULMAO && l.currentQuantity <= l.minThreshold,
+          (l) =>
+            l.type !== LocationType.PULMAO &&
+            l.productId != null &&
+            needsReplenishment(l.fillPercent, l.minPercent),
         );
         const slice = filtered.slice(skip, skip + take);
         return {
@@ -1239,6 +1251,8 @@ export async function webRoutes(app: FastifyInstance) {
           id: m.id,
           type: m.type,
           quantity: m.quantity,
+          percentBefore: m.percentBefore,
+          percentAfter: m.percentAfter,
           createdAt: m.createdAt,
           reference: m.reference,
           notes: m.notes,
@@ -1310,7 +1324,10 @@ export async function webRoutes(app: FastifyInstance) {
     Body: {
       productId?: string;
       toLocationId?: string;
+      /** Unidades recebidas (opcional) */
       quantity?: number;
+      /** % que a gôndola ficou / que o SKU ocupa no pulmão */
+      percent?: number;
       reference?: string;
       notes?: string;
     };
@@ -1318,11 +1335,18 @@ export async function webRoutes(app: FastifyInstance) {
     "/api/receipts",
     { preHandler: guard(Permission.RECEIPTS_VIEW) },
     async (request, reply) => {
-      const { productId, toLocationId, quantity, reference, notes } =
-        request.body ?? {};
-      if (!productId || !toLocationId || !quantity || quantity < 1) {
-        return reply.status(400).send({ error: "Produto, local e quantidade são obrigatórios" });
+      const { productId, toLocationId, reference, notes } = request.body ?? {};
+      if (!productId || !toLocationId) {
+        return reply.status(400).send({ error: "Produto e local são obrigatórios" });
       }
+      let percent: number;
+      try {
+        percent = parsePercent(request.body?.percent);
+      } catch (e) {
+        if (e instanceof StockPercentError) return reply.status(400).send({ error: e.message });
+        throw e;
+      }
+      const quantity = Math.max(0, Math.floor(Number(request.body?.quantity ?? 0)) || 0);
       const loc = await prisma.location.findFirst({
         where: { id: toLocationId, ...tenantWhere(request) },
       });
@@ -1330,13 +1354,33 @@ export async function webRoutes(app: FastifyInstance) {
       if (loc.type === LocationType.PICK_FACE && loc.productId && loc.productId !== productId) {
         return reply.status(400).send({ error: "Gôndola alocada para outro produto" });
       }
+      if (loc.type === LocationType.PULMAO && percent <= 0) {
+        return reply.status(400).send({ error: "Informe quanto o SKU ocupa no pulmão (mínimo 1%)" });
+      }
 
       const movement = await prisma.$transaction(async (tx) => {
-        const created = await tx.inventoryMovement.create({
+        let percentBefore: number;
+        if (loc.type === LocationType.PULMAO) {
+          const r = await setPulmaoSkuPercent(
+            tx,
+            { tenantId: loc.tenantId, locationId: loc.id, productId },
+            percent,
+          );
+          percentBefore = r.previous;
+        } else {
+          percentBefore = loc.fillPercent;
+          await tx.location.update({
+            where: { id: toLocationId },
+            data: { fillPercent: percent, productId },
+          });
+        }
+        return tx.inventoryMovement.create({
           data: {
             tenantId: loc.tenantId,
             type: InventoryMovementType.ENTRY,
             quantity,
+            percentBefore,
+            percentAfter: percent,
             userId: request.authUser!.id,
             productId,
             toLocationId,
@@ -1348,15 +1392,6 @@ export async function webRoutes(app: FastifyInstance) {
             toLocation: { select: { barcode: true } },
           },
         });
-        if (loc.type === LocationType.PULMAO) {
-          await addPulmaoStock(tx, { tenantId: loc.tenantId, locationId: loc.id, productId }, quantity);
-        } else {
-          await tx.location.update({
-            where: { id: toLocationId },
-            data: { currentQuantity: { increment: quantity }, productId },
-          });
-        }
-        return created;
       });
 
       return reply.status(201).send({ receipt: movement });
@@ -1673,7 +1708,10 @@ export async function webRoutes(app: FastifyInstance) {
 
   app.post<{
     Params: { id: string };
-    Body: { pulmaoLocationBarcode?: string };
+    Body: {
+      pulmaoLocationBarcode?: string;
+      percents?: Array<{ itemId: string; percent: number }>;
+    };
   }>(
     "/api/purchase-receipts/return/:id/complete",
     { preHandler: guard(Permission.RECEIPTS_VIEW) },
@@ -1700,6 +1738,7 @@ export async function webRoutes(app: FastifyInstance) {
           sessionId: request.params.id,
           userId: request.authUser!.id,
           pulmaoLocationBarcode: pulmao,
+          percents: request.body?.percents ?? [],
         });
         const detail = await getPurchaseReceiptDetailForWeb(
           request.params.id,
@@ -2414,6 +2453,7 @@ export async function webRoutes(app: FastifyInstance) {
       locationBarcode?: string;
       productBarcode?: string;
       quantity?: number;
+      pulmaoPercent?: number;
     };
   }>(
     "/api/putaway/:sessionId/store",
@@ -2430,6 +2470,7 @@ export async function webRoutes(app: FastifyInstance) {
           locationBarcode,
           productBarcode: productBarcode?.trim() || undefined,
           quantity: Number(request.body?.quantity ?? 1),
+          pulmaoPercent: request.body?.pulmaoPercent,
           userId: request.authUser!.id,
         });
       } catch (e) {

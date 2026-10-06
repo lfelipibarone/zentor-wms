@@ -1,5 +1,6 @@
 import { LocationFace, LocationType, Prisma } from "@prisma/client";
 import { prisma } from "../lib/prisma.js";
+import { DEFAULT_MIN_PERCENT } from "./stock-percent.js";
 import {
   assertLocationTypeChange,
   assertMaxPickFaceLocations,
@@ -25,8 +26,10 @@ export interface LocationImportInput {
   type: LocationType;
   productSku?: string;
   capacity: number;
-  minThreshold: number;
-  currentQuantity?: number;
+  /** % mínima da gôndola */
+  minPercent: number;
+  /** % atual da gôndola (só quando a planilha informa) */
+  fillPercent?: number;
   active?: boolean;
 }
 
@@ -113,7 +116,7 @@ export function normalizeImportRow(
   }
 
   const capacity = parseNumber(raw.capacity, 100);
-  const minThreshold = parseNumber(raw.minThreshold, 0);
+  const minPercent = parseNumber(raw.minPercent ?? raw.minThreshold, DEFAULT_MIN_PERCENT);
   if (capacity === undefined || capacity < 1) {
     return {
       error: {
@@ -123,12 +126,12 @@ export function normalizeImportRow(
       },
     };
   }
-  if (minThreshold === undefined || minThreshold < 0) {
+  if (minPercent === undefined || minPercent < 0 || minPercent > 100) {
     return {
       error: {
         row: rowIndex,
         barcode,
-        message: "Mínimo inválido",
+        message: "% mínima inválida (0 a 100)",
       },
     };
   }
@@ -144,7 +147,12 @@ export function normalizeImportRow(
     };
   }
 
-  const currentQuantity = parseNumber(raw.currentQuantity, 0);
+  const fillPercent = parseNumber(raw.fillPercent ?? raw.currentQuantity);
+  if (fillPercent !== undefined && (fillPercent < 0 || fillPercent > 100)) {
+    return {
+      error: { row: rowIndex, barcode, message: "% atual inválida (0 a 100)" },
+    };
+  }
   const productSku = raw.productSku
     ? String(raw.productSku).trim()
     : undefined;
@@ -167,11 +175,8 @@ export function normalizeImportRow(
       type,
       productSku: productSku || undefined,
       capacity: Math.floor(capacity),
-      minThreshold: Math.floor(minThreshold),
-      currentQuantity:
-        currentQuantity !== undefined
-          ? Math.max(0, Math.floor(currentQuantity))
-          : 0,
+      minPercent: Math.round(minPercent),
+      fillPercent: fillPercent !== undefined ? Math.round(fillPercent) : undefined,
       active: parseBool(raw.active),
     },
   };
@@ -250,7 +255,7 @@ export async function importLocations(
         row: input.row,
       });
 
-      const existingSelect = { id: true, barcode: true, type: true, currentQuantity: true } as const;
+      const existingSelect = { id: true, barcode: true, type: true, fillPercent: true } as const;
       const byBarcode = await prisma.location.findFirst({
         where: { tenantId, barcode: input.barcode },
         select: existingSelect,
@@ -288,12 +293,12 @@ export async function importLocations(
         face: input.face ?? LocationFace.A,
         type: input.type,
         capacity: input.capacity,
-        minThreshold: input.minThreshold,
+        minPercent: input.minPercent,
         active: input.active ?? true,
       };
-      // Saldo do pulmão vem de LocationStock (por SKU); a planilha só define saldo de gôndola.
-      const importedQuantity =
-        input.type === LocationType.PULMAO ? undefined : input.currentQuantity;
+      // % do pulmão vem dos SKUs (LocationStock); a planilha só define a % da gôndola.
+      const importedPercent =
+        input.type === LocationType.PULMAO ? undefined : input.fillPercent;
 
       if (existing) assertLocationTypeChange(existing, input.type);
       if (productId && input.type === "PICK_FACE") {
@@ -311,9 +316,7 @@ export async function importLocations(
           data: {
             ...baseData,
             barcode: input.barcode,
-            ...(importedQuantity !== undefined
-              ? { currentQuantity: importedQuantity }
-              : {}),
+            ...(importedPercent !== undefined ? { fillPercent: importedPercent } : {}),
             ...(input.active !== undefined ? { active: input.active } : {}),
             productId: input.productSku ? productId : undefined,
           },
@@ -328,7 +331,7 @@ export async function importLocations(
             tenantId,
             barcode: input.barcode,
             ...baseData,
-            currentQuantity: importedQuantity ?? 0,
+            fillPercent: importedPercent ?? 0,
             productId,
           },
         });

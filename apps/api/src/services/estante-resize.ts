@@ -93,7 +93,7 @@ export async function resizeEstante(
       type: true,
       face: true,
       productId: true,
-      currentQuantity: true,
+      fillPercent: true,
       linhaId: true,
       coluna: { select: { code: true } },
       linha: { select: { code: true } },
@@ -117,7 +117,7 @@ export async function resizeEstante(
     (l) => !l.coluna || !l.linha || !desired.has(positionKey(l.coluna.code, l.linha.code, l.face)),
   );
   const blocked = toRemove.filter(
-    (l) => l.productId || l.currentQuantity > 0 || Object.values(l._count).some((n) => n > 0),
+    (l) => l.productId || l.fillPercent > 0 || Object.values(l._count).some((n) => n > 0),
   );
   if (blocked.length) {
     const list = blocked

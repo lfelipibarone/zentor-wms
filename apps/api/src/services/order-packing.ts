@@ -343,7 +343,7 @@ export async function listUnifiedPackingQueue(tenantId: string, opts?: { approac
     items.push({ kind: "order", sortKey: order.packingUrgency ?? 0, order });
   }
   for (const need of replenishmentNeeds) {
-    items.push({ kind: "replenishment", sortKey: need.deficit, need });
+    items.push({ kind: "replenishment", sortKey: need.percentToFill, need });
   }
 
   return { items };

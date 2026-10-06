@@ -97,9 +97,9 @@ export interface PickLocationDto {
   row: string;
   barcode: string;
   label: string;
-  currentQuantity?: number;
-  capacity?: number;
-  minThreshold?: number;
+  /** % atual da gôndola */
+  fillPercent?: number;
+  minPercent?: number;
 }
 
 export interface PickingItemDto {
@@ -146,13 +146,16 @@ export interface AdjustLocationResult {
     id: string;
     barcode: string;
     type: string;
-    currentQuantity: number;
-    capacity: number;
+    /** Gôndola: % atual. Pulmão: ocupação total. */
+    fillPercent: number;
+    minPercent: number;
+    needsReplenishment: boolean;
     label: string;
     product: { id: string; sku: string; name: string; barcode: string | null } | null;
+    /** % do produto informado (no pulmão, só a do SKU) */
+    productPercent: number;
   };
-  previousQuantity: number;
-  adjustmentDelta: number;
+  previousPercent: number;
   reconciliation: {
     pulmaoOnly: boolean;
     orderItems: Array<{
@@ -183,20 +186,32 @@ export interface LocationLookup {
   row: string;
   barcode: string;
   type: string;
-  currentQuantity: number;
-  capacity: number;
-  minThreshold: number;
+  /** Gôndola: % atual. Pulmão: ocupação total (soma das % dos SKUs). */
+  fillPercent: number;
+  minPercent: number;
   label: string;
   /** SKU da gôndola; pulmão vem sempre sem produto e usa `stocks` */
   product: Product | null;
-  /** SKUs com saldo no pulmão (maior saldo primeiro) */
+  /** SKUs no pulmão (maior % primeiro) */
   stocks: PulmaoStock[];
   needsReplenishment: boolean;
 }
 
 export interface PulmaoStock {
   product: Pick<Product, "id" | "sku" | "name" | "barcode" | "imageUrl">;
-  quantity: number;
+  /** % do pulmão ocupada por este SKU */
+  percent: number;
+}
+
+export interface StockLocationResult {
+  location: {
+    id: string;
+    fillPercent: number;
+    minPercent: number;
+    product: Product | null;
+  };
+  previousPercent: number;
+  movementType: "ENTRY" | "REPLENISHMENT";
 }
 
 export interface PutawayStoredLocation {
@@ -211,9 +226,8 @@ export interface RequestReplenishmentResult {
     id: string;
     barcode: string;
     label: string;
-    currentQuantity: number;
-    capacity: number;
-    minThreshold: number;
+    fillPercent: number;
+    minPercent: number;
     product: {
       id: string;
       sku: string;
@@ -221,12 +235,8 @@ export interface RequestReplenishmentResult {
       barcode: string | null;
     } | null;
   };
-  previousQuantity: number;
-  countedQuantity: number;
-  inputMode: "UNITS" | "PERCENT";
-  inputValue: number;
+  previousPercent: number;
   needsReplenishment: boolean;
-  deficit: number;
   message: string;
 }
 
@@ -239,15 +249,16 @@ export interface ReplenishmentNeed {
   sku: string;
   productName: string;
   imageUrl?: string | null;
-  currentQuantity: number;
-  minThreshold: number;
-  capacity: number;
-  deficit: number;
+  fillPercent: number;
+  minPercent: number;
+  /** Pontos de % que faltam para encher */
+  percentToFill: number;
   suggestedPulmao: {
     id: string;
     barcode: string;
     label: string;
-    currentQuantity: number;
+    /** % deste SKU no pulmão */
+    percent: number;
   } | null;
   assignmentId?: string | null;
   assignedToId?: string | null;
@@ -308,8 +319,9 @@ export interface ProductLocationOption {
   id: string;
   barcode: string;
   label: string;
-  currentQuantity: number;
-  capacity: number;
+  /** Gôndola: % atual. Pulmão: % deste SKU. */
+  fillPercent: number;
+  minPercent: number;
   isSuggested: boolean;
 }
 
@@ -390,7 +402,11 @@ export const api = {
     ),
 
   pickItem: (orderId: string, itemId: string, quantity: number) =>
-    request<{ quantityPicked: number; completed: boolean }>(
+    request<{
+      quantityPicked: number;
+      completed: boolean;
+      location: { id: string; fillPercent: number; minPercent: number } | null;
+    }>(
       `/mobile/orders/${orderId}/items/${itemId}/pick`,
       {
         method: "POST",
@@ -418,55 +434,31 @@ export const api = {
       `/mobile/locations/barcode/${encodeURIComponent(barcode)}`
     ),
 
-  requestReplenishment: (
-    barcode: string,
-    inputMode: "UNITS" | "PERCENT",
-    value: number,
-  ) =>
+  requestReplenishment: (barcode: string, percent: number) =>
     request<RequestReplenishmentResult>(
       `/mobile/locations/barcode/${encodeURIComponent(barcode)}/request-replenishment`,
       {
         method: "POST",
-        body: JSON.stringify({ inputMode, value }),
+        body: JSON.stringify({ percent }),
       },
     ),
 
-  replenishLocation: (
-    locationId: string,
-    quantity: number,
-    productBarcode?: string
-  ) =>
-    request<{ currentQuantity: number; added: number }>(
-      `/mobile/locations/${locationId}/replenish`,
-      {
-        method: "POST",
-        body: JSON.stringify({ quantity, productBarcode }),
-      }
-    ),
-
-  stockLocation: (
-    locationId: string,
-    productBarcode: string,
-    quantity?: number
-  ) =>
-    request<{
-      location: {
-        id: string;
-        currentQuantity: number;
-        capacity: number;
-        minThreshold: number;
-        product: Product | null;
-      };
-      added: number;
-      movementType: "ENTRY" | "REPLENISHMENT";
-    }>(`/mobile/locations/${locationId}/stock`, {
+  replenishLocation: (locationId: string, percent: number, productBarcode?: string) =>
+    request<StockLocationResult>(`/mobile/locations/${locationId}/replenish`, {
       method: "POST",
-      body: JSON.stringify({ productBarcode, quantity }),
+      body: JSON.stringify({ percent, productBarcode }),
     }),
 
-  adjustLocationQuantity: (params: {
+  stockLocation: (locationId: string, productBarcode: string, percent: number) =>
+    request<StockLocationResult>(`/mobile/locations/${locationId}/stock`, {
+      method: "POST",
+      body: JSON.stringify({ productBarcode, percent }),
+    }),
+
+  /** Gôndola: % que ela ficou. Pulmão: % do SKU (0 = acabou). */
+  adjustLocationPercent: (params: {
     locationId: string;
-    countedQuantity: number;
+    percent: number;
     productBarcode?: string | null;
     reason?: string;
     orderId?: string;
@@ -478,7 +470,7 @@ export const api = {
       {
         method: "POST",
         body: JSON.stringify({
-          countedQuantity: params.countedQuantity,
+          percent: params.percent,
           productBarcode: params.productBarcode ?? undefined,
           reason: params.reason,
           orderId: params.orderId,
@@ -492,17 +484,13 @@ export const api = {
     fromLocationBarcode: string;
     toLocationBarcode: string;
     productBarcode: string;
-    quantity: number;
+    remainingPercent?: number;
+    skuFinished?: boolean;
+    percent: number;
   }) =>
     request<{
-      fromLocation: { id: string; barcode: string; currentQuantity: number };
-      toLocation: {
-        id: string;
-        barcode: string;
-        currentQuantity: number;
-        productId: string | null;
-      };
-      transferred: number;
+      fromLocation: { barcode: string; skuPercent: number; fillPercent: number };
+      toLocation: { barcode: string; fillPercent: number };
     }>("/mobile/replenishment/transfer", {
       method: "POST",
       body: JSON.stringify(body),
@@ -542,19 +530,18 @@ export const api = {
   stockPulmao: (body: {
     locationBarcode: string;
     productBarcode: string;
-    quantity: number;
+    /** % que o SKU passa a ocupar no pulmão */
+    percent: number;
   }) =>
     request<{
       location: {
         barcode: string;
-        /** Total do pulmão (todos os SKUs) */
-        currentQuantity: number;
+        /** Ocupação do pulmão (soma das % dos SKUs) */
+        fillPercent: number;
         product: Pick<Product, "id" | "sku" | "name">;
-        /** Saldo do SKU guardado neste pulmão */
-        productQuantity: number;
+        productPercent: number;
         stocks: PulmaoStock[];
       };
-      added: number;
     }>(
       "/mobile/locations/pulmao/stock",
       { method: "POST", body: JSON.stringify(body) },
@@ -568,12 +555,15 @@ export const api = {
   withdrawCargoTransfer: (body: {
     fromLocationBarcode: string;
     productBarcode: string;
-    quantity: number;
+    /** % que o SKU ainda ocupa no pulmão */
+    remainingPercent?: number;
+    /** SKU acabou no pulmão (sai da lista) */
+    skuFinished?: boolean;
     targetPickFaceId?: string;
   }) =>
     request<{
       transfer: CargoTransferSummary;
-      fromLocation: { barcode: string; currentQuantity: number };
+      fromLocation: { barcode: string; skuPercent: number; fillPercent: number };
     }>("/mobile/cargo-transfers/withdraw", {
       method: "POST",
       body: JSON.stringify(body),
@@ -593,12 +583,13 @@ export const api = {
     body: {
       toLocationBarcode: string;
       productBarcode?: string;
-      quantity?: number;
+      /** % que a gôndola ficou */
+      percent: number;
     },
   ) =>
     request<{
       transfer: CargoTransferSummary;
-      toLocation: { barcode: string; currentQuantity: number };
+      toLocation: { barcode: string; fillPercent: number };
     }>(`/mobile/cargo-transfers/${id}/deposit`, {
       method: "POST",
       body: JSON.stringify(body),
@@ -728,6 +719,7 @@ export const api = {
       quantityTotal: number;
       sortStatus: string;
       readyForSort: boolean;
+      location: { id: string; fillPercent: number; minPercent: number } | null;
     }>(`/mobile/waves/lines/${lineId}/pick`, {
       method: "POST",
       body: JSON.stringify(body),
@@ -826,12 +818,13 @@ export const api = {
   completeReturnReceipt: (
     sessionId: string,
     pulmaoLocationBarcode: string,
+    percents: Array<{ itemId: string; percent: number }>,
   ) =>
     request<ReturnReceiptSessionDto>(
       `/mobile/purchase-receipts/return/${sessionId}/complete`,
       {
         method: "POST",
-        body: JSON.stringify({ pulmaoLocationBarcode }),
+        body: JSON.stringify({ pulmaoLocationBarcode, percents }),
       },
     ),
 
@@ -842,8 +835,7 @@ export const api = {
         corridor: string;
         row: string;
         label: string;
-        currentQuantity: number;
-        capacity: number;
+        fillPercent: number;
       };
     }>(`/mobile/cargo-transfers/${transferId}/suggest-face`),
 
@@ -872,6 +864,8 @@ export const api = {
       locationBarcode: string;
       productBarcode?: string;
       quantity?: number;
+      /** % que o SKU passa a ocupar no pulmão */
+      pulmaoPercent: number;
     }
   ) =>
     request<PutawaySessionDto>(`/mobile/putaway/${sessionId}/store`, {
@@ -1026,9 +1020,8 @@ export interface WaveLineSummary {
     label: string;
     corridor: string;
     row: string;
-    currentQuantity: number;
-    capacity?: number;
-    minThreshold?: number;
+    fillPercent: number;
+    minPercent?: number;
   };
   quantityTotal: number;
   quantityPicked: number;

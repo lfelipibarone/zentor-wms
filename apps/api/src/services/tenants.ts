@@ -2,6 +2,7 @@ import { Prisma } from "@prisma/client";
 import { prisma } from "../lib/prisma.js";
 import { hashPassword } from "../lib/password.js";
 import { seedTenantRolePermissions } from "./role-permissions.js";
+import { markTenantStockPercent } from "./stock-percent.js";
 
 export class TenantServiceError extends Error {
   constructor(
@@ -99,6 +100,7 @@ export async function createTenant(params: { name: string; slug?: string; cnpj?:
       },
     });
     await seedTenantRolePermissions(t.id, tx);
+    await markTenantStockPercent(tx, t.id);
     return t;
   });
 

@@ -5,6 +5,7 @@ import {
   OrderTimeLogEvent,
 } from "@prisma/client";
 import { prisma } from "../lib/prisma.js";
+import { needsReplenishment } from "./stock-percent.js";
 import {
   getDashboardStageMetrics,
   type DashboardStageMetrics,
@@ -38,9 +39,8 @@ export interface DashboardProductivityDto {
     barcode: string;
     productSku: string | null;
     productName: string | null;
-    currentQuantity: number;
-    minThreshold: number;
-    capacity: number;
+    fillPercent: number;
+    minPercent: number;
   }>;
   stageMetrics: DashboardStageMetrics;
   updatedAt: string;
@@ -180,7 +180,7 @@ export async function getDashboardProductivity(
       include: { product: true },
     })
   )
-    .filter((loc) => loc.currentQuantity <= loc.minThreshold)
+    .filter((loc) => loc.productId && needsReplenishment(loc.fillPercent, loc.minPercent))
     .map((loc) => ({
       locationId: loc.id,
       corridor: loc.corridor,
@@ -188,9 +188,8 @@ export async function getDashboardProductivity(
       barcode: loc.barcode,
       productSku: loc.product?.sku ?? null,
       productName: loc.product?.name ?? null,
-      currentQuantity: loc.currentQuantity,
-      minThreshold: loc.minThreshold,
-      capacity: loc.capacity,
+      fillPercent: loc.fillPercent,
+      minPercent: loc.minPercent,
     }));
 
   const hourlyMap = emptyHourlyBuckets();

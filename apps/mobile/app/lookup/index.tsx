@@ -54,13 +54,11 @@ export default function LookupScreen() {
 
           <View style={styles.qtyBox}>
             <Text style={styles.qtyLabel}>
-              {data.type === "PULMAO" ? "TOTAL NO PULMÃO" : "QUANTIDADE"}
+              {data.type === "PULMAO" ? "OCUPAÇÃO DO PULMÃO" : "GÔNDOLA"}
             </Text>
-            <Text style={styles.qtyValue}>{data.currentQuantity}</Text>
+            <Text style={styles.qtyValue}>{data.fillPercent}%</Text>
             {data.type !== "PULMAO" ? (
-              <Text style={styles.qtySub}>
-                Cap: {data.capacity} · Mín: {data.minThreshold}
-              </Text>
+              <Text style={styles.qtySub}>Mínimo: {data.minPercent}%</Text>
             ) : null}
           </View>
 

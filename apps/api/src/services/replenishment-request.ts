@@ -1,18 +1,12 @@
 import { LocationType } from "@prisma/client";
 import { prisma } from "../lib/prisma.js";
-import {
-  adjustLocationQuantity,
-  LocationAdjustError,
-} from "./location-adjust.js";
-
-export type ReplenishmentInputMode = "UNITS" | "PERCENT";
+import { adjustLocationPercent, LocationAdjustError } from "./location-adjust.js";
 
 export type RequestReplenishmentInput = {
   tenantId: string;
   userId: string;
   barcode: string;
-  inputMode: ReplenishmentInputMode;
-  value: number;
+  percent: unknown;
 };
 
 export type RequestReplenishmentResult = {
@@ -20,9 +14,8 @@ export type RequestReplenishmentResult = {
     id: string;
     barcode: string;
     label: string;
-    currentQuantity: number;
-    capacity: number;
-    minThreshold: number;
+    fillPercent: number;
+    minPercent: number;
     product: {
       id: string;
       sku: string;
@@ -30,45 +23,12 @@ export type RequestReplenishmentResult = {
       barcode: string | null;
     } | null;
   };
-  previousQuantity: number;
-  countedQuantity: number;
-  inputMode: ReplenishmentInputMode;
-  inputValue: number;
+  previousPercent: number;
   needsReplenishment: boolean;
-  deficit: number;
   message: string;
 };
 
-function computeDeficit(
-  currentQuantity: number,
-  minThreshold: number,
-  capacity: number,
-): number {
-  const deficit = Math.max(0, minThreshold - currentQuantity);
-  const room = Math.max(0, capacity - currentQuantity);
-  return Math.min(deficit > 0 ? deficit : room, room || deficit || 1);
-}
-
-function resolveCountedQuantity(
-  inputMode: ReplenishmentInputMode,
-  value: number,
-  capacity: number,
-): number {
-  if (inputMode === "PERCENT") {
-    const percent = Math.floor(Number(value));
-    if (!Number.isFinite(percent) || percent < 0 || percent > 100) {
-      throw new LocationAdjustError("Percentual deve estar entre 0 e 100");
-    }
-    return Math.min(capacity, Math.round((capacity * percent) / 100));
-  }
-
-  const units = Math.floor(Number(value));
-  if (!Number.isFinite(units) || units < 0) {
-    throw new LocationAdjustError("Quantidade em unidades inválida");
-  }
-  return units;
-}
-
+/** Correção da gôndola: grava a % atual; abaixo ou igual à % mínima entra na fila de reposição. */
 export async function requestReplenishmentFromPickFace(
   input: RequestReplenishmentInput,
 ): Promise<RequestReplenishmentResult> {
@@ -80,10 +40,10 @@ export async function requestReplenishmentFromPickFace(
   const location = await prisma.location.findFirst({
     where: {
       tenantId: input.tenantId,
-      barcode,
+      barcode: { equals: barcode, mode: "insensitive" },
       active: true,
     },
-    include: { product: true },
+    select: { type: true, productId: true },
   });
 
   if (!location) {
@@ -96,56 +56,36 @@ export async function requestReplenishmentFromPickFace(
     );
   }
 
-  if (!location.productId || !location.product) {
+  if (!location.productId) {
     throw new LocationAdjustError(
       "Gôndola sem produto alocado — aloque um SKU antes de solicitar reabastecimento",
     );
   }
 
-  const countedQuantity = resolveCountedQuantity(
-    input.inputMode,
-    input.value,
-    location.capacity,
-  );
-
-  const adjust = await adjustLocationQuantity({
+  const adjust = await adjustLocationPercent({
     tenantId: input.tenantId,
     userId: input.userId,
     barcode,
-    countedQuantity,
-    reason: "Solicitação de reabastecimento",
+    percent: input.percent,
+    reason: "Correção / solicitação de reabastecimento",
   });
 
-  const needsReplenishment =
-    adjust.location.currentQuantity <= adjust.location.minThreshold;
-  const deficit = needsReplenishment
-    ? computeDeficit(
-        adjust.location.currentQuantity,
-        adjust.location.minThreshold,
-        adjust.location.capacity,
-      )
-    : 0;
-
+  const { needsReplenishment } = adjust.location;
   const message = needsReplenishment
-    ? `Saldo atualizado. Gôndola na fila de reposição (repor ~${deficit} un.).`
-    : "Saldo atualizado. Gôndola ainda acima do mínimo — não entrou na fila.";
+    ? `Gôndola em ${adjust.location.fillPercent}% — entrou na fila de reposição.`
+    : `Gôndola em ${adjust.location.fillPercent}% — acima do mínimo (${adjust.location.minPercent}%), não entrou na fila.`;
 
   return {
     location: {
       id: adjust.location.id,
       barcode: adjust.location.barcode,
       label: adjust.location.label,
-      currentQuantity: adjust.location.currentQuantity,
-      capacity: adjust.location.capacity,
-      minThreshold: adjust.location.minThreshold,
+      fillPercent: adjust.location.fillPercent,
+      minPercent: adjust.location.minPercent,
       product: adjust.location.product,
     },
-    previousQuantity: adjust.previousQuantity,
-    countedQuantity: adjust.location.currentQuantity,
-    inputMode: input.inputMode,
-    inputValue: input.value,
+    previousPercent: adjust.previousPercent,
     needsReplenishment,
-    deficit,
     message,
   };
 }

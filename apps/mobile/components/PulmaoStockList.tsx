@@ -3,7 +3,7 @@ import { ProductThumbnail } from "@/components/ProductThumbnail";
 import type { PulmaoStock } from "@/lib/api";
 import { theme, spacing, typography } from "@/lib/theme";
 
-/** SKUs guardados no pulmão, com o saldo de cada um. */
+/** SKUs guardados no pulmão, com a % que cada um ocupa. */
 export function PulmaoStockList({ stocks }: { stocks: PulmaoStock[] }) {
   if (stocks.length === 0) {
     return <Text style={styles.empty}>Pulmão vazio</Text>;
@@ -22,7 +22,7 @@ export function PulmaoStockList({ stocks }: { stocks: PulmaoStock[] }) {
               {s.product.name}
             </Text>
           </View>
-          <Text style={styles.qty}>{s.quantity} un.</Text>
+          <Text style={styles.qty}>{s.percent}%</Text>
         </View>
       ))}
     </View>

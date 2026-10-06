@@ -15,6 +15,7 @@ import { LOCATION_TYPE_LABEL, MOVEMENT_TYPE_LABEL } from "@/lib/labels";
 import { Pagination } from "@/components/ui/pagination";
 import type { PaginationMeta } from "@/lib/pagination";
 import { fetchMovements, fetchStockLocations } from "@/lib/api/operations";
+import { PercentBar } from "@/components/ops/percent-bar";
 import { PulmaoStocksCell } from "@/components/ops/pulmao-stocks-cell";
 
 type Tab = "balances" | "movements";
@@ -88,7 +89,7 @@ export function StockLocationsView({
             onClick={() => setTab("balances")}
             className={`rounded-lg px-4 py-2 text-sm font-medium ${tab === "balances" ? "bg-[#0d9488] text-white" : "border bg-white"}`}
           >
-            Saldos
+            Ocupação
           </button>
           <button
             type="button"
@@ -138,7 +139,7 @@ export function StockLocationsView({
                 <TableRow>
                   <TableHead>Local</TableHead>
                   <TableHead>Tipo</TableHead>
-                  <TableHead>Quantidade</TableHead>
+                  <TableHead>Ocupação</TableHead>
                   <TableHead>Mínimo</TableHead>
                   <TableHead>Alerta</TableHead>
                 </TableRow>
@@ -146,7 +147,7 @@ export function StockLocationsView({
               <TableBody>
                 {locations.map((l) => {
                   const isPulmao = l.type === "PULMAO";
-                  const alert = !isPulmao && l.currentQuantity <= l.minThreshold;
+                  const alert = !isPulmao && !!l.product && l.fillPercent <= l.minPercent;
                   return (
                     <TableRow key={l.id} className={alert ? "bg-amber-50" : ""}>
                       <TableCell className="font-mono">{l.barcode}</TableCell>
@@ -157,12 +158,10 @@ export function StockLocationsView({
                         {isPulmao ? (
                           <PulmaoStocksCell stocks={l.stocks} />
                         ) : (
-                          <>
-                            {l.currentQuantity} / {l.capacity}
-                          </>
+                          <PercentBar percent={l.fillPercent} minPercent={l.minPercent} />
                         )}
                       </TableCell>
-                      <TableCell>{isPulmao ? "—" : l.minThreshold}</TableCell>
+                      <TableCell>{isPulmao ? "—" : `${l.minPercent}%`}</TableCell>
                       <TableCell>{isPulmao ? "—" : alert ? "Repor" : "OK"}</TableCell>
                     </TableRow>
                   );
@@ -180,7 +179,7 @@ export function StockLocationsView({
                 <TableRow>
                   <TableHead>Data</TableHead>
                   <TableHead>Tipo</TableHead>
-                  <TableHead>Qtd</TableHead>
+                  <TableHead>%</TableHead>
                   <TableHead>Origem</TableHead>
                   <TableHead>Destino</TableHead>
                   <TableHead>Operador</TableHead>
@@ -197,7 +196,13 @@ export function StockLocationsView({
                     <TableCell>
                       {MOVEMENT_TYPE_LABEL[m.type] ?? m.type}
                     </TableCell>
-                    <TableCell>{m.quantity}</TableCell>
+                    <TableCell className="whitespace-nowrap tabular-nums">
+                      {m.percentAfter != null
+                        ? `${m.percentBefore ?? 0}% → ${m.percentAfter}%`
+                        : m.quantity > 0
+                          ? `${m.quantity} un.`
+                          : "—"}
+                    </TableCell>
                     <TableCell>{m.fromLocation?.barcode ?? "—"}</TableCell>
                     <TableCell>{m.toLocation?.barcode ?? "—"}</TableCell>
                     <TableCell>{m.userName}</TableCell>

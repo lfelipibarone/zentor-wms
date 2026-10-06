@@ -10,10 +10,12 @@ import {
 } from "react-native";
 import { BarcodeScanner } from "@/components/BarcodeScanner";
 import { FactoryButton } from "@/components/FactoryButton";
+import { CompactPercentField } from "@/components/PercentInput";
 import { PulmaoLocationPicker } from "@/components/PulmaoLocationPicker";
 import { PulmaoStockList } from "@/components/PulmaoStockList";
 import { ScreenShell } from "@/components/ScreenShell";
 import { api, ApiError, type LocationLookup } from "@/lib/api";
+import { parsePercentText } from "@/lib/percent";
 import { theme, spacing, typography } from "@/lib/theme";
 
 export default function ReturnReceiptCheckScreen() {
@@ -27,6 +29,8 @@ export default function ReturnReceiptCheckScreen() {
     null,
   );
   const [saving, setSaving] = useState(false);
+  /** % que cada SKU devolvido passa a ocupar no pulmão (por item) */
+  const [percents, setPercents] = useState<Record<string, string>>({});
   const [feedback, setFeedback] = useState<string | null>(null);
 
   const load = useCallback(async () => {
@@ -61,11 +65,44 @@ export default function ReturnReceiptCheckScreen() {
     }
   };
 
+  const selectPulmao = (loc: LocationLookup | null) => {
+    setSelectedPulmao(loc);
+    if (!loc || !data) {
+      setPercents({});
+      return;
+    }
+    const initial: Record<string, string> = {};
+    for (const it of data.items) {
+      const current = loc.stocks.find(
+        (st) => st.product.sku.toUpperCase() === (it.productCode ?? "").toUpperCase(),
+      );
+      initial[it.id] = current ? String(current.percent) : "";
+    }
+    setPercents(initial);
+  };
+
+  const itemsToStore = data?.items.filter((it) => it.quantityChecked > 0) ?? [];
+  const percentsValid = itemsToStore.every((it) => {
+    const p = parsePercentText(percents[it.id] ?? "");
+    return p !== null && p >= 1;
+  });
+
   const handleFinalize = async () => {
     if (!sessionId || !selectedPulmao) return;
+    if (!percentsValid) {
+      setFeedback("Informe a % de cada SKU no pulmão (mínimo 1%).");
+      return;
+    }
     setSaving(true);
     try {
-      await api.completeReturnReceipt(sessionId, selectedPulmao.barcode);
+      await api.completeReturnReceipt(
+        sessionId,
+        selectedPulmao.barcode,
+        itemsToStore.map((it) => ({
+          itemId: it.id,
+          percent: parsePercentText(percents[it.id] ?? "") ?? 0,
+        })),
+      );
       Alert.alert("Devolução concluída", "Produtos armazenados no pulmão.", [
         { text: "OK", onPress: () => router.replace("/purchase-receipt") },
       ]);
@@ -125,7 +162,7 @@ export default function ReturnReceiptCheckScreen() {
             <PulmaoLocationPicker
               defaultSku={defaultSku}
               onSelect={(loc) => {
-                setSelectedPulmao(loc);
+                selectPulmao(loc);
                 setFeedback(`Pulmão: ${loc.label}`);
               }}
               disabled={saving}
@@ -135,20 +172,36 @@ export default function ReturnReceiptCheckScreen() {
               <View style={styles.locCard}>
                 <Text style={styles.locTitle}>{selectedPulmao.label}</Text>
                 <Text style={styles.locMeta}>
-                  {selectedPulmao.barcode} · total {selectedPulmao.currentQuantity} un.
+                  {selectedPulmao.barcode} · ocupação {selectedPulmao.fillPercent}%
                 </Text>
                 <PulmaoStockList stocks={selectedPulmao.stocks} />
               </View>
+              <Text style={styles.sectionTitle}>
+                Quanto cada SKU ocupa no pulmão depois de guardar?
+              </Text>
+              {itemsToStore.map((it) => (
+                <View key={it.id} style={styles.percentRow}>
+                  <View style={styles.percentInfo}>
+                    <Text style={styles.sku}>{it.productCode}</Text>
+                    <Text style={styles.locMeta}>{it.quantityChecked} un. devolvidas</Text>
+                  </View>
+                  <CompactPercentField
+                    value={percents[it.id] ?? ""}
+                    onChange={(t) => setPercents((prev) => ({ ...prev, [it.id]: t }))}
+                  />
+                </View>
+              ))}
               <FactoryButton
                 label="Finalizar devolução"
                 variant="success"
                 onPress={handleFinalize}
+                disabled={!percentsValid}
                 loading={saving}
               />
               <FactoryButton
                 label="Trocar pulmão"
                 variant="secondary"
-                onPress={() => setSelectedPulmao(null)}
+                onPress={() => selectPulmao(null)}
                 disabled={saving}
               />
             </>
@@ -184,6 +237,16 @@ const styles = StyleSheet.create({
     borderColor: theme.border,
   },
   sku: { fontFamily: "monospace", fontWeight: "600" },
+  percentRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: spacing.sm,
+    paddingVertical: spacing.xs,
+    borderBottomWidth: 1,
+    borderColor: theme.border,
+  },
+  percentInfo: { flex: 1, gap: 2 },
   qty: { fontWeight: "700" },
   empty: { color: theme.textMuted, textAlign: "center", padding: spacing.lg },
   destinoSection: {

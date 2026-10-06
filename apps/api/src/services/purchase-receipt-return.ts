@@ -7,7 +7,8 @@ import {
 } from "@prisma/client";
 import { prisma } from "../lib/prisma.js";
 import { findProductByBarcode } from "./location-stock.js";
-import { addPulmaoStock } from "./pulmao-inventory.js";
+import { setPulmaoSkuPercent } from "./pulmao-inventory.js";
+import { parsePercent } from "./stock-percent.js";
 
 export async function startReturnReceiptSession(params: {
   tenantId: string;
@@ -131,6 +132,8 @@ export async function completeReturnReceipt(params: {
   sessionId: string;
   userId: string;
   pulmaoLocationBarcode: string;
+  /** % que cada item (id do item da devolução) passa a ocupar no pulmão */
+  percents: Array<{ itemId: string; percent: unknown }>;
 }) {
   const session = await prisma.purchaseReceiptSession.findUnique({
     where: { id: params.sessionId },
@@ -141,6 +144,17 @@ export async function completeReturnReceipt(params: {
   }
   if (session.items.length === 0) {
     throw new Error("Bipe ao menos um produto antes de finalizar");
+  }
+
+  const percentByItem = new Map<string, number>();
+  for (const it of session.items) {
+    if (Math.floor(Number(it.quantityChecked)) <= 0) continue;
+    const informed = params.percents?.find((p) => p.itemId === it.id);
+    const percent = parsePercent(informed?.percent, `% de ${it.productCode ?? "item"} no pulmão`);
+    if (percent <= 0) {
+      throw new Error(`Informe quanto ${it.productCode ?? "o item"} ocupa no pulmão (mínimo 1%)`);
+    }
+    percentByItem.set(it.id, percent);
   }
 
   const loc = await prisma.location.findFirst({
@@ -173,10 +187,11 @@ export async function completeReturnReceipt(params: {
       });
       if (!product) continue;
 
-      await addPulmaoStock(
+      const percent = percentByItem.get(it.id)!;
+      const { previous } = await setPulmaoSkuPercent(
         tx,
         { tenantId: session.tenantId, locationId: loc.id, productId: product.id },
-        qty,
+        percent,
       );
 
       await tx.inventoryMovement.create({
@@ -184,6 +199,8 @@ export async function completeReturnReceipt(params: {
           tenantId: session.tenantId,
           type: InventoryMovementType.ENTRY,
           quantity: qty,
+          percentBefore: previous,
+          percentAfter: percent,
           userId: params.userId,
           productId: product.id,
           toLocationId: loc.id,

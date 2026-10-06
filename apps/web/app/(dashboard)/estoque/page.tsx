@@ -15,6 +15,7 @@ import { LOCATION_TYPE_LABEL } from "@/lib/labels";
 import { Pagination } from "@/components/ui/pagination";
 import type { PaginationMeta } from "@/lib/pagination";
 import { fetchStockLocations } from "@/lib/api/operations";
+import { PercentBar } from "@/components/ops/percent-bar";
 import { PulmaoStocksCell } from "@/components/ops/pulmao-stocks-cell";
 import { cn } from "@/lib/utils";
 
@@ -64,7 +65,7 @@ export default function EstoquePage() {
     <div>
       <PageHeader
         title="Estoque"
-        description="Gôndolas de pulmão e estoque de giro — saldos e capacidade."
+        description="Gôndolas de pulmão e estoque de giro — ocupação em % e % mínima."
       />
 
       <div className="mb-4 flex flex-wrap gap-2">
@@ -121,9 +122,7 @@ export default function EstoquePage() {
                 <TableHead>SKU</TableHead>
                 <TableHead>Tipo</TableHead>
                 <TableHead>Endereço</TableHead>
-                <TableHead className="text-right">Estoque</TableHead>
-                <TableHead className="text-right">Disponível</TableHead>
-                <TableHead className="text-right">Capacidade</TableHead>
+                <TableHead>Ocupação</TableHead>
                 <TableHead className="text-right">Mínimo</TableHead>
                 <TableHead>Alerta</TableHead>
               </TableRow>
@@ -131,8 +130,7 @@ export default function EstoquePage() {
             <TableBody>
               {locations.map((l) => {
                 const isPulmao = l.type === "PULMAO";
-                const available = l.capacity - l.currentQuantity;
-                const alert = !isPulmao && l.currentQuantity <= l.minThreshold;
+                const alert = !isPulmao && !!l.product && l.fillPercent <= l.minPercent;
                 return (
                   <TableRow key={l.id} className={alert ? "bg-amber-50" : ""}>
                     <TableCell>
@@ -160,17 +158,14 @@ export default function EstoquePage() {
                         {l.barcode}
                       </span>
                     </TableCell>
-                    <TableCell className="text-right tabular-nums">
-                      {l.currentQuantity}
+                    <TableCell>
+                      <PercentBar
+                        percent={l.fillPercent}
+                        minPercent={isPulmao ? null : l.minPercent}
+                      />
                     </TableCell>
                     <TableCell className="text-right tabular-nums">
-                      {isPulmao ? "—" : available}
-                    </TableCell>
-                    <TableCell className="text-right tabular-nums">
-                      {isPulmao ? "Sem limite" : l.capacity}
-                    </TableCell>
-                    <TableCell className="text-right tabular-nums">
-                      {isPulmao ? "—" : l.minThreshold}
+                      {isPulmao ? "—" : `${l.minPercent}%`}
                     </TableCell>
                     <TableCell>{isPulmao ? "—" : alert ? "Repor" : "OK"}</TableCell>
                   </TableRow>

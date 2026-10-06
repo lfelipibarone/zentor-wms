@@ -296,7 +296,7 @@ export async function listProductLocations(
     throw new ProductLocationsError("Produto não encontrado", 404);
   }
 
-  // No pulmão, currentQuantity é o saldo deste SKU (o pulmão pode ter outros SKUs).
+  // No pulmão, fillPercent é a % deste SKU (o pulmão pode ter outros SKUs).
   const sorted =
     type === LocationType.PULMAO
       ? (
@@ -304,13 +304,13 @@ export async function listProductLocations(
             where: {
               tenantId,
               productId: product.id,
-              quantity: { gt: 0 },
+              percent: { gt: 0 },
               location: { active: true, type: LocationType.PULMAO },
             },
             include: { location: true },
-            orderBy: { quantity: "desc" },
+            orderBy: { percent: "desc" },
           })
-        ).map((s) => ({ ...s.location, currentQuantity: s.quantity }))
+        ).map((s) => ({ ...s.location, fillPercent: s.percent }))
       : (await getRouteEngine(tenantId)).sortByRoute(
           await prisma.location.findMany({
             where: { tenantId, active: true, type, productId: product.id },
@@ -319,7 +319,7 @@ export async function listProductLocations(
 
   let suggestedId: string | null = null;
   if (type === LocationType.PICK_FACE && sorted.length > 0) {
-    const best = await resolvePickFaceForProduct(product.id, tenantId, 1);
+    const best = await resolvePickFaceForProduct(product.id, tenantId, "pick");
     suggestedId = best.id;
   } else if (type === LocationType.PULMAO && sorted.length > 0) {
     suggestedId = sorted[0]!.id;
@@ -339,9 +339,8 @@ export async function listProductLocations(
       label: formatRouteLabel(loc),
       corridor: loc.corridor,
       row: loc.row,
-      currentQuantity: loc.currentQuantity,
-      capacity: loc.capacity,
-      minThreshold: loc.minThreshold,
+      fillPercent: loc.fillPercent,
+      minPercent: loc.minPercent,
       isSuggested: loc.id === suggestedId,
     })),
   };

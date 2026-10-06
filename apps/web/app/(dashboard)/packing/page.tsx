@@ -306,13 +306,13 @@ export default function PackingPage() {
                     </span>
                     <p className="mt-2 font-mono font-bold">{entry.need.sku}</p>
                     <p className="text-sm text-muted-foreground">
-                      {entry.need.routeLabel} · {entry.need.currentQuantity}/
-                      {entry.need.minThreshold} un. · repor ~{entry.need.deficit} un.
+                      {entry.need.routeLabel} · gôndola em {entry.need.fillPercent}% (mín.{" "}
+                      {entry.need.minPercent}%) · falta {entry.need.percentToFill}%
                     </p>
                     {entry.need.suggestedPulmao ? (
                       <p className="mt-1 text-xs text-violet-800">
                         Pulmão sugerido: {entry.need.suggestedPulmao.label} (
-                        {entry.need.suggestedPulmao.currentQuantity} un.)
+                        {entry.need.suggestedPulmao.percent}% deste SKU)
                       </p>
                     ) : null}
                   </div>

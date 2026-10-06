@@ -15,11 +15,11 @@ export function useStockLocation(locationId: string) {
   return useMutation({
     mutationFn: ({
       productBarcode,
-      quantity,
+      percent,
     }: {
       productBarcode: string;
-      quantity?: number;
-    }) => api.stockLocation(locationId, productBarcode, quantity),
+      percent: number;
+    }) => api.stockLocation(locationId, productBarcode, percent),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["location"] });
     },

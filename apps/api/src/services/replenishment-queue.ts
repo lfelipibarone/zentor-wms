@@ -2,6 +2,7 @@ import { CargoTransferStatus, LocationType } from "@prisma/client";
 import { prisma } from "../lib/prisma.js";
 import { formatRouteLabel } from "./packing-queue-sort.js";
 import { getRouteEngine } from "./route-engine/index.js";
+import { needsReplenishment, percentToFill } from "./stock-percent.js";
 
 export type ReplenishmentNeed = {
   id: string;
@@ -12,19 +13,20 @@ export type ReplenishmentNeed = {
   sku: string;
   productName: string;
   imageUrl: string | null;
-  currentQuantity: number;
-  minThreshold: number;
-  capacity: number;
-  deficit: number;
+  fillPercent: number;
+  minPercent: number;
+  /** Pontos de % que faltam para encher a gôndola */
+  percentToFill: number;
   suggestedPulmao: {
     id: string;
     barcode: string;
     label: string;
-    /** Saldo deste SKU no pulmão */
-    currentQuantity: number;
+    /** % deste SKU no pulmão */
+    percent: number;
   } | null;
 };
 
+/** Gôndolas com % igual ou abaixo da % mínima (sem transporte já a caminho). */
 export async function listReplenishmentNeeds(
   tenantId: string,
 ): Promise<ReplenishmentNeed[]> {
@@ -49,7 +51,7 @@ export async function listReplenishmentNeeds(
     prisma.locationStock.findMany({
       where: {
         tenantId,
-        quantity: { gt: 0 },
+        percent: { gt: 0 },
         location: { active: true, type: LocationType.PULMAO },
       },
       include: {
@@ -67,13 +69,13 @@ export async function listReplenishmentNeeds(
   const bestPulmaoByProduct = new Map<string, (typeof pulmaoStocks)[number]>();
   for (const stock of pulmaoStocks) {
     const best = bestPulmaoByProduct.get(stock.productId);
-    if (!best || stock.quantity > best.quantity) {
+    if (!best || stock.percent > best.percent) {
       bestPulmaoByProduct.set(stock.productId, stock);
     }
   }
 
   const lowFaces = faces.filter(
-    (f) => f.currentQuantity <= f.minThreshold && f.product,
+    (f) => needsReplenishment(f.fillPercent, f.minPercent) && f.product,
   );
 
   const sorted = (await getRouteEngine(tenantId)).sortByRoute(lowFaces);
@@ -82,13 +84,6 @@ export async function listReplenishmentNeeds(
     .filter((face) => !blockedFaceIds.has(face.id))
     .map((face) => {
       const product = face.product!;
-      const deficit = Math.max(0, face.minThreshold - face.currentQuantity);
-      const room = Math.max(0, face.capacity - face.currentQuantity);
-      const qtyNeeded = Math.min(
-        deficit > 0 ? deficit : room,
-        room || deficit || 1,
-      );
-
       const bestPulmao = bestPulmaoByProduct.get(product.id) ?? null;
 
       return {
@@ -100,16 +95,15 @@ export async function listReplenishmentNeeds(
         sku: product.sku,
         productName: product.name,
         imageUrl: product.imageUrl,
-        currentQuantity: face.currentQuantity,
-        minThreshold: face.minThreshold,
-        capacity: face.capacity,
-        deficit: qtyNeeded,
+        fillPercent: face.fillPercent,
+        minPercent: face.minPercent,
+        percentToFill: percentToFill(face.fillPercent),
         suggestedPulmao: bestPulmao
           ? {
               id: bestPulmao.location.id,
               barcode: bestPulmao.location.barcode,
               label: formatRouteLabel(bestPulmao.location),
-              currentQuantity: bestPulmao.quantity,
+              percent: bestPulmao.percent,
             }
           : null,
       };

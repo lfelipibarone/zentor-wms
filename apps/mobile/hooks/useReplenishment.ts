@@ -12,23 +12,18 @@ export function useLocationByBarcode(barcode: string | null) {
 export function useReplenish(locationId: string) {
   return useMutation({
     mutationFn: ({
-      quantity,
+      percent,
       productBarcode,
     }: {
-      quantity: number;
+      percent: number;
       productBarcode?: string;
-    }) => api.replenishLocation(locationId, quantity, productBarcode),
+    }) => api.replenishLocation(locationId, percent, productBarcode),
   });
 }
 
 export function useRequestReplenishment(barcode: string | null) {
   return useMutation({
-    mutationFn: ({
-      inputMode,
-      value,
-    }: {
-      inputMode: "UNITS" | "PERCENT";
-      value: number;
-    }) => api.requestReplenishment(barcode!, inputMode, value),
+    mutationFn: ({ percent }: { percent: number }) =>
+      api.requestReplenishment(barcode!, percent),
   });
 }

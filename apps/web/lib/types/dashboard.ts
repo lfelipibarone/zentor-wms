@@ -28,9 +28,10 @@ export interface ShelfAlertItem {
   barcode: string;
   productSku: string | null;
   productName: string | null;
-  currentQuantity: number;
-  minThreshold: number;
-  capacity: number;
+  /** % atual da gôndola */
+  fillPercent: number;
+  /** % mínima antes de repor */
+  minPercent: number;
 }
 
 export interface StageMetrics {

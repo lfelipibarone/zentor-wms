@@ -29,6 +29,15 @@ export default function HomeScreen() {
       <FactoryButton label="Picking" onPress={() => router.push("/picking")} />
 
       <FactoryButton
+        label="Atualizar gôndola"
+        variant="secondary"
+        onPress={() => router.push("/atualizar-gondola")}
+      />
+      <Text style={styles.putawayHint}>
+        Leia o QR do produto e informe a % da gôndola
+      </Text>
+
+      <FactoryButton
         label="Correção"
         variant="secondary"
         onPress={() => router.push("/correcao")}

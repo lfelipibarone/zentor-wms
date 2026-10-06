@@ -327,12 +327,19 @@ function OrdersQueuePanel({
       onRefresh={onRefresh}
       ListHeaderComponent={header}
       ListFooterComponent={
-        <FactoryButton
-          label="Atualizar"
-          variant="secondary"
-          onPress={onRefresh}
-          loading={refreshing}
-        />
+        <View style={styles.footer}>
+          <FactoryButton
+            label="Atualizar"
+            variant="secondary"
+            onPress={onRefresh}
+            loading={refreshing}
+          />
+          <FactoryButton
+            label="Atualizar gôndola (QR do produto)"
+            variant="secondary"
+            onPress={() => router.push("/atualizar-gondola")}
+          />
+        </View>
       }
       ListEmptyComponent={
         <Text style={styles.empty}>
@@ -585,6 +592,7 @@ function OrderCard({
 }
 
 const styles = StyleSheet.create({
+  footer: { gap: spacing.sm },
   safe: { flex: 1, backgroundColor: theme.bg },
   headerFixed: {
     flexGrow: 0,

@@ -82,8 +82,8 @@ export function fetchReportsSummary(from?: string, to?: string) {
     lowStock: Array<{
       barcode: string;
       sku?: string;
-      currentQuantity: number;
-      minThreshold: number;
+      fillPercent: number;
+      minPercent: number;
     }>;
   }>(`/api/reports/summary${q ? `?${q}` : ""}`);
 }

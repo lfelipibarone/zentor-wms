@@ -18,6 +18,7 @@ import {
   type LocationOption,
   type ProductDetail,
 } from "@/lib/api/products";
+import { PercentBar } from "@/components/ops/percent-bar";
 
 const TYPE_LABEL = { PICK_FACE: "Gôndola", PULMAO: "Pulmão" } as const;
 
@@ -141,7 +142,7 @@ export function ProductLocationsCard({
                           {!loc.active
                             ? "Inativa"
                             : loc.product
-                              ? `${loc.product.sku} · ${loc.currentQuantity} un.`
+                              ? `${loc.product.sku} · ${loc.fillPercent}%`
                               : "Livre"}
                         </p>
                       </div>
@@ -176,8 +177,7 @@ export function ProductLocationsCard({
                 <TableRow>
                   <TableHead>Posição</TableHead>
                   <TableHead>Tipo</TableHead>
-                  <TableHead className="text-right">Qtd.</TableHead>
-                  <TableHead className="text-right">Capac.</TableHead>
+                  <TableHead>Ocupação</TableHead>
                   <TableHead className="text-right">Mín.</TableHead>
                   <TableHead />
                 </TableRow>
@@ -195,16 +195,18 @@ export function ProductLocationsCard({
                         <span className="ml-1 text-xs text-muted-foreground">{l.face === "B" ? "LE" : "LD"}</span>
                       ) : null}
                     </TableCell>
-                    <TableCell className="text-right tabular-nums">{l.currentQuantity}</TableCell>
-                    <TableCell className="text-right tabular-nums">
-                      {l.type === "PULMAO" ? "—" : l.capacity}
+                    <TableCell>
+                      <PercentBar
+                        percent={l.fillPercent}
+                        minPercent={l.type === "PULMAO" ? null : l.minPercent}
+                      />
                     </TableCell>
                     <TableCell className="text-right tabular-nums">
-                      {l.type === "PULMAO" ? "—" : l.minThreshold}
+                      {l.type === "PULMAO" ? "—" : `${l.minPercent}%`}
                     </TableCell>
                     <TableCell className="text-right">
                       {l.type === "PULMAO" ? (
-                        <span className="text-xs text-muted-foreground">Saldo no pulmão</span>
+                        <span className="text-xs text-muted-foreground">% do SKU no pulmão</span>
                       ) : (
                         <button
                           type="button"

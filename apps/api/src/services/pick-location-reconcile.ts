@@ -1,6 +1,5 @@
 import { LocationType, OrderStatus, PickWaveStatus } from "@prisma/client";
 import { prisma } from "../lib/prisma.js";
-import { allocateQuantityAcrossPickFaces } from "./pick-allocation.js";
 import { resolvePickFaceForProduct } from "./pick-face-resolve.js";
 
 export type ReconcileOrderItemRow = {
@@ -38,6 +37,10 @@ export type ReconcileOpts = {
 
 function formatLocation(loc: { corridor: string; row: string; barcode: string }) {
   return `${loc.corridor}-${loc.row} · ${loc.barcode}`;
+}
+
+export function emptyFaceHint(loc: { fillPercent: number } | null | undefined): string | null {
+  return loc && loc.fillPercent <= 0 ? "Gôndola registrada como vazia (0%)" : null;
 }
 
 export async function buildPickingSessionSlice(orderId: string) {
@@ -84,12 +87,7 @@ export async function buildPickingSessionSlice(orderId: string) {
       remaining ?? item.quantityOrdered - item.quantityPicked,
     product: item.product,
     pickLocation: mapLoc(item.pickLocation),
-    stockMismatchHint:
-      item.pickLocation &&
-      item.pickLocation.currentQuantity <
-        item.quantityOrdered - item.quantityPicked
-        ? `Saldo na gôndola (${item.pickLocation.currentQuantity}) menor que o pendente`
-        : null,
+    stockMismatchHint: emptyFaceHint(item.pickLocation),
   });
 
   return {
@@ -112,19 +110,8 @@ export async function buildPickingSessionSlice(orderId: string) {
 async function resolvePrimaryPickLocationId(
   tenantId: string,
   productId: string,
-  quantityNeeded: number,
 ): Promise<string> {
-  try {
-    const { segments } = await allocateQuantityAcrossPickFaces(
-      productId,
-      tenantId,
-      quantityNeeded,
-    );
-    if (segments[0]) return segments[0].locationId;
-  } catch {
-    /* fallback */
-  }
-  const loc = await resolvePickFaceForProduct(productId, tenantId);
+  const loc = await resolvePickFaceForProduct(productId, tenantId, "pick");
   return loc.id;
 }
 
@@ -239,11 +226,7 @@ export async function reconcilePickTargetsAfterStockChange(
       const oldBarcode = item.pickLocation?.barcode ?? null;
       let newLocationId: string;
       try {
-        newLocationId = await resolvePrimaryPickLocationId(
-          tenantId,
-          productId,
-          remaining,
-        );
+        newLocationId = await resolvePrimaryPickLocationId(tenantId, productId);
       } catch (e) {
         warnings.push(
           `Pedido ${item.order.erpOrderId}: ${e instanceof Error ? e.message : "sem gôndola"}`,
@@ -272,7 +255,7 @@ export async function reconcilePickTargetsAfterStockChange(
     }
   } else {
     warnings.push(
-      "Ajuste em pulmão: saldo de origem atualizado; faces de pick dos pedidos não alteradas",
+      "Ajuste em pulmão: % do pulmão atualizada; gôndolas dos pedidos não alteradas",
     );
   }
 
@@ -294,7 +277,7 @@ export async function reconcilePickTargetsAfterStockChange(
       const loc = await prisma.location.findUnique({
         where: { id: line.pickLocationId },
       });
-      if (loc && loc.currentQuantity < remaining) {
+      if (loc && remaining > 0 && loc.fillPercent <= 0) {
         waveLines.push({
           waveLineId: line.id,
           waveId: line.waveId,
@@ -302,7 +285,7 @@ export async function reconcilePickTargetsAfterStockChange(
           oldLocationBarcode: line.pickLocation.barcode,
           newLocationBarcode: null,
           action: "warning",
-          message: `Linha em andamento: saldo na gôndola (${loc.currentQuantity}) pode ser insuficiente para ${remaining} un.`,
+          message: `Linha em andamento: gôndola registrada como vazia e faltam ${remaining} un.`,
         });
         warnings.push(
           `Onda ${line.wave.name}: linha ${line.pickLocation.barcode} já iniciada`,
@@ -313,11 +296,7 @@ export async function reconcilePickTargetsAfterStockChange(
 
     let newLocationId: string;
     try {
-      newLocationId = await resolvePrimaryPickLocationId(
-        tenantId,
-        productId,
-        line.quantityTotal,
-      );
+      newLocationId = await resolvePrimaryPickLocationId(tenantId, productId);
     } catch (e) {
       waveLines.push({
         waveLineId: line.id,
@@ -347,7 +326,7 @@ export async function reconcilePickTargetsAfterStockChange(
         action: migrated.ok ? "updated" : "warning",
         message: migrated.message,
       });
-    } else if (newLoc.currentQuantity < line.quantityTotal) {
+    } else if (newLoc.fillPercent <= 0) {
       waveLines.push({
         waveLineId: line.id,
         waveId: line.waveId,
@@ -355,10 +334,10 @@ export async function reconcilePickTargetsAfterStockChange(
         oldLocationBarcode: line.pickLocation.barcode,
         newLocationBarcode: newLoc.barcode,
         action: "warning",
-        message: `Saldo (${newLoc.currentQuantity}) menor que necessário (${line.quantityTotal})`,
+        message: "Gôndola registrada como vazia (0%) e não há outra com produto",
       });
       warnings.push(
-        `Onda ${line.wave.name}: estoque insuficiente em ${newLoc.barcode} após ajuste`,
+        `Onda ${line.wave.name}: ${newLoc.barcode} vazia após ajuste`,
       );
     }
   }

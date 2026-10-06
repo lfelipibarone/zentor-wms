@@ -38,6 +38,10 @@ export default function RootLayout() {
               options={{ headerShown: false }}
             />
             <Stack.Screen
+              name="atualizar-gondola/index"
+              options={{ headerShown: false }}
+            />
+            <Stack.Screen
               name="armazenagem-pulmao/index"
               options={{ headerShown: false }}
             />

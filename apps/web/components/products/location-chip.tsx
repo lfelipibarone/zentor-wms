@@ -3,11 +3,12 @@ import { cn } from "@/lib/utils";
 export function LocationChip({
   barcode,
   type,
-  quantity,
+  percent,
 }: {
   barcode: string;
   type: "PICK_FACE" | "PULMAO";
-  quantity: number;
+  /** Gôndola: % atual. Pulmão: % deste SKU. */
+  percent: number;
 }) {
   return (
     <span
@@ -18,7 +19,7 @@ export function LocationChip({
       title={type === "PULMAO" ? "Pulmão" : "Gôndola"}
     >
       {barcode}
-      <span className="text-[10px] opacity-70">· {quantity} un.</span>
+      <span className="text-[10px] opacity-70">· {percent}%</span>
     </span>
   );
 }
