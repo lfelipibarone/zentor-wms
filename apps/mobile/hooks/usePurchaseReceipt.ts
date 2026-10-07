@@ -16,6 +16,7 @@ export function usePurchaseReceiptSession(sessionId: string | undefined) {
     queryKey: ["purchase-receipt-session", sessionId],
     queryFn: () => api.getPurchaseReceiptSession(sessionId!),
     enabled: Boolean(sessionId),
+    refetchInterval: 15_000,
   });
 }
 

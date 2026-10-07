@@ -16,6 +16,7 @@ export function usePutawaySession(sessionId: string | undefined) {
     queryKey: ["putaway-session", sessionId],
     queryFn: () => api.getPutawaySession(sessionId!),
     enabled: Boolean(sessionId),
+    refetchInterval: 15_000,
   });
 }
 

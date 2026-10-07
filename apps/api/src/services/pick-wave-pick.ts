@@ -10,6 +10,7 @@ import {
   ensurePickingEndLog,
   ensurePickingStartLog,
 } from "./order-time-log-helpers.js";
+import { assertWaveShareStarted, finishShareIfDone } from "./work-share.js";
 
 export interface ConsolidatedPickInput {
   lineId: string;
@@ -41,6 +42,7 @@ export async function confirmConsolidatedPick(input: ConsolidatedPickInput) {
   if (line.wave.status !== PickWaveStatus.RELEASED) {
     throw new PickWaveError("Onda não está ativa");
   }
+  const shareId = await assertWaveShareStarted(line.waveId, line.partId, input.userId);
   await assertWaveOperatorForMutation(line.waveId, input.userId, line.partId);
   if (line.sortStatus === PickWaveLineSortStatus.SORTED) {
     throw new PickWaveError("Linha já finalizada no packing");
@@ -167,6 +169,8 @@ export async function confirmConsolidatedPick(input: ConsolidatedPickInput) {
       }
     }
   });
+
+  if (shareId) await finishShareIfDone(shareId);
 
   const updated = await prisma.pickWaveLine.findUnique({
     where: { id: line.id },

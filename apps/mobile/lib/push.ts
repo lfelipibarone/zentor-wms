@@ -45,3 +45,23 @@ export async function setupPushNotifications(): Promise<void> {
   const tokenData = await Notifications.getExpoPushTokenAsync();
   await registerPushDevice(tokenData.data);
 }
+
+type PushRoute = { pathname: string; params: Record<string, string> };
+
+/** Ao tocar numa notificação com rota (ex.: parte de tarefa), abre a tela. */
+export async function listenForPushTaps(
+  onRoute: (route: PushRoute) => void,
+): Promise<() => void> {
+  if (!isRemotePushSupported()) return () => {};
+  const Notifications = await import("expo-notifications");
+  const handle = (data: unknown) => {
+    const route = (data as { route?: PushRoute } | null)?.route;
+    if (route?.pathname) onRoute({ pathname: route.pathname, params: route.params ?? {} });
+  };
+  const last = await Notifications.getLastNotificationResponseAsync();
+  if (last) handle(last.notification.request.content.data);
+  const sub = Notifications.addNotificationResponseReceivedListener((response) =>
+    handle(response.notification.request.content.data),
+  );
+  return () => sub.remove();
+}

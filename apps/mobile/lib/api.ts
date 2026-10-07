@@ -595,6 +595,39 @@ export const api = {
       body: JSON.stringify(body),
     }),
 
+  listColleagues: () =>
+    request<{ colleagues: Colleague[] }>("/mobile/colleagues"),
+
+  splitWork: (body: {
+    kind: WorkShareKind;
+    refId: string;
+    partId?: string | null;
+    assigneeIds: string[];
+  }) =>
+    request<{ shares: WorkShareSummary[]; mine: WorkShareSummary | null }>(
+      "/mobile/work/split",
+      { method: "POST", body: JSON.stringify(body) },
+    ),
+
+  listMyWork: () =>
+    request<{ shares: WorkShareSummary[] }>("/mobile/work/mine"),
+
+  startWorkShare: (shareId: string) =>
+    request<{ share: WorkShareSummary }>(`/mobile/work/shares/${shareId}/start`, {
+      method: "POST",
+    }),
+
+  declineWorkShare: (shareId: string) =>
+    request<{ share: WorkShareSummary }>(`/mobile/work/shares/${shareId}/decline`, {
+      method: "POST",
+    }),
+
+  reassignWorkShare: (shareId: string, userId: string) =>
+    request<{ share: WorkShareSummary }>(`/mobile/work/shares/${shareId}/reassign`, {
+      method: "POST",
+      body: JSON.stringify({ userId }),
+    }),
+
   getMobileConfig: () =>
     request<{ waveEnabled: boolean }>("/mobile/config"),
 
@@ -656,6 +689,7 @@ export const api = {
         part: WavePartRef | null;
       };
       lines: WaveLineSummary[];
+      work: WorkRefDto;
     }>(`/mobile/waves/${waveId}${partQuery(partId)}`),
 
   acceptWave: (waveId: string, partId?: string | null) =>
@@ -684,6 +718,7 @@ export const api = {
         part: WavePartRef | null;
       };
       lines: WaveLineSummary[];
+      work: WorkRefDto;
     }>("/mobile/waves/current"),
 
   acceptCurrentWave: () =>
@@ -917,6 +952,7 @@ export interface PutawaySessionDto {
     /** Pulmões onde o item foi guardado, com a quantidade em cada um */
     storedLocations: PutawayStoredLocation[];
     completed: boolean;
+    workShareId?: string | null;
   }>;
   nextItem: {
     id: string;
@@ -927,6 +963,9 @@ export interface PutawaySessionDto {
     remaining: number;
   } | null;
   allStored: boolean;
+  /** Itens da minha parte guardados (sem divisão: a NF toda) */
+  myAllStored?: boolean;
+  work?: WorkRefDto | null;
 }
 
 export interface PurchaseReceiptSessionDto {
@@ -949,6 +988,7 @@ export interface PurchaseReceiptSessionDto {
     quantityExpected: number;
     quantityChecked: number;
     completed: boolean;
+    workShareId?: string | null;
   }>;
   nextItem: {
     id: string;
@@ -961,6 +1001,9 @@ export interface PurchaseReceiptSessionDto {
     remaining: number;
   } | null;
   allChecked: boolean;
+  /** Itens da minha parte conferidos (sem divisão: a NF toda) */
+  myAllChecked?: boolean;
+  work?: WorkRefDto | null;
 }
 
 export interface ReturnReceiptSessionDto {
@@ -982,6 +1025,46 @@ export interface ReturnReceiptSessionDto {
   }>;
   totalUnits: number;
   hasItems: boolean;
+}
+
+export type WorkShareKind = "PICK_WAVE" | "RECEIPT_CHECK" | "PUTAWAY";
+export type WorkShareStatus = "RESERVED" | "STARTED" | "FINISHED" | "DECLINED" | "CANCELLED";
+
+export interface Colleague {
+  id: string;
+  name: string;
+}
+
+/** Parte de uma tarefa dividida entre agentes, com o cronômetro do funcionário. */
+export interface WorkShareSummary {
+  id: string;
+  kind: WorkShareKind;
+  kindLabel: string;
+  status: WorkShareStatus;
+  shareIndex: number;
+  shareCount: number;
+  title: string;
+  subtitle: string | null;
+  assignedTo: { id: string; name: string };
+  assignedBy: { id: string; name: string } | null;
+  itemsTotal: number;
+  unitsTotal: number;
+  itemsDone: number;
+  unitsDone: number;
+  reservedAt: string;
+  startedAt: string | null;
+  finishedAt: string | null;
+  elapsedSec: number | null;
+  waveId: string | null;
+  wavePartId: string | null;
+  receiptSessionId: string | null;
+  putawaySessionId: string | null;
+  route: { pathname: string; params: Record<string, string> };
+}
+
+export interface WorkRefDto {
+  mine: WorkShareSummary | null;
+  shares: WorkShareSummary[];
 }
 
 export interface WavePartSummary {

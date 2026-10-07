@@ -15,11 +15,14 @@ import { PutawaySummary } from "@/components/PutawaySummary";
 import { PercentInput } from "@/components/PercentInput";
 import { QuantityInput } from "@/components/QuantityInput";
 import { ScreenShell } from "@/components/ScreenShell";
+import { SplitWorkModal } from "@/components/SplitWorkModal";
+import { WorkShareCard, workBlockedMessage } from "@/components/WorkTimer";
 import {
   useCompletePutaway,
   usePutawaySession,
   useStorePutawayItem,
 } from "@/hooks/usePutaway";
+import { useSplitWork } from "@/hooks/useWorkShares";
 import { ApiError, type LocationLookup } from "@/lib/api";
 import { theme, spacing, typography } from "@/lib/theme";
 
@@ -41,6 +44,17 @@ export default function PutawaySessionScreen() {
   const nextStored =
     data?.items.find((it) => it.id === next?.id)?.storedLocations ?? [];
   const finished = data?.session.status === "COMPLETED";
+  const work = data?.work;
+  const shared = (work?.shares.length ?? 0) > 0;
+  const blocked = workBlockedMessage(work);
+  const pendingCount = data?.items.filter((it) => !it.completed).length ?? 0;
+  const needsAccept = Boolean(data) && !shared && !finished && pendingCount > 0;
+  const myItems = shared
+    ? (data?.items ?? []).filter((it) => it.workShareId && it.workShareId === work?.mine?.id)
+    : data?.items ?? [];
+  const myDone = shared ? Boolean(data?.myAllStored) : Boolean(data?.allStored);
+  const [splitOpen, setSplitOpen] = useState(false);
+  const splitWork = useSplitWork();
 
   useEffect(() => {
     setPhase("scan-location");
@@ -80,8 +94,10 @@ export default function PutawaySessionScreen() {
       setSelectedLocation(null);
       setPendingQty(null);
       setPhase("scan-location");
-      if (updated.allStored) {
+      if (updated.session.status === "COMPLETED" || updated.allStored) {
         setFeedback(`${storedMsg}. Todos os itens armazenados ✓`);
+      } else if (updated.myAllStored && (updated.work?.shares.length ?? 0) > 0) {
+        setFeedback(`${storedMsg}. Sua parte terminou ✓ — aguardando os colegas`);
       } else if (updated.nextItem) {
         setFeedback(
           `${storedMsg}. Próximo: ${updated.nextItem.description ?? updated.nextItem.productCode}`,
@@ -104,6 +120,23 @@ export default function PutawaySessionScreen() {
     }
   };
 
+  const handleSplit = async (colleagueIds: string[]) => {
+    if (!data) return;
+    try {
+      await splitWork.mutateAsync({
+        kind: "PUTAWAY",
+        refId: data.session.purchaseReceiptId,
+        colleagueIds,
+      });
+      setSplitOpen(false);
+    } catch (e) {
+      Alert.alert(
+        "Erro",
+        e instanceof ApiError ? e.message : "Não foi possível aceitar a armazenagem",
+      );
+    }
+  };
+
   if (isLoading || !data) {
     return (
       <ScreenShell backToHome scroll title="Armazenagem">
@@ -115,6 +148,7 @@ export default function PutawaySessionScreen() {
   if (finished) {
     return (
       <ScreenShell backToHome scroll title="Armazenagem concluída" subtitle="Itens endereçados no pulmão">
+        <WorkShareCard work={work} />
         <PutawaySummary items={data.items} />
         <FactoryButton label="OK" onPress={() => router.replace("/putaway")} />
       </ScreenShell>
@@ -134,107 +168,137 @@ export default function PutawaySessionScreen() {
     >
       {feedback ? <Text style={styles.feedback}>{feedback}</Text> : null}
 
-      {next && !data.allStored ? (
-        <View style={styles.productRow}>
-          <ProductThumbnail
-            imageUrl={next.imageUrl}
-            alt={next.description ?? next.productCode ?? ""}
-            size={72}
-          />
-          <View style={styles.productMeta}>
-            <Text style={styles.productCode}>{next.productCode}</Text>
-            {next.description ? (
-              <Text style={styles.productDesc}>{next.description}</Text>
-            ) : null}
-            <Text style={styles.productRemaining}>
-              Faltam {next.remaining} un.
-            </Text>
-            {nextStored.map((loc) => (
-              <Text key={loc.locationId} style={styles.storedLine}>
-                Já guardado: {loc.quantity} un. em {loc.label}
-              </Text>
-            ))}
-          </View>
-        </View>
-      ) : null}
+      <WorkShareCard work={work} />
 
-      {data.allStored ? (
+      <SplitWorkModal
+        visible={splitOpen}
+        title="Armazenagem no pulmão"
+        subtitle={`${pendingCount} itens pendentes`}
+        itemCount={pendingCount}
+        loading={splitWork.isPending}
+        onCancel={() => setSplitOpen(false)}
+        onConfirm={handleSplit}
+      />
+
+      {needsAccept ? (
+        <FactoryButton
+          label="Aceitar armazenagem"
+          onPress={() => setSplitOpen(true)}
+          loading={splitWork.isPending}
+        />
+      ) : blocked ? (
+        <Text style={styles.blocked}>{blocked}</Text>
+      ) : shared && myDone ? (
         <>
-          <PutawaySummary items={data.items} title="Confira onde cada item foi guardado" />
-          <FactoryButton
-            label="Finalizar armazenagem"
-            onPress={handleComplete}
-            loading={complete.isPending}
-          />
+          <Text style={styles.done}>Sua parte foi armazenada ✓ — aguardando os colegas</Text>
+          <PutawaySummary items={myItems} title="Onde você guardou cada item" />
+          <FactoryButton label="Voltar à fila" variant="secondary" onPress={() => router.replace("/putaway")} />
         </>
       ) : (
         <>
-          {phase === "scan-location" ? (
-            <>
-              <Text style={styles.hint}>
-                1. Escolha o local de pulmão (bip ou busca por SKU)
-              </Text>
-              <PulmaoLocationPicker
-                defaultSku={next?.productCode ?? ""}
-                onSelect={handleLocationSelect}
-                disabled={store.isPending}
+          {next && !data.allStored ? (
+            <View style={styles.productRow}>
+              <ProductThumbnail
+                imageUrl={next.imageUrl}
+                alt={next.description ?? next.productCode ?? ""}
+                size={72}
               />
-            </>
-          ) : next && selectedLocation ? (
-            <>
-              <View style={styles.locCard}>
-                <Text style={styles.locTitle}>{selectedLocation.label}</Text>
-                <Text style={styles.locMeta}>Ocupação: {selectedLocation.fillPercent}%</Text>
-                <PulmaoStockList stocks={selectedLocation.stocks} />
+              <View style={styles.productMeta}>
+                <Text style={styles.productCode}>{next.productCode}</Text>
+                {next.description ? (
+                  <Text style={styles.productDesc}>{next.description}</Text>
+                ) : null}
+                <Text style={styles.productRemaining}>
+                  Faltam {next.remaining} un.
+                </Text>
+                {nextStored.map((loc) => (
+                  <Text key={loc.locationId} style={styles.storedLine}>
+                    Já guardado: {loc.quantity} un. em {loc.label}
+                  </Text>
+                ))}
               </View>
-              {phase === "confirm-qty" ? (
-                <>
-                  <Text style={styles.hint}>
-                    2. Quantidade para {next.description ?? next.productCode}
-                  </Text>
-                  <QuantityInput
-                    label="Unidades a armazenar"
-                    max={next.remaining}
-                    onConfirm={handleConfirmQty}
-                  />
-                </>
-              ) : (
-                <>
-                  <Text style={styles.hint}>
-                    3. {pendingQty} un. de {next.productCode} — quanto o SKU ocupa no pulmão?
-                  </Text>
-                  <PercentInput
-                    label="% do SKU neste pulmão"
-                    hint={
-                      currentSkuPercent != null
-                        ? `Antes ocupava ${currentSkuPercent}%. Informe o total depois de guardar.`
-                        : "Informe quanto este SKU ocupa do pulmão depois de guardar."
-                    }
-                    initialValue={currentSkuPercent}
-                    resetKey={`${selectedLocation.id}-${next.id}`}
-                    minPercent={1}
-                    confirmLabel="Guardar"
-                    loading={store.isPending}
-                    onConfirm={handleConfirmPercent}
-                  />
-                  <FactoryButton
-                    label="Corrigir quantidade"
-                    variant="secondary"
-                    onPress={() => setPhase("confirm-qty")}
-                  />
-                </>
-              )}
+            </View>
+          ) : null}
+
+          {data.allStored ? (
+            <>
+              <PutawaySummary items={data.items} title="Confira onde cada item foi guardado" />
               <FactoryButton
-                label="Trocar local"
-                variant="secondary"
-                onPress={() => {
-                  setPhase("scan-location");
-                  setSelectedLocation(null);
-                  setPendingQty(null);
-                }}
+                label="Finalizar armazenagem"
+                onPress={handleComplete}
+                loading={complete.isPending}
               />
             </>
-          ) : null}
+          ) : (
+            <>
+              {phase === "scan-location" ? (
+                <>
+                  <Text style={styles.hint}>
+                    1. Escolha o local de pulmão (bip ou busca por SKU)
+                  </Text>
+                  <PulmaoLocationPicker
+                    defaultSku={next?.productCode ?? ""}
+                    onSelect={handleLocationSelect}
+                    disabled={store.isPending}
+                  />
+                </>
+              ) : next && selectedLocation ? (
+                <>
+                  <View style={styles.locCard}>
+                    <Text style={styles.locTitle}>{selectedLocation.label}</Text>
+                    <Text style={styles.locMeta}>Ocupação: {selectedLocation.fillPercent}%</Text>
+                    <PulmaoStockList stocks={selectedLocation.stocks} />
+                  </View>
+                  {phase === "confirm-qty" ? (
+                    <>
+                      <Text style={styles.hint}>
+                        2. Quantidade para {next.description ?? next.productCode}
+                      </Text>
+                      <QuantityInput
+                        label="Unidades a armazenar"
+                        max={next.remaining}
+                        onConfirm={handleConfirmQty}
+                      />
+                    </>
+                  ) : (
+                    <>
+                      <Text style={styles.hint}>
+                        3. {pendingQty} un. de {next.productCode} — quanto o SKU ocupa no pulmão?
+                      </Text>
+                      <PercentInput
+                        label="% do SKU neste pulmão"
+                        hint={
+                          currentSkuPercent != null
+                            ? `Antes ocupava ${currentSkuPercent}%. Informe o total depois de guardar.`
+                            : "Informe quanto este SKU ocupa do pulmão depois de guardar."
+                        }
+                        initialValue={currentSkuPercent}
+                        resetKey={`${selectedLocation.id}-${next.id}`}
+                        minPercent={1}
+                        confirmLabel="Guardar"
+                        loading={store.isPending}
+                        onConfirm={handleConfirmPercent}
+                      />
+                      <FactoryButton
+                        label="Corrigir quantidade"
+                        variant="secondary"
+                        onPress={() => setPhase("confirm-qty")}
+                      />
+                    </>
+                  )}
+                  <FactoryButton
+                    label="Trocar local"
+                    variant="secondary"
+                    onPress={() => {
+                      setPhase("scan-location");
+                      setSelectedLocation(null);
+                      setPendingQty(null);
+                    }}
+                  />
+                </>
+              ) : null}
+            </>
+          )}
         </>
       )}
     </ScreenShell>
@@ -287,6 +351,18 @@ const styles = StyleSheet.create({
     backgroundColor: theme.surface,
     borderRadius: 8,
     color: theme.text,
+  },
+  blocked: {
+    textAlign: "center",
+    fontWeight: "700",
+    color: theme.warning,
+    marginVertical: spacing.sm,
+  },
+  done: {
+    textAlign: "center",
+    fontWeight: "700",
+    color: theme.success,
+    marginBottom: spacing.sm,
   },
   hint: {
     marginBottom: spacing.sm,

@@ -1,5 +1,5 @@
-import { router } from "expo-router";
-import { useState } from "react";
+import { router, useLocalSearchParams } from "expo-router";
+import { useEffect, useState } from "react";
 import {
   ActivityIndicator,
   FlatList,
@@ -10,11 +10,10 @@ import {
 } from "react-native";
 import { FactoryButton } from "@/components/FactoryButton";
 import { CollectionDeadlineRow } from "@/components/CollectionDeadlineRow";
-import {
-  useAcceptWave,
-  useReleasedWaves,
-  useWaveById,
-} from "@/hooks/useWavePicking";
+import { SplitWorkModal } from "@/components/SplitWorkModal";
+import { WorkShareCard, workBlockedMessage } from "@/components/WorkTimer";
+import { useReleasedWaves, useWaveById } from "@/hooks/useWavePicking";
+import { useSplitWork } from "@/hooks/useWorkShares";
 import type { WaveLineSummary } from "@/lib/api";
 import { ApiError } from "@/lib/api";
 import { showErrorAlert, showInfoAlert } from "@/lib/app-alert";
@@ -41,8 +40,17 @@ type WaveEntry = {
 };
 
 export default function WavePickingListScreen() {
+  const params = useLocalSearchParams<{ waveId?: string; partId?: string }>();
   const released = useReleasedWaves();
-  const [selected, setSelected] = useState<{ waveId: string; partId: string | null } | null>(null);
+  const [selected, setSelected] = useState<{ waveId: string; partId: string | null } | null>(
+    params.waveId ? { waveId: params.waveId, partId: params.partId ?? null } : null,
+  );
+  const [splitOpen, setSplitOpen] = useState(false);
+  const splitWork = useSplitWork();
+
+  useEffect(() => {
+    if (params.waveId) setSelected({ waveId: params.waveId, partId: params.partId ?? null });
+  }, [params.waveId, params.partId]);
 
   const waves = released.data?.waves ?? [];
   const entries = waves.flatMap((w): WaveEntry[] =>
@@ -77,7 +85,6 @@ export default function WavePickingListScreen() {
   const active = selected ?? (entries[0] ? { waveId: entries[0].waveId, partId: entries[0].partId } : null);
 
   const { data, isLoading, error, refetch, isRefetching } = useWaveById(active?.waveId ?? null, active?.partId);
-  const acceptWave = useAcceptWave(active?.waveId ?? null, active?.partId);
 
   if (released.isLoading) {
     return (
@@ -172,7 +179,8 @@ export default function WavePickingListScreen() {
     );
   }
 
-  const { wave, lines } = data;
+  const { wave, lines, work } = data;
+  const blocked = workBlockedMessage(work);
   const pending = lines.filter((l) => l.sortStatus !== "SORTED");
   const waveTitle = wave.part ? `${wave.name} · ${wave.part.name}` : wave.name;
 
@@ -201,14 +209,35 @@ export default function WavePickingListScreen() {
         </Text>
         <FactoryButton
           label={wave.part ? "Aceitar esta parte" : "Aceitar esta onda"}
-          onPress={() => {
-            void acceptWave.mutateAsync().catch((e) => {
-              showErrorAlert(
-                e instanceof ApiError ? e.message : "Erro ao aceitar onda",
-              );
-            });
+          onPress={() => setSplitOpen(true)}
+          loading={splitWork.isPending}
+        />
+        <SplitWorkModal
+          visible={splitOpen}
+          title={waveTitle}
+          subtitle={`${lines.length} linhas · ${wave.orderCount} pedidos`}
+          itemCount={lines.filter((l) => l.quantityPicked === 0).length}
+          loading={splitWork.isPending}
+          onCancel={() => setSplitOpen(false)}
+          onConfirm={(colleagueIds) => {
+            splitWork
+              .mutateAsync({
+                kind: "PICK_WAVE",
+                refId: wave.id,
+                partId: wave.part?.id,
+                colleagueIds,
+              })
+              .then((res) => {
+                setSplitOpen(false);
+                setSelected({ waveId: wave.id, partId: res.mine?.wavePartId ?? wave.part?.id ?? null });
+                void released.refetch();
+              })
+              .catch((e) => {
+                showErrorAlert(
+                  e instanceof ApiError ? e.message : "Erro ao aceitar onda",
+                );
+              });
           }}
-          loading={acceptWave.isPending}
         />
         <FactoryButton
           label="Atualizar"
@@ -256,9 +285,7 @@ export default function WavePickingListScreen() {
             {wave.marketplaces.join(" · ")}
           </Text>
         ) : null}
-        <Text style={styles.acceptHint}>
-          {wave.part ? "Você está executando esta parte" : "Você está executando esta onda"}
-        </Text>
+        <WorkShareCard work={work} />
       </View>
 
       <FlatList
@@ -274,6 +301,10 @@ export default function WavePickingListScreen() {
             <Pressable
               style={[styles.card, done && styles.cardDone]}
               onPress={() => {
+                if (blocked && !done) {
+                  showInfoAlert(blocked);
+                  return;
+                }
                 if (done) {
                   showInfoAlert(
                     item.sortStatus === "PICKED"

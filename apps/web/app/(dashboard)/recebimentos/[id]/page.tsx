@@ -6,6 +6,8 @@ import { ProductImageZoom } from "@/components/ops/product-image-zoom";
 import { PageHeader } from "@/components/ops/page-header";
 import { PurchaseReceiptStatusBadge } from "@/components/ops/purchase-receipt-status-badge";
 import { DataState } from "@/components/ops/data-state";
+import { WorkSharesPanel } from "@/components/ops/work-shares-panel";
+import { fetchReceiptWorkShares } from "@/lib/api/work-shares";
 import {
   Table,
   TableBody,
@@ -46,6 +48,7 @@ export default function PurchaseReceiptDetailPage() {
   const [saving, setSaving] = useState(false);
   const scanInputRef = useRef<HTMLInputElement>(null);
 
+  const loadWorkShares = useCallback(() => fetchReceiptWorkShares(sessionId), [sessionId]);
   const isReturn = detail?.kind === "RETURN";
   const isCompleted = detail?.status === "COMPLETED";
 
@@ -195,6 +198,10 @@ export default function PurchaseReceiptDetailPage() {
           Voltar
         </button>
       </div>
+
+      {sessionId ? (
+        <WorkSharesPanel title="Partes e agentes" load={loadWorkShares} showKind />
+      ) : null}
 
       <DataState loading={loading} error={error} empty={false}>
         {detail ? (

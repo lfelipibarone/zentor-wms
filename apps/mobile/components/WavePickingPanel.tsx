@@ -1,4 +1,5 @@
 import { router } from "expo-router";
+import { useState } from "react";
 import {
   ActivityIndicator,
   FlatList,
@@ -10,11 +11,10 @@ import {
 import { FactoryButton } from "@/components/FactoryButton";
 import { CollectionDeadlineRow } from "@/components/CollectionDeadlineRow";
 import { ProductThumbnail } from "@/components/ProductThumbnail";
-import {
-  useAcceptWave,
-  useCurrentWave,
-  useReleaseWaveAccept,
-} from "@/hooks/useWavePicking";
+import { SplitWorkModal } from "@/components/SplitWorkModal";
+import { WorkShareCard, workBlockedMessage } from "@/components/WorkTimer";
+import { useCurrentWave, useReleaseWaveAccept } from "@/hooks/useWavePicking";
+import { useSplitWork } from "@/hooks/useWorkShares";
 import { showErrorAlert, showInfoAlert } from "@/lib/app-alert";
 import { ApiError } from "@/lib/api";
 import type { WaveLineSummary } from "@/lib/api";
@@ -29,7 +29,8 @@ function statusLabel(line: WaveLineSummary) {
 
 export function WavePickingPanel() {
   const { data, isLoading, error, refetch, isRefetching } = useCurrentWave();
-  const acceptWave = useAcceptWave(data?.wave.id, data?.wave.part?.id);
+  const splitWork = useSplitWork();
+  const [splitOpen, setSplitOpen] = useState(false);
   const releaseWave = useReleaseWaveAccept(data?.wave.id, data?.wave.part?.id);
 
   if (isLoading) {
@@ -58,7 +59,8 @@ export function WavePickingPanel() {
     );
   }
 
-  const { wave, lines } = data;
+  const { wave, lines, work } = data;
+  const blocked = workBlockedMessage(work);
   const waveTitle = wave.part ? `${wave.name} · ${wave.part.name}` : wave.name;
   const pending = lines.filter((l) => l.sortStatus !== "SORTED");
   const canReleaseWave =
@@ -94,14 +96,34 @@ export function WavePickingPanel() {
         </Text>
         <FactoryButton
           label={wave.part ? "Aceitar esta parte" : "Aceitar esta onda"}
-          onPress={() => {
-            void acceptWave.mutateAsync().catch((e) => {
-              showErrorAlert(
-                e instanceof ApiError ? e.message : "Erro ao aceitar onda",
-              );
-            });
+          onPress={() => setSplitOpen(true)}
+          loading={splitWork.isPending}
+        />
+        <SplitWorkModal
+          visible={splitOpen}
+          title={waveTitle}
+          subtitle={`${lines.length} linhas · ${wave.orderCount} pedidos`}
+          itemCount={lines.filter((l) => l.quantityPicked === 0).length}
+          loading={splitWork.isPending}
+          onCancel={() => setSplitOpen(false)}
+          onConfirm={(colleagueIds) => {
+            splitWork
+              .mutateAsync({
+                kind: "PICK_WAVE",
+                refId: wave.id,
+                partId: wave.part?.id,
+                colleagueIds,
+              })
+              .then(() => {
+                setSplitOpen(false);
+                void refetch();
+              })
+              .catch((e) => {
+                showErrorAlert(
+                  e instanceof ApiError ? e.message : "Erro ao aceitar onda",
+                );
+              });
           }}
-          loading={acceptWave.isPending}
         />
         <FactoryButton
           label="Atualizar"
@@ -140,6 +162,7 @@ export function WavePickingPanel() {
           {wave.marketplaces.join(" · ")}
         </Text>
       ) : null}
+      <WorkShareCard work={work} />
       {canReleaseWave ? (
         <FactoryButton
           label="Cancelar aceite"
@@ -172,6 +195,10 @@ export function WavePickingPanel() {
         const done =
           item.sortStatus === "PICKED" || item.sortStatus === "SORTED";
         const openLine = () => {
+          if (blocked && !done) {
+            showInfoAlert(blocked);
+            return;
+          }
           if (done) {
             showInfoAlert(
               item.sortStatus === "PICKED"

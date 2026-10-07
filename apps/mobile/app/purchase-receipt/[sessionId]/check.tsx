@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { router, useLocalSearchParams } from "expo-router";
 import {
   ActivityIndicator,
@@ -12,13 +12,16 @@ import { BarcodeScanner } from "@/components/BarcodeScanner";
 import { FactoryButton } from "@/components/FactoryButton";
 import { QuantityInput } from "@/components/QuantityInput";
 import { ScreenShell } from "@/components/ScreenShell";
+import { SplitWorkModal } from "@/components/SplitWorkModal";
+import { WorkShareCard, workBlockedMessage } from "@/components/WorkTimer";
 import {
   useCompletePurchaseReceipt,
   useConfirmPurchaseReceiptItem,
   usePurchaseReceiptSession,
   useScanPurchaseReceiptItem,
 } from "@/hooks/usePurchaseReceipt";
-import { api, ApiError } from "@/lib/api";
+import { useSplitWork } from "@/hooks/useWorkShares";
+import { ApiError, type PurchaseReceiptSessionDto } from "@/lib/api";
 import { theme, spacing, typography } from "@/lib/theme";
 
 export default function PurchaseReceiptCheckScreen() {
@@ -29,23 +32,62 @@ export default function PurchaseReceiptCheckScreen() {
   const complete = useCompletePurchaseReceipt(sessionId ?? "");
   const [scannerOpen, setScannerOpen] = useState(false);
   const [feedback, setFeedback] = useState<string | null>(null);
+  const [splitOpen, setSplitOpen] = useState(false);
+  const splitWork = useSplitWork();
 
   const next = data?.nextItem;
   const remaining = next
     ? Math.max(0, next.quantityExpected - next.quantityChecked)
     : 0;
+  const work = data?.work;
+  const shared = (work?.shares.length ?? 0) > 0;
+  const blocked = workBlockedMessage(work);
+  const completed = data?.session.status === "COMPLETED";
+  const pendingCount = data?.items.filter((it) => !it.completed).length ?? 0;
+  const needsAccept = Boolean(data) && !shared && !completed && pendingCount > 0;
+  const myItems = shared
+    ? (data?.items ?? []).filter((it) => it.workShareId && it.workShareId === work?.mine?.id)
+    : data?.items ?? [];
+  const othersCount = (data?.items.length ?? 0) - myItems.length;
 
-  useEffect(() => {
+  const showCompletedAlert = () =>
+    Alert.alert(
+      "Conferência concluída",
+      "NF conferida. Próximo passo: armazenagem no pulmão.",
+      [
+        { text: "Armazenagem", onPress: () => router.replace("/putaway") },
+        { text: "Voltar", onPress: () => router.replace("/purchase-receipt") },
+      ],
+    );
+
+  const handleSplit = async (colleagueIds: string[]) => {
     if (!sessionId) return;
-    api.markPurchaseReceiptConferenceStart(sessionId).catch(() => {});
-  }, [sessionId]);
+    try {
+      await splitWork.mutateAsync({ kind: "RECEIPT_CHECK", refId: sessionId, colleagueIds });
+      setSplitOpen(false);
+    } catch (e) {
+      Alert.alert(
+        "Erro",
+        e instanceof ApiError ? e.message : "Não foi possível aceitar a conferência",
+      );
+    }
+  };
 
   const applySessionFeedback = (
-    updated: Awaited<ReturnType<typeof api.getPurchaseReceiptSession>>,
+    updated: PurchaseReceiptSessionDto,
   ) => {
+    if (updated.session.status === "COMPLETED") {
+      setFeedback("Todos os itens conferidos ✓");
+      showCompletedAlert();
+      return;
+    }
     const item = updated.nextItem;
     if (!item) {
-      setFeedback("Todos os itens conferidos ✓");
+      setFeedback(
+        (updated.work?.shares.length ?? 0) > 0
+          ? "Sua parte terminou ✓ — aguardando os colegas"
+          : "Todos os itens conferidos ✓",
+      );
     } else if (item.remaining > 0) {
       setFeedback(
         `${item.description ?? item.productCode}: faltam ${item.remaining}`,
@@ -82,14 +124,7 @@ export default function PurchaseReceiptCheckScreen() {
   const handleComplete = async () => {
     try {
       await complete.mutateAsync();
-      Alert.alert(
-        "Conferência concluída",
-        "NF conferida. Próximo passo: armazenagem no pulmão.",
-        [
-          { text: "Armazenagem", onPress: () => router.replace("/putaway") },
-          { text: "Voltar", onPress: () => router.replace("/purchase-receipt") },
-        ],
-      );
+      showCompletedAlert();
     } catch (e) {
       Alert.alert(
         "Erro",
@@ -117,7 +152,31 @@ export default function PurchaseReceiptCheckScreen() {
         <Text style={styles.syncHint}>{data.session.tinySyncMessage}</Text>
       ) : null}
 
-      {next ? (
+      <WorkShareCard work={work} />
+
+      {completed ? (
+        <>
+          <Text style={styles.done}>Recebimento concluído</Text>
+          <FactoryButton
+            label="Ir para armazenagem"
+            variant="success"
+            onPress={() => router.replace("/putaway")}
+          />
+        </>
+      ) : needsAccept ? (
+        <>
+          <Text style={styles.feedback}>
+            {pendingCount} itens para conferir. Aceite para começar (sozinho ou dividindo).
+          </Text>
+          <FactoryButton
+            label="Aceitar conferência"
+            onPress={() => setSplitOpen(true)}
+            loading={splitWork.isPending}
+          />
+        </>
+      ) : blocked ? (
+        <Text style={styles.blocked}>{blocked}</Text>
+      ) : next ? (
         <View style={styles.nextCard}>
           <Text style={styles.nextLabel}>Próximo item</Text>
           <Text style={styles.nextTitle}>
@@ -131,12 +190,14 @@ export default function PurchaseReceiptCheckScreen() {
           ) : null}
         </View>
       ) : (
-        <Text style={styles.done}>Todos os itens conferidos</Text>
+        <Text style={styles.done}>
+          {shared ? "Sua parte foi conferida ✓" : "Todos os itens conferidos"}
+        </Text>
       )}
 
       {feedback ? <Text style={styles.feedback}>{feedback}</Text> : null}
 
-      {next && remaining > 0 ? (
+      {!completed && !needsAccept && !blocked && next && remaining > 0 ? (
         <QuantityInput
           label="Quantidade conferida"
           max={remaining}
@@ -145,13 +206,13 @@ export default function PurchaseReceiptCheckScreen() {
         />
       ) : null}
 
-      {next ? (
+      {completed || needsAccept || blocked ? null : next ? (
         <FactoryButton
           label="Bipar produto (opcional)"
           variant="secondary"
           onPress={() => setScannerOpen(true)}
         />
-      ) : (
+      ) : shared ? null : (
         <FactoryButton
           label="Conferência finalizada"
           onPress={handleComplete}
@@ -159,7 +220,7 @@ export default function PurchaseReceiptCheckScreen() {
         />
       )}
 
-      {data.allChecked ? (
+      {!completed && data.allChecked ? (
         <FactoryButton
           label="Finalizar recebimento"
           variant="success"
@@ -168,7 +229,12 @@ export default function PurchaseReceiptCheckScreen() {
       ) : null}
 
       <ScrollView style={styles.list}>
-        {data.items.map((it) => (
+        {othersCount > 0 ? (
+          <Text style={styles.othersHint}>
+            {othersCount} itens com os colegas
+          </Text>
+        ) : null}
+        {myItems.map((it) => (
           <View
             key={it.id}
             style={[styles.row, it.completed && styles.rowDone]}
@@ -182,6 +248,16 @@ export default function PurchaseReceiptCheckScreen() {
           </View>
         ))}
       </ScrollView>
+
+      <SplitWorkModal
+        visible={splitOpen}
+        title={`Conferir NF ${data.session.invoiceNumber ?? ""}`}
+        subtitle={data.session.supplierName}
+        itemCount={pendingCount}
+        loading={splitWork.isPending}
+        onCancel={() => setSplitOpen(false)}
+        onConfirm={handleSplit}
+      />
 
       <BarcodeScanner
         visible={scannerOpen}
@@ -239,6 +315,18 @@ const styles = StyleSheet.create({
     borderBottomColor: theme.border,
   },
   rowDone: { opacity: 0.55 },
+  blocked: {
+    textAlign: "center",
+    fontWeight: "700",
+    color: theme.warning,
+    marginVertical: spacing.sm,
+  },
+  othersHint: {
+    fontSize: typography.caption,
+    color: theme.textMuted,
+    fontStyle: "italic",
+    paddingVertical: spacing.xs,
+  },
   rowTitle: { color: theme.text, fontSize: typography.caption },
   rowQty: { color: theme.textMuted, fontSize: typography.caption },
 });

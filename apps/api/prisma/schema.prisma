@@ -130,6 +130,21 @@ enum PutawaySessionStatus {
   COMPLETED
 }
 
+/// Etapa de uma parte de tarefa dividida entre funcionários
+enum WorkShareKind {
+  PICK_WAVE
+  RECEIPT_CHECK
+  PUTAWAY
+}
+
+enum WorkShareStatus {
+  RESERVED
+  STARTED
+  FINISHED
+  DECLINED
+  CANCELLED
+}
+
 /// Transporte de carga pulmão → gôndola (duas etapas)
 enum CargoTransferStatus {
   IN_TRANSIT
@@ -183,6 +198,7 @@ model Tenant {
   floorPlans                  WarehouseFloorPlan[]
   floorElements               WarehouseFloorElement[]
   approachWaves               ApproachWave[]
+  workShares                  WorkShare[]
 
   @@map("tenants")
 }
@@ -253,6 +269,8 @@ model User {
   cargoTransfersWithdrawn  CargoTransfer[]           @relation("CargoTransferWithdrawnBy")
   cargoTransfersDeposited  CargoTransfer[]           @relation("CargoTransferDepositedBy")
   replenishmentAssignments ReplenishmentAssignment[] @relation("ReplenishmentAssignedTo")
+  workSharesAssigned       WorkShare[]               @relation("WorkShareAssignedTo")
+  workSharesSplit          WorkShare[]               @relation("WorkShareAssignedBy")
   tinyConnections          TinyConnection[]
 
   @@index([role])
@@ -930,9 +948,9 @@ model CargoTransfer {
   /// Unidades levadas (opcional; 0 quando não informado)
   quantity  Int
 
-  fromLocationId   String
-  toLocationId     String?
-  targetPickFaceId String?
+  fromLocationId    String
+  toLocationId      String?
+  targetPickFaceId  String?
   /// % do SKU no pulmão antes da retirada (para desfazer ao cancelar)
   fromPercentBefore Int?
 
@@ -1030,6 +1048,7 @@ model PickWave {
   orders     PickWaveOrder[]
   lines      PickWaveLine[]
   parts      PickWavePart[]
+  workShares WorkShare[]
 
   @@index([tenantId])
   @@index([tenantId, status])
@@ -1055,6 +1074,7 @@ model PickWavePart {
   approachWave ApproachWave?  @relation(fields: [approachWaveId], references: [id], onDelete: SetNull)
   acceptedBy   User?          @relation("WavePartAcceptedBy", fields: [acceptedById], references: [id], onDelete: SetNull)
   lines        PickWaveLine[]
+  workShare    WorkShare?
 
   @@index([waveId])
   @@index([acceptedById])
@@ -1130,6 +1150,7 @@ model PurchaseReceiptSession {
   timeLogs           PurchaseReceiptTimeLog[]
   putaway            PutawaySession?
   inventoryMovements InventoryMovement[]
+  workShares         WorkShare[]
 
   @@unique([tenantId, accessKey], map: "purchase_receipt_sessions_tenant_access_key")
   @@index([tenantId, kind])
@@ -1168,6 +1189,7 @@ model PutawaySession {
   items              PutawayItem[]
   timeLogs           PutawayTimeLog[]
   inventoryMovements InventoryMovement[]
+  workShares         WorkShare[]
 
   @@index([status])
   @@map("putaway_sessions")
@@ -1198,12 +1220,15 @@ model PutawayItem {
   quantityStored   Decimal @default(0) @db.Decimal(12, 3)
   /// Último pulmão usado; todos os pulmões do item estão nas movimentações (putawayItemId)
   locationId       String?
+  workShareId      String?
 
   session   PutawaySession      @relation(fields: [sessionId], references: [id], onDelete: Cascade)
   location  Location?           @relation(fields: [locationId], references: [id], onDelete: SetNull)
+  workShare WorkShare?          @relation(fields: [workShareId], references: [id], onDelete: SetNull)
   movements InventoryMovement[]
 
   @@index([sessionId])
+  @@index([workShareId])
   @@map("putaway_items")
 }
 
@@ -1217,11 +1242,14 @@ model PurchaseReceiptItem {
   barcode          String?
   quantityExpected Decimal @db.Decimal(12, 3)
   quantityChecked  Decimal @default(0) @db.Decimal(12, 3)
+  workShareId      String?
 
-  session PurchaseReceiptSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  session   PurchaseReceiptSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  workShare WorkShare?             @relation(fields: [workShareId], references: [id], onDelete: SetNull)
 
   @@unique([sessionId, lineNumber])
   @@index([sessionId])
+  @@index([workShareId])
   @@map("purchase_receipt_items")
 }
 
@@ -1306,6 +1334,51 @@ model PickWaveAllocation {
   @@index([waveLineId])
   @@index([sortCompletedAt])
   @@map("pick_wave_allocations")
+}
+
+// -----------------------------------------------------------------------------
+// WorkShare — parte de uma tarefa (onda, conferência de NF, armazenagem) de um
+// funcionário, com o cronômetro dele (startedAt → finishedAt)
+// -----------------------------------------------------------------------------
+
+model WorkShare {
+  id               String          @id @default(cuid())
+  tenantId         String
+  kind             WorkShareKind
+  status           WorkShareStatus @default(RESERVED)
+  assignedToId     String
+  /// Quem dividiu a tarefa (nulo quando o próprio funcionário aceitou sozinho)
+  assignedById     String?
+  shareIndex       Int             @default(1)
+  shareCount       Int             @default(1)
+  waveId           String?
+  wavePartId       String?         @unique
+  receiptSessionId String?
+  putawaySessionId String?
+  itemsTotal       Int             @default(0)
+  unitsTotal       Int             @default(0)
+  reservedAt       DateTime        @default(now())
+  startedAt        DateTime?
+  finishedAt       DateTime?
+  createdAt        DateTime        @default(now())
+  updatedAt        DateTime        @updatedAt
+
+  tenant         Tenant                  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  assignedTo     User                    @relation("WorkShareAssignedTo", fields: [assignedToId], references: [id], onDelete: Restrict)
+  assignedBy     User?                   @relation("WorkShareAssignedBy", fields: [assignedById], references: [id], onDelete: SetNull)
+  wave           PickWave?               @relation(fields: [waveId], references: [id], onDelete: Cascade)
+  wavePart       PickWavePart?           @relation(fields: [wavePartId], references: [id], onDelete: SetNull)
+  receiptSession PurchaseReceiptSession? @relation(fields: [receiptSessionId], references: [id], onDelete: Cascade)
+  putawaySession PutawaySession?         @relation(fields: [putawaySessionId], references: [id], onDelete: Cascade)
+  receiptItems   PurchaseReceiptItem[]
+  putawayItems   PutawayItem[]
+
+  @@index([tenantId, kind, startedAt])
+  @@index([assignedToId, status])
+  @@index([waveId])
+  @@index([receiptSessionId])
+  @@index([putawaySessionId])
+  @@map("work_shares")
 }
 
 // -----------------------------------------------------------------------------

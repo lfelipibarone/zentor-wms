@@ -628,12 +628,28 @@ export async function webRoutes(app: FastifyInstance) {
     },
   );
 
+  app.get<{ Params: { id: string } }>(
+    "/api/waves/:id/work-shares",
+    { preHandler: guard(Permission.SALES_VIEW) },
+    async (request) => {
+      const { summarizeSharesWhere } = await import("../services/work-share.js");
+      const shares = await summarizeSharesWhere({
+        tenantId: tenantWhere(request).tenantId,
+        waveId: request.params.id,
+        status: { not: "CANCELLED" },
+      });
+      return { shares };
+    },
+  );
+
   app.post<{ Params: { id: string } }>(
     "/api/waves/:id/close",
     { preHandler: guard(Permission.SALES_VIEW) },
     async (request, reply) => {
       try {
         await closePickWave(request.params.id);
+        const { closeWaveShares } = await import("../services/work-share.js");
+        await closeWaveShares(request.params.id);
         return { ok: true };
       } catch (e) {
         if (e instanceof PickWaveError) {
@@ -1518,6 +1534,23 @@ export async function webRoutes(app: FastifyInstance) {
     },
   );
 
+  app.get<{ Params: { id: string } }>(
+    "/api/purchase-receipts/:id/work-shares",
+    { preHandler: guard(Permission.RECEIPTS_VIEW) },
+    async (request) => {
+      const { summarizeSharesWhere } = await import("../services/work-share.js");
+      const shares = await summarizeSharesWhere({
+        tenantId: tenantWhere(request).tenantId,
+        status: { not: "CANCELLED" },
+        OR: [
+          { receiptSessionId: request.params.id, kind: "RECEIPT_CHECK" },
+          { kind: "PUTAWAY", putawaySession: { purchaseReceiptId: request.params.id } },
+        ],
+      });
+      return { shares };
+    },
+  );
+
   app.post<{ Params: { id: string } }>(
     "/api/purchase-receipts/:id/conference-start",
     { preHandler: guard(Permission.RECEIPTS_VIEW) },
@@ -2316,6 +2349,22 @@ export async function webRoutes(app: FastifyInstance) {
         id: "packing_time_by_user",
         label: "Tempo de packing por operador",
         description: "Totais e médias de tempo de packing por operador",
+        requiresPeriod: true,
+        group: "operation_times",
+      },
+      {
+        id: "work_time_by_user_stage",
+        label: "Tempo por funcionário e etapa",
+        description:
+          "Separação em onda, conferência NF e armazenagem: partes, itens, unidades, tempo total, médio e unidades/hora por funcionário",
+        requiresPeriod: true,
+        group: "operation_times",
+      },
+      {
+        id: "work_shares",
+        label: "Partes de tarefas (cronômetro)",
+        description:
+          "Uma linha por parte: tarefa, parte X de N, funcionário, início, fim e duração",
         requiresPeriod: true,
         group: "operation_times",
       },

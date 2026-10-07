@@ -12,6 +12,7 @@ import { StageMetricsCards } from "./stage-metrics-cards";
 import { ReturnsByReasonChart } from "./returns-by-reason-chart";
 import { StageDurationChart } from "./stage-duration-chart";
 import { PackingReturnsTable } from "./packing-returns-table";
+import { WorkTimePanel } from "./work-time-panel";
 
 export function DashboardView() {
   const [data, setData] = useState<DashboardProductivity | null>(null);
@@ -89,6 +90,8 @@ export function DashboardView() {
       </header>
 
       <KpiCards kpis={data.kpis} />
+
+      <WorkTimePanel />
 
       <div>
         <h2 className="mb-4 text-lg font-semibold tracking-tight">

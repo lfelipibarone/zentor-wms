@@ -14,6 +14,7 @@ import {
   type NotificationDto,
 } from "@/lib/notifications-api";
 import { showErrorAlert } from "@/lib/app-alert";
+import { openWorkShareRoute } from "@/lib/work-route";
 import { theme, spacing, typography } from "@/lib/theme";
 
 export default function NotificationsScreen() {
@@ -75,12 +76,14 @@ export default function NotificationsScreen() {
         renderItem={({ item }) => (
           <Pressable
             style={[styles.item, !item.readAt && styles.unread]}
-            disabled={Boolean(item.readAt)}
+            disabled={Boolean(item.readAt) && !item.data?.route}
             onPress={async () => {
+              const route = item.data?.route;
+              if (route) openWorkShareRoute(route);
               if (item.readAt) return;
               try {
                 await markNotificationRead(item.id);
-                await load();
+                if (!route) await load();
               } catch (e) {
                 showErrorAlert(
                   e instanceof Error ? e.message : "Erro ao marcar como lida",

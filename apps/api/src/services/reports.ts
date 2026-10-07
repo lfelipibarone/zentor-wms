@@ -21,6 +21,10 @@ import {
 } from "./operation-time-reports.js";
 import { buildOrderOperationTimelineReport } from "./order-operation-timeline.js";
 import {
+  buildWorkSharesReport,
+  buildWorkTimeByUserStageReport,
+} from "./work-share-metrics.js";
+import {
   fmtDateBr,
   type ReportColumn,
   type ReportResult as BaseReportResult,
@@ -41,6 +45,8 @@ export const REPORT_IDS = [
   "volume_by_marketplace",
   "order_operation_timeline",
   ...OPERATION_TIME_REPORT_IDS,
+  "work_time_by_user_stage",
+  "work_shares",
 ] as const;
 
 /** Aceita aliases legados na query string (ex.: report=picking). */
@@ -157,6 +163,8 @@ export function reportTitle(id: ReportId): string {
     picking_time_by_user: "Tempo de picking por operador",
     packing_time_by_order: "Tempo de packing por pedido",
     packing_time_by_user: "Tempo de packing por operador",
+    work_time_by_user_stage: "Tempo por funcionário e etapa",
+    work_shares: "Partes de tarefas por funcionário",
   };
   return titles[id];
 }
@@ -222,6 +230,10 @@ export async function runReport(params: {
         to,
         marketplace,
       )) as ReportResult;
+    case "work_time_by_user_stage":
+      return (await buildWorkTimeByUserStageReport(tenantId, from, to)) as ReportResult;
+    case "work_shares":
+      return (await buildWorkSharesReport(tenantId, from, to)) as ReportResult;
     default:
       throw new Error("Relatório desconhecido");
   }

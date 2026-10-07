@@ -1,4 +1,5 @@
 import { router } from "expo-router";
+import { useState } from "react";
 import {
   ActivityIndicator,
   FlatList,
@@ -9,26 +10,38 @@ import {
 } from "react-native";
 import { FactoryButton } from "@/components/FactoryButton";
 import { ScreenShell } from "@/components/ScreenShell";
-import { usePutawayQueue, useStartPutaway } from "@/hooks/usePutaway";
-import { ApiError } from "@/lib/api";
+import { SplitWorkModal } from "@/components/SplitWorkModal";
+import { usePutawayQueue } from "@/hooks/usePutaway";
+import { useSplitWork } from "@/hooks/useWorkShares";
+import { ApiError, type PutawayQueueItem } from "@/lib/api";
 import { showErrorAlert } from "@/lib/app-alert";
 import { theme, spacing, typography } from "@/lib/theme";
 
 export default function PutawayListScreen() {
   const { data, isLoading, error, refetch, isRefetching } = usePutawayQueue();
-  const start = useStartPutaway();
+  const splitWork = useSplitWork();
+  const [toSplit, setToSplit] = useState<PutawayQueueItem | null>(null);
 
-  const openItem = async (
-    purchaseReceiptId: string,
-    putawaySessionId: string | null,
-  ) => {
+  const openItem = (item: PutawayQueueItem) => {
+    if (item.putawaySessionId && item.status !== "PENDING") {
+      router.push(`/putaway/${item.putawaySessionId}`);
+      return;
+    }
+    setToSplit(item);
+  };
+
+  const handleSplit = async (colleagueIds: string[]) => {
+    if (!toSplit) return;
     try {
-      if (putawaySessionId) {
-        router.push(`/putaway/${putawaySessionId}`);
-        return;
-      }
-      const session = await start.mutateAsync(purchaseReceiptId);
-      router.push(`/putaway/${session.session.id}`);
+      const res = await splitWork.mutateAsync({
+        kind: "PUTAWAY",
+        refId: toSplit.purchaseReceiptId,
+        colleagueIds,
+      });
+      setToSplit(null);
+      const sessionId = res.mine?.putawaySessionId ?? res.shares[0]?.putawaySessionId;
+      if (sessionId) router.push(`/putaway/${sessionId}`);
+      else void refetch();
     } catch (e) {
       showErrorAlert(
         e instanceof ApiError ? e.message : "Erro ao iniciar armazenagem",
@@ -97,20 +110,27 @@ export default function PutawayListScreen() {
                 </Text>
                 <FactoryButton
                   label={
-                    item.putawaySessionId
+                    item.putawaySessionId && item.status !== "PENDING"
                       ? "Continuar armazenagem"
                       : "Iniciar armazenagem"
                   }
-                  onPress={() =>
-                    openItem(item.purchaseReceiptId, item.putawaySessionId)
-                  }
-                  loading={start.isPending}
+                  onPress={() => openItem(item)}
+                  loading={splitWork.isPending && toSplit?.purchaseReceiptId === item.purchaseReceiptId}
                 />
               </View>
             )}
           />
         </>
       )}
+      <SplitWorkModal
+        visible={Boolean(toSplit)}
+        title={`Armazenar NF ${toSplit?.invoiceNumber ?? ""}`}
+        subtitle={toSplit?.supplierName}
+        itemCount={toSplit?.itemCount}
+        loading={splitWork.isPending}
+        onCancel={() => setToSplit(null)}
+        onConfirm={handleSplit}
+      />
     </ScreenShell>
   );
 }

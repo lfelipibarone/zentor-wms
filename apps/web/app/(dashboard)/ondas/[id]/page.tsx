@@ -6,6 +6,8 @@ import { useParams, useRouter } from "next/navigation";
 import { MarketplaceBadge } from "@/components/ops/marketplace-badge";
 import { PageHeader } from "@/components/ops/page-header";
 import { DataState } from "@/components/ops/data-state";
+import { WorkSharesPanel } from "@/components/ops/work-shares-panel";
+import { fetchWaveWorkShares } from "@/lib/api/work-shares";
 import {
   Table,
   TableBody,
@@ -113,6 +115,7 @@ export default function WaveDetailPage() {
   }, [availableOrders, addSearch]);
 
   const canEdit = detail?.status === "RELEASED";
+  const loadWorkShares = useCallback(() => fetchWaveWorkShares(waveId), [waveId]);
 
   const handleRemove = async (orderId: string, erpOrderId: string) => {
     if (
@@ -219,6 +222,7 @@ export default function WaveDetailPage() {
       <DataState loading={loading} error={error} empty={!detail}>
         {detail ? (
           <div className="space-y-6">
+            <WorkSharesPanel title="Partes e agentes" load={loadWorkShares} />
             <section className="rounded-xl border bg-white p-4 shadow-sm">
               <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
                 <h2 className="text-sm font-semibold">

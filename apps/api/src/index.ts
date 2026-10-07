@@ -13,6 +13,7 @@ import { startWaveScheduler } from "./services/wave-scheduler.js";
 import { startTinyOAuthRefreshWorker } from "./services/tiny-oauth-refresh-worker.js";
 import { startTinyOrderSyncScheduler } from "./services/tiny-order-sync-scheduler.js";
 import { recoverStaleTinyBlockedConnections } from "./services/tiny-rate-limit.js";
+import { WorkShareError } from "./services/work-share.js";
 
 const PORT = Number(process.env.PORT ?? 3333);
 const HOST = process.env.HOST ?? "0.0.0.0";
@@ -26,6 +27,13 @@ async function main() {
     origin: true,
     methods: ["GET", "HEAD", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
     allowedHeaders: ["Content-Type", "Authorization", "x-tenant-slug", "Accept"],
+  });
+
+  app.setErrorHandler((error, _request, reply) => {
+    if (error instanceof WorkShareError) {
+      return reply.status(error.statusCode).send({ error: error.message });
+    }
+    return reply.send(error);
   });
 
   app.get("/health", async () => ({ ok: true }));

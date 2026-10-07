@@ -42,6 +42,18 @@ import {
 import { acceptOrdersBatch } from "../services/order-picking-batch.js";
 import { isWaveEnabled } from "../services/wave-settings.js";
 import { confirmConsolidatedPick } from "../services/pick-wave-pick.js";
+import {
+  WorkShareError,
+  cancelOpenWaveShares,
+  declineShare,
+  getWorkForRef,
+  listColleagues,
+  listMyWork,
+  reassignShare,
+  splitWork,
+  startShare,
+} from "../services/work-share.js";
+import { WorkShareKind, WorkShareStatus } from "@prisma/client";
 import { confirmSortAllocation } from "../services/pick-wave-sort.js";
 import {
   completePurchaseReceipt,
@@ -1162,6 +1174,54 @@ export async function mobileRoutes(app: FastifyInstance) {
     );
   }
 
+  async function mapWaveMobilePayloadWithWork(
+    wave: ReleasedWave,
+    userId: string,
+    part: ReturnType<typeof pickWavePart>,
+  ) {
+    const payload = mapWaveMobilePayload(wave, userId, part);
+    const work = await getWorkForRef({ kind: "PICK_WAVE", waveId: wave.id, partId: part?.id }, userId);
+    const mine =
+      work.mine && (part ? work.mine.wavePartId === part.id : !work.mine.wavePartId) ? work.mine : null;
+    return { ...payload, work: { mine, shares: work.shares } };
+  }
+
+  /** Onda/parte que tenho reservada ou em andamento (dividida por um colega ou aceita por mim). */
+  async function findMyOpenWaveShare(tenantId: string, userId: string) {
+    return prisma.workShare.findFirst({
+      where: {
+        tenantId,
+        kind: WorkShareKind.PICK_WAVE,
+        assignedToId: userId,
+        status: { in: [WorkShareStatus.STARTED, WorkShareStatus.RESERVED] },
+        wave: { status: "RELEASED" },
+      },
+      orderBy: [{ status: "desc" }, { reservedAt: "asc" }],
+    });
+  }
+
+  async function acceptWaveForUser(
+    tenantId: string,
+    wave: ReleasedWave,
+    userId: string,
+    part: ReturnType<typeof pickWavePart>,
+  ) {
+    const { mine } = await splitWork({
+      tenantId,
+      kind: WorkShareKind.PICK_WAVE,
+      refId: wave.id,
+      partId: part?.id ?? null,
+      assigneeIds: [userId],
+      byUserId: userId,
+    });
+    return {
+      waveId: wave.id,
+      ...(part ? { partId: part.id } : {}),
+      acceptedAt: mine?.reservedAt ?? new Date().toISOString(),
+      work: mine,
+    };
+  }
+
   function mapWaveMobilePayload(
     wave: ReleasedWave,
     userId: string,
@@ -1336,12 +1396,23 @@ export async function mobileRoutes(app: FastifyInstance) {
     }
 
     const userId = resolveUserId(request);
+    const myShare = await findMyOpenWaveShare(tenantId, userId);
+    if (myShare?.waveId) {
+      const mineWave = await getReleasedWaveById(tenantId, myShare.waveId);
+      if (mineWave) {
+        return mapWaveMobilePayloadWithWork(
+          mineWave,
+          userId,
+          pickWavePart(mineWave, userId, myShare.wavePartId ?? undefined),
+        );
+      }
+    }
     const wave = await getCurrentReleasedWave(tenantId);
     if (!wave) {
       return reply.status(404).send({ error: "Nenhuma onda ativa" });
     }
 
-    return mapWaveMobilePayload(wave, userId, pickWavePart(wave, userId));
+    return mapWaveMobilePayloadWithWork(wave, userId, pickWavePart(wave, userId));
   });
 
   app.post("/mobile/waves/current/accept", async (request, reply) => {
@@ -1358,8 +1429,7 @@ export async function mobileRoutes(app: FastifyInstance) {
     }
 
     try {
-      const part = pickWavePart(wave, userId);
-      return part ? await acceptPickWavePart(part.id, userId) : await acceptPickWave(wave.id, userId);
+      return await acceptWaveForUser(tenantId, wave, userId, pickWavePart(wave, userId));
     } catch (e) {
       if (e instanceof PickWaveError) {
         return reply.status(e.statusCode).send({ error: e.message });
@@ -1383,7 +1453,11 @@ export async function mobileRoutes(app: FastifyInstance) {
         return reply.status(404).send({ error: "Onda não encontrada" });
       }
       try {
-        return mapWaveMobilePayload(wave, userId, pickWavePart(wave, userId, request.query.partId));
+        return await mapWaveMobilePayloadWithWork(
+          wave,
+          userId,
+          pickWavePart(wave, userId, request.query.partId),
+        );
       } catch (e) {
         if (e instanceof PickWaveError) {
           return reply.status(e.statusCode).send({ error: e.message });
@@ -1408,8 +1482,12 @@ export async function mobileRoutes(app: FastifyInstance) {
         return reply.status(404).send({ error: "Onda não encontrada" });
       }
       try {
-        const part = pickWavePart(wave, userId, request.query.partId);
-        return part ? await acceptPickWavePart(part.id, userId) : await acceptPickWave(wave.id, userId);
+        return await acceptWaveForUser(
+          tenantId,
+          wave,
+          userId,
+          pickWavePart(wave, userId, request.query.partId),
+        );
       } catch (e) {
         if (e instanceof PickWaveError) {
           return reply.status(e.statusCode).send({ error: e.message });
@@ -1436,7 +1514,11 @@ export async function mobileRoutes(app: FastifyInstance) {
 
       try {
         const part = pickWavePart(wave, userId, request.query.partId);
-        return part ? await releasePickWavePartAccept(part.id, userId) : await releasePickWaveAccept(wave.id, userId);
+        const released = part
+          ? await releasePickWavePartAccept(part.id, userId)
+          : await releasePickWaveAccept(wave.id, userId);
+        await cancelOpenWaveShares({ waveId: wave.id, partId: part?.id });
+        return released;
       } catch (e) {
         if (e instanceof PickWaveError) {
           return reply.status(e.statusCode).send({ error: e.message });
@@ -1461,7 +1543,11 @@ export async function mobileRoutes(app: FastifyInstance) {
 
     try {
       const part = pickWavePart(wave, userId);
-      return part ? await releasePickWavePartAccept(part.id, userId) : await releasePickWaveAccept(wave.id, userId);
+      const released = part
+        ? await releasePickWavePartAccept(part.id, userId)
+        : await releasePickWaveAccept(wave.id, userId);
+      await cancelOpenWaveShares({ waveId: wave.id, partId: part?.id });
+      return released;
     } catch (e) {
       if (e instanceof PickWaveError) {
         return reply.status(e.statusCode).send({ error: e.message });
@@ -1469,6 +1555,90 @@ export async function mobileRoutes(app: FastifyInstance) {
       throw e;
     }
   });
+
+  // ---------------------------------------------------------------------------
+  // Tarefas divididas entre agentes (onda, conferência NF, armazenagem)
+  // ---------------------------------------------------------------------------
+
+  app.get("/mobile/colleagues", async (request) => {
+    const colleagues = await listColleagues(request.authUser!.tenantId!, resolveUserId(request));
+    return { colleagues };
+  });
+
+  app.post<{
+    Body: { kind?: string; refId?: string; partId?: string | null; assigneeIds?: string[] };
+  }>("/mobile/work/split", async (request, reply) => {
+    const { kind, refId, partId, assigneeIds } = request.body ?? {};
+    if (!kind || !(kind in WorkShareKind)) {
+      return reply.status(400).send({ error: "Tipo de tarefa inválido" });
+    }
+    if (!refId?.trim()) return reply.status(400).send({ error: "refId obrigatório" });
+    if (!Array.isArray(assigneeIds) || assigneeIds.length === 0) {
+      return reply.status(400).send({ error: "Escolha pelo menos 1 agente" });
+    }
+    const tenantId = request.authUser!.tenantId!;
+    try {
+      return await splitWork({
+        tenantId,
+        kind: kind as WorkShareKind,
+        refId: refId.trim(),
+        partId: partId ?? null,
+        assigneeIds,
+        byUserId: resolveUserId(request),
+      });
+    } catch (e) {
+      if (e instanceof PickWaveError) {
+        return reply.status(e.statusCode).send({ error: e.message });
+      }
+      if (e instanceof WorkShareError) throw e;
+      const message = e instanceof Error ? e.message : "Erro ao dividir tarefa";
+      return reply.status(422).send({ error: message });
+    }
+  });
+
+  app.get("/mobile/work/mine", async (request) => {
+    const shares = await listMyWork(request.authUser!.tenantId!, resolveUserId(request));
+    return { shares };
+  });
+
+  app.post<{ Params: { shareId: string } }>(
+    "/mobile/work/shares/:shareId/start",
+    async (request) => {
+      const share = await startShare(
+        request.params.shareId,
+        request.authUser!.tenantId!,
+        resolveUserId(request),
+      );
+      return { share };
+    },
+  );
+
+  app.post<{ Params: { shareId: string } }>(
+    "/mobile/work/shares/:shareId/decline",
+    async (request) => {
+      const share = await declineShare(
+        request.params.shareId,
+        request.authUser!.tenantId!,
+        resolveUserId(request),
+      );
+      return { share };
+    },
+  );
+
+  app.post<{ Params: { shareId: string }; Body: { userId?: string } }>(
+    "/mobile/work/shares/:shareId/reassign",
+    async (request, reply) => {
+      const toUserId = request.body?.userId?.trim();
+      if (!toUserId) return reply.status(400).send({ error: "Escolha o agente" });
+      const share = await reassignShare(
+        request.params.shareId,
+        request.authUser!.tenantId!,
+        resolveUserId(request),
+        toUserId,
+      );
+      return { share };
+    },
+  );
 
   app.get("/mobile/config", async (request) => {
     const tenantId = request.authUser!.tenantId!;
@@ -1597,7 +1767,7 @@ export async function mobileRoutes(app: FastifyInstance) {
     "/mobile/purchase-receipts/:sessionId",
     async (request, reply) => {
       try {
-        return await getPurchaseReceiptSession(request.params.sessionId);
+        return await getPurchaseReceiptSession(request.params.sessionId, resolveUserId(request));
       } catch (e) {
         const message = e instanceof Error ? e.message : "Sessão não encontrada";
         return reply.status(404).send({ error: message });
@@ -1620,6 +1790,7 @@ export async function mobileRoutes(app: FastifyInstance) {
           sessionId: request.params.sessionId,
           barcode,
           quantity: request.body?.quantity,
+          userId: resolveUserId(request),
         });
       } catch (e) {
         const message = e instanceof Error ? e.message : "Erro ao registrar bip";
@@ -1643,6 +1814,7 @@ export async function mobileRoutes(app: FastifyInstance) {
           request.params.sessionId,
           itemId,
           Number(quantity ?? 1),
+          resolveUserId(request),
         );
       } catch (e) {
         const message = e instanceof Error ? e.message : "Erro ao confirmar item";
@@ -1782,7 +1954,7 @@ export async function mobileRoutes(app: FastifyInstance) {
   app.get("/mobile/putaway/queue", async (request, reply) => {
     try {
       const tenantId = request.authUser!.tenantId!;
-      const queue = await listPutawayQueue(tenantId);
+      const queue = await listPutawayQueue(tenantId, resolveUserId(request));
       return { queue };
     } catch (e) {
       const message = e instanceof Error ? e.message : "Erro ao listar fila";
@@ -1811,7 +1983,7 @@ export async function mobileRoutes(app: FastifyInstance) {
     "/mobile/putaway/:sessionId",
     async (request, reply) => {
       try {
-        return await getPutawaySession(request.params.sessionId);
+        return await getPutawaySession(request.params.sessionId, resolveUserId(request));
       } catch (e) {
         const message = e instanceof Error ? e.message : "Sessão não encontrada";
         return reply.status(404).send({ error: message });

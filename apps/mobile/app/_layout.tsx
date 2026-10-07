@@ -58,6 +58,7 @@ export default function RootLayout() {
               options={{ headerShown: false }}
             />
             <Stack.Screen name="perfil" options={{ title: "Meu perfil" }} />
+            <Stack.Screen name="minhas-tarefas" options={{ title: "Minhas tarefas" }} />
             <Stack.Screen
               name="notifications"
               options={{ title: "Notificações" }}

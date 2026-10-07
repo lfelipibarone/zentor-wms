@@ -5,6 +5,7 @@ import { Permission } from "@wms/shared";
 const requireDashboard = createPermissionGuard(Permission.DASHBOARD_VIEW);
 import { tenantWhere } from "../lib/tenant-context.js";
 import { getDashboardProductivity } from "../services/dashboard-productivity.js";
+import { getDashboardWorkShares } from "../services/work-share-metrics.js";
 
 export async function dashboardRoutes(app: FastifyInstance) {
   app.get("/api/dashboard/productivity", { preHandler: requireDashboard }, async (request, reply) => {
@@ -16,4 +17,8 @@ export async function dashboardRoutes(app: FastifyInstance) {
       return reply.status(500).send({ error: "Erro ao gerar dashboard" });
     }
   });
+
+  app.get("/api/dashboard/work-shares", { preHandler: requireDashboard }, async (request) =>
+    getDashboardWorkShares(tenantWhere(request).tenantId),
+  );
 }

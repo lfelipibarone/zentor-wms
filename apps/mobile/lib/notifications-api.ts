@@ -5,6 +5,7 @@ export interface NotificationDto {
   title: string;
   body: string;
   category: string;
+  data?: { type?: string; route?: { pathname: string; params: Record<string, string> } } | null;
   readAt: string | null;
   createdAt: string;
 }

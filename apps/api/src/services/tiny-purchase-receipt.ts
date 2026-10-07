@@ -7,6 +7,13 @@ import { prisma } from "../lib/prisma.js";
 import { findNfItemByScannedCode } from "./location-stock.js";
 import { getTinyApiClient, TinyApiError } from "./tiny-api-v3-client.js";
 import { logIntegrationEvent } from "./tiny-integration.js";
+import {
+  assertItemShareStarted,
+  finishShareIfDone,
+  getWorkForRef,
+  hasShares,
+  openShareIdsForUser,
+} from "./work-share.js";
 
 function asRecord(v: unknown): Record<string, unknown> | null {
   return v && typeof v === "object" && !Array.isArray(v)
@@ -240,7 +247,7 @@ export async function startPurchaseReceiptByBarcode(params: {
         data: { status: PurchaseReceiptSessionStatus.IN_CHECK },
       });
     }
-    return formatPurchaseReceiptSession(existing.id);
+    return formatPurchaseReceiptSession(existing.id, params.userId);
   }
 
   let listRow = await findEntryInvoiceByAccessKey(params.tenantId, accessKey);
@@ -300,19 +307,29 @@ export async function startPurchaseReceiptByBarcode(params: {
     payload: { notaId, sessionId: session.id },
   });
 
-  return formatPurchaseReceiptSession(session.id);
+  return formatPurchaseReceiptSession(session.id, params.userId);
 }
 
-export async function formatPurchaseReceiptSession(sessionId: string) {
+export async function formatPurchaseReceiptSession(sessionId: string, viewerId?: string) {
   const session = await prisma.purchaseReceiptSession.findUnique({
     where: { id: sessionId },
     include: { items: { orderBy: { lineNumber: "asc" } } },
   });
   if (!session) throw new Error("Sessão não encontrada");
 
-  const next = session.items.find(
-    (it) => Number(it.quantityChecked) < Number(it.quantityExpected),
+  const work = viewerId
+    ? await getWorkForRef({ kind: "RECEIPT_CHECK", receiptSessionId: session.id }, viewerId)
+    : null;
+  const myShareIds = new Set(
+    (work?.shares ?? []).filter((s) => s.assignedTo.id === viewerId).map((s) => s.id),
   );
+  const visibleItems =
+    work && work.shares.length > 0
+      ? session.items.filter((it) => it.workShareId && myShareIds.has(it.workShareId))
+      : session.items;
+  const isPending = (it: (typeof session.items)[number]) =>
+    Number(it.quantityChecked) < Number(it.quantityExpected);
+  const next = visibleItems.find(isPending);
 
   return {
     session: {
@@ -337,6 +354,7 @@ export async function formatPurchaseReceiptSession(sessionId: string) {
       quantityExpected: Number(it.quantityExpected),
       quantityChecked: Number(it.quantityChecked),
       completed: Number(it.quantityChecked) >= Number(it.quantityExpected),
+      workShareId: it.workShareId,
     })),
     nextItem: next
       ? {
@@ -354,17 +372,21 @@ export async function formatPurchaseReceiptSession(sessionId: string) {
     allChecked: session.items.every(
       (it) => Number(it.quantityChecked) >= Number(it.quantityExpected),
     ),
+    /** Itens da minha parte conferidos (sem divisão: a NF toda) */
+    myAllChecked: !visibleItems.some(isPending),
+    work,
   };
 }
 
-export async function getPurchaseReceiptSession(sessionId: string) {
-  return formatPurchaseReceiptSession(sessionId);
+export async function getPurchaseReceiptSession(sessionId: string, viewerId?: string) {
+  return formatPurchaseReceiptSession(sessionId, viewerId);
 }
 
 export async function confirmReceiptItem(
   sessionId: string,
   itemId: string,
   quantity: number,
+  userId?: string,
 ) {
   const session = await prisma.purchaseReceiptSession.findUnique({
     where: { id: sessionId },
@@ -378,6 +400,8 @@ export async function confirmReceiptItem(
   const item = session.items.find((it) => it.id === itemId);
   if (!item) throw new Error("Item não pertence a esta nota");
 
+  const shareId = userId ? await assertItemShareStarted(item.workShareId, userId) : null;
+
   const addQty = Math.max(1, Math.floor(quantity));
   const newChecked = Math.min(
     Number(item.quantityExpected),
@@ -389,13 +413,29 @@ export async function confirmReceiptItem(
     data: { quantityChecked: new Prisma.Decimal(newChecked) },
   });
 
-  return getPurchaseReceiptSession(sessionId);
+  if (shareId && userId && (await finishShareIfDone(shareId))) {
+    await completeReceiptWhenAllSharesDone(sessionId, userId);
+  }
+
+  return getPurchaseReceiptSession(sessionId, userId);
+}
+
+/** NF dividida: quem termina a última parte fecha a conferência. */
+async function completeReceiptWhenAllSharesDone(sessionId: string, userId: string) {
+  if (!(await hasShares({ receiptSessionId: sessionId }))) return;
+  const items = await prisma.purchaseReceiptItem.findMany({ where: { sessionId } });
+  const allChecked = items.every((it) => Number(it.quantityChecked) >= Number(it.quantityExpected));
+  const session = await prisma.purchaseReceiptSession.findUnique({ where: { id: sessionId } });
+  if (allChecked && session && session.status !== PurchaseReceiptSessionStatus.COMPLETED) {
+    await completePurchaseReceipt(sessionId, userId);
+  }
 }
 
 export async function scanPurchaseReceiptItem(params: {
   sessionId: string;
   barcode: string;
   quantity?: number;
+  userId?: string;
 }) {
   const session = await prisma.purchaseReceiptSession.findUnique({
     where: { id: params.sessionId },
@@ -406,7 +446,19 @@ export async function scanPurchaseReceiptItem(params: {
     throw new Error("Conferência já finalizada");
   }
 
-  const item = await findNfItemByScannedCode(session.tenantId, session.items, params.barcode);
+  const myShareIds = params.userId
+    ? await openShareIdsForUser({ receiptSessionId: session.id }, params.userId)
+    : new Set<string>();
+  const myPending = session.items.filter(
+    (it) =>
+      it.workShareId &&
+      myShareIds.has(it.workShareId) &&
+      Number(it.quantityChecked) < Number(it.quantityExpected),
+  );
+  const item =
+    (myPending.length > 0
+      ? await findNfItemByScannedCode(session.tenantId, myPending, params.barcode)
+      : null) ?? (await findNfItemByScannedCode(session.tenantId, session.items, params.barcode));
 
   if (!item) {
     throw new Error("Produto não pertence a esta nota");
@@ -416,6 +468,7 @@ export async function scanPurchaseReceiptItem(params: {
     params.sessionId,
     item.id,
     params.quantity ?? 1,
+    params.userId,
   );
 }
 

@@ -16,6 +16,13 @@ import {
   pickNextItemByEngine,
   sortPendingItemsByEngine,
 } from "./route-engine/index.js";
+import {
+  OPEN_SHARE_STATUSES,
+  assertItemShareStarted,
+  finishShareIfDone,
+  getWorkForRef,
+  hasShares,
+} from "./work-share.js";
 
 const putawayLocationSelect = {
   id: true,
@@ -82,7 +89,7 @@ export function storedLocationsOf(
   return stored;
 }
 
-export async function listPutawayQueue(tenantId?: string) {
+export async function listPutawayQueue(tenantId?: string, userId?: string) {
   const sessions = await prisma.purchaseReceiptSession.findMany({
     where: {
       ...(tenantId ? { tenantId } : {}),
@@ -90,6 +97,18 @@ export async function listPutawayQueue(tenantId?: string) {
       OR: [
         { putaway: null },
         { putaway: { status: PutawaySessionStatus.PENDING } },
+        ...(userId
+          ? [
+              {
+                putaway: {
+                  status: PutawaySessionStatus.IN_PROGRESS,
+                  workShares: {
+                    some: { assignedToId: userId, status: { in: OPEN_SHARE_STATUSES } },
+                  },
+                },
+              },
+            ]
+          : []),
       ],
     },
     orderBy: { completedAt: "desc" },
@@ -113,7 +132,7 @@ export async function listPutawayQueue(tenantId?: string) {
   }));
 }
 
-async function ensurePutawaySession(purchaseReceiptId: string, userId: string) {
+export async function ensurePutawaySession(purchaseReceiptId: string, userId: string) {
   const receipt = await prisma.purchaseReceiptSession.findUnique({
     where: { id: purchaseReceiptId },
     include: { items: true, putaway: { include: { items: true } } },
@@ -194,9 +213,18 @@ async function resolveProductImageUrl(
 
 async function formatPutaway(
   session: NonNullable<Awaited<ReturnType<typeof ensurePutawaySession>>>,
+  viewerId?: string,
 ) {
+  const work = viewerId
+    ? await getWorkForRef({ kind: "PUTAWAY", putawaySessionId: session.id }, viewerId)
+    : null;
+  const myShareIds = new Set(
+    (work?.shares ?? []).filter((s) => s.assignedTo.id === viewerId).map((s) => s.id),
+  );
+  const isMine = (it: (typeof session.items)[0]) =>
+    !work || work.shares.length === 0 || (!!it.workShareId && myShareIds.has(it.workShareId));
   const isPending = (it: (typeof session.items)[0]) =>
-    Number(it.quantityStored) < Number(it.quantityExpected);
+    isMine(it) && Number(it.quantityStored) < Number(it.quantityExpected);
 
   const lastStoredLoc = [...session.items]
     .filter((it) => it.location && Number(it.quantityStored) > 0)
@@ -217,6 +245,7 @@ async function formatPutaway(
   const next =
     pickNextItemByEngine(engine, pendingWithLoc, isPending, lastStoredLoc, "RECEIVING") ??
     session.items.find(isPending);
+
 
   const routeQueue = sortPendingItemsByEngine(
     engine,
@@ -252,6 +281,7 @@ async function formatPutaway(
       locationBarcode: it.location?.barcode ?? null,
       storedLocations: storedLocationsOf(it),
       completed: Number(it.quantityStored) >= Number(it.quantityExpected),
+      workShareId: it.workShareId,
     })),
     nextItem: next
       ? {
@@ -267,6 +297,9 @@ async function formatPutaway(
     allStored: session.items.every(
       (it) => Number(it.quantityStored) >= Number(it.quantityExpected),
     ),
+    /** Itens da minha parte guardados (sem divisão: a NF toda) */
+    myAllStored: !session.items.some(isPending),
+    work,
     routeQueue: routeQueue.slice(0, 5).map((it) => ({
       id: it.id,
       productCode: it.productCode,
@@ -278,10 +311,10 @@ async function formatPutaway(
 export async function startPutaway(purchaseReceiptId: string, userId: string) {
   const session = await ensurePutawaySession(purchaseReceiptId, userId);
   if (!session) throw new Error("Sessão de armazenagem não encontrada");
-  return await formatPutaway(session);
+  return await formatPutaway(session, userId);
 }
 
-export async function getPutawaySession(sessionId: string) {
+export async function getPutawaySession(sessionId: string, viewerId?: string) {
   const session = await prisma.putawaySession.findUnique({
     where: { id: sessionId },
     include: {
@@ -290,7 +323,7 @@ export async function getPutawaySession(sessionId: string) {
     },
   });
   if (!session) throw new Error("Sessão não encontrada");
-  return await formatPutaway(session);
+  return await formatPutaway(session, viewerId);
 }
 
 export async function storePutawayItem(params: {
@@ -331,6 +364,7 @@ export async function storePutawayItem(params: {
 
   const item = session.items.find((i) => i.id === params.itemId);
   if (!item) throw new Error("Item não encontrado");
+  const shareId = await assertItemShareStarted(item.workShareId, params.userId);
 
   const code = params.productBarcode?.trim() ?? "";
   if (
@@ -417,7 +451,24 @@ export async function storePutawayItem(params: {
     });
   });
 
-  return getPutawaySession(params.sessionId);
+  if (shareId && (await finishShareIfDone(shareId))) {
+    await completePutawayWhenAllSharesDone(params.sessionId);
+  }
+
+  return getPutawaySession(params.sessionId, params.userId);
+}
+
+/** Armazenagem dividida: quem termina a última parte fecha a armazenagem. */
+async function completePutawayWhenAllSharesDone(sessionId: string) {
+  if (!(await hasShares({ putawaySessionId: sessionId }))) return;
+  const session = await prisma.putawaySession.findUnique({
+    where: { id: sessionId },
+    include: { items: true },
+  });
+  if (!session || session.status === PutawaySessionStatus.COMPLETED) return;
+  if (session.items.every((it) => Number(it.quantityStored) >= Number(it.quantityExpected))) {
+    await completePutaway(sessionId);
+  }
 }
 
 export async function completePutaway(sessionId: string) {

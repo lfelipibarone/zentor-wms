@@ -36,6 +36,22 @@ export async function notifyUsersWithPermission(
   },
   tenantId?: string,
 ) {
+  const targets = await listUserIdsWithPermission(permission, tenantId);
+
+  await Promise.all(
+    targets.map((userId) =>
+      createNotification({
+        userId,
+        title: payload.title,
+        body: payload.body,
+        category: payload.category,
+        data: payload.data,
+      }),
+    ),
+  );
+}
+
+export async function listUserIdsWithPermission(permission: string, tenantId?: string) {
   const users = await prisma.user.findMany({
     where: {
       active: true,
@@ -68,18 +84,7 @@ export async function notifyUsersWithPermission(
       targets.push(u.id);
     }
   }
-
-  await Promise.all(
-    targets.map((userId) =>
-      createNotification({
-        userId,
-        title: payload.title,
-        body: payload.body,
-        category: payload.category,
-        data: payload.data,
-      }),
-    ),
-  );
+  return targets;
 }
 
 async function sendPushToUser(

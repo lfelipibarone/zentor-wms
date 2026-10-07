@@ -18,6 +18,8 @@ export type ReportId =
   | "picking_time_by_user"
   | "packing_time_by_order"
   | "packing_time_by_user"
+  | "work_time_by_user_stage"
+  | "work_shares"
   | "volume_by_marketplace";
 
 export interface ReportColumn {
