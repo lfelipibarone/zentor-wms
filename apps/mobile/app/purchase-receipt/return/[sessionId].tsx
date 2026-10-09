@@ -1,22 +1,17 @@
 import { useCallback, useEffect, useState } from "react";
 import { router, useLocalSearchParams } from "expo-router";
-import {
-  ActivityIndicator,
-  Alert,
-  FlatList,
-  StyleSheet,
-  Text,
-  View,
-} from "react-native";
+import { Alert, StyleSheet, Text, View } from "react-native";
 import { BarcodeScanner } from "@/components/BarcodeScanner";
 import { FactoryButton } from "@/components/FactoryButton";
 import { CompactPercentField } from "@/components/PercentInput";
 import { PulmaoLocationPicker } from "@/components/PulmaoLocationPicker";
 import { PulmaoStockList } from "@/components/PulmaoStockList";
 import { ScreenShell } from "@/components/ScreenShell";
+import { BigCode, Card, EmptyState, Loading, Notice, SectionTitle } from "@/components/ui";
 import { api, ApiError, type LocationLookup } from "@/lib/api";
+import { modules } from "@/lib/modules";
 import { parsePercentText } from "@/lib/percent";
-import { theme, spacing, typography } from "@/lib/theme";
+import { theme, spacing, typography, radius } from "@/lib/theme";
 
 export default function ReturnReceiptCheckScreen() {
   const { sessionId } = useLocalSearchParams<{ sessionId: string }>();
@@ -115,49 +110,52 @@ export default function ReturnReceiptCheckScreen() {
 
   if (loading || !data) {
     return (
-      <View style={styles.centered}>
-        <ActivityIndicator size="large" color={theme.primary} />
-      </View>
+      <ScreenShell module="recebimento" title="Devolução">
+        <Loading />
+      </ScreenShell>
     );
   }
 
   const defaultSku =
     data.items.find((it) => it.productCode)?.productCode ?? "";
+  const feedbackError = feedback != null && !feedback.startsWith("+1") && !feedback.startsWith("Pulmão:");
 
   return (
     <ScreenShell
       scroll
+      module="recebimento"
       title="Devolução"
-      subtitle={data.session.reference ?? "Bipe produtos devolvidos"}
+      subtitle={data.session.reference}
+      headerRight={<Text style={styles.headerCount}>{data.totalUnits} un.</Text>}
     >
-      <Text style={styles.total}>{data.totalUnits} un. registradas</Text>
-      {feedback ? <Text style={styles.feedback}>{feedback}</Text> : null}
+      {feedback ? (
+        <Notice tone={feedbackError ? "danger" : "success"}>{feedback}</Notice>
+      ) : null}
 
       <FactoryButton
         label="Bipar produto"
+        icon="barcode"
+        color={color}
         onPress={() => setProductScanner(true)}
         loading={saving}
       />
 
-      <FlatList
-        data={data.items}
-        keyExtractor={(it) => it.id}
-        style={styles.list}
-        scrollEnabled={false}
-        ListEmptyComponent={
-          <Text style={styles.empty}>Nenhum item — bipe um produto</Text>
-        }
-        renderItem={({ item }) => (
-          <View style={styles.row}>
-            <Text style={styles.sku}>{item.productCode}</Text>
-            <Text style={styles.qty}>{item.quantityChecked} un.</Text>
-          </View>
-        )}
-      />
+      {data.items.length === 0 ? (
+        <EmptyState icon="cube-outline" title="Nenhum item" />
+      ) : (
+        <View style={styles.list}>
+          {data.items.map((item) => (
+            <View key={item.id} style={styles.row}>
+              <Text style={styles.sku}>{item.productCode}</Text>
+              <Text style={styles.qty}>{item.quantityChecked} un.</Text>
+            </View>
+          ))}
+        </View>
+      )}
 
       {data.hasItems ? (
-        <View style={styles.destinoSection}>
-          <Text style={styles.sectionTitle}>Destino no pulmão</Text>
+        <>
+          <SectionTitle>Destino no pulmão</SectionTitle>
           {!selectedPulmao ? (
             <PulmaoLocationPicker
               defaultSku={defaultSku}
@@ -169,30 +167,31 @@ export default function ReturnReceiptCheckScreen() {
             />
           ) : (
             <>
-              <View style={styles.locCard}>
-                <Text style={styles.locTitle}>{selectedPulmao.label}</Text>
-                <Text style={styles.locMeta}>
-                  Ocupação {selectedPulmao.fillPercent}%
-                </Text>
-                <PulmaoStockList stocks={selectedPulmao.stocks} />
-              </View>
-              <Text style={styles.sectionTitle}>
-                Quanto cada SKU ocupa no pulmão depois de guardar?
-              </Text>
+              <BigCode
+                label="Pulmão"
+                code={selectedPulmao.label}
+                meta={`Ocupação ${selectedPulmao.fillPercent}%`}
+                color={modules.armazenagem.color}
+              />
+              <PulmaoStockList stocks={selectedPulmao.stocks} />
+              <SectionTitle>% de cada SKU no pulmão</SectionTitle>
               {itemsToStore.map((it) => (
-                <View key={it.id} style={styles.percentRow}>
-                  <View style={styles.percentInfo}>
-                    <Text style={styles.sku}>{it.productCode}</Text>
-                    <Text style={styles.locMeta}>{it.quantityChecked} un. devolvidas</Text>
+                <Card key={it.id}>
+                  <View style={styles.percentRow}>
+                    <View style={styles.percentInfo}>
+                      <Text style={styles.sku}>{it.productCode}</Text>
+                      <Text style={styles.meta}>{it.quantityChecked} un.</Text>
+                    </View>
+                    <CompactPercentField
+                      value={percents[it.id] ?? ""}
+                      onChange={(t) => setPercents((prev) => ({ ...prev, [it.id]: t }))}
+                    />
                   </View>
-                  <CompactPercentField
-                    value={percents[it.id] ?? ""}
-                    onChange={(t) => setPercents((prev) => ({ ...prev, [it.id]: t }))}
-                  />
-                </View>
+                </Card>
               ))}
               <FactoryButton
                 label="Finalizar devolução"
+                icon="checkmark-done"
                 variant="success"
                 onPress={handleFinalize}
                 disabled={!percentsValid}
@@ -200,19 +199,20 @@ export default function ReturnReceiptCheckScreen() {
               />
               <FactoryButton
                 label="Trocar pulmão"
+                icon="swap-horizontal"
+                size="sm"
                 variant="secondary"
                 onPress={() => selectPulmao(null)}
                 disabled={saving}
               />
             </>
           )}
-        </View>
+        </>
       ) : null}
 
       <BarcodeScanner
         visible={productScanner}
         title="Produto devolvido"
-        hint="Código de barras do produto"
         onScan={handleProductScan}
         onClose={() => setProductScanner(false)}
       />
@@ -220,59 +220,33 @@ export default function ReturnReceiptCheckScreen() {
   );
 }
 
+const color = modules.recebimento.color;
+
 const styles = StyleSheet.create({
-  centered: { flex: 1, justifyContent: "center", alignItems: "center" },
-  total: {
-    fontSize: typography.subtitle,
-    fontWeight: "700",
-    marginBottom: spacing.sm,
+  headerCount: { color: theme.headerTint, fontWeight: "900", fontSize: typography.body },
+  list: {
+    backgroundColor: theme.surface,
+    borderRadius: radius.lg,
+    borderWidth: 1,
+    borderColor: theme.border,
   },
-  feedback: { color: theme.primary, marginBottom: spacing.sm },
-  list: { maxHeight: 280, marginVertical: spacing.md },
   row: {
     flexDirection: "row",
     justifyContent: "space-between",
-    padding: spacing.sm,
+    alignItems: "center",
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm + 2,
     borderBottomWidth: 1,
     borderColor: theme.border,
   },
-  sku: { fontFamily: "monospace", fontWeight: "600" },
+  sku: { fontWeight: "900", color: theme.text },
+  qty: { fontWeight: "900", color: theme.text },
+  meta: { color: theme.textMuted, fontSize: typography.caption, fontWeight: "700" },
   percentRow: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
     gap: spacing.sm,
-    paddingVertical: spacing.xs,
-    borderBottomWidth: 1,
-    borderColor: theme.border,
   },
   percentInfo: { flex: 1, gap: 2 },
-  qty: { fontWeight: "700" },
-  empty: { color: theme.textMuted, textAlign: "center", padding: spacing.lg },
-  destinoSection: {
-    marginTop: spacing.md,
-    gap: spacing.sm,
-  },
-  sectionTitle: {
-    fontWeight: "900",
-    fontSize: typography.body,
-    color: theme.text,
-  },
-  locCard: {
-    backgroundColor: theme.surface,
-    borderRadius: 12,
-    padding: spacing.md,
-    borderWidth: 2,
-    borderColor: theme.primary,
-  },
-  locTitle: {
-    fontSize: typography.subtitle,
-    fontWeight: "900",
-    color: theme.primary,
-  },
-  locMeta: {
-    color: theme.textMuted,
-    fontSize: typography.caption,
-    marginTop: 4,
-  },
 });

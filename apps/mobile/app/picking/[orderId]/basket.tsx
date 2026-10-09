@@ -1,11 +1,13 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { router, useLocalSearchParams, useNavigation } from "expo-router";
-import { ActivityIndicator, Alert, StyleSheet, Text, View } from "react-native";
+import { Alert, StyleSheet, Text, View } from "react-native";
 import { OrderStatus } from "@wms/shared";
 import { BarcodeScanner } from "@/components/BarcodeScanner";
 import { FactoryButton } from "@/components/FactoryButton";
 import { ProductThumbnail } from "@/components/ProductThumbnail";
 import { ScreenShell } from "@/components/ScreenShell";
+import { Card, Loading, Notice, SectionTitle } from "@/components/ui";
+import { modules } from "@/lib/modules";
 import {
   useAttachBasket,
   usePickingSession,
@@ -95,72 +97,62 @@ export default function BasketScanScreen() {
     }
   };
 
+  const units = session?.items.reduce((n, i) => n + i.quantityOrdered, 0) ?? 0;
+
   return (
     <ScreenShell
       scroll
-      title={session?.order.erpOrderId ?? "Separar pedido"}
-      subtitle="Vincule uma cesta física ao pedido (cronômetro já iniciou no aceite)"
+      module="picking"
+      title={session?.order.erpOrderId ?? "Pedido"}
+      subtitle={session ? `${session.items.length} itens · ${units} un.` : null}
     >
-      {isLoading ? (
-        <ActivityIndicator size="large" color={theme.primary} />
-      ) : null}
+      {isLoading ? <Loading /> : null}
+
+      {error ? <Notice tone="danger">{error}</Notice> : null}
+
+      <FactoryButton
+        label="Bipar cesta"
+        icon="basket"
+        color={modules.picking.color}
+        onPress={() => setScannerOpen(true)}
+        loading={attach.isPending}
+      />
 
       {session ? (
         <>
-          <Text style={styles.sectionTitle}>Itens a separar</Text>
-          <View style={styles.itemsList}>
-            {session.items.map((item) => (
-              <View
-                key={item.id}
-                style={[styles.itemRow, item.completed && styles.itemDone]}
-              >
+          <SectionTitle>Itens</SectionTitle>
+          {session.items.map((item) => (
+            <Card key={item.id} muted={item.completed}>
+              <View style={styles.itemRow}>
                 <ProductThumbnail
                   imageUrl={item.product?.imageUrl}
                   alt={item.product?.name ?? "Produto"}
-                  size={56}
+                  size={52}
                 />
                 <View style={styles.itemInfo}>
                   <Text style={styles.itemSku}>
                     {item.product?.sku ?? "SKU indisponível"}
                   </Text>
-                  <Text style={styles.itemName} numberOfLines={2}>
+                  <Text style={styles.itemName} numberOfLines={1}>
                     {item.product?.name ?? "Produto não encontrado"}
                   </Text>
-                  <Text style={styles.itemMeta}>
-                    {item.quantityOrdered} un.
-                    {item.pickLocation?.label
-                      ? ` · ${item.pickLocation.label}`
-                      : ""}
-                  </Text>
-                  {item.completed ? (
-                    <Text style={styles.itemDoneLabel}>Concluído</Text>
+                  {item.pickLocation?.label ? (
+                    <Text style={styles.itemLoc}>{item.pickLocation.label}</Text>
                   ) : null}
                 </View>
+                <Text style={styles.itemQty}>{item.quantityOrdered}</Text>
               </View>
-            ))}
-          </View>
+            </Card>
+          ))}
         </>
       ) : null}
-
-      <View style={styles.infoBox}>
-        <Text style={styles.info}>
-          Aponte a câmera para o código de barras da cesta de separação.
-          O tempo de separação será registrado automaticamente.
-        </Text>
-      </View>
-
-      {error ? <Text style={styles.error}>{error}</Text> : null}
-
-      <FactoryButton
-        label="Abrir leitor"
-        onPress={() => setScannerOpen(true)}
-        loading={attach.isPending}
-      />
 
       {canRelease ? (
         <FactoryButton
           label="Cancelar aceite"
-          variant="secondary"
+          icon="close"
+          size="sm"
+          variant="ghost"
           onPress={handleReleaseAcceptPress}
           loading={releaseAccept.isPending}
         />
@@ -168,8 +160,7 @@ export default function BasketScanScreen() {
 
       <BarcodeScanner
         visible={scannerOpen}
-        title="Código da cesta"
-        hint="Bipe o barcode da cesta (Basket)"
+        title="Bipar cesta"
         onScan={handleScan}
         onClose={() => setScannerOpen(false)}
       />
@@ -178,43 +169,10 @@ export default function BasketScanScreen() {
 }
 
 const styles = StyleSheet.create({
-  sectionTitle: {
-    fontSize: typography.subtitle,
-    fontWeight: "800",
-    color: theme.text,
-    marginBottom: spacing.sm,
-  },
-  itemsList: { gap: spacing.sm, marginBottom: spacing.md },
-  itemRow: {
-    flexDirection: "row",
-    gap: spacing.md,
-    backgroundColor: theme.surface,
-    padding: spacing.md,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: theme.border,
-  },
-  itemDone: { opacity: 0.65 },
-  itemInfo: { flex: 1, gap: 2 },
-  itemSku: { fontWeight: "800", color: theme.text },
-  itemName: { color: theme.text, fontSize: typography.body },
-  itemMeta: { color: theme.textMuted, fontSize: typography.caption },
-  itemDoneLabel: {
-    color: theme.success,
-    fontWeight: "700",
-    fontSize: typography.caption,
-  },
-  infoBox: {
-    backgroundColor: theme.surface,
-    padding: spacing.lg,
-    borderRadius: 12,
-    borderLeftWidth: 6,
-    borderLeftColor: theme.primary,
-  },
-  info: { fontSize: typography.body, color: theme.text, lineHeight: 26 },
-  error: {
-    color: theme.danger,
-    fontSize: typography.body,
-    fontWeight: "700",
-  },
+  itemRow: { flexDirection: "row", gap: spacing.md, alignItems: "center" },
+  itemInfo: { flex: 1, gap: 1 },
+  itemSku: { fontWeight: "900", color: theme.info },
+  itemName: { color: theme.text, fontWeight: "600" },
+  itemLoc: { color: theme.textMuted, fontWeight: "800", fontSize: typography.caption },
+  itemQty: { fontSize: 26, fontWeight: "900", color: theme.text },
 });

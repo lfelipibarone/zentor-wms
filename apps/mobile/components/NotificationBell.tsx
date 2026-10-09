@@ -1,13 +1,11 @@
 import { useCallback, useEffect, useState } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import { router } from "expo-router";
-import {
-  fetchNotifications,
-  type NotificationDto,
-} from "@/lib/notifications-api";
-import { theme, typography } from "@/lib/theme";
+import { Ionicons } from "@expo/vector-icons";
+import { fetchNotifications } from "@/lib/notifications-api";
+import { theme } from "@/lib/theme";
 
-export function NotificationBell() {
+export function NotificationBell({ color = theme.headerTint }: { color?: string }) {
   const [unread, setUnread] = useState(0);
 
   const refresh = useCallback(async () => {
@@ -31,7 +29,7 @@ export function NotificationBell() {
       style={styles.bell}
       accessibilityLabel="Notificações"
     >
-      <Text style={styles.icon}>🔔</Text>
+      <Ionicons name="notifications-outline" size={26} color={color} />
       {unread > 0 ? (
         <View style={styles.badge}>
           <Text style={styles.badgeText}>{unread > 9 ? "9+" : unread}</Text>
@@ -43,18 +41,19 @@ export function NotificationBell() {
 
 const styles = StyleSheet.create({
   bell: { padding: 8, position: "relative" },
-  icon: { fontSize: 22 },
   badge: {
     position: "absolute",
     top: 4,
-    right: 4,
-    minWidth: 16,
-    height: 16,
-    borderRadius: 8,
+    right: 3,
+    minWidth: 18,
+    height: 18,
+    borderRadius: 9,
     backgroundColor: theme.danger,
     alignItems: "center",
     justifyContent: "center",
     paddingHorizontal: 3,
+    borderWidth: 2,
+    borderColor: theme.headerBg,
   },
   badgeText: {
     color: "#fff",

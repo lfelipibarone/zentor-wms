@@ -1,21 +1,18 @@
 import { router } from "expo-router";
 import { useState } from "react";
-import {
-  ActivityIndicator,
-  FlatList,
-  Pressable,
-  StyleSheet,
-  Text,
-  View,
-} from "react-native";
-import { FactoryButton } from "@/components/FactoryButton";
+import { FlatList, Pressable, StyleSheet, Text, View } from "react-native";
+import { Ionicons } from "@expo/vector-icons";
 import { ScreenShell } from "@/components/ScreenShell";
 import { SplitWorkModal } from "@/components/SplitWorkModal";
+import { Badge, Card, EmptyState, Loading, Notice } from "@/components/ui";
 import { usePutawayQueue } from "@/hooks/usePutaway";
 import { useSplitWork } from "@/hooks/useWorkShares";
 import { ApiError, type PutawayQueueItem } from "@/lib/api";
 import { showErrorAlert } from "@/lib/app-alert";
-import { theme, spacing, typography } from "@/lib/theme";
+import { modules } from "@/lib/modules";
+import { theme, spacing, typography, radius } from "@/lib/theme";
+
+const color = modules.armazenagem.color;
 
 export default function PutawayListScreen() {
   const { data, isLoading, error, refetch, isRefetching } = usePutawayQueue();
@@ -51,76 +48,61 @@ export default function PutawayListScreen() {
 
   return (
     <ScreenShell
-      backToHome
-      title="Armazenagem pulmão"
+      module="armazenagem"
+      title="Armazenagem"
+      subtitle={data ? `${data.length} NF na fila` : null}
       style={styles.shell}
-      subtitle="NFs conferidas no recebimento — endereçamento no pulmão"
     >
       {isLoading ? (
-        <View style={styles.centered}>
-          <ActivityIndicator size="large" color={theme.primary} />
-        </View>
+        <Loading />
       ) : error ? (
-        <Text style={styles.error}>
+        <Notice tone="danger">
           {error instanceof Error ? error.message : "Erro ao carregar fila"}
-        </Text>
+        </Notice>
       ) : (
-        <>
-          <Text style={styles.count}>{data?.length ?? 0} NF(s) na fila</Text>
-          <FlatList
-            style={styles.listWrap}
-            data={data ?? []}
-            keyExtractor={(item) => item.purchaseReceiptId}
-            refreshing={isRefetching}
-            onRefresh={refetch}
-            contentContainerStyle={styles.list}
-            ListEmptyComponent={
-              <Text style={styles.empty}>
-                Nenhuma NF aguardando armazenagem. Conferir notas no painel web.
-              </Text>
-            }
-            ListFooterComponent={
-              <View style={styles.footer}>
-                <FactoryButton
-                  label="Atualizar"
-                  variant="secondary"
-                  onPress={() => refetch()}
-                  loading={isRefetching}
-                />
-                <Pressable
-                  style={styles.avulsoLink}
-                  onPress={() => router.push("/armazenagem-pulmao")}
-                >
-                  <Text style={styles.avulsoLinkText}>
-                    Entrada avulsa no pulmão (sem NF)
-                  </Text>
-                </Pressable>
-              </View>
-            }
-            renderItem={({ item }) => (
-              <View style={styles.card}>
-                <Text style={styles.numero}>
-                  NF {item.invoiceNumber ?? "—"}
-                </Text>
-                {item.supplierName ? (
-                  <Text style={styles.meta}>{item.supplierName}</Text>
-                ) : null}
-                <Text style={styles.meta}>
-                  {item.itemCount} itens · {item.receiptOperator}
-                </Text>
-                <FactoryButton
-                  label={
-                    item.putawaySessionId && item.status !== "PENDING"
-                      ? "Continuar armazenagem"
-                      : "Iniciar armazenagem"
-                  }
-                  onPress={() => openItem(item)}
-                  loading={splitWork.isPending && toSplit?.purchaseReceiptId === item.purchaseReceiptId}
-                />
-              </View>
-            )}
-          />
-        </>
+        <FlatList
+          style={styles.listWrap}
+          data={data ?? []}
+          keyExtractor={(item) => item.purchaseReceiptId}
+          refreshing={isRefetching}
+          onRefresh={refetch}
+          contentContainerStyle={styles.list}
+          ListEmptyComponent={<EmptyState icon="archive-outline" title="Nenhuma NF para armazenar" />}
+          ListFooterComponent={
+            <Pressable
+              style={({ pressed }) => [styles.avulso, pressed && styles.pressed]}
+              onPress={() => router.push("/armazenagem-pulmao")}
+            >
+              <Ionicons name="add-circle-outline" size={22} color={color} />
+              <Text style={styles.avulsoText}>Entrada avulsa (sem NF)</Text>
+            </Pressable>
+          }
+          renderItem={({ item }) => {
+            const started = Boolean(item.putawaySessionId && item.status !== "PENDING");
+            return (
+              <Card accent={started ? theme.warning : color} onPress={() => openItem(item)}>
+                <View style={styles.row}>
+                  <View style={styles.flex}>
+                    <Text style={styles.numero}>NF {item.invoiceNumber ?? "—"}</Text>
+                    {item.supplierName ? (
+                      <Text style={styles.meta} numberOfLines={1}>
+                        {item.supplierName}
+                      </Text>
+                    ) : null}
+                  </View>
+                  <Ionicons name="chevron-forward" size={24} color={theme.textSoft} />
+                </View>
+                <View style={styles.badges}>
+                  <Badge label={`${item.itemCount} itens`} icon="cube" />
+                  {started ? <Badge label="Em andamento" tone="warning" solid /> : null}
+                  {item.receiptOperator ? (
+                    <Badge label={item.receiptOperator} icon="person" />
+                  ) : null}
+                </View>
+              </Card>
+            );
+          }}
+        />
       )}
       <SplitWorkModal
         visible={Boolean(toSplit)}
@@ -137,34 +119,25 @@ export default function PutawayListScreen() {
 
 const styles = StyleSheet.create({
   shell: { flex: 1 },
+  flex: { flex: 1 },
   listWrap: { flex: 1, minHeight: 120 },
-  centered: { padding: spacing.xl, alignItems: "center" },
-  count: {
-    marginBottom: spacing.sm,
-    fontWeight: "800",
-    fontSize: typography.body,
-    color: theme.text,
-  },
-  list: { paddingBottom: spacing.xl },
-  card: {
-    backgroundColor: theme.surface,
-    borderRadius: 12,
-    padding: spacing.md,
-    marginBottom: spacing.sm,
-    borderWidth: 2,
-    borderColor: theme.border,
-    gap: spacing.sm,
-  },
+  list: { paddingBottom: spacing.xl, gap: spacing.sm },
+  row: { flexDirection: "row", alignItems: "center", gap: spacing.sm },
   numero: { fontWeight: "900", fontSize: typography.subtitle, color: theme.text },
-  meta: { color: theme.textMuted, fontSize: typography.caption, fontWeight: "600" },
-  footer: { gap: spacing.md, marginTop: spacing.sm },
-  avulsoLink: { paddingVertical: spacing.sm, alignItems: "center" },
-  avulsoLinkText: {
-    color: theme.primary,
-    fontWeight: "800",
-    fontSize: typography.caption,
-    textDecorationLine: "underline",
+  meta: { color: theme.textMuted, fontWeight: "600" },
+  badges: { flexDirection: "row", flexWrap: "wrap", gap: 6, marginTop: spacing.sm },
+  avulso: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: spacing.sm,
+    paddingVertical: spacing.md,
+    marginTop: spacing.sm,
+    borderRadius: radius.lg,
+    borderWidth: 1.5,
+    borderStyle: "dashed",
+    borderColor: color,
   },
-  error: { color: theme.danger },
-  empty: { textAlign: "center", color: theme.textMuted, marginTop: spacing.lg },
+  avulsoText: { color, fontWeight: "800", fontSize: typography.body },
+  pressed: { opacity: 0.8 },
 });

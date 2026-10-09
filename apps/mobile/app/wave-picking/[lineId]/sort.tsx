@@ -1,11 +1,13 @@
 import { useState } from "react";
 import { router, useLocalSearchParams } from "expo-router";
-import { ActivityIndicator, StyleSheet, Text, View } from "react-native";
+import { StyleSheet, Text, View } from "react-native";
 import { BarcodeScanner } from "@/components/BarcodeScanner";
 import { FactoryButton } from "@/components/FactoryButton";
 import { ScreenShell } from "@/components/ScreenShell";
+import { Badge, Card, Loading, Notice } from "@/components/ui";
 import { useWaveLine, useWaveLineSort } from "@/hooks/useWavePicking";
 import { ApiError } from "@/lib/api";
+import { modules } from "@/lib/modules";
 import { theme, spacing, typography } from "@/lib/theme";
 
 export default function WaveSortScreen() {
@@ -20,9 +22,9 @@ export default function WaveSortScreen() {
 
   if (isLoading || !line) {
     return (
-      <View style={styles.centered}>
-        <ActivityIndicator size="large" color={theme.primary} />
-      </View>
+      <ScreenShell module="picking" title="Distribuir nas cestas">
+        <Loading />
+      </ScreenShell>
     );
   }
 
@@ -51,30 +53,40 @@ export default function WaveSortScreen() {
   };
 
   return (
-    <ScreenShell scroll>
-      <Text style={styles.title}>Packing — separar nas cestas</Text>
-      <Text style={styles.sub}>
-        {line.product.sku} · {line.quantityPicked} un. coletadas
-      </Text>
-
+    <ScreenShell
+      scroll
+      module="picking"
+      title="Distribuir nas cestas"
+      subtitle={`${line.product.sku} · ${line.quantityPicked} un.`}
+    >
       {line.allocations.map((alloc) => (
-        <View key={alloc.id} style={styles.card}>
-          <Text style={styles.erp}>{alloc.order.erpOrderId}</Text>
-          <Text style={styles.qty}>
-            {alloc.quantitySorted} / {alloc.quantity} un.
-          </Text>
+        <Card
+          key={alloc.id}
+          accent={alloc.remaining > 0 ? modules.picking.color : theme.success}
+          style={styles.card}
+        >
+          <View style={styles.cardTop}>
+            <Text style={styles.erp} numberOfLines={1}>
+              {alloc.order.erpOrderId}
+            </Text>
+            <Text style={styles.qty}>
+              {alloc.quantitySorted}/{alloc.quantity}
+            </Text>
+          </View>
           {alloc.order.basketCode ? (
-            <Text style={styles.basket}>Cesta: {alloc.order.basketCode}</Text>
+            <Badge label={alloc.order.basketCode} icon="basket" tone="info" />
           ) : null}
           {alloc.remaining > 0 ? (
             <FactoryButton
               label={
                 activeAllocId === alloc.id
-                  ? "Bipar cesta..."
+                  ? "Bipando cesta…"
                   : alloc.order.basketCode
                     ? "Confirmar na cesta"
-                    : "Bipar cesta e confirmar"
+                    : "Bipar cesta"
               }
+              icon="basket"
+              size="md"
               variant="success"
               loading={sort.isPending && activeAllocId === alloc.id}
               onPress={() => {
@@ -97,15 +109,17 @@ export default function WaveSortScreen() {
               }}
             />
           ) : (
-            <Text style={styles.done}>Separado ✓</Text>
+            <Badge label="Separado" tone="success" icon="checkmark" />
           )}
-        </View>
+        </Card>
       ))}
 
-      {message ? <Text style={styles.message}>{message}</Text> : null}
+      {message ? <Notice tone="info">{message}</Notice> : null}
 
       <FactoryButton
         label="Voltar à onda"
+        icon="arrow-back"
+        size="md"
         variant="secondary"
         onPress={() => router.replace("/picking")}
       />
@@ -124,25 +138,8 @@ export default function WaveSortScreen() {
 }
 
 const styles = StyleSheet.create({
-  centered: { flex: 1, justifyContent: "center", alignItems: "center" },
-  title: { fontSize: typography.title, fontWeight: "900", color: theme.primary },
-  sub: { color: theme.textMuted, marginBottom: spacing.lg },
-  card: {
-    backgroundColor: theme.surface,
-    borderRadius: 12,
-    padding: spacing.md,
-    marginBottom: spacing.sm,
-    borderWidth: 1,
-    borderColor: theme.border,
-  },
-  erp: { fontWeight: "900", fontSize: typography.subtitle },
-  qty: { marginTop: spacing.xs, fontWeight: "700" },
-  basket: { color: theme.info, marginTop: spacing.xs },
-  done: { color: theme.success, fontWeight: "800", marginTop: spacing.sm },
-  message: {
-    textAlign: "center",
-    fontWeight: "700",
-    color: theme.success,
-    marginVertical: spacing.md,
-  },
+  card: { gap: spacing.sm },
+  cardTop: { flexDirection: "row", alignItems: "center", gap: spacing.sm },
+  erp: { flex: 1, fontWeight: "900", fontSize: typography.subtitle, color: theme.text },
+  qty: { fontWeight: "900", fontSize: typography.subtitle, color: theme.text },
 });

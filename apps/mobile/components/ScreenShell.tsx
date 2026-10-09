@@ -1,75 +1,83 @@
-import { SafeAreaView } from "react-native-safe-area-context";
-import {
-  ScrollView,
-  StyleSheet,
-  Text,
-  View,
-  type ViewProps,
-} from "react-native";
-import { BackButton } from "@/components/BackButton";
-import { theme, spacing, typography } from "@/lib/theme";
+import type { ReactNode } from "react";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { ScrollView, StyleSheet, View, type ViewProps } from "react-native";
+import { AppHeader } from "@/components/AppHeader";
+import type { ModuleKey } from "@/lib/modules";
+import { theme, spacing } from "@/lib/theme";
 
 /** Padding horizontal padrão das telas com ScreenShell */
 export const screenPadding = spacing.md;
 
 interface ScreenShellProps extends ViewProps {
   title?: string;
-  subtitle?: string;
+  subtitle?: string | null;
+  /** Cor e ícone do módulo no cabeçalho */
+  module?: ModuleKey;
   /** Conteúdo rolável quando passa da altura da tela */
   scroll?: boolean;
-  /** Exibe seta de voltar para a tela inicial (sem texto) */
-  backToHome?: boolean;
-  children: React.ReactNode;
+  /** Seta de voltar no cabeçalho (padrão: sim) */
+  back?: boolean;
+  onBack?: () => void;
+  headerRight?: ReactNode;
+  /** Conteúdo fixo logo abaixo do título (abas, filtros) */
+  headerExtra?: ReactNode;
+  children: ReactNode;
 }
 
 export function ScreenShell({
   title,
   subtitle,
+  module,
   scroll = false,
-  backToHome = false,
+  back = true,
+  onBack,
+  headerRight,
+  headerExtra,
   children,
   style,
   ...rest
 }: ScreenShellProps) {
-  const content = (
-    <>
-      {backToHome ? (
-        <View style={styles.backRow}>
-          <BackButton color={theme.text} />
-        </View>
-      ) : null}
-      {title || subtitle ? (
-        <View style={styles.header}>
-          {title ? <Text style={styles.title}>{title}</Text> : null}
-          {subtitle ? <Text style={styles.subtitle}>{subtitle}</Text> : null}
-        </View>
-      ) : null}
-      {children}
-    </>
-  );
+  const insets = useSafeAreaInsets();
+  const bottomPad = { paddingBottom: Math.max(insets.bottom, spacing.md) + spacing.md };
 
   return (
-    <SafeAreaView style={styles.safe} edges={["top", "left", "right", "bottom"]}>
+    <View style={styles.root}>
+      {title ? (
+        <AppHeader
+          title={title}
+          subtitle={subtitle}
+          module={module}
+          back={back}
+          onBack={onBack}
+          right={headerRight}
+        >
+          {headerExtra}
+        </AppHeader>
+      ) : (
+        <View style={{ height: insets.top, backgroundColor: theme.headerBg }} />
+      )}
       {scroll ? (
         <ScrollView
-          contentContainerStyle={[styles.scrollContent, style]}
+          style={styles.flex}
+          contentContainerStyle={[styles.scrollContent, bottomPad, style]}
           keyboardShouldPersistTaps="always"
-          showsVerticalScrollIndicator
+          showsVerticalScrollIndicator={false}
           {...rest}
         >
-          {content}
+          {children}
         </ScrollView>
       ) : (
-        <View style={[styles.container, style]} {...rest}>
-          {content}
+        <View style={[styles.container, bottomPad, style]} {...rest}>
+          {children}
         </View>
       )}
-    </SafeAreaView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: theme.bg },
+  root: { flex: 1, backgroundColor: theme.bg },
+  flex: { flex: 1 },
   container: {
     flex: 1,
     padding: screenPadding,
@@ -79,21 +87,5 @@ const styles = StyleSheet.create({
     flexGrow: 1,
     padding: screenPadding,
     gap: spacing.md,
-    paddingBottom: spacing.xl,
-  },
-  backRow: {
-    alignSelf: "flex-start",
-    marginBottom: spacing.md,
-  },
-  header: { gap: spacing.xs, marginBottom: spacing.sm },
-  title: {
-    fontSize: typography.title,
-    fontWeight: "900",
-    color: theme.text,
-  },
-  subtitle: {
-    fontSize: typography.body,
-    color: theme.textMuted,
-    fontWeight: "600",
   },
 });

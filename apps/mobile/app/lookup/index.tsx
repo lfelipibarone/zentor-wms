@@ -13,12 +13,10 @@ export default function LookupScreen() {
   const { data, isLoading, error, refetch } = useLookupLocation(barcode);
 
   return (
-    <ScreenShell scroll>
-      <Text style={styles.subtitle}>
-        Bipe qualquer gôndola para ver produto e estoque
-      </Text>
+    <ScreenShell scroll module="consulta" title="Consulta">
       <FactoryButton
         label="Bipar gôndola"
+        icon="scan"
         onPress={() => setScannerOpen(true)}
       />
 
@@ -92,11 +90,6 @@ export default function LookupScreen() {
 }
 
 const styles = StyleSheet.create({
-  subtitle: {
-    color: theme.textMuted,
-    fontSize: typography.body,
-    marginBottom: spacing.sm,
-  },
   loading: { color: theme.textMuted, fontSize: typography.body },
   error: { color: theme.danger, fontWeight: "700", fontSize: typography.body },
   result: {

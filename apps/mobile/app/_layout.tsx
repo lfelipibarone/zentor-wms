@@ -3,6 +3,7 @@ import { Stack } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { AuthGate } from "@/components/AuthGate";
+import { Toaster } from "@/components/Toaster";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { appStackScreenOptions } from "@/lib/navigation";
 
@@ -43,12 +44,13 @@ export default function RootLayout() {
             />
             <Stack.Screen
               name="cargo-transport/index"
-              options={{ title: "Transporte de carga" }}
+              options={{ headerShown: false }}
             />
             <Stack.Screen
               name="stocking/index"
-              options={{ title: "Abastecer estoque" }}
+              options={{ headerShown: false }}
             />
+            <Stack.Screen name="lookup/index" options={{ headerShown: false }} />
             <Stack.Screen
               name="purchase-receipt"
               options={{ headerShown: false }}
@@ -57,13 +59,14 @@ export default function RootLayout() {
               name="putaway"
               options={{ headerShown: false }}
             />
-            <Stack.Screen name="perfil" options={{ title: "Meu perfil" }} />
-            <Stack.Screen name="minhas-tarefas" options={{ title: "Minhas tarefas" }} />
+            <Stack.Screen name="perfil" options={{ headerShown: false }} />
+            <Stack.Screen name="minhas-tarefas" options={{ headerShown: false }} />
             <Stack.Screen
               name="notifications"
-              options={{ title: "Notificações" }}
+              options={{ headerShown: false }}
             />
           </Stack>
+          <Toaster />
         </AuthGate>
       </AuthProvider>
     </QueryClientProvider>

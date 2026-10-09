@@ -13,7 +13,7 @@ export function ProductThumbnail({
   alt = "Produto",
   size = 80,
 }: ProductThumbnailProps) {
-  const borderRadius = 10;
+  const borderRadius = 12;
 
   if (imageUrl) {
     return (
@@ -37,8 +37,8 @@ export function ProductThumbnail({
       ]}
       accessibilityLabel={`${alt} sem imagem`}
     >
-      <Ionicons name="cube-outline" size={size * 0.4} color={theme.textMuted} />
-      <Text style={styles.placeholderText}>Sem foto</Text>
+      <Ionicons name="cube-outline" size={size * 0.45} color={theme.textSoft} />
+      {size >= 72 ? <Text style={styles.placeholderText}>Sem foto</Text> : null}
     </View>
   );
 }

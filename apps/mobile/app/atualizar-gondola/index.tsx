@@ -1,13 +1,23 @@
 import { useState } from "react";
-import { Pressable, StyleSheet, Text, TextInput, View } from "react-native";
+import { StyleSheet, Text, View } from "react-native";
 import { BarcodeScanner } from "@/components/BarcodeScanner";
 import { FactoryButton } from "@/components/FactoryButton";
 import { PercentInput } from "@/components/PercentInput";
 import { ProductThumbnail } from "@/components/ProductThumbnail";
 import { ScreenShell } from "@/components/ScreenShell";
+import {
+  BigCode,
+  Card,
+  Field,
+  Notice,
+  OptionRow,
+  OrDivider,
+  SectionTitle,
+} from "@/components/ui";
 import { useAdjustLocationStock } from "@/hooks/useAdjustLocationStock";
 import { api, ApiError, type ProductLocationOption } from "@/lib/api";
 import { showErrorAlert } from "@/lib/app-alert";
+import { modules } from "@/lib/modules";
 import { theme, spacing, typography } from "@/lib/theme";
 
 type FoundProduct = {
@@ -108,7 +118,7 @@ export default function AtualizarGondolaScreen() {
       });
       setMessage(
         `${product.sku} · ${face.label}: ${result.location.fillPercent}%` +
-          (result.location.needsReplenishment ? " — entrou na fila de reposição" : "") +
+          (result.location.needsReplenishment ? " · foi para reposição" : "") +
           " ✓",
       );
       reset();
@@ -117,47 +127,48 @@ export default function AtualizarGondolaScreen() {
     }
   };
 
-  return (
-    <ScreenShell scroll backToHome title="Atualizar gôndola">
-      <Text style={styles.subtitle}>
-        Leia o QR do produto ou o código da gôndola e informe a % que ela está.
-      </Text>
+  const saved = message?.includes("✓");
 
-      {message ? (
-        <Text style={[styles.message, message.includes("✓") ? styles.ok : styles.info]}>
-          {message}
-        </Text>
-      ) : null}
+  return (
+    <ScreenShell scroll module="gondola" title="Atualizar gôndola">
+      {message ? <Notice tone={saved ? "success" : "info"}>{message.replace(" ✓", "")}</Notice> : null}
 
       {!product ? (
         <>
           <FactoryButton
-            label="Ler produto ou gôndola"
-            onPress={() => setScannerOpen(true)}
+            label={saved ? "Ler próxima" : "Ler produto ou gôndola"}
+            icon="scan"
+            color={color}
+            onPress={() => reset(true)}
             loading={loading}
           />
-          <Text style={styles.or}>ou digite o SKU / código da gôndola</Text>
-          <TextInput
-            style={styles.input}
-            value={codeDraft}
-            onChangeText={setCodeDraft}
-            placeholder="SKU, EAN ou código da gôndola"
-            autoCapitalize="characters"
-            onSubmitEditing={() => loadCode(codeDraft)}
-          />
-          <FactoryButton
-            label="Buscar"
-            variant="secondary"
-            disabled={!codeDraft.trim()}
-            loading={loading}
-            onPress={() => loadCode(codeDraft)}
-          />
+          <OrDivider />
+          <View style={styles.searchRow}>
+            <Field
+              style={styles.flex}
+              value={codeDraft}
+              onChangeText={setCodeDraft}
+              placeholder="SKU, EAN ou gôndola"
+              autoCapitalize="characters"
+              returnKeyType="search"
+              onSubmitEditing={() => loadCode(codeDraft)}
+            />
+            <FactoryButton
+              label="Buscar"
+              icon="search"
+              size="md"
+              variant="secondary"
+              disabled={!codeDraft.trim()}
+              loading={loading}
+              onPress={() => loadCode(codeDraft)}
+            />
+          </View>
         </>
       ) : (
         <>
-          <View style={styles.card}>
+          <Card>
             <View style={styles.productRow}>
-              <ProductThumbnail imageUrl={product.imageUrl} alt={product.name} size={72} />
+              <ProductThumbnail imageUrl={product.imageUrl} alt={product.name} size={64} />
               <View style={styles.productInfo}>
                 <Text style={styles.sku}>{product.sku}</Text>
                 <Text style={styles.name} numberOfLines={2}>
@@ -165,41 +176,43 @@ export default function AtualizarGondolaScreen() {
                 </Text>
               </View>
             </View>
-          </View>
+          </Card>
 
           {faces.length > 1 && !face ? (
             <>
-              <Text style={styles.sectionTitle}>Qual gôndola?</Text>
+              <SectionTitle>Qual gôndola?</SectionTitle>
               {faces.map((loc) => (
-                <Pressable key={loc.id} style={styles.optionRow} onPress={() => setFace(loc)}>
-                  <Text style={styles.optionLabel}>{loc.label}</Text>
-                  <Text style={styles.meta}>
-                    {loc.fillPercent}% · mín. {loc.minPercent}%
-                  </Text>
-                </Pressable>
+                <OptionRow
+                  key={loc.id}
+                  title={loc.label}
+                  meta={`${loc.fillPercent}% · mín. ${loc.minPercent}%`}
+                  onPress={() => setFace(loc)}
+                />
               ))}
             </>
           ) : null}
 
           {face ? (
             <>
-              <View style={styles.faceCard}>
-                <Text style={styles.faceLabel}>{face.label}</Text>
-                <Text style={styles.faceMeta}>
-                  Registrado: {face.fillPercent}% · mínimo {face.minPercent}%
-                </Text>
-              </View>
+              <BigCode
+                label="Gôndola"
+                code={face.label}
+                meta={`Agora ${face.fillPercent}% · mín. ${face.minPercent}%`}
+                color={color}
+              />
               <PercentInput
-                label="Quanto tem na gôndola agora?"
+                label="Quanto tem agora?"
                 initialValue={face.fillPercent}
                 resetKey={face.id}
-                confirmLabel="Salvar %"
+                confirmLabel="Salvar"
                 loading={adjust.isPending}
                 onConfirm={savePercent}
               />
               {faces.length > 1 ? (
                 <FactoryButton
                   label="Outra gôndola deste produto"
+                  icon="swap-horizontal"
+                  size="sm"
                   variant="secondary"
                   onPress={() => setFace(null)}
                 />
@@ -207,18 +220,19 @@ export default function AtualizarGondolaScreen() {
             </>
           ) : null}
 
-          <FactoryButton label="Ler outro código" variant="secondary" onPress={() => reset(true)} />
+          <FactoryButton
+            label="Ler outro código"
+            icon="scan"
+            size="sm"
+            variant="secondary"
+            onPress={() => reset(true)}
+          />
         </>
       )}
-
-      {!product && message?.includes("✓") ? (
-        <FactoryButton label="Ler próxima gôndola" onPress={() => reset(true)} />
-      ) : null}
 
       <BarcodeScanner
         visible={scannerOpen}
         title="Produto ou gôndola"
-        hint="Aponte para o QR do produto ou a etiqueta da gôndola"
         onScan={(code) => {
           setScannerOpen(false);
           void loadCode(code);
@@ -229,54 +243,13 @@ export default function AtualizarGondolaScreen() {
   );
 }
 
+const color = modules.gondola.color;
+
 const styles = StyleSheet.create({
-  subtitle: { color: theme.textMuted, fontSize: typography.body, marginBottom: spacing.md },
-  or: { textAlign: "center", color: theme.textMuted, marginVertical: spacing.sm },
-  input: {
-    borderWidth: 2,
-    borderColor: theme.border,
-    borderRadius: 12,
-    padding: spacing.md,
-    marginBottom: spacing.sm,
-    backgroundColor: theme.surface,
-  },
-  card: {
-    backgroundColor: theme.surface,
-    borderRadius: 16,
-    padding: spacing.md,
-    borderWidth: 2,
-    borderColor: theme.border,
-    marginBottom: spacing.md,
-  },
+  flex: { flex: 1 },
+  searchRow: { flexDirection: "row", gap: spacing.sm, alignItems: "center" },
   productRow: { flexDirection: "row", gap: spacing.md, alignItems: "center" },
   productInfo: { flex: 1, gap: 2 },
   sku: { fontWeight: "900", fontSize: typography.subtitle, color: theme.info },
   name: { color: theme.text, fontWeight: "600" },
-  sectionTitle: { fontWeight: "900", fontSize: typography.body, color: theme.text },
-  optionRow: {
-    padding: spacing.md,
-    borderBottomWidth: 1,
-    borderBottomColor: theme.border,
-    backgroundColor: theme.surface,
-  },
-  optionLabel: { fontWeight: "800", fontSize: typography.body, color: theme.text },
-  meta: { color: theme.textMuted, fontSize: typography.caption, marginTop: 2 },
-  faceCard: {
-    backgroundColor: theme.primary,
-    borderRadius: 16,
-    padding: spacing.lg,
-    alignItems: "center",
-    marginBottom: spacing.md,
-  },
-  faceLabel: { fontSize: 32, fontWeight: "900", color: theme.primaryText, textAlign: "center" },
-  faceMeta: { color: theme.primaryText, fontWeight: "700", marginTop: spacing.xs },
-  message: {
-    padding: spacing.md,
-    borderRadius: 12,
-    fontWeight: "700",
-    textAlign: "center",
-    marginBottom: spacing.md,
-  },
-  ok: { backgroundColor: "#d1fae5", color: "#065f46" },
-  info: { backgroundColor: theme.surfaceElevated, color: theme.text },
 });

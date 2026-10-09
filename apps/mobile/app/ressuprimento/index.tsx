@@ -1,14 +1,7 @@
 import { useCallback, useState } from "react";
-import {
-  ActivityIndicator,
-  FlatList,
-  Pressable,
-  StyleSheet,
-  Text,
-  TextInput,
-  View,
-} from "react-native";
+import { FlatList, StyleSheet, Text, View } from "react-native";
 import { useFocusEffect } from "expo-router";
+import { Ionicons } from "@expo/vector-icons";
 import { BarcodeScanner } from "@/components/BarcodeScanner";
 import { FactoryButton } from "@/components/FactoryButton";
 import { PercentInput } from "@/components/PercentInput";
@@ -19,6 +12,18 @@ import {
 import { ProductThumbnail } from "@/components/ProductThumbnail";
 import { ScreenShell } from "@/components/ScreenShell";
 import {
+  Badge,
+  BigCode,
+  Card,
+  EmptyState,
+  Field,
+  Loading,
+  OptionRow,
+  OrDivider,
+  SectionTitle,
+  Steps,
+} from "@/components/ui";
+import {
   api,
   ApiError,
   type CargoTransferSummary,
@@ -26,9 +31,10 @@ import {
   type ProductLocationOption,
   type ReplenishmentNeed,
 } from "@/lib/api";
-import { showErrorAlert, showInfoAlert } from "@/lib/app-alert";
+import { showErrorAlert, showToast } from "@/lib/app-alert";
+import { modules } from "@/lib/modules";
 import { pulmaoPercentOf, pulmaoStocksSummary } from "@/lib/pulmao";
-import { theme, spacing, typography } from "@/lib/theme";
+import { theme, spacing, typography, radius } from "@/lib/theme";
 
 function apiErr(e: unknown, fallback: string) {
   return e instanceof ApiError ? e.message : fallback;
@@ -92,7 +98,7 @@ export default function RessuprimentoScreen() {
       setProductImageUrl(need.imageUrl ?? null);
       setSelected({ ...need, isMine: true, canWork: true });
       setPhase("withdraw");
-      showInfoAlert(`Aceito · gôndola ${need.routeLabel}`);
+      showToast(`Aceito · gôndola ${need.routeLabel}`);
     } catch (e) {
       showErrorAlert(apiErr(e, "Erro ao aceitar"));
     } finally {
@@ -103,7 +109,7 @@ export default function RessuprimentoScreen() {
   const openTransfer = (t: CargoTransferSummary) => {
     setActiveTransfer(t);
     setPhase("deposit");
-    showInfoAlert(
+    showToast(
       `${t.product.sku} → bipar gôndola${t.targetPickFace ? ` ${t.targetPickFace.label}` : ""}`,
     );
   };
@@ -115,7 +121,7 @@ export default function RessuprimentoScreen() {
       const res = await api.listProductLocations(skuDraft.trim(), "PULMAO");
       setProductImageUrl(res.product.imageUrl ?? null);
       setPulmaoOptions(res.locations);
-      showInfoAlert(`${res.locations.length} pulmão(ões) encontrado(s)`);
+      showToast(`${res.locations.length} pulmão(ões) encontrado(s)`);
     } catch (e) {
       showErrorAlert(apiErr(e, "SKU não encontrado"));
     } finally {
@@ -180,7 +186,7 @@ export default function RessuprimentoScreen() {
       setActiveTransfer(result.transfer);
       setDepositBarcode(null);
       setPhase("deposit");
-      showInfoAlert(
+      showToast(
         result.fromLocation.skuPercent === 0
           ? `Em trânsito · ${selected.sku} saiu do pulmão ${result.fromLocation.barcode}`
           : `Em trânsito · ${selected.sku} ficou com ${result.fromLocation.skuPercent}% no pulmão`,
@@ -232,7 +238,7 @@ export default function RessuprimentoScreen() {
         percent,
       });
       setPhase("done");
-      showInfoAlert(`Reabastecido · gôndola ${result.toLocation.barcode} em ${result.toLocation.fillPercent}%`);
+      showToast(`Reabastecido · gôndola ${result.toLocation.barcode} em ${result.toLocation.fillPercent}%`);
       setSelected(null);
       setActiveTransfer(null);
       setPulmao(null);
@@ -258,7 +264,7 @@ export default function RessuprimentoScreen() {
         await api.releaseReplenishmentNeed(selected.pickFaceId).catch(() => {});
       }
       resetAll();
-      showInfoAlert("Transporte cancelado");
+      showToast("Transporte cancelado");
     } catch (e) {
       showErrorAlert(apiErr(e, "Erro ao cancelar"));
     } finally {
@@ -280,113 +286,111 @@ export default function RessuprimentoScreen() {
   };
 
   if (phase === "list") {
-    const listHeader = (
-      <View style={styles.listHeader}>
-        {myTransfers.length > 0 ? (
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Meus em trânsito</Text>
-            {myTransfers.map((t) => (
-              <Pressable
-                key={t.id}
-                style={styles.card}
-                onPress={() => openTransfer(t)}
-              >
-                <View style={styles.productRow}>
-                  <ProductThumbnail
-                    imageUrl={t.product.imageUrl}
-                    alt={t.product.name}
-                    size={72}
-                  />
-                  <View style={styles.productInfo}>
-                    <Text style={styles.sku}>{t.product.sku}</Text>
-                    <Text style={styles.name}>{t.product.name}</Text>
-                    <Text style={styles.meta}>
-                      {t.quantity > 0 ? `${t.quantity} un. · ` : ""}
+    const listHeader =
+      myTransfers.length > 0 ? (
+        <View style={styles.listHeader}>
+          <SectionTitle>Em trânsito comigo</SectionTitle>
+          {myTransfers.map((t) => (
+            <Card key={t.id} accent={theme.warning} onPress={() => openTransfer(t)}>
+              <View style={styles.productRow}>
+                <ProductThumbnail imageUrl={t.product.imageUrl} alt={t.product.name} size={56} />
+                <View style={styles.productInfo}>
+                  <Text style={styles.sku}>{t.product.sku}</Text>
+                  <Text style={styles.name} numberOfLines={1}>
+                    {t.product.name}
+                  </Text>
+                  <View style={styles.routeRow}>
+                    <Text style={styles.routeText} numberOfLines={1}>
                       {t.fromLocation.label}
                     </Text>
-                    {t.targetPickFace ? (
-                      <Text style={styles.meta}>
-                        → {t.targetPickFace.label}
-                      </Text>
-                    ) : null}
-                    <Text style={styles.tapHint}>TOQUE PARA DEPOSITAR</Text>
+                    <Ionicons name="arrow-forward" size={14} color={theme.textMuted} />
+                    <Text style={[styles.routeText, styles.routeTarget]} numberOfLines={1}>
+                      {t.targetPickFace?.label ?? "gôndola"}
+                    </Text>
                   </View>
                 </View>
-              </Pressable>
-            ))}
-          </View>
-        ) : null}
-        <Text style={styles.sectionTitle}>Fila de reabastecimento</Text>
-      </View>
-    );
+                <Ionicons name="chevron-forward" size={24} color={theme.textSoft} />
+              </View>
+            </Card>
+          ))}
+          <SectionTitle>Fila</SectionTitle>
+        </View>
+      ) : null;
 
     return (
-      <ScreenShell backToHome title="Ressuprimento" style={styles.listShell}>
+      <ScreenShell
+        module="ressuprimento"
+        title="Ressuprimento"
+        subtitle={loadingList ? null : `${needs.length} gôndolas abaixo do mínimo`}
+        style={styles.listShell}
+      >
         {loadingList ? (
-          <View style={styles.listLoading}>
-            <ActivityIndicator size="large" color={theme.primary} />
-          </View>
+          <Loading />
         ) : (
           <FlatList
             style={styles.listFlex}
             data={needs}
             keyExtractor={(item) => item.pickFaceId}
             contentContainerStyle={styles.listContent}
+            refreshing={false}
+            onRefresh={load}
             ListHeaderComponent={listHeader}
             ListEmptyComponent={
-              <Text style={styles.empty}>Nenhuma necessidade aberta</Text>
+              <EmptyState icon="checkmark-done-circle-outline" title="Nenhuma gôndola para repor" />
             }
-            ListFooterComponent={
-              <FactoryButton
-                label="Atualizar"
-                variant="secondary"
-                onPress={load}
-              />
-            }
-            renderItem={({ item }) => (
-              <View style={styles.card}>
-                <View style={styles.productRow}>
-                  <ProductThumbnail
-                    imageUrl={item.imageUrl}
-                    alt={item.productName}
-                    size={72}
-                  />
-                  <View style={styles.productInfo}>
-                    <Text style={styles.sku}>{item.sku}</Text>
-                    <Text style={styles.name}>{item.productName}</Text>
+            renderItem={({ item }) => {
+              const busy = Boolean(item.assignedToName && !item.isMine);
+              return (
+                <Card
+                  accent={item.isMine ? theme.warning : busy ? theme.borderStrong : color}
+                  muted={busy}
+                >
+                  <View style={styles.needTop}>
+                    <Text style={styles.needLoc} numberOfLines={1}>
+                      {item.routeLabel}
+                    </Text>
+                    <FillGauge fill={item.fillPercent} min={item.minPercent} />
                   </View>
-                </View>
-                <Text style={styles.meta}>
-                  {item.routeLabel} · {item.fillPercent}% (mín. {item.minPercent}%) ·
-                  falta {item.percentToFill}%
-                </Text>
-                {item.assignedToName && !item.isMine ? (
-                  <Text style={styles.warn}>
-                    Em andamento: {item.assignedToName}
-                  </Text>
-                ) : null}
-                {item.isMine ? (
-                  <FactoryButton
-                    label="Continuar"
-                    onPress={() => {
-                      setSelected(item);
-                      setProductImageUrl(item.imageUrl ?? null);
-                      setPhase(
-                        item.assignmentStatus === "WITHDRAWN"
-                          ? "deposit"
-                          : "withdraw",
-                      );
-                    }}
-                  />
-                ) : item.canAccept ? (
-                  <FactoryButton
-                    label="Aceitar"
-                    onPress={() => acceptNeed(item)}
-                    loading={loading}
-                  />
-                ) : null}
-              </View>
-            )}
+                  <View style={styles.productRow}>
+                    <ProductThumbnail imageUrl={item.imageUrl} alt={item.productName} size={48} />
+                    <View style={styles.productInfo}>
+                      <Text style={styles.sku}>{item.sku}</Text>
+                      <Text style={styles.name} numberOfLines={1}>
+                        {item.productName}
+                      </Text>
+                    </View>
+                  </View>
+                  {busy ? (
+                    <Badge label={item.assignedToName ?? ""} icon="person" />
+                  ) : item.isMine ? (
+                    <FactoryButton
+                      label="Continuar"
+                      icon="play"
+                      size="md"
+                      color={theme.warning}
+                      onPress={() => {
+                        setSelected(item);
+                        setProductImageUrl(item.imageUrl ?? null);
+                        setPhase(
+                          item.assignmentStatus === "WITHDRAWN"
+                            ? "deposit"
+                            : "withdraw",
+                        );
+                      }}
+                    />
+                  ) : item.canAccept ? (
+                    <FactoryButton
+                      label="Aceitar"
+                      icon="hand-left"
+                      size="md"
+                      color={color}
+                      onPress={() => acceptNeed(item)}
+                      loading={loading}
+                    />
+                  ) : null}
+                </Card>
+              );
+            }}
           />
         )}
       </ScreenShell>
@@ -397,63 +401,82 @@ export default function RessuprimentoScreen() {
     const pulmaoPct = pulmao ? pulmaoPercentOf(pulmao, selected.productId) : 0;
 
     return (
-      <ScreenShell scroll backToHome title="Retirar do pulmão">
-        <View style={styles.card}>
-          <Text style={styles.meta}>Gôndola alvo: {selected.routeLabel}</Text>
+      <ScreenShell
+        scroll
+        module="ressuprimento"
+        title="Retirar do pulmão"
+        subtitle={`Para ${selected.routeLabel}`}
+      >
+        <Steps steps={["Retirar", "Depositar"]} current={0} color={color} />
+        <Card>
           <View style={styles.productRow}>
             <ProductThumbnail
               imageUrl={selected.imageUrl ?? productImageUrl}
               alt={selected.productName}
+              size={64}
             />
             <View style={styles.productInfo}>
               <Text style={styles.sku}>{selected.sku}</Text>
-              <Text style={styles.name}>{selected.productName}</Text>
+              <Text style={styles.name} numberOfLines={2}>
+                {selected.productName}
+              </Text>
             </View>
           </View>
-        </View>
+        </Card>
 
         {!pulmao ? (
           <>
+            {selected.suggestedPulmao ? (
+              <Badge
+                label={`Sugerido: ${selected.suggestedPulmao.label} · ${selected.suggestedPulmao.percent}%`}
+                tone="warning"
+                icon="star"
+              />
+            ) : null}
             <FactoryButton
               label="Bipar pulmão"
+              icon="scan"
+              color={color}
               onPress={() => {
                 setScanTarget("pulmao");
                 setScannerOpen(true);
               }}
             />
-            <Text style={styles.or}>ou informe o SKU</Text>
-            <TextInput
-              style={styles.input}
-              value={skuDraft}
-              onChangeText={setSkuDraft}
-              placeholder="SKU / código"
-              autoCapitalize="characters"
-            />
-            <FactoryButton
-              label="Buscar pulmões"
-              variant="secondary"
-              onPress={searchPulmaoBySku}
-              loading={loading}
-            />
+            <OrDivider label="ou busque pelo SKU" />
+            <View style={styles.searchRow}>
+              <Field
+                style={styles.flex}
+                value={skuDraft}
+                onChangeText={setSkuDraft}
+                placeholder={selected.sku}
+                autoCapitalize="characters"
+              />
+              <FactoryButton
+                label="Buscar"
+                icon="search"
+                size="md"
+                variant="secondary"
+                onPress={searchPulmaoBySku}
+                loading={loading}
+              />
+            </View>
             {pulmaoOptions.map((loc) => (
-              <Pressable
+              <OptionRow
                 key={loc.id}
-                style={styles.optionRow}
-                onPress={() => pickPulmao(loc)}
-              >
-                <Text style={styles.optionLabel}>
-                  {loc.label}
-                  {loc.isSuggested ? " ★" : ""}
-                </Text>
-                <Text style={styles.meta}>{loc.fillPercent}% deste SKU</Text>
-              </Pressable>
+                title={loc.label}
+                meta={`${loc.fillPercent}% deste SKU`}
+                highlight={loc.isSuggested}
+                onPress={() => void pickPulmao(loc)}
+              />
             ))}
           </>
         ) : (
           <>
-            <View style={styles.card}>
-              <Text style={styles.locTitle}>{pulmao.label}</Text>
-            </View>
+            <BigCode
+              label="Pulmão"
+              code={pulmao.label}
+              color={modules.armazenagem.color}
+            />
             <PulmaoWithdrawPercent
               sku={selected.sku}
               pulmaoLabel={pulmao.label}
@@ -466,7 +489,9 @@ export default function RessuprimentoScreen() {
 
         <FactoryButton
           label="Cancelar aceite"
-          variant="secondary"
+          icon="close"
+          size="sm"
+          variant="ghost"
           onPress={async () => {
             await api.releaseReplenishmentNeed(selected.pickFaceId).catch(() => {});
             resetAll();
@@ -484,33 +509,33 @@ export default function RessuprimentoScreen() {
 
   if (phase === "deposit" && activeTransfer) {
     return (
-      <ScreenShell scroll backToHome title="Depositar na gôndola">
-        <View style={styles.card}>
+      <ScreenShell scroll module="ressuprimento" title="Depositar na gôndola">
+        <Steps steps={["Retirar", "Depositar"]} current={1} color={color} />
+        <Card>
           <View style={styles.productRow}>
             <ProductThumbnail
               imageUrl={activeTransfer.product.imageUrl}
               alt={activeTransfer.product.name}
+              size={64}
             />
             <View style={styles.productInfo}>
               <Text style={styles.sku}>{activeTransfer.product.sku}</Text>
-              <Text style={styles.name}>{activeTransfer.product.name}</Text>
-              <Text style={styles.meta}>
-                Em trânsito desde {activeTransfer.fromLocation.label}
+              <Text style={styles.name} numberOfLines={2}>
+                {activeTransfer.product.name}
               </Text>
-              {activeTransfer.targetPickFace ? (
-                <Text style={styles.locTitle}>
-                  {activeTransfer.targetPickFace.label}
-                </Text>
-              ) : null}
+              <Text style={styles.meta}>De {activeTransfer.fromLocation.label}</Text>
             </View>
           </View>
-        </View>
+        </Card>
+
+        {activeTransfer.targetPickFace ? (
+          <BigCode label="Levar para" code={activeTransfer.targetPickFace.label} color={color} />
+        ) : null}
 
         {depositBarcode ? (
           <>
             <PercentInput
               label={`Gôndola ${depositBarcode} — quanto ficou?`}
-              hint="Depois de abastecer, informe a % da gôndola."
               initialValue={100}
               resetKey={depositBarcode}
               confirmLabel="Confirmar depósito"
@@ -519,6 +544,8 @@ export default function RessuprimentoScreen() {
             />
             <FactoryButton
               label="Trocar gôndola"
+              icon="swap-horizontal"
+              size="sm"
               variant="secondary"
               onPress={() => setDepositBarcode(null)}
             />
@@ -527,43 +554,47 @@ export default function RessuprimentoScreen() {
           <>
             <FactoryButton
               label="Bipar gôndola"
+              icon="scan"
+              color={color}
               onPress={() => {
                 setScanTarget("gondola");
                 setScannerOpen(true);
               }}
             />
-            <Text style={styles.or}>ou SKU para listar gôndolas</Text>
-            <TextInput
-              style={styles.input}
-              value={skuDraft}
-              onChangeText={setSkuDraft}
-              placeholder="SKU"
-              autoCapitalize="characters"
-            />
-            <FactoryButton
-              label="Buscar gôndolas"
-              variant="secondary"
-              onPress={searchFaceBySku}
-            />
+            <OrDivider label="ou busque pelo SKU" />
+            <View style={styles.searchRow}>
+              <Field
+                style={styles.flex}
+                value={skuDraft}
+                onChangeText={setSkuDraft}
+                placeholder={activeTransfer.product.sku}
+                autoCapitalize="characters"
+              />
+              <FactoryButton
+                label="Buscar"
+                icon="search"
+                size="md"
+                variant="secondary"
+                onPress={searchFaceBySku}
+              />
+            </View>
             {faceOptions.map((loc) => (
-              <Pressable
+              <OptionRow
                 key={loc.id}
-                style={styles.optionRow}
-                onPress={() => chooseDepositGondola(loc.barcode)}
-              >
-                <Text style={styles.optionLabel}>
-                  {loc.label}
-                  {loc.isSuggested ? " ★" : ""}
-                </Text>
-                <Text style={styles.meta}>Gôndola em {loc.fillPercent}%</Text>
-              </Pressable>
+                title={loc.label}
+                meta={`Gôndola em ${loc.fillPercent}%`}
+                highlight={loc.isSuggested}
+                onPress={() => void chooseDepositGondola(loc.barcode)}
+              />
             ))}
           </>
         )}
 
         <FactoryButton
           label="Cancelar transporte"
-          variant="secondary"
+          icon="close"
+          size="sm"
+          variant="ghost"
           onPress={cancelTransit}
           loading={loading}
         />
@@ -578,84 +609,55 @@ export default function RessuprimentoScreen() {
   }
 
   return (
-    <ScreenShell scroll backToHome title="Concluído">
-      <Text style={styles.doneText}>Operação finalizada</Text>
-      <FactoryButton label="Voltar à fila" onPress={resetAll} />
+    <ScreenShell scroll module="ressuprimento" title="Concluído">
+      <EmptyState icon="checkmark-circle" title="Gôndola reabastecida" />
+      <FactoryButton label="Voltar à fila" icon="arrow-back" color={color} onPress={resetAll} />
     </ScreenShell>
   );
 }
 
+/** Barra de ocupação da gôndola com a marca do mínimo */
+function FillGauge({ fill, min }: { fill: number; min: number }) {
+  const barColor = fill <= min / 2 ? theme.danger : theme.warning;
+  return (
+    <View style={styles.gaugeWrap}>
+      <View style={styles.gauge}>
+        <View style={[styles.gaugeFill, { width: `${Math.min(100, fill)}%`, backgroundColor: barColor }]} />
+        <View style={[styles.gaugeMin, { left: `${Math.min(100, min)}%` }]} />
+      </View>
+      <Text style={[styles.gaugeText, { color: barColor }]}>{fill}%</Text>
+    </View>
+  );
+}
+
+const color = modules.ressuprimento.color;
+
 const styles = StyleSheet.create({
-  listShell: {
-    gap: 0,
-    paddingBottom: 0,
-  },
+  flex: { flex: 1 },
+  listShell: { paddingBottom: 0 },
   listFlex: { flex: 1 },
-  listLoading: {
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  listHeader: {
-    gap: spacing.sm,
-    paddingTop: spacing.sm,
-    marginBottom: spacing.sm,
-  },
-  listContent: {
-    paddingBottom: spacing.xl,
-    flexGrow: 1,
-  },
-  doneText: {
-    textAlign: "center",
-    fontSize: typography.body,
-    color: theme.text,
-    marginBottom: spacing.md,
-  },
-  tapHint: {
-    marginTop: spacing.xs,
-    fontWeight: "800",
-    color: theme.primary,
-    fontSize: typography.caption,
-  },
-  section: { marginBottom: spacing.md },
-  sectionTitle: { fontWeight: "800", marginBottom: spacing.sm },
-  empty: { color: theme.textMuted, textAlign: "center" },
-  card: {
-    backgroundColor: theme.surface,
-    borderRadius: 12,
-    padding: spacing.md,
-    marginBottom: spacing.sm,
-    borderWidth: 2,
-    borderColor: theme.border,
-  },
-  productRow: {
-    flexDirection: "row",
-    gap: spacing.md,
-    alignItems: "flex-start",
-    marginBottom: spacing.sm,
-  },
-  productInfo: { flex: 1, gap: spacing.xs },
+  listHeader: { gap: spacing.sm, marginBottom: spacing.xs },
+  listContent: { paddingBottom: spacing.xl * 2, gap: spacing.sm, flexGrow: 1 },
+  needTop: { flexDirection: "row", alignItems: "center", gap: spacing.sm },
+  needLoc: { flex: 1, fontSize: typography.subtitle, fontWeight: "900", color: theme.text },
+  productRow: { flexDirection: "row", gap: spacing.sm, alignItems: "center", marginVertical: spacing.sm },
+  productInfo: { flex: 1, gap: 2 },
   sku: { fontWeight: "900", color: theme.info },
-  name: { color: theme.text },
-  meta: { color: theme.textMuted, fontSize: typography.caption, marginTop: 4 },
-  warn: { color: theme.danger, fontSize: typography.caption },
-  locTitle: {
-    fontSize: typography.title,
-    fontWeight: "900",
-    color: theme.primary,
+  name: { color: theme.text, fontWeight: "600" },
+  meta: { color: theme.textMuted, fontSize: typography.caption, fontWeight: "700" },
+  routeRow: { flexDirection: "row", alignItems: "center", gap: 4 },
+  routeText: { color: theme.textMuted, fontWeight: "800", fontSize: typography.caption, flexShrink: 1 },
+  routeTarget: { color },
+  searchRow: { flexDirection: "row", gap: spacing.sm, alignItems: "center" },
+  gaugeWrap: { flexDirection: "row", alignItems: "center", gap: 6 },
+  gauge: {
+    width: 70,
+    height: 8,
+    borderRadius: radius.pill,
+    backgroundColor: theme.border,
+    overflow: "hidden",
   },
-  or: { textAlign: "center", color: theme.textMuted, marginVertical: spacing.sm },
-  input: {
-    borderWidth: 2,
-    borderColor: theme.border,
-    borderRadius: 12,
-    padding: spacing.md,
-    marginBottom: spacing.sm,
-  },
-  optionRow: {
-    padding: spacing.md,
-    borderBottomWidth: 1,
-    borderBottomColor: theme.border,
-  },
-  optionLabel: { fontWeight: "700" },
+  gaugeFill: { height: "100%" },
+  gaugeMin: { position: "absolute", top: 0, bottom: 0, width: 2, backgroundColor: theme.text },
+  gaugeText: { fontWeight: "900", fontSize: typography.caption },
 });

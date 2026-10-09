@@ -1,14 +1,15 @@
 import { useState } from "react";
 import { router } from "expo-router";
-import { ActivityIndicator, Alert, StyleSheet, Text, View } from "react-native";
+import { Alert } from "react-native";
 import { BarcodeScanner } from "@/components/BarcodeScanner";
 import { FactoryButton } from "@/components/FactoryButton";
 import { ScreenShell } from "@/components/ScreenShell";
 import { SplitWorkModal } from "@/components/SplitWorkModal";
+import { Loading } from "@/components/ui";
 import { useStartPurchaseReceipt } from "@/hooks/usePurchaseReceipt";
 import { useSplitWork } from "@/hooks/useWorkShares";
 import { ApiError, type PurchaseReceiptSessionDto } from "@/lib/api";
-import { theme, spacing } from "@/lib/theme";
+import { modules } from "@/lib/modules";
 
 export default function PurchaseReceiptScanScreen() {
   const [scannerOpen, setScannerOpen] = useState(true);
@@ -66,28 +67,22 @@ export default function PurchaseReceiptScanScreen() {
   };
 
   return (
-    <ScreenShell
-      backToHome
-      scroll
-      title="Bipar DANFE"
-      subtitle="Aponte para o código de barras da chave de acesso na DANFE"
-    >
+    <ScreenShell scroll module="recebimento" title="Bipar DANFE">
       {start.isPending ? (
-        <View style={styles.centered}>
-          <ActivityIndicator size="large" color={theme.primary} />
-          <Text style={styles.loading}>Buscando nota no Tiny…</Text>
-        </View>
+        <Loading label="Buscando nota…" />
       ) : (
         <FactoryButton
           label="Abrir câmera"
+          icon="scan"
+          color={modules.recebimento.color}
           onPress={() => setScannerOpen(true)}
         />
       )}
 
       <BarcodeScanner
         visible={scannerOpen && !start.isPending && !toSplit}
-        title="DANFE — chave de acesso"
-        hint="O código de barras da NF-e (44 dígitos)"
+        title="DANFE"
+        hint="Código de barras da chave de acesso"
         onScan={handleScan}
         onClose={() => router.replace("/purchase-receipt")}
       />
@@ -107,8 +102,3 @@ export default function PurchaseReceiptScanScreen() {
     </ScreenShell>
   );
 }
-
-const styles = StyleSheet.create({
-  centered: { alignItems: "center", padding: spacing.xl },
-  loading: { marginTop: spacing.md, color: theme.textMuted },
-});

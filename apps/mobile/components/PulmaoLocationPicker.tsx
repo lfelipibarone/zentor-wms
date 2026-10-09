@@ -1,13 +1,9 @@
 import { useEffect, useState } from "react";
-import {
-  Pressable,
-  StyleSheet,
-  Text,
-  TextInput,
-  View,
-} from "react-native";
+import { StyleSheet, View } from "react-native";
 import { BarcodeScanner } from "@/components/BarcodeScanner";
 import { FactoryButton } from "@/components/FactoryButton";
+import { Field, OptionRow, OrDivider } from "@/components/ui";
+import { modules } from "@/lib/modules";
 import {
   api,
   ApiError,
@@ -15,7 +11,7 @@ import {
   type ProductLocationOption,
 } from "@/lib/api";
 import { showErrorAlert } from "@/lib/app-alert";
-import { theme, spacing, typography } from "@/lib/theme";
+import { spacing } from "@/lib/theme";
 
 function normalizeBarcode(code: string) {
   return code.trim().toUpperCase();
@@ -113,45 +109,49 @@ export function PulmaoLocationPicker({
     <View style={styles.wrap}>
       <FactoryButton
         label="Bipar pulmão"
+        icon="scan"
+        color={modules.armazenagem.color}
         onPress={() => setScannerOpen(true)}
         loading={loading}
         disabled={disabled}
       />
-      <Text style={styles.or}>ou informe o SKU</Text>
-      <TextInput
-        style={styles.input}
-        value={skuDraft}
-        onChangeText={setSkuDraft}
-        placeholder="SKU / código"
-        autoCapitalize="characters"
-        editable={!disabled}
-      />
-      <FactoryButton
-        label="Buscar pulmões"
-        variant="secondary"
-        onPress={searchPulmaoBySku}
-        loading={loading}
-        disabled={disabled}
-      />
+      <OrDivider label="ou busque pelo SKU" />
+      <View style={styles.searchRow}>
+        <Field
+          style={styles.flex}
+          value={skuDraft}
+          onChangeText={setSkuDraft}
+          placeholder="SKU"
+          autoCapitalize="characters"
+          editable={!disabled}
+          onSubmitEditing={searchPulmaoBySku}
+          returnKeyType="search"
+        />
+        <FactoryButton
+          label="Buscar"
+          icon="search"
+          size="md"
+          variant="secondary"
+          onPress={searchPulmaoBySku}
+          loading={loading}
+          disabled={disabled}
+        />
+      </View>
       {pulmaoOptions.map((loc) => (
-        <Pressable
+        <OptionRow
           key={loc.id}
-          style={styles.optionRow}
-          onPress={() => pickPulmao(loc)}
-          disabled={disabled || loading}
-        >
-          <Text style={styles.optionLabel}>
-            {loc.label}
-            {loc.isSuggested ? " ★" : ""}
-          </Text>
-          <Text style={styles.meta}>{loc.fillPercent}% deste SKU no pulmão</Text>
-        </Pressable>
+          title={loc.label}
+          meta={`${loc.fillPercent}% deste SKU`}
+          highlight={loc.isSuggested}
+          onPress={() => {
+            if (!disabled && !loading) void pickPulmao(loc);
+          }}
+        />
       ))}
 
       <BarcodeScanner
         visible={scannerOpen}
         title="Bipar pulmão"
-        hint="Endereço de pulmão"
         onScan={handlePulmaoScan}
         onClose={() => setScannerOpen(false)}
       />
@@ -160,31 +160,7 @@ export function PulmaoLocationPicker({
 }
 
 const styles = StyleSheet.create({
-  wrap: { gap: spacing.xs },
-  or: {
-    textAlign: "center",
-    color: theme.textMuted,
-    marginVertical: spacing.sm,
-    fontSize: typography.caption,
-    fontWeight: "600",
-  },
-  input: {
-    borderWidth: 2,
-    borderColor: theme.border,
-    borderRadius: 12,
-    padding: spacing.md,
-    marginBottom: spacing.xs,
-    backgroundColor: theme.surface,
-    color: theme.text,
-  },
-  optionRow: {
-    padding: spacing.md,
-    borderBottomWidth: 1,
-    borderBottomColor: theme.border,
-    backgroundColor: theme.surface,
-    borderRadius: 8,
-    marginBottom: spacing.xs,
-  },
-  optionLabel: { fontWeight: "700", color: theme.text },
-  meta: { color: theme.textMuted, fontSize: typography.caption, marginTop: 4 },
+  wrap: { gap: spacing.sm },
+  flex: { flex: 1 },
+  searchRow: { flexDirection: "row", gap: spacing.sm, alignItems: "center" },
 });

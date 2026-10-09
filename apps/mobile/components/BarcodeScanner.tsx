@@ -1,8 +1,10 @@
 import { useCallback, useRef, useState } from "react";
-import { Modal, StyleSheet, Text, View } from "react-native";
+import { Modal, Pressable, StyleSheet, Text, View } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { Ionicons } from "@expo/vector-icons";
 import { CameraView, useCameraPermissions } from "expo-camera";
 import { FactoryButton } from "./FactoryButton";
-import { theme, spacing, typography } from "@/lib/theme";
+import { theme, spacing, typography, radius } from "@/lib/theme";
 
 interface BarcodeScannerProps {
   visible: boolean;
@@ -19,6 +21,7 @@ export function BarcodeScanner({
   onScan,
   onClose,
 }: BarcodeScannerProps) {
+  const insets = useSafeAreaInsets();
   const [permission, requestPermission] = useCameraPermissions();
   const scannedRef = useRef(false);
   const [lastCode, setLastCode] = useState<string | null>(null);
@@ -43,23 +46,22 @@ export function BarcodeScanner({
   return (
     <Modal visible animationType="slide" onRequestClose={onClose}>
       <View style={styles.container}>
-        <Text style={styles.title}>{title}</Text>
-        {hint ? <Text style={styles.hint}>{hint}</Text> : null}
-
         {!permission?.granted ? (
-          <View style={styles.permissionBox}>
-            <Text style={styles.permissionText}>
-              Permissão de câmera necessária para bipar códigos.
-            </Text>
-            <FactoryButton
-              label="Permitir câmera"
-              onPress={requestPermission}
+          <View style={[styles.permissionBox, { paddingTop: insets.top + spacing.xl }]}>
+            <Ionicons
+              name="camera-outline"
+              size={64}
+              color={theme.headerMuted}
+              style={styles.centerSelf}
             />
+            <Text style={styles.permissionText}>Libere a câmera para bipar</Text>
+            <FactoryButton label="Permitir câmera" icon="camera" onPress={requestPermission} />
+            <FactoryButton label="Fechar" variant="secondary" onPress={onClose} />
           </View>
         ) : (
-          <View style={styles.cameraWrap}>
+          <>
             <CameraView
-              style={styles.camera}
+              style={StyleSheet.absoluteFill}
               facing="back"
               barcodeScannerSettings={{
                 barcodeTypes: [
@@ -74,22 +76,50 @@ export function BarcodeScanner({
               }}
               onBarcodeScanned={scannedRef.current ? undefined : handleBarcode}
             />
-            <View style={styles.reticle} pointerEvents="none" />
-          </View>
+            <View style={styles.reticleWrap} pointerEvents="none">
+              <View style={styles.reticle} />
+            </View>
+
+            <View style={[styles.topBar, { paddingTop: insets.top + spacing.sm }]}>
+              <View style={styles.flex}>
+                <Text style={styles.title} numberOfLines={1}>
+                  {title}
+                </Text>
+                {hint ? (
+                  <Text style={styles.hint} numberOfLines={2}>
+                    {hint}
+                  </Text>
+                ) : null}
+              </View>
+              <Pressable
+                onPress={onClose}
+                style={styles.closeBtn}
+                hitSlop={12}
+                accessibilityLabel="Fechar leitor"
+              >
+                <Ionicons name="close" size={28} color="#fff" />
+              </Pressable>
+            </View>
+
+            {lastCode ? (
+              <View style={[styles.bottom, { paddingBottom: insets.bottom + spacing.md }]}>
+                <View style={styles.lastCode}>
+                  <Ionicons name="checkmark-circle" size={20} color={theme.success} />
+                  <Text style={styles.lastCodeText} numberOfLines={1}>
+                    {lastCode}
+                  </Text>
+                </View>
+                <FactoryButton
+                  label="Bipar novamente"
+                  icon="scan"
+                  size="md"
+                  variant="secondary"
+                  onPress={resetScan}
+                />
+              </View>
+            ) : null}
+          </>
         )}
-
-        {lastCode ? (
-          <Text style={styles.lastCode}>Lido: {lastCode}</Text>
-        ) : null}
-
-        <View style={styles.actions}>
-          <FactoryButton
-            label="Bipar novamente"
-            variant="secondary"
-            onPress={resetScan}
-          />
-          <FactoryButton label="Fechar" variant="danger" onPress={onClose} />
-        </View>
       </View>
     </Modal>
   );
@@ -106,7 +136,7 @@ export function ScanTriggerButton({
   const [open, setOpen] = useState(false);
   return (
     <>
-      <FactoryButton label={label} onPress={() => setOpen(true)} />
+      <FactoryButton label={label} icon="scan" onPress={() => setOpen(true)} />
       <BarcodeScanner
         visible={open}
         title="Escanear código"
@@ -121,54 +151,65 @@ export function ScanTriggerButton({
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: theme.bg,
-    padding: spacing.md,
-    gap: spacing.md,
-    paddingTop: spacing.xl,
+  container: { flex: 1, backgroundColor: "#000" },
+  flex: { flex: 1 },
+  centerSelf: { alignSelf: "center" },
+  topBar: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.sm,
+    paddingHorizontal: spacing.md,
+    paddingBottom: spacing.md,
+    backgroundColor: "rgba(15,23,42,0.75)",
   },
-  title: {
-    fontSize: typography.title,
-    fontWeight: "900",
-    color: theme.text,
-    textAlign: "center",
+  title: { fontSize: typography.subtitle, fontWeight: "900", color: "#fff" },
+  hint: { fontSize: typography.caption, color: theme.headerMuted, fontWeight: "600", marginTop: 2 },
+  closeBtn: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: "rgba(255,255,255,0.15)",
+    alignItems: "center",
+    justifyContent: "center",
   },
-  hint: {
-    fontSize: typography.body,
-    color: theme.textMuted,
-    textAlign: "center",
-  },
-  cameraWrap: {
-    flex: 1,
-    borderRadius: 16,
-    overflow: "hidden",
-    borderWidth: 3,
-    borderColor: theme.primary,
-  },
-  camera: { flex: 1 },
-  reticle: {
+  reticleWrap: {
     ...StyleSheet.absoluteFill,
-    margin: 48,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  reticle: {
+    width: "78%",
+    aspectRatio: 1.4,
     borderWidth: 4,
-    borderColor: theme.scannerOverlay,
-    borderRadius: 12,
+    borderColor: theme.primary,
+    borderRadius: radius.xl,
   },
   permissionBox: {
     flex: 1,
     justifyContent: "center",
-    gap: spacing.lg,
+    padding: spacing.lg,
+    gap: spacing.md,
+    alignItems: "stretch",
   },
   permissionText: {
-    color: theme.text,
-    fontSize: typography.body,
-    textAlign: "center",
-  },
-  lastCode: {
-    color: theme.success,
+    color: "#fff",
     fontSize: typography.subtitle,
-    fontWeight: "700",
+    fontWeight: "800",
     textAlign: "center",
   },
-  actions: { gap: spacing.sm },
+  bottom: {
+    position: "absolute",
+    left: 0,
+    right: 0,
+    bottom: 0,
+    padding: spacing.md,
+    gap: spacing.sm,
+    backgroundColor: "rgba(15,23,42,0.75)",
+  },
+  lastCode: { flexDirection: "row", alignItems: "center", gap: spacing.sm, justifyContent: "center" },
+  lastCodeText: { color: "#fff", fontSize: typography.body, fontWeight: "800" },
 });

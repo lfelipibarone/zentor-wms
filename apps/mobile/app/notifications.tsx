@@ -1,12 +1,8 @@
 import { useCallback, useEffect, useState } from "react";
-import {
-  ActivityIndicator,
-  FlatList,
-  Pressable,
-  StyleSheet,
-  Text,
-  View,
-} from "react-native";
+import { FlatList, Pressable, StyleSheet, Text, View } from "react-native";
+import { Ionicons } from "@expo/vector-icons";
+import { ScreenShell } from "@/components/ScreenShell";
+import { Card, EmptyState, Loading } from "@/components/ui";
 import {
   fetchNotifications,
   markAllNotificationsRead,
@@ -15,7 +11,7 @@ import {
 } from "@/lib/notifications-api";
 import { showErrorAlert } from "@/lib/app-alert";
 import { openWorkShareRoute } from "@/lib/work-route";
-import { theme, spacing, typography } from "@/lib/theme";
+import { theme, spacing, typography, radius } from "@/lib/theme";
 
 export default function NotificationsScreen() {
   const [items, setItems] = useState<NotificationDto[]>([]);
@@ -40,91 +36,105 @@ export default function NotificationsScreen() {
     load();
   }, [load]);
 
-  if (loading) {
-    return (
-      <View style={styles.centered}>
-        <ActivityIndicator size="large" color={theme.primary} />
-      </View>
-    );
-  }
+  const markAll = async () => {
+    try {
+      await markAllNotificationsRead();
+      await load();
+    } catch (e) {
+      showErrorAlert(e instanceof Error ? e.message : "Erro ao marcar como lidas");
+    }
+  };
+
+  const hasUnread = items.some((n) => !n.readAt);
 
   return (
-    <View style={styles.container}>
-      <View style={styles.header}>
-        <Text style={styles.title}>Notificações</Text>
-        <Pressable
-          onPress={async () => {
-            try {
-              await markAllNotificationsRead();
-              await load();
-            } catch (e) {
-              showErrorAlert(
-                e instanceof Error ? e.message : "Erro ao marcar como lidas",
-              );
-            }
-          }}
-        >
-          <Text style={styles.markAll}>Marcar todas lidas</Text>
-        </Pressable>
-      </View>
-      <FlatList
-        data={items}
-        keyExtractor={(n) => n.id}
-        ListEmptyComponent={
-          <Text style={styles.empty}>Nenhuma notificação</Text>
-        }
-        renderItem={({ item }) => (
+    <ScreenShell
+      title="Notificações"
+      style={styles.shell}
+      headerRight={
+        hasUnread ? (
           <Pressable
-            style={[styles.item, !item.readAt && styles.unread]}
-            disabled={Boolean(item.readAt) && !item.data?.route}
-            onPress={async () => {
-              const route = item.data?.route;
-              if (route) openWorkShareRoute(route);
-              if (item.readAt) return;
-              try {
-                await markNotificationRead(item.id);
-                if (!route) await load();
-              } catch (e) {
-                showErrorAlert(
-                  e instanceof Error ? e.message : "Erro ao marcar como lida",
-                );
-              }
-            }}
+            onPress={markAll}
+            style={styles.headerAction}
+            hitSlop={8}
+            accessibilityLabel="Marcar todas como lidas"
           >
-            <Text style={styles.itemTitle}>{item.title}</Text>
-            <Text style={styles.itemBody}>{item.body}</Text>
-            <Text style={styles.itemDate}>
-              {new Date(item.createdAt).toLocaleString("pt-BR")}
-            </Text>
+            <Ionicons name="checkmark-done" size={22} color={theme.headerTint} />
           </Pressable>
-        )}
-      />
-    </View>
+        ) : null
+      }
+    >
+      {loading ? (
+        <Loading />
+      ) : (
+        <FlatList
+          style={styles.flex}
+          data={items}
+          keyExtractor={(n) => n.id}
+          contentContainerStyle={styles.list}
+          refreshing={false}
+          onRefresh={load}
+          ListEmptyComponent={
+            <EmptyState icon="notifications-off-outline" title="Nenhuma notificação" />
+          }
+          renderItem={({ item }) => (
+            <Card
+              accent={item.readAt ? undefined : theme.primary}
+              onPress={
+                item.readAt && !item.data?.route
+                  ? undefined
+                  : async () => {
+                      const route = item.data?.route;
+                      if (route) openWorkShareRoute(route);
+                      if (item.readAt) return;
+                      try {
+                        await markNotificationRead(item.id);
+                        if (!route) await load();
+                      } catch (e) {
+                        showErrorAlert(
+                          e instanceof Error ? e.message : "Erro ao marcar como lida",
+                        );
+                      }
+                    }
+              }
+            >
+              <View style={styles.row}>
+                <Text style={[styles.itemTitle, item.readAt && styles.read]} numberOfLines={2}>
+                  {item.title}
+                </Text>
+                <Text style={styles.itemDate}>
+                  {new Date(item.createdAt).toLocaleString("pt-BR", {
+                    day: "2-digit",
+                    month: "2-digit",
+                    hour: "2-digit",
+                    minute: "2-digit",
+                  })}
+                </Text>
+              </View>
+              <Text style={styles.itemBody}>{item.body}</Text>
+            </Card>
+          )}
+        />
+      )}
+    </ScreenShell>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: theme.bg, padding: spacing.md },
-  centered: { flex: 1, justifyContent: "center", alignItems: "center" },
-  header: {
-    flexDirection: "row",
-    justifyContent: "space-between",
+  shell: { paddingBottom: 0 },
+  flex: { flex: 1 },
+  list: { paddingBottom: spacing.xl * 2, gap: spacing.sm, flexGrow: 1 },
+  headerAction: {
+    width: 40,
+    height: 40,
+    borderRadius: radius.md,
     alignItems: "center",
-    marginBottom: spacing.md,
+    justifyContent: "center",
+    backgroundColor: "rgba(255,255,255,0.08)",
   },
-  title: { fontSize: typography.title, fontWeight: "900", color: theme.text },
-  markAll: { color: theme.primary, fontWeight: "700", fontSize: typography.caption },
-  empty: { textAlign: "center", color: theme.textMuted, marginTop: spacing.lg },
-  item: {
-    backgroundColor: theme.surface,
-    borderRadius: 10,
-    padding: spacing.md,
-    marginBottom: spacing.sm,
-    borderWidth: 1,
-    borderColor: theme.border,
-  },
-  unread: { borderColor: theme.primary, backgroundColor: "#F0FDFA" },
-  itemTitle: { fontWeight: "800", color: theme.text },
-  itemBody: { color: theme.textMuted, marginTop: 4 },
-  itemDate: { fontSize: typography.caption, color: theme.textMuted, marginTop: 6 },
+  row: { flexDirection: "row", alignItems: "flex-start", gap: spacing.sm },
+  itemTitle: { flex: 1, fontWeight: "900", color: theme.text, fontSize: typography.body },
+  read: { color: theme.textMuted },
+  itemBody: { color: theme.textMuted, marginTop: 4, fontWeight: "600" },
+  itemDate: { fontSize: typography.small, color: theme.textSoft, fontWeight: "700" },
 });

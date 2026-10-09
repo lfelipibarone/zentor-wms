@@ -1,13 +1,8 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { router, useLocalSearchParams } from "expo-router";
 import { productMatchesCode } from "@wms/shared";
-import {
-  ActivityIndicator,
-  Alert,
-  StyleSheet,
-  Text,
-  View,
-} from "react-native";
+import { Alert, StyleSheet, Text, View } from "react-native";
+import { Ionicons } from "@expo/vector-icons";
 import {
   AdjustStockModal,
   type AdjustStockContext,
@@ -19,6 +14,7 @@ import { ProblemReportModal } from "@/components/ProblemReportModal";
 import { CollectionDeadlineRow } from "@/components/CollectionDeadlineRow";
 import { ProductThumbnail } from "@/components/ProductThumbnail";
 import { ScreenShell } from "@/components/ScreenShell";
+import { Card, EmptyState, Loading, Notice, ProgressBar } from "@/components/ui";
 import { useAdjustLocationStock } from "@/hooks/useAdjustLocationStock";
 import {
   useCompletePicking,
@@ -29,8 +25,9 @@ import {
 } from "@/hooks/usePicking";
 import { showErrorAlert } from "@/lib/app-alert";
 import { api, ApiError } from "@/lib/api";
+import { modules } from "@/lib/modules";
 import { formatPercent } from "@/lib/percent";
-import { theme, spacing, typography } from "@/lib/theme";
+import { theme, spacing, typography, radius } from "@/lib/theme";
 import { OrderStatus } from "@wms/shared";
 
 type PickStep = "location" | "product" | "quantity";
@@ -262,24 +259,21 @@ export default function PickScreen() {
 
   if (isLoading || !session) {
     return (
-      <View style={styles.centered}>
-        <ActivityIndicator size="large" color={theme.primary} />
-      </View>
+      <ScreenShell module="picking" title="Pedido">
+        <Loading />
+      </ScreenShell>
     );
   }
 
+  const basket = basketCode ?? session.order.basket?.code ?? "—";
+
   if (session.order.status === OrderStatus.PAUSED_ISSUE) {
     return (
-      <ScreenShell
-        scroll
-        title="Pedido pausado"
-        subtitle={session.order.erpOrderId}
-      >
-        <Text style={styles.paused}>
-          Este pedido está pausado por problema reportado.
-        </Text>
+      <ScreenShell scroll module="picking" title={session.order.erpOrderId}>
+        <EmptyState icon="pause-circle" title="Pedido pausado por problema" />
         <FactoryButton
           label="Voltar à fila"
+          icon="arrow-back"
           onPress={() => router.replace("/picking")}
         />
       </ScreenShell>
@@ -290,15 +284,15 @@ export default function PickScreen() {
     return (
       <ScreenShell
         scroll
-        title="Pedido completo"
-        subtitle={`Cesta ${basketCode ?? session.order.basket?.code ?? "—"}`}
+        module="picking"
+        title={session.order.erpOrderId}
+        subtitle={`Cesta ${basket}`}
       >
-        <Text style={styles.doneText}>
-          Todos os itens foram separados. Envie a cesta para conferência.
-        </Text>
-        {feedback ? <Text style={[styles.feedback, styles.feedbackOk]}>{feedback}</Text> : null}
+        <EmptyState icon="checkmark-circle" title="Todos os itens separados" />
+        {feedback ? <Notice tone="success">{feedback}</Notice> : null}
         <FactoryButton
-          label="Finalizar — Aguardando conferência"
+          label="Enviar para conferência"
+          icon="send"
           variant="success"
           loading={completePicking.isPending}
           disabled={afterPick !== null}
@@ -306,7 +300,9 @@ export default function PickScreen() {
         />
         <FactoryButton
           label="Relatar problema"
-          variant="danger"
+          icon="warning"
+          size="md"
+          variant="secondary"
           onPress={() => setProblemOpen(true)}
         />
         <ProblemReportModal
@@ -326,35 +322,43 @@ export default function PickScreen() {
       next.pickLocation.label ||
       `${next.pickLocation.corridor}-${next.pickLocation.row}`
     : "Sem endereço";
+  const doneItems = session.items.filter((i) => i.completed).length;
+  const feedbackTone = feedback?.includes("✓")
+    ? "success"
+    : feedback?.startsWith("Bipado") || feedback?.startsWith("Gôndola ajustada")
+      ? "info"
+      : "danger";
 
   return (
     <ScreenShell
       scroll
+      module="picking"
       title={session.order.erpOrderId}
       subtitle={[
+        `Cesta ${basket}`,
         session.order.marketplaceLabel ?? session.order.marketplace,
-        `Cesta ${basketCode ?? session.order.basket?.code ?? "—"}`,
-        "rota otimizada",
       ]
         .filter(Boolean)
         .join(" · ")}
-    >
-      <CollectionDeadlineRow deadline={session.order.collectionDeadline} />
-      {session.routeQueue && session.routeQueue.length > 1 ? (
-        <Text style={styles.routeHint}>
-          Depois:{" "}
-          {session.routeQueue
-            .slice(1, 3)
-            .map((r) => r.pickLocation?.label ?? "?")
-            .join(" → ")}
+      headerRight={
+        <Text style={styles.headerCount}>
+          {doneItems}/{session.items.length}
         </Text>
-      ) : null}
+      }
+    >
+      <View style={styles.progressWrap}>
+        <ProgressBar value={doneItems} total={session.items.length} color={color} />
+        <CollectionDeadlineRow deadline={session.order.collectionDeadline} compact />
+      </View>
+
       <View style={styles.locationCard}>
-        <Text style={styles.locLabel}>VÁ ATÉ</Text>
-        <Text style={styles.locValue}>{locLabel}</Text>
+        <Text style={styles.locLabel}>Vá até</Text>
+        <Text style={styles.locValue} adjustsFontSizeToFit numberOfLines={1}>
+          {locLabel}
+        </Text>
         {next.pickLocation?.fillPercent != null ? (
           <Text style={styles.locStock}>
-            Gôndola: {formatPercent(next.pickLocation.fillPercent)}
+            Gôndola {formatPercent(next.pickLocation.fillPercent)}
             {next.pickLocation.minPercent != null
               ? ` · mín. ${formatPercent(next.pickLocation.minPercent)}`
               : ""}
@@ -363,63 +367,54 @@ export default function PickScreen() {
         {next.stockMismatchHint ? (
           <Text style={styles.stockWarn}>{next.stockMismatchHint}</Text>
         ) : null}
+        {session.routeQueue && session.routeQueue.length > 1 ? (
+          <Text style={styles.routeNext} numberOfLines={1}>
+            Depois:{" "}
+            {session.routeQueue
+              .slice(1, 3)
+              .map((r) => r.pickLocation?.label ?? "?")
+              .join(" → ")}
+          </Text>
+        ) : null}
       </View>
 
-      {adjustContext ? (
-        <FactoryButton
-          label="Corrigir % da gôndola"
-          variant="secondary"
-          onPress={() => setAdjustOpen(true)}
-        />
-      ) : null}
-
-      <View style={styles.productCard}>
+      <Card>
         <View style={styles.productRow}>
           <ProductThumbnail
             imageUrl={next.product?.imageUrl}
             alt={next.product?.name ?? "Produto"}
-            size={88}
+            size={84}
           />
           <View style={styles.productInfo}>
             <Text style={styles.sku}>
               {next.product?.sku ?? "SKU indisponível"}
             </Text>
-            <Text style={styles.productName}>
+            <Text style={styles.productName} numberOfLines={3}>
               {next.product?.name ?? "Produto não encontrado"}
             </Text>
-            <Text style={styles.qty}>
-              Separar: {next.remaining} de {next.quantityOrdered}
+          </View>
+          <View style={styles.qtyBox}>
+            <Text style={styles.qtyValue}>{next.remaining}</Text>
+            <Text style={styles.qtyLabel}>
+              {next.remaining !== next.quantityOrdered ? `de ${next.quantityOrdered}` : "un."}
             </Text>
           </View>
         </View>
-        <Text style={styles.scanHint}>
-          Informe a quantidade coletada
-          {requiresScan ? " ou bipe o produto (opcional)" : ""}
-        </Text>
-      </View>
+      </Card>
 
-      {feedback ? (
-        <Text
-          style={[
-            styles.feedback,
-            feedback.includes("✓") ? styles.feedbackOk : styles.feedbackErr,
-          ]}
-        >
-          {feedback}
-        </Text>
-      ) : null}
+      {feedback ? <Notice tone={feedbackTone}>{feedback}</Notice> : null}
 
-      {step === "location" && !locationValidated ? (
+      {!locationValidated ? (
         <FactoryButton
           label="Bipar gôndola"
+          icon="scan"
+          color={color}
           onPress={() => {
             setScannerMode("location");
             setScannerOpen(true);
           }}
         />
-      ) : null}
-
-      {locationValidated ? (
+      ) : (
         <>
           <QuantityInput
             label="Quantidade coletada"
@@ -430,9 +425,11 @@ export default function PickScreen() {
           <FactoryButton
             label={
               requiresScan
-                ? `Bipar produto (+1) · ${scanCount}/${next.remaining}`
-                : "Bipar produto (opcional)"
+                ? `Bipar produto · ${scanCount}/${next.remaining}`
+                : "Bipar produto"
             }
+            icon="barcode"
+            size="md"
             variant="secondary"
             onPress={() => {
               setScannerMode("product");
@@ -441,53 +438,71 @@ export default function PickScreen() {
             loading={pickItem.isPending}
           />
         </>
-      ) : null}
+      )}
 
-      <FactoryButton
-        label="Relatar problema"
-        variant="danger"
-        onPress={() => setProblemOpen(true)}
-      />
-
-      {session.items.length > 1 ? (
-        <>
+      <View style={styles.toolsRow}>
+        {adjustContext ? (
           <FactoryButton
-            label={
-              itemsExpanded
-                ? "Ocultar todos os itens"
-                : `Ver todos os itens (${session.items.length})`
-            }
+            label="% gôndola"
+            icon="speedometer"
+            size="sm"
             variant="secondary"
+            style={styles.flex}
+            onPress={() => setAdjustOpen(true)}
+          />
+        ) : null}
+        {session.items.length > 1 ? (
+          <FactoryButton
+            label={`Itens (${session.items.length})`}
+            icon={itemsExpanded ? "chevron-up" : "list"}
+            size="sm"
+            variant="secondary"
+            style={styles.flex}
             onPress={() => setItemsExpanded((v) => !v)}
           />
-          {itemsExpanded ? (
-            <View style={styles.itemsPreview}>
-              {session.items.map((item) => (
-                <View key={item.id} style={styles.itemsPreviewRow}>
-                  <ProductThumbnail
-                    imageUrl={item.product?.imageUrl}
-                    alt={item.product?.name ?? "Produto"}
-                    size={40}
-                  />
-                  <View style={styles.itemsPreviewInfo}>
-                    <Text style={styles.itemsPreviewSku}>
-                      {item.product?.sku ?? "SKU indisponível"}
-                    </Text>
-                    <Text style={styles.itemsPreviewQty}>
-                      {item.quantityPicked}/{item.quantityOrdered} un.
-                    </Text>
-                  </View>
-                </View>
-              ))}
+        ) : null}
+        <FactoryButton
+          label="Problema"
+          icon="warning"
+          size="sm"
+          variant="secondary"
+          style={styles.flex}
+          onPress={() => setProblemOpen(true)}
+        />
+      </View>
+
+      {itemsExpanded ? (
+        <View style={styles.itemsPreview}>
+          {session.items.map((item) => (
+            <View
+              key={item.id}
+              style={[styles.itemsPreviewRow, item.completed && styles.itemsPreviewDone]}
+            >
+              <ProductThumbnail
+                imageUrl={item.product?.imageUrl}
+                alt={item.product?.name ?? "Produto"}
+                size={40}
+              />
+              <Text style={styles.itemsPreviewSku} numberOfLines={1}>
+                {item.product?.sku ?? "SKU indisponível"}
+              </Text>
+              <Text style={styles.itemsPreviewQty}>
+                {item.quantityPicked}/{item.quantityOrdered}
+              </Text>
+              {item.completed ? (
+                <Ionicons name="checkmark-circle" size={20} color={theme.success} />
+              ) : null}
             </View>
-          ) : null}
-        </>
+          ))}
+        </View>
       ) : null}
 
       {canReleaseAccept ? (
         <FactoryButton
           label="Cancelar aceite"
-          variant="secondary"
+          icon="close"
+          size="sm"
+          variant="ghost"
           onPress={async () => {
             try {
               await releaseAccept.mutateAsync();
@@ -505,12 +520,7 @@ export default function PickScreen() {
       <BarcodeScanner
         visible={scannerOpen}
         title={
-          scannerMode === "location" ? "Bipar gôndola" : "Bipar produto"
-        }
-        hint={
-          scannerMode === "location"
-            ? "Confirme que está na posição correta"
-            : "Bipe o código de cada unidade"
+          scannerMode === "location" ? `Gôndola ${locLabel}` : next.product?.sku ?? "Produto"
         }
         onScan={
           scannerMode === "location" ? handleLocationScan : handleProductScan
@@ -537,105 +547,77 @@ export default function PickScreen() {
   );
 }
 
+const color = modules.picking.color;
+
 const styles = StyleSheet.create({
-  centered: {
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-    backgroundColor: theme.bg,
-  },
+  flex: { flex: 1 },
+  headerCount: { color: theme.headerTint, fontWeight: "900", fontSize: typography.body },
+  progressWrap: { gap: spacing.sm },
   locationCard: {
-    backgroundColor: theme.primary,
-    borderRadius: 16,
-    padding: spacing.lg,
+    backgroundColor: color,
+    borderRadius: radius.xl,
+    paddingVertical: spacing.lg,
+    paddingHorizontal: spacing.md,
     alignItems: "center",
   },
   locLabel: {
     fontSize: typography.caption,
     fontWeight: "900",
-    color: theme.primaryText,
-    letterSpacing: 2,
+    color: "rgba(255,255,255,0.85)",
+    letterSpacing: 1.5,
+    textTransform: "uppercase",
   },
   locValue: {
-    fontSize: 40,
+    fontSize: 44,
     fontWeight: "900",
-    color: theme.primaryText,
+    color: "#fff",
     textAlign: "center",
   },
   locStock: {
-    color: theme.primaryText,
-    fontWeight: "700",
-    marginTop: spacing.sm,
-    fontSize: typography.body,
+    color: "#fff",
+    fontWeight: "800",
+    marginTop: spacing.xs,
   },
   stockWarn: {
-    color: "#fef3c7",
-    fontWeight: "600",
+    color: "#FEF3C7",
+    fontWeight: "700",
     marginTop: spacing.xs,
     textAlign: "center",
     fontSize: typography.caption,
   },
-  productCard: {
-    backgroundColor: theme.surface,
-    borderRadius: 16,
-    padding: spacing.lg,
-    gap: spacing.sm,
-    borderWidth: 2,
-    borderColor: theme.border,
-  },
-  productRow: {
-    flexDirection: "row",
-    gap: spacing.md,
-    alignItems: "flex-start",
-  },
-  productInfo: { flex: 1, gap: spacing.xs },
-  sku: {
-    fontSize: typography.caption,
-    color: theme.info,
-    fontWeight: "800",
-  },
-  productName: {
-    fontSize: typography.subtitle,
-    fontWeight: "800",
-    color: theme.text,
-  },
-  qty: {
-    fontSize: typography.title,
-    fontWeight: "900",
-    color: theme.success,
-  },
-  routeHint: {
-    color: theme.textMuted,
-    fontSize: typography.caption,
-    marginBottom: spacing.sm,
-  },
-  scanHint: { color: theme.textMuted, fontSize: typography.body },
-  feedback: {
-    fontSize: typography.body,
+  routeNext: {
+    color: "rgba(255,255,255,0.8)",
     fontWeight: "700",
-    textAlign: "center",
+    fontSize: typography.caption,
+    marginTop: spacing.sm,
   },
-  feedbackOk: { color: theme.success },
-  feedbackErr: { color: theme.danger },
-  doneText: {
-    fontSize: typography.body,
-    color: theme.text,
-    lineHeight: 26,
+  productRow: { flexDirection: "row", gap: spacing.md, alignItems: "center" },
+  productInfo: { flex: 1, gap: 2 },
+  sku: { fontSize: typography.body, color: theme.info, fontWeight: "900" },
+  productName: { fontSize: typography.caption + 1, fontWeight: "700", color: theme.text },
+  qtyBox: {
+    minWidth: 64,
+    alignItems: "center",
+    paddingVertical: spacing.xs,
+    paddingHorizontal: spacing.sm,
+    borderRadius: radius.md,
+    backgroundColor: modules.picking.soft,
   },
-  paused: { color: theme.warning, fontSize: typography.body },
-  itemsPreview: {
-    gap: spacing.sm,
-    marginBottom: spacing.sm,
-  },
+  qtyValue: { fontSize: 34, fontWeight: "900", color: "#0F766E" },
+  qtyLabel: { fontSize: typography.small, fontWeight: "800", color: "#0F766E" },
+  toolsRow: { flexDirection: "row", gap: spacing.sm },
+  itemsPreview: { gap: spacing.xs },
   itemsPreviewRow: {
     flexDirection: "row",
     alignItems: "center",
     gap: spacing.sm,
     padding: spacing.sm,
     backgroundColor: theme.surface,
-    borderRadius: 8,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    borderColor: theme.border,
   },
-  itemsPreviewInfo: { flex: 1 },
-  itemsPreviewSku: { fontWeight: "700", color: theme.text },
-  itemsPreviewQty: { color: theme.textMuted, fontSize: typography.caption },
+  itemsPreviewDone: { opacity: 0.55 },
+  itemsPreviewSku: { flex: 1, fontWeight: "800", color: theme.text },
+  itemsPreviewQty: { color: theme.textMuted, fontWeight: "800" },
 });

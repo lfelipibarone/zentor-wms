@@ -1,7 +1,6 @@
 import { useCallback, useState } from "react";
 import {
   ActivityIndicator,
-  FlatList,
   Pressable,
   StyleSheet,
   Text,
@@ -128,23 +127,19 @@ export default function CargoTransportScreen() {
 
   if (phase === "list") {
     return (
-      <ScreenShell scroll backToHome>
-        <Text style={styles.pageHint}>
-          Fila de reabastecimento do estoque de giro. Retire do pulmão; depois
-          deposite na gôndola em Abastecer estoque.
-        </Text>
-
+      <ScreenShell scroll module="transporte" title="Transporte de carga">
         {loadingList ? (
           <ActivityIndicator size="large" color={theme.primary} />
         ) : needs.length === 0 ? (
           <Text style={styles.empty}>Nenhuma gôndola abaixo do mínimo.</Text>
         ) : (
-          <FlatList
-            data={needs}
-            keyExtractor={(n) => n.pickFaceId}
-            scrollEnabled={false}
-            renderItem={({ item }) => (
-              <Pressable style={styles.card} onPress={() => startNeed(item)}>
+          <View>
+            {needs.map((item) => (
+              <Pressable
+                key={item.pickFaceId}
+                style={styles.card}
+                onPress={() => startNeed(item)}
+              >
                 <Text style={styles.badge}>REPOSIÇÃO · PULMÃO → GIRO</Text>
                 <Text style={styles.sku}>{item.sku}</Text>
                 <Text style={styles.name}>{item.productName}</Text>
@@ -162,8 +157,8 @@ export default function CargoTransportScreen() {
                   <Text style={styles.warn}>Sem pulmão com este SKU</Text>
                 )}
               </Pressable>
-            )}
-          />
+            ))}
+          </View>
         )}
 
         {message ? <Text style={styles.message}>{message}</Text> : null}
@@ -179,7 +174,7 @@ export default function CargoTransportScreen() {
   const pulmaoPct = pulmao && selected ? pulmaoPercentOf(pulmao, selected.productId) : 0;
 
   return (
-    <ScreenShell scroll backToHome>
+    <ScreenShell scroll module="transporte" title="Transporte de carga">
       {selected ? (
         <View style={styles.card}>
           <Text style={styles.badge}>Gôndola alvo</Text>
@@ -249,11 +244,6 @@ export default function CargoTransportScreen() {
 }
 
 const styles = StyleSheet.create({
-  pageHint: {
-    fontSize: typography.body,
-    color: theme.textMuted,
-    marginBottom: spacing.md,
-  },
   empty: { textAlign: "center", color: theme.textMuted, marginVertical: spacing.lg },
   instruction: {
     fontSize: typography.body,

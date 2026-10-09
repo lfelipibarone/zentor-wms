@@ -152,15 +152,15 @@ export function workBlockedMessage(work: WorkRefDto | null | undefined): string 
 }
 
 const styles = StyleSheet.create({
-  wrap: { gap: spacing.sm, marginBottom: spacing.sm },
+  wrap: { gap: spacing.sm },
   card: {
-    backgroundColor: theme.surface,
-    borderRadius: 14,
-    borderWidth: 2,
+    backgroundColor: theme.warningSoft,
+    borderRadius: 16,
+    borderWidth: 1.5,
     borderColor: theme.warning,
     padding: spacing.md,
   },
-  cardRunning: { borderColor: theme.primary },
+  cardRunning: { borderColor: theme.primary, backgroundColor: theme.primarySoft },
   row: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
   heading: { fontSize: typography.body, fontWeight: "900", color: theme.text },
   meta: { color: theme.textMuted, fontWeight: "600", marginTop: 2 },
@@ -173,7 +173,9 @@ const styles = StyleSheet.create({
   btn: { marginTop: spacing.sm, marginBottom: 0 },
   btnSmall: { marginTop: spacing.xs, marginBottom: 0 },
   others: {
-    backgroundColor: theme.surfaceElevated,
+    backgroundColor: theme.surface,
+    borderWidth: 1,
+    borderColor: theme.border,
     borderRadius: 12,
     padding: spacing.sm,
     gap: spacing.xs,

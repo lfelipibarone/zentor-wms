@@ -1,19 +1,22 @@
 import { useState } from "react";
 import { router, useLocalSearchParams } from "expo-router";
-import {
-  ActivityIndicator,
-  Alert,
-  ScrollView,
-  StyleSheet,
-  Text,
-  View,
-} from "react-native";
+import { Alert, StyleSheet, Text, View } from "react-native";
+import { Ionicons } from "@expo/vector-icons";
 import { BarcodeScanner } from "@/components/BarcodeScanner";
 import { FactoryButton } from "@/components/FactoryButton";
 import { QuantityInput } from "@/components/QuantityInput";
 import { ScreenShell } from "@/components/ScreenShell";
 import { SplitWorkModal } from "@/components/SplitWorkModal";
 import { WorkShareCard, workBlockedMessage } from "@/components/WorkTimer";
+import {
+  Badge,
+  Card,
+  EmptyState,
+  Loading,
+  Notice,
+  ProgressBar,
+  SectionTitle,
+} from "@/components/ui";
 import {
   useCompletePurchaseReceipt,
   useConfirmPurchaseReceiptItem,
@@ -22,7 +25,8 @@ import {
 } from "@/hooks/usePurchaseReceipt";
 import { useSplitWork } from "@/hooks/useWorkShares";
 import { ApiError, type PurchaseReceiptSessionDto } from "@/lib/api";
-import { theme, spacing, typography } from "@/lib/theme";
+import { modules } from "@/lib/modules";
+import { theme, spacing, typography, radius } from "@/lib/theme";
 
 export default function PurchaseReceiptCheckScreen() {
   const { sessionId } = useLocalSearchParams<{ sessionId: string }>();
@@ -135,67 +139,85 @@ export default function PurchaseReceiptCheckScreen() {
 
   if (isLoading || !data) {
     return (
-      <View style={styles.centered}>
-        <ActivityIndicator size="large" color={theme.primary} />
-      </View>
+      <ScreenShell module="recebimento" title="Conferência">
+        <Loading />
+      </ScreenShell>
     );
   }
 
+  const doneCount = myItems.filter((it) => it.completed).length;
+  const feedbackOk = feedback?.includes("✓") || feedback?.startsWith("Item OK");
+
   return (
     <ScreenShell
-      backToHome
       scroll
+      module="recebimento"
       title={`NF ${data.session.invoiceNumber ?? ""}`}
-      subtitle={data.session.supplierName ?? "Conferência de itens"}
+      subtitle={data.session.supplierName}
+      headerRight={
+        <Text style={styles.headerCount}>
+          {doneCount}/{myItems.length}
+        </Text>
+      }
     >
+      <ProgressBar value={doneCount} total={myItems.length} color={color} />
+
       {data.session.tinySyncMessage ? (
-        <Text style={styles.syncHint}>{data.session.tinySyncMessage}</Text>
+        <Notice tone="info">{data.session.tinySyncMessage}</Notice>
       ) : null}
 
       <WorkShareCard work={work} />
 
       {completed ? (
         <>
-          <Text style={styles.done}>Recebimento concluído</Text>
+          <EmptyState icon="checkmark-circle" title="Recebimento concluído" />
           <FactoryButton
             label="Ir para armazenagem"
-            variant="success"
+            icon={modules.armazenagem.icon}
+            color={modules.armazenagem.color}
             onPress={() => router.replace("/putaway")}
           />
         </>
       ) : needsAccept ? (
         <>
-          <Text style={styles.feedback}>
-            {pendingCount} itens para conferir. Aceite para começar (sozinho ou dividindo).
-          </Text>
+          <View style={styles.acceptBox}>
+            <Text style={styles.acceptValue}>{pendingCount}</Text>
+            <Text style={styles.acceptLabel}>itens para conferir</Text>
+          </View>
           <FactoryButton
             label="Aceitar conferência"
+            icon="hand-left"
+            color={color}
             onPress={() => setSplitOpen(true)}
             loading={splitWork.isPending}
           />
         </>
       ) : blocked ? (
-        <Text style={styles.blocked}>{blocked}</Text>
+        <Notice tone="warning">{blocked}</Notice>
       ) : next ? (
-        <View style={styles.nextCard}>
+        <Card accent={color}>
           <Text style={styles.nextLabel}>Próximo item</Text>
           <Text style={styles.nextTitle}>
             {next.description ?? next.productCode ?? "—"}
           </Text>
-          <Text style={styles.nextMeta}>
-            {next.quantityChecked} / {next.quantityExpected} un.
-          </Text>
-          {next.barcode ? (
-            <Text style={styles.nextBarcode}>GTIN: {next.barcode}</Text>
-          ) : null}
-        </View>
+          <View style={styles.nextRow}>
+            <Text style={styles.nextQty}>
+              {next.quantityChecked}
+              <Text style={styles.nextQtyOf}> / {next.quantityExpected} un.</Text>
+            </Text>
+            {next.barcode ? <Badge label={next.barcode} icon="barcode" /> : null}
+          </View>
+        </Card>
       ) : (
-        <Text style={styles.done}>
-          {shared ? "Sua parte foi conferida ✓" : "Todos os itens conferidos"}
-        </Text>
+        <EmptyState
+          icon="checkmark-circle"
+          title={shared ? "Sua parte foi conferida" : "Todos os itens conferidos"}
+        />
       )}
 
-      {feedback ? <Text style={styles.feedback}>{feedback}</Text> : null}
+      {feedback ? (
+        <Notice tone={feedbackOk ? "success" : "info"}>{feedback}</Notice>
+      ) : null}
 
       {!completed && !needsAccept && !blocked && next && remaining > 0 ? (
         <QuantityInput
@@ -208,11 +230,13 @@ export default function PurchaseReceiptCheckScreen() {
 
       {completed || needsAccept || blocked ? null : next ? (
         <FactoryButton
-          label="Bipar produto (opcional)"
+          label="Bipar produto"
+          icon="barcode"
+          size="md"
           variant="secondary"
           onPress={() => setScannerOpen(true)}
         />
-      ) : shared ? null : (
+      ) : shared || data.allChecked ? null : (
         <FactoryButton
           label="Conferência finalizada"
           onPress={handleComplete}
@@ -223,31 +247,42 @@ export default function PurchaseReceiptCheckScreen() {
       {!completed && data.allChecked ? (
         <FactoryButton
           label="Finalizar recebimento"
+          icon="checkmark-done"
           variant="success"
           onPress={handleComplete}
         />
       ) : null}
 
-      <ScrollView style={styles.list}>
-        {othersCount > 0 ? (
-          <Text style={styles.othersHint}>
-            {othersCount} itens com os colegas
-          </Text>
-        ) : null}
-        {myItems.map((it) => (
-          <View
-            key={it.id}
-            style={[styles.row, it.completed && styles.rowDone]}
+      {myItems.length > 0 ? (
+        <>
+          <SectionTitle
+            right={
+              othersCount > 0 ? (
+                <Badge label={`${othersCount} com colegas`} icon="people" />
+              ) : undefined
+            }
           >
-            <Text style={styles.rowTitle}>
-              {it.lineNumber}. {it.description ?? it.productCode}
-            </Text>
-            <Text style={styles.rowQty}>
-              {it.quantityChecked} / {it.quantityExpected}
-            </Text>
+            Itens
+          </SectionTitle>
+          <View style={styles.list}>
+            {myItems.map((it) => (
+              <View key={it.id} style={[styles.row, it.completed && styles.rowDone]}>
+                <Ionicons
+                  name={it.completed ? "checkmark-circle" : "ellipse-outline"}
+                  size={20}
+                  color={it.completed ? theme.success : theme.textSoft}
+                />
+                <Text style={styles.rowTitle} numberOfLines={1}>
+                  {it.description ?? it.productCode}
+                </Text>
+                <Text style={styles.rowQty}>
+                  {it.quantityChecked}/{it.quantityExpected}
+                </Text>
+              </View>
+            ))}
           </View>
-        ))}
-      </ScrollView>
+        </>
+      ) : null}
 
       <SplitWorkModal
         visible={splitOpen}
@@ -261,7 +296,7 @@ export default function PurchaseReceiptCheckScreen() {
 
       <BarcodeScanner
         visible={scannerOpen}
-        title="Bipar produto"
+        title={next?.description ?? next?.productCode ?? "Produto"}
         onScan={handleProductScan}
         onClose={() => setScannerOpen(false)}
       />
@@ -269,64 +304,56 @@ export default function PurchaseReceiptCheckScreen() {
   );
 }
 
+const color = modules.recebimento.color;
+
 const styles = StyleSheet.create({
-  centered: { flex: 1, justifyContent: "center", alignItems: "center" },
-  syncHint: {
-    fontSize: typography.caption,
+  headerCount: { color: theme.headerTint, fontWeight: "900", fontSize: typography.body },
+  acceptBox: {
+    alignItems: "center",
+    paddingVertical: spacing.lg,
+    backgroundColor: modules.recebimento.soft,
+    borderRadius: radius.xl,
+  },
+  acceptValue: { fontSize: 48, fontWeight: "900", color },
+  acceptLabel: { fontWeight: "800", color, fontSize: typography.body },
+  nextLabel: {
     color: theme.textMuted,
-    marginBottom: spacing.sm,
-  },
-  nextCard: {
-    backgroundColor: theme.surface,
-    borderRadius: 12,
-    padding: spacing.md,
-    borderWidth: 2,
-    borderColor: theme.primary,
-    marginBottom: spacing.sm,
-  },
-  nextLabel: { color: theme.textMuted, fontSize: typography.caption },
-  nextTitle: {
+    fontSize: typography.small,
     fontWeight: "800",
+    textTransform: "uppercase",
+    letterSpacing: 0.6,
+  },
+  nextTitle: {
+    fontWeight: "900",
     fontSize: typography.subtitle,
     color: theme.text,
-    marginTop: 4,
+    marginTop: 2,
   },
-  nextMeta: { marginTop: spacing.xs, color: theme.primary, fontWeight: "700" },
-  nextBarcode: {
-    marginTop: 4,
-    fontSize: typography.caption,
-    color: theme.textMuted,
+  nextRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: spacing.sm,
+    marginTop: spacing.sm,
   },
-  done: {
-    fontWeight: "700",
-    color: theme.success,
-    marginBottom: spacing.sm,
-    textAlign: "center",
+  nextQty: { fontSize: 30, fontWeight: "900", color },
+  nextQtyOf: { fontSize: typography.body, color: theme.textMuted, fontWeight: "700" },
+  list: {
+    backgroundColor: theme.surface,
+    borderRadius: radius.lg,
+    borderWidth: 1,
+    borderColor: theme.border,
   },
-  feedback: {
-    textAlign: "center",
-    marginBottom: spacing.sm,
-    color: theme.text,
-  },
-  list: { marginTop: spacing.md, maxHeight: 220 },
   row: {
-    paddingVertical: spacing.xs,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.sm,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm + 2,
     borderBottomWidth: 1,
     borderBottomColor: theme.border,
   },
   rowDone: { opacity: 0.55 },
-  blocked: {
-    textAlign: "center",
-    fontWeight: "700",
-    color: theme.warning,
-    marginVertical: spacing.sm,
-  },
-  othersHint: {
-    fontSize: typography.caption,
-    color: theme.textMuted,
-    fontStyle: "italic",
-    paddingVertical: spacing.xs,
-  },
-  rowTitle: { color: theme.text, fontSize: typography.caption },
-  rowQty: { color: theme.textMuted, fontSize: typography.caption },
+  rowTitle: { flex: 1, color: theme.text, fontWeight: "700" },
+  rowQty: { color: theme.text, fontWeight: "900" },
 });

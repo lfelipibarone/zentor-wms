@@ -1,13 +1,8 @@
 import { useState } from "react";
-import {
-  ActivityIndicator,
-  FlatList,
-  Pressable,
-  StyleSheet,
-  Text,
-  View,
-} from "react-native";
+import { FlatList, StyleSheet, Text, View } from "react-native";
 import { FactoryButton } from "@/components/FactoryButton";
+import { ScreenShell } from "@/components/ScreenShell";
+import { Badge, Card, EmptyState, Loading, ProgressBar } from "@/components/ui";
 import { ColleaguePickerModal } from "@/components/SplitWorkModal";
 import { WORK_STATUS_LABEL, WorkTimer } from "@/components/WorkTimer";
 import { useAuth } from "@/contexts/AuthContext";
@@ -32,100 +27,118 @@ export default function MyTasksScreen() {
     }
   };
 
-  if (isLoading) {
-    return (
-      <View style={styles.centered}>
-        <ActivityIndicator size="large" color={theme.primary} />
-      </View>
-    );
-  }
-
   return (
-    <View style={styles.container}>
-      <FlatList
-        data={shares}
-        keyExtractor={(s) => s.id}
-        refreshing={isRefetching}
-        onRefresh={refetch}
-        contentContainerStyle={styles.list}
-        ListEmptyComponent={
-          <Text style={styles.empty}>Nenhuma tarefa reservada para você.</Text>
-        }
-        renderItem={({ item }) => {
-          const declinedByOther = item.status === "DECLINED" && item.assignedTo.id !== user?.id;
-          return (
-            <Pressable
-              style={[
-                styles.card,
-                item.status === "STARTED" && styles.cardRunning,
-                declinedByOther && styles.cardDeclined,
-              ]}
-              disabled={declinedByOther}
-              onPress={() => openWorkShareRoute(item.route)}
-            >
-              <View style={styles.row}>
-                <Text style={styles.kind}>{item.kindLabel}</Text>
-                {item.status === "STARTED" ? <WorkTimer share={item} /> : null}
-              </View>
-              <Text style={styles.title}>{item.title}</Text>
-              {item.subtitle ? <Text style={styles.meta}>{item.subtitle}</Text> : null}
-              <Text style={styles.meta}>
-                {item.shareCount > 1 ? `Parte ${item.shareIndex} de ${item.shareCount} · ` : ""}
-                {item.itemsDone}/{item.itemsTotal} itens · {WORK_STATUS_LABEL[item.status]}
-              </Text>
+    <ScreenShell module="tarefas" title="Minhas tarefas" style={styles.shell}>
+      {isLoading ? (
+        <Loading />
+      ) : (
+        <FlatList
+          style={styles.flex}
+          data={shares}
+          keyExtractor={(s) => s.id}
+          refreshing={isRefetching}
+          onRefresh={refetch}
+          contentContainerStyle={styles.list}
+          ListEmptyComponent={<EmptyState icon="people-outline" title="Nenhuma tarefa" />}
+          renderItem={({ item }) => {
+            const declinedByOther = item.status === "DECLINED" && item.assignedTo.id !== user?.id;
+            const accent = declinedByOther
+              ? theme.danger
+              : item.status === "STARTED"
+                ? theme.primary
+                : theme.warning;
+            const statusTone =
+              item.status === "STARTED" ? "primary" : declinedByOther ? "danger" : "warning";
+            return (
+              <Card
+                accent={accent}
+                onPress={declinedByOther ? undefined : () => openWorkShareRoute(item.route)}
+                style={styles.card}
+              >
+                <View style={styles.row}>
+                  <Badge label={item.kindLabel} tone="info" />
+                  <Badge label={WORK_STATUS_LABEL[item.status]} tone={statusTone} />
+                  <View style={styles.flex} />
+                  {item.status === "STARTED" ? <WorkTimer share={item} /> : null}
+                </View>
+                <Text style={styles.title}>{item.title}</Text>
+                {item.subtitle ? <Text style={styles.meta}>{item.subtitle}</Text> : null}
+                <View style={styles.progressRow}>
+                  <View style={styles.flex}>
+                    <ProgressBar value={item.itemsDone} total={item.itemsTotal} color={accent} />
+                  </View>
+                  <Text style={styles.progressText}>
+                    {item.itemsDone}/{item.itemsTotal}
+                  </Text>
+                  {item.shareCount > 1 ? (
+                    <Badge label={`Parte ${item.shareIndex}/${item.shareCount}`} />
+                  ) : null}
+                </View>
 
-              {declinedByOther ? (
-                <>
-                  <Text style={styles.declined}>Recusada por {item.assignedTo.name}</Text>
-                  <FactoryButton
-                    label="Passar para outro colega"
-                    onPress={() => setReassigning(item)}
-                    style={styles.btn}
-                  />
-                  <FactoryButton
-                    label="Assumir eu mesmo"
-                    variant="secondary"
-                    loading={reassign.isPending && reassign.variables?.shareId === item.id}
-                    onPress={() =>
-                      user && run(() => reassign.mutateAsync({ shareId: item.id, userId: user.id }))
-                    }
-                    style={styles.btn}
-                  />
-                </>
-              ) : item.status === "RESERVED" ? (
-                <>
-                  {item.assignedBy && item.assignedBy.id !== user?.id ? (
-                    <Text style={styles.meta}>Enviada por {item.assignedBy.name}</Text>
-                  ) : null}
-                  <FactoryButton
-                    label="Iniciar"
-                    variant="success"
-                    loading={start.isPending && start.variables === item.id}
-                    onPress={() =>
-                      run(async () => {
-                        await start.mutateAsync(item.id);
-                        openWorkShareRoute(item.route);
-                      })
-                    }
-                    style={styles.btn}
-                  />
-                  {item.assignedBy && item.assignedBy.id !== user?.id ? (
-                    <FactoryButton
-                      label="Recusar"
-                      variant="secondary"
-                      loading={decline.isPending && decline.variables === item.id}
-                      onPress={() => run(() => decline.mutateAsync(item.id))}
-                      style={styles.btn}
-                    />
-                  ) : null}
-                </>
-              ) : (
-                <Text style={styles.tap}>TOQUE PARA CONTINUAR</Text>
-              )}
-            </Pressable>
-          );
-        }}
-      />
+                {declinedByOther ? (
+                  <>
+                    <Text style={styles.declined}>Recusada por {item.assignedTo.name}</Text>
+                    <View style={styles.actions}>
+                      <FactoryButton
+                        label="Passar"
+                        icon="swap-horizontal"
+                        size="md"
+                        style={styles.flex}
+                        onPress={() => setReassigning(item)}
+                      />
+                      <FactoryButton
+                        label="Assumir"
+                        icon="hand-left"
+                        size="md"
+                        variant="secondary"
+                        style={styles.flex}
+                        loading={reassign.isPending && reassign.variables?.shareId === item.id}
+                        onPress={() =>
+                          user &&
+                          run(() => reassign.mutateAsync({ shareId: item.id, userId: user.id }))
+                        }
+                      />
+                    </View>
+                  </>
+                ) : item.status === "RESERVED" ? (
+                  <>
+                    {item.assignedBy && item.assignedBy.id !== user?.id ? (
+                      <Text style={styles.meta}>De {item.assignedBy.name}</Text>
+                    ) : null}
+                    <View style={styles.actions}>
+                      <FactoryButton
+                        label="Iniciar"
+                        icon="play"
+                        size="md"
+                        variant="success"
+                        style={styles.flex}
+                        loading={start.isPending && start.variables === item.id}
+                        onPress={() =>
+                          run(async () => {
+                            await start.mutateAsync(item.id);
+                            openWorkShareRoute(item.route);
+                          })
+                        }
+                      />
+                      {item.assignedBy && item.assignedBy.id !== user?.id ? (
+                        <FactoryButton
+                          label="Recusar"
+                          icon="close"
+                          size="md"
+                          variant="secondary"
+                          style={styles.flex}
+                          loading={decline.isPending && decline.variables === item.id}
+                          onPress={() => run(() => decline.mutateAsync(item.id))}
+                        />
+                      ) : null}
+                    </View>
+                  </>
+                ) : null}
+              </Card>
+            );
+          }}
+        />
+      )}
 
       <ColleaguePickerModal
         visible={Boolean(reassigning)}
@@ -142,41 +155,20 @@ export default function MyTasksScreen() {
           });
         }}
       />
-    </View>
+    </ScreenShell>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: theme.bg },
-  centered: { flex: 1, justifyContent: "center", alignItems: "center" },
-  list: { padding: spacing.md, paddingBottom: spacing.xl },
-  empty: { textAlign: "center", color: theme.textMuted, marginTop: spacing.lg },
-  card: {
-    backgroundColor: theme.surface,
-    borderRadius: 14,
-    padding: spacing.md,
-    marginBottom: spacing.sm,
-    borderWidth: 2,
-    borderColor: theme.warning,
-  },
-  cardRunning: { borderColor: theme.primary },
-  cardDeclined: { borderColor: theme.danger },
-  row: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
-  kind: {
-    fontSize: typography.caption,
-    fontWeight: "800",
-    color: theme.primary,
-    textTransform: "uppercase",
-  },
-  title: { fontSize: typography.body, fontWeight: "900", color: theme.text, marginTop: 2 },
-  meta: { color: theme.textMuted, fontWeight: "600", marginTop: 2 },
-  declined: { color: theme.danger, fontWeight: "800", marginTop: spacing.xs },
-  btn: { marginTop: spacing.sm, marginBottom: 0 },
-  tap: {
-    marginTop: spacing.sm,
-    textAlign: "center",
-    fontWeight: "800",
-    color: theme.primary,
-    fontSize: typography.caption,
-  },
+  shell: { paddingBottom: 0 },
+  flex: { flex: 1 },
+  list: { paddingBottom: spacing.xl * 2, gap: spacing.sm, flexGrow: 1 },
+  card: { gap: spacing.sm },
+  row: { flexDirection: "row", alignItems: "center", gap: 6 },
+  title: { fontSize: typography.subtitle, fontWeight: "900", color: theme.text },
+  meta: { color: theme.textMuted, fontWeight: "600" },
+  progressRow: { flexDirection: "row", alignItems: "center", gap: spacing.sm },
+  progressText: { fontWeight: "900", color: theme.text },
+  declined: { color: theme.danger, fontWeight: "800" },
+  actions: { flexDirection: "row", gap: spacing.sm },
 });

@@ -1,7 +1,8 @@
 import { StyleSheet, Text, View } from "react-native";
 import { ProductThumbnail } from "@/components/ProductThumbnail";
 import type { PulmaoStock } from "@/lib/api";
-import { theme, spacing, typography } from "@/lib/theme";
+import { modules } from "@/lib/modules";
+import { theme, spacing, typography, radius } from "@/lib/theme";
 
 /** SKUs guardados no pulmão, com a % que cada um ocupa. */
 export function PulmaoStockList({ stocks }: { stocks: PulmaoStock[] }) {
@@ -10,9 +11,6 @@ export function PulmaoStockList({ stocks }: { stocks: PulmaoStock[] }) {
   }
   return (
     <View style={styles.wrap}>
-      <Text style={styles.title}>
-        {stocks.length} SKU{stocks.length > 1 ? "s" : ""} neste pulmão
-      </Text>
       {stocks.map((s) => (
         <View key={s.product.id} style={styles.row}>
           <ProductThumbnail imageUrl={s.product.imageUrl} alt={s.product.name} size={40} />
@@ -30,12 +28,18 @@ export function PulmaoStockList({ stocks }: { stocks: PulmaoStock[] }) {
 }
 
 const styles = StyleSheet.create({
-  wrap: { gap: spacing.xs, marginTop: spacing.sm },
-  title: { fontWeight: "800", color: theme.text, fontSize: typography.caption },
+  wrap: {
+    backgroundColor: theme.surface,
+    borderRadius: radius.lg,
+    borderWidth: 1,
+    borderColor: theme.border,
+    padding: spacing.sm,
+    gap: spacing.sm,
+  },
   row: { flexDirection: "row", alignItems: "center", gap: spacing.sm },
   info: { flex: 1 },
   sku: { fontWeight: "800", color: theme.text },
   name: { color: theme.textMuted, fontSize: typography.caption },
-  qty: { fontWeight: "900", color: theme.primary },
-  empty: { color: theme.textMuted, fontSize: typography.caption, marginTop: spacing.sm },
+  qty: { fontWeight: "900", color: modules.armazenagem.color, fontSize: typography.body },
+  empty: { color: theme.textMuted, fontSize: typography.caption, fontWeight: "700" },
 });

@@ -137,14 +137,8 @@ export function SplitWorkModal({
                     })}
                   </View>
                 )}
-                <Text style={styles.hint}>
-                  Os itens são divididos na ordem da rota. Cada um recebe uma notificação e toca em
-                  Iniciar para começar o cronômetro.
-                </Text>
               </>
-            ) : (
-              <Text style={styles.hint}>Toque em Iniciar depois para começar o cronômetro.</Text>
-            )}
+            ) : null}
 
             <FactoryButton
               label={confirmLabel}
@@ -271,10 +265,5 @@ const styles = StyleSheet.create({
   colleagueName: { fontSize: typography.body, fontWeight: "700", color: theme.text },
   colleagueNameOn: { color: theme.primaryDark },
   partTag: { color: theme.primary, fontWeight: "800", fontSize: typography.caption },
-  hint: {
-    fontSize: typography.caption,
-    color: theme.textMuted,
-    marginBottom: spacing.md,
-  },
   cancelBtn: { marginTop: spacing.sm },
 });

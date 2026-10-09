@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { router, useLocalSearchParams } from "expo-router";
-import { ActivityIndicator, Alert, StyleSheet, Text, View } from "react-native";
+import { Alert, StyleSheet, Text, View } from "react-native";
+import { Ionicons } from "@expo/vector-icons";
 import {
   AdjustStockModal,
   type AdjustStockContext,
@@ -9,13 +10,16 @@ import { BarcodeScanner } from "@/components/BarcodeScanner";
 import { FactoryButton } from "@/components/FactoryButton";
 import { QuantityInput } from "@/components/QuantityInput";
 import { CollectionDeadlineRow } from "@/components/CollectionDeadlineRow";
+import { ProductThumbnail } from "@/components/ProductThumbnail";
 import { ScreenShell } from "@/components/ScreenShell";
+import { Badge, Card, Loading, Notice, SectionTitle } from "@/components/ui";
 import { useAdjustLocationStock } from "@/hooks/useAdjustLocationStock";
 import { useWaveLine, useWaveLinePick } from "@/hooks/useWavePicking";
 import { showErrorAlert } from "@/lib/app-alert";
 import { ApiError } from "@/lib/api";
+import { modules } from "@/lib/modules";
 import { formatPercent } from "@/lib/percent";
-import { theme, spacing, typography } from "@/lib/theme";
+import { theme, spacing, typography, radius } from "@/lib/theme";
 
 export default function WavePickScreen() {
   const { lineId } = useLocalSearchParams<{ lineId: string }>();
@@ -30,15 +34,16 @@ export default function WavePickScreen() {
   const [adjustOpen, setAdjustOpen] = useState(false);
   /** Coleta da linha concluída: o separador precisa informar a % da gôndola */
   const [afterPickOpen, setAfterPickOpen] = useState(false);
-  const [message, setMessage] = useState<string | null>(null);
+  const [message, setMessage] = useState<{ text: string; error: boolean } | null>(null);
+  const say = (text: string, error = false) => setMessage({ text, error });
 
   const line = data?.line;
 
   if (isLoading || !line) {
     return (
-      <View style={styles.centered}>
-        <ActivityIndicator size="large" color={theme.primary} />
-      </View>
+      <ScreenShell module="picking" title="Onda">
+        <Loading />
+      </ScreenShell>
     );
   }
 
@@ -63,13 +68,13 @@ export default function WavePickScreen() {
         waveLineId: lineId,
       });
       setAdjustOpen(false);
-      setMessage(`Gôndola ajustada: ${formatPercent(result.location.fillPercent)}`);
+      say(`Gôndola ajustada: ${formatPercent(result.location.fillPercent)}`);
 
       const waveUpdate = result.reconciliation.waveLines.find(
         (w) => w.waveLineId === lineId,
       );
       if (waveUpdate?.newLocationBarcode && waveUpdate.action === "updated") {
-        setMessage(`Gôndola atualizada: ${waveUpdate.newLocationBarcode}`);
+        say(`Gôndola atualizada: ${waveUpdate.newLocationBarcode}`);
         setLocationOk(false);
       }
 
@@ -82,7 +87,7 @@ export default function WavePickScreen() {
 
       await refetch();
     } catch (e) {
-      setMessage(e instanceof ApiError ? e.message : "Erro ao ajustar estoque");
+      say(e instanceof ApiError ? e.message : "Erro ao ajustar estoque", true);
     }
   };
 
@@ -93,15 +98,15 @@ export default function WavePickScreen() {
         productBarcode,
         quantity: qty,
       });
-      setMessage(
+      say(
         `Pick registrado: ${result.quantityPicked}/${result.quantityTotal}`,
       );
       if (result.readyForSort) {
-        setMessage("Pick concluído — informe a % que ficou na gôndola.");
+        say("Pick concluído — informe a % que ficou na gôndola.");
         setAfterPickOpen(true);
       }
     } catch (e) {
-      setMessage(e instanceof ApiError ? e.message : "Erro no pick");
+      say(e instanceof ApiError ? e.message : "Erro no pick", true);
     }
   };
 
@@ -121,92 +126,128 @@ export default function WavePickScreen() {
     }
   };
 
+  const picked = line.sortStatus === "PICKED";
   return (
-    <ScreenShell scroll>
-      <Text style={styles.sku}>{line.product.sku}</Text>
-      <CollectionDeadlineRow deadline={line.collectionDeadline} />
-      <Text style={styles.name}>{line.product.name}</Text>
-      <Text style={styles.loc}>{line.pickLocation.label}</Text>
-      <Text style={styles.stock}>
-        Gôndola: {formatPercent(line.pickLocation.fillPercent)}
-        {line.pickLocation.minPercent != null
-          ? ` · mín. ${formatPercent(line.pickLocation.minPercent)}`
-          : ""}
-      </Text>
-      <Text style={styles.qty}>
-        Coletar: {line.remaining} un. ({line.ordersCount} pedidos)
-      </Text>
+    <ScreenShell
+      scroll
+      module="picking"
+      title={line.product.sku}
+      subtitle={`${line.ordersCount} pedidos`}
+    >
+      <View style={styles.locationCard}>
+        <Text style={styles.locLabel}>Vá até</Text>
+        <Text style={styles.locValue} adjustsFontSizeToFit numberOfLines={1}>
+          {line.pickLocation.label}
+        </Text>
+        <Text style={styles.locStock}>
+          Gôndola {formatPercent(line.pickLocation.fillPercent)}
+          {line.pickLocation.minPercent != null
+            ? ` · mín. ${formatPercent(line.pickLocation.minPercent)}`
+            : ""}
+        </Text>
+        {locationOk ? (
+          <View style={styles.locOk}>
+            <Ionicons name="checkmark-circle" size={18} color="#fff" />
+            <Text style={styles.locOkText}>Confirmada</Text>
+          </View>
+        ) : null}
+      </View>
+
+      <Card>
+        <View style={styles.productRow}>
+          <ProductThumbnail imageUrl={line.product.imageUrl} alt={line.product.name} size={84} />
+          <View style={styles.productInfo}>
+            <Text style={styles.sku}>{line.product.sku}</Text>
+            <Text style={styles.name} numberOfLines={3}>
+              {line.product.name}
+            </Text>
+            <CollectionDeadlineRow deadline={line.collectionDeadline} compact />
+          </View>
+          <View style={styles.qtyBox}>
+            <Text style={styles.qtyValue}>{line.remaining}</Text>
+            <Text style={styles.qtyLabel}>un.</Text>
+          </View>
+        </View>
+      </Card>
+
+      {message ? (
+        <Notice tone={message.error ? "danger" : "success"}>{message.text}</Notice>
+      ) : null}
+
+      {picked ? (
+        <FactoryButton
+          label="Informar % da gôndola"
+          icon="speedometer"
+          onPress={() => setAfterPickOpen(true)}
+        />
+      ) : !locationOk ? (
+        <FactoryButton
+          label="Bipar gôndola"
+          icon="scan"
+          color={modules.picking.color}
+          onPress={() => {
+            setScannerMode("location");
+            setScannerOpen(true);
+          }}
+        />
+      ) : (
+        <>
+          <QuantityInput
+            label="Quantidade coletada"
+            max={maxPick}
+            loading={pick.isPending}
+            onConfirm={(q) => confirmPick(q, line.product.barcode ?? undefined)}
+          />
+          <FactoryButton
+            label="Bipar produto (+1)"
+            icon="barcode"
+            size="md"
+            variant="secondary"
+            disabled={maxPick <= 0}
+            onPress={() => {
+              setScannerMode("product");
+              setScannerOpen(true);
+            }}
+          />
+        </>
+      )}
 
       <FactoryButton
         label="Corrigir % da gôndola"
+        icon="speedometer"
+        size="sm"
         variant="secondary"
         onPress={() => setAdjustOpen(true)}
       />
 
-      <View style={styles.ordersBox}>
-        <Text style={styles.ordersTitle}>Pedidos nesta linha</Text>
+      <SectionTitle>Pedidos</SectionTitle>
+      <View style={styles.orders}>
         {line.orders.map((o) => (
-          <Text key={o.orderId} style={styles.orderRow}>
-            {o.erpOrderId} · {o.quantity} un.
-            {o.basketCode ? ` · ${o.basketCode}` : ""}
-          </Text>
+          <View key={o.orderId} style={styles.orderRow}>
+            <Text style={styles.orderErp} numberOfLines={1}>
+              {o.erpOrderId}
+            </Text>
+            {o.basketCode ? <Badge label={o.basketCode} icon="basket" /> : null}
+            <Text style={styles.orderQty}>{o.quantity} un.</Text>
+          </View>
         ))}
       </View>
 
-      <FactoryButton
-        label={locationOk ? "Gôndola confirmada ✓" : "Bipar gôndola"}
-        onPress={() => {
-          setScannerMode("location");
-          setScannerOpen(true);
-        }}
-      />
-      <FactoryButton
-        label="Bipar produto (+1)"
-        variant="success"
-        disabled={!locationOk || maxPick <= 0}
-        onPress={() => {
-          setScannerMode("product");
-          setScannerOpen(true);
-        }}
-      />
-      <QuantityInput
-        label={`Quantidade total (máx. ${maxPick})`}
-        max={maxPick}
-        loading={pick.isPending}
-        onConfirm={(q) => confirmPick(q, line.product.barcode ?? undefined)}
-      />
-
-      {message ? <Text style={styles.message}>{message}</Text> : null}
-
-      {line.sortStatus === "PICKED" ? (
-        <>
-          <Text style={styles.message}>
-            Pick concluído — finalize o packing no painel web.
-          </Text>
-          <FactoryButton
-            label="Informar % da gôndola"
-            variant="secondary"
-            onPress={() => setAfterPickOpen(true)}
-          />
-        </>
-      ) : null}
-
       <BarcodeScanner
         visible={scannerOpen}
-        title={scannerMode === "location" ? "Bipar gôndola" : "Bipar produto"}
-        hint={
+        title={
           scannerMode === "location"
-            ? line.pickLocation.barcode
-            : line.product.barcode ?? line.product.sku
+            ? `Gôndola ${line.pickLocation.label}`
+            : line.product.sku
         }
         onScan={(code) => {
           setScannerOpen(false);
           if (scannerMode === "location") {
             if (code.trim().toUpperCase() === line.pickLocation.barcode.toUpperCase()) {
               setLocationOk(true);
-              setMessage("Gôndola confirmada ✓");
+              say("Gôndola confirmada ✓");
             } else {
-              setMessage("Gôndola incorreta");
+              say("Gôndola incorreta", true);
             }
           } else {
             void confirmPick(1, code);
@@ -234,24 +275,62 @@ export default function WavePickScreen() {
 }
 
 const styles = StyleSheet.create({
-  centered: {
-    flex: 1,
-    justifyContent: "center",
+  locationCard: {
+    backgroundColor: modules.picking.color,
+    borderRadius: radius.xl,
+    paddingVertical: spacing.lg,
+    paddingHorizontal: spacing.md,
     alignItems: "center",
-    backgroundColor: theme.bg,
   },
-  sku: { fontWeight: "900", fontSize: typography.subtitle, color: theme.info },
-  name: { fontSize: typography.body, fontWeight: "700", marginBottom: spacing.sm },
-  loc: { fontFamily: "monospace", color: theme.textMuted },
-  stock: { color: theme.text, fontWeight: "600", marginTop: spacing.xs },
-  qty: { fontSize: 22, fontWeight: "900", marginVertical: spacing.md },
-  ordersBox: {
+  locLabel: {
+    fontSize: typography.caption,
+    fontWeight: "900",
+    color: "rgba(255,255,255,0.85)",
+    letterSpacing: 1.5,
+    textTransform: "uppercase",
+  },
+  locValue: { fontSize: 44, fontWeight: "900", color: "#fff", textAlign: "center" },
+  locStock: { color: "#fff", fontWeight: "800", marginTop: spacing.xs },
+  locOk: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    marginTop: spacing.sm,
+    backgroundColor: "rgba(255,255,255,0.2)",
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 4,
+    borderRadius: radius.pill,
+  },
+  locOkText: { color: "#fff", fontWeight: "900" },
+  productRow: { flexDirection: "row", gap: spacing.md, alignItems: "center" },
+  productInfo: { flex: 1, gap: 4 },
+  sku: { fontWeight: "900", fontSize: typography.body, color: theme.info },
+  name: { fontSize: typography.caption + 1, fontWeight: "700", color: theme.text },
+  qtyBox: {
+    minWidth: 64,
+    alignItems: "center",
+    paddingVertical: spacing.xs,
+    paddingHorizontal: spacing.sm,
+    borderRadius: radius.md,
+    backgroundColor: modules.picking.soft,
+  },
+  qtyValue: { fontSize: 34, fontWeight: "900", color: "#0F766E" },
+  qtyLabel: { fontSize: typography.small, fontWeight: "800", color: "#0F766E" },
+  orders: {
     backgroundColor: theme.surface,
-    borderRadius: 12,
-    padding: spacing.md,
-    marginBottom: spacing.md,
+    borderRadius: radius.lg,
+    borderWidth: 1,
+    borderColor: theme.border,
   },
-  ordersTitle: { fontWeight: "800", marginBottom: spacing.xs },
-  orderRow: { color: theme.textMuted, fontSize: typography.caption },
-  message: { marginTop: spacing.md, color: theme.text, fontWeight: "600" },
+  orderRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.sm,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm + 2,
+    borderBottomWidth: 1,
+    borderBottomColor: theme.border,
+  },
+  orderErp: { flex: 1, fontWeight: "800", color: theme.text },
+  orderQty: { fontWeight: "900", color: theme.text },
 });

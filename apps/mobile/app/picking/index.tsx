@@ -1,16 +1,7 @@
 import { useEffect, useState } from "react";
 import { router } from "expo-router";
-import {
-  ActivityIndicator,
-  Alert,
-  FlatList,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Text,
-  View,
-} from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
+import { Alert, FlatList, Pressable, StyleSheet, Text, View } from "react-native";
+import { Ionicons } from "@expo/vector-icons";
 import { useQuery } from "@tanstack/react-query";
 import { OrderStatus } from "@wms/shared";
 import {
@@ -18,12 +9,14 @@ import {
   useMobileConfig,
   useOrderQueue,
 } from "@/hooks/usePicking";
+import { AppHeader } from "@/components/AppHeader";
 import { FactoryButton } from "@/components/FactoryButton";
 import { CollectionDeadlineRow } from "@/components/CollectionDeadlineRow";
 import { WavePickingPanel } from "@/components/WavePickingPanel";
-import { BackButton } from "@/components/BackButton";
-import { showErrorAlert, showInfoAlert } from "@/lib/app-alert";
-import { theme, spacing, typography } from "@/lib/theme";
+import { Badge, Card, EmptyState, Loading, SectionTitle, SegmentedTabs } from "@/components/ui";
+import { showErrorAlert, showToast } from "@/lib/app-alert";
+import { modules } from "@/lib/modules";
+import { theme, spacing, typography, radius } from "@/lib/theme";
 import {
   api,
   ApiError,
@@ -36,6 +29,8 @@ import {
 } from "@/lib/api";
 
 type Tab = "wave" | "orders" | "problems";
+
+const color = modules.picking.color;
 
 export default function PickingHubScreen() {
   const [tab, setTab] = useState<Tab>("wave");
@@ -107,10 +102,14 @@ export default function PickingHubScreen() {
     }
   };
 
-  const tabs: { id: Tab; label: string }[] = [
+  const problemCount =
+    (problemOrders.data?.orders.length ?? 0) +
+    (problemWaves.data?.waves.reduce((n, w) => n + w.problemOrders.length, 0) ?? 0);
+
+  const tabs: { id: Tab; label: string; count?: number }[] = [
     { id: "wave", label: "Ondas" },
-    { id: "orders", label: "Pedidos" },
-    { id: "problems", label: "Problemas" },
+    { id: "orders", label: "Pedidos", count: data?.length },
+    { id: "problems", label: "Problemas", count: problemCount },
   ];
 
   const problemsLoading =
@@ -122,33 +121,23 @@ export default function PickingHubScreen() {
   };
 
   return (
-    <SafeAreaView style={styles.safe} edges={["top", "bottom", "left", "right"]}>
-      <View style={styles.headerFixed}>
-        <View style={styles.topBar}>
-          <BackButton color={theme.text} />
-          <Text style={styles.hubTitle}>Separação</Text>
-        </View>
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          style={styles.tabScroll}
-          contentContainerStyle={styles.tabRow}
-        >
-          {tabs.map((t) => (
-            <Pressable
-              key={t.id}
-              style={[styles.tab, tab === t.id && styles.tabActive]}
-              onPress={() => setTab(t.id)}
-            >
-              <Text
-                style={[styles.tabText, tab === t.id && styles.tabTextActive]}
-              >
-                {t.label}
-              </Text>
-            </Pressable>
-          ))}
-        </ScrollView>
-      </View>
+    <View style={styles.safe}>
+      <AppHeader
+        title="Picking"
+        module="picking"
+        right={
+          <Pressable
+            onPress={() => router.push("/atualizar-gondola")}
+            hitSlop={8}
+            style={styles.headerAction}
+            accessibilityLabel="Atualizar gôndola"
+          >
+            <Ionicons name={modules.gondola.icon} size={22} color={theme.headerTint} />
+          </Pressable>
+        }
+      >
+        <SegmentedTabs tabs={tabs} value={tab} onChange={setTab} dark />
+      </AppHeader>
 
       <View style={styles.body}>
         {tab === "wave" ? (
@@ -165,10 +154,7 @@ export default function PickingHubScreen() {
             }
           />
         ) : isLoading ? (
-          <View style={styles.centered}>
-            <ActivityIndicator size="large" color={theme.primary} />
-            <Text style={styles.loadingText}>Carregando fila...</Text>
-          </View>
+          <Loading />
         ) : (
           <OrdersQueuePanel
             orders={data ?? []}
@@ -180,7 +166,7 @@ export default function PickingHubScreen() {
           />
         )}
       </View>
-    </SafeAreaView>
+    </View>
   );
 }
 
@@ -238,8 +224,8 @@ function OrdersQueuePanel({
     try {
       const result = await createWave.mutateAsync({ orderIds, appendToWaveId });
       await onRefresh();
-      showInfoAlert(
-        `Onda criada com ${result.orderCount} pedido(s) e ${result.lineCount} linha(s). Aceite na aba Ondas.`,
+      showToast(
+        `Onda criada com ${result.orderCount} pedido(s) e ${result.lineCount} linha(s).`,
       );
       onGoToWaves();
     } catch (e) {
@@ -279,74 +265,58 @@ function OrdersQueuePanel({
     }
   };
 
-  const header = (
-    <View style={styles.listHeader}>
-      <Text style={styles.count}>{orders.length} pedido(s) na fila</Text>
-      <Text style={styles.waveHint}>
-        Pedidos em onda liberada aparecem na aba Ondas.
-      </Text>
-      {proximityGroups.length > 0 ? (
-        <View style={styles.recBlock}>
-          <Text style={styles.recTitle}>Recomendado — pedidos próximos</Text>
-          {proximityGroups.slice(0, 5).map((g) => (
-            <View key={g.id} style={styles.recCard}>
-              <Text style={styles.recMeta}>
-                {g.orders.length} pedido(s) · {g.routeHint}
+  const header =
+    proximityGroups.length > 0 ? (
+      <View style={styles.listHeader}>
+        <SectionTitle>Pedidos próximos</SectionTitle>
+        {proximityGroups.slice(0, 5).map((g) => (
+          <Card key={g.id} accent={color}>
+            <View style={styles.recTop}>
+              <Badge label={`${g.orders.length} pedidos`} tone="primary" icon="git-merge" />
+              <Text style={styles.recRoute} numberOfLines={1}>
+                {g.routeHint}
               </Text>
-              <Text style={styles.recOrders} numberOfLines={2}>
-                {g.orders.map((o) => o.erpOrderId).join(" · ")}
-              </Text>
-              <View style={styles.recActions}>
-                {config?.waveEnabled ? (
-                  <FactoryButton
-                    label="Criar onda com este grupo"
-                    onPress={() => void handleCreateWave(g)}
-                    loading={createWave.isPending}
-                  />
-                ) : null}
-                <FactoryButton
-                  label="Abrir primeiro pedido"
-                  variant="secondary"
-                  onPress={() => void handleAcceptBatch(g)}
-                />
-              </View>
             </View>
-          ))}
-        </View>
-      ) : null}
-    </View>
-  );
+            <Text style={styles.recOrders} numberOfLines={2}>
+              {g.orders.map((o) => o.erpOrderId).join(" · ")}
+            </Text>
+            <View style={styles.recActions}>
+              {config?.waveEnabled ? (
+                <FactoryButton
+                  label="Criar onda"
+                  icon="layers"
+                  size="md"
+                  color={color}
+                  style={styles.flex}
+                  onPress={() => void handleCreateWave(g)}
+                  loading={createWave.isPending}
+                />
+              ) : null}
+              <FactoryButton
+                label="Abrir 1º"
+                icon="open-outline"
+                size="md"
+                variant="secondary"
+                style={styles.flex}
+                onPress={() => void handleAcceptBatch(g)}
+              />
+            </View>
+          </Card>
+        ))}
+        <SectionTitle>Fila</SectionTitle>
+      </View>
+    ) : null;
 
   return (
     <FlatList
-      style={styles.listFlex}
+      style={styles.flex}
       data={orders}
       keyExtractor={(item) => item.id}
       contentContainerStyle={styles.list}
       refreshing={refreshing}
       onRefresh={onRefresh}
       ListHeaderComponent={header}
-      ListFooterComponent={
-        <View style={styles.footer}>
-          <FactoryButton
-            label="Atualizar"
-            variant="secondary"
-            onPress={onRefresh}
-            loading={refreshing}
-          />
-          <FactoryButton
-            label="Atualizar gôndola"
-            variant="secondary"
-            onPress={() => router.push("/atualizar-gondola")}
-          />
-        </View>
-      }
-      ListEmptyComponent={
-        <Text style={styles.empty}>
-          Nenhum pedido avulso na fila. Verifique a aba Ondas se houver ondas
-          liberadas.
-        </Text>
-      }
+      ListEmptyComponent={<EmptyState icon="cart-outline" title="Nenhum pedido na fila" />}
       renderItem={({ item }) => (
         <OrderCard item={item} onPress={() => onPressOrder(item)} />
       )}
@@ -392,47 +362,32 @@ function ProblemsPanel({
   onRefresh: () => void;
   refreshing: boolean;
 }) {
-  if (loading) {
-    return (
-      <View style={styles.centered}>
-        <ActivityIndicator size="large" color={theme.primary} />
-      </View>
-    );
-  }
+  if (loading) return <Loading />;
 
-  const header = (
-    <View style={styles.listHeader}>
-      {waves.length > 0 ? (
-        <View style={styles.problemsSection}>
-          <Text style={styles.sectionTitle}>
-            {waves.length} onda(s) com problema
-          </Text>
-          {waves.map((wave) => (
-            <View key={wave.id} style={styles.waveSection}>
-              <Text style={styles.waveSectionTitle}>{wave.name}</Text>
-              {wave.problemOrders.map((o) => (
-                <OrderCard
-                  key={o.id}
-                  item={waveOrderToProblem(o, wave.name)}
-                  problem
-                  resume
-                  inWave
-                  onPress={() => onPressOrder(waveOrderToProblem(o, wave.name))}
-                />
-              ))}
-            </View>
-          ))}
-        </View>
-      ) : null}
-      <Text style={styles.sectionTitle}>
-        {orders.length} pedido(s) com problema
-      </Text>
-    </View>
-  );
+  const header =
+    waves.length > 0 ? (
+      <View style={styles.listHeader}>
+        {waves.map((wave) => (
+          <View key={wave.id} style={styles.waveSection}>
+            <SectionTitle>{wave.name}</SectionTitle>
+            {wave.problemOrders.map((o) => (
+              <OrderCard
+                key={o.id}
+                item={waveOrderToProblem(o, wave.name)}
+                problem
+                inWave
+                onPress={() => onPressOrder(waveOrderToProblem(o, wave.name))}
+              />
+            ))}
+          </View>
+        ))}
+        {orders.length > 0 ? <SectionTitle>Pedidos avulsos</SectionTitle> : null}
+      </View>
+    ) : null;
 
   return (
     <FlatList
-      style={styles.listFlex}
+      style={styles.flex}
       data={orders}
       keyExtractor={(item) => item.id}
       contentContainerStyle={styles.list}
@@ -441,56 +396,33 @@ function ProblemsPanel({
       ListHeaderComponent={header}
       ListEmptyComponent={
         waves.length === 0 ? (
-          <Text style={styles.empty}>Nenhum pedido com problema</Text>
+          <EmptyState icon="checkmark-circle-outline" title="Nenhum problema" />
         ) : null
       }
       renderItem={({ item }) => (
-        <OrderCard
-          item={item}
-          problem
-          resume
-          onPress={() => onPressOrder(item)}
-        />
+        <OrderCard item={item} problem onPress={() => onPressOrder(item)} />
       )}
-      ListFooterComponent={
-        <FactoryButton
-          label="Atualizar"
-          variant="secondary"
-          onPress={onRefresh}
-          loading={refreshing}
-        />
-      }
     />
   );
 }
 
 function PickingIssueBlock({ detail }: { detail: PickingIssueDetail }) {
-  const title =
-    detail.source === "PACKING"
-      ? "Problema no packing"
-      : "Problema na separação";
   return (
     <View style={styles.issueBlock}>
-      <Text style={styles.issueBlockTitle}>{title}</Text>
-      <Text style={styles.issueBlockLine}>
-        <Text style={styles.issueBlockLabel}>Tipo: </Text>
-        {detail.typeLabel}
+      <Text style={styles.issueTitle}>
+        {detail.source === "PACKING" ? "Packing" : "Separação"} · {detail.typeLabel}
       </Text>
       {detail.sku ? (
-        <Text style={styles.issueBlockLine}>
-          <Text style={styles.issueBlockLabel}>SKU: </Text>
+        <Text style={styles.issueLine} numberOfLines={1}>
           {detail.sku}
+          {detail.quantity > 0 ? ` · ${detail.quantity} un.` : ""}
           {detail.productName ? ` — ${detail.productName}` : ""}
         </Text>
       ) : null}
-      {detail.quantity > 0 ? (
-        <Text style={styles.issueBlockLine}>
-          <Text style={styles.issueBlockLabel}>Qtd.: </Text>
-          {detail.quantity} un.
-        </Text>
-      ) : null}
       {detail.description ? (
-        <Text style={styles.issueBlockDesc}>{detail.description}</Text>
+        <Text style={styles.issueLine} numberOfLines={2}>
+          {detail.description}
+        </Text>
       ) : null}
     </View>
   );
@@ -500,13 +432,11 @@ function OrderCard({
   item,
   onPress,
   problem,
-  resume,
   inWave,
 }: {
   item: QueueOrder | ProblemOrder;
   onPress: () => void;
   problem?: boolean;
-  resume?: boolean;
   inWave?: boolean;
 }) {
   const returned =
@@ -521,289 +451,115 @@ function OrderCard({
   const totalUnits = item.totalUnits ?? 0;
   const qtyPicked =
     "qtyPicked" in item ? (item as ProblemOrder).qtyPicked : 0;
+  const routeHint = "routeHint" in item ? item.routeHint : null;
+  const neighbors =
+    "proximityNeighborCount" in item ? item.proximityNeighborCount ?? 0 : 0;
+
+  const accent = paused
+    ? theme.danger
+    : returned || problem
+      ? theme.warning
+      : resuming
+        ? theme.info
+        : color;
 
   return (
-    <Pressable
-      style={[
-        styles.card,
-        (returned || paused || problem) && styles.cardReturned,
-      ]}
-      onPress={onPress}
-    >
-      {returned ? (
-        <View style={styles.returnBadge}>
-          <Text style={styles.returnBadgeText}>RETORNO SEPARAÇÃO</Text>
-        </View>
-      ) : null}
-      {resuming ? (
-        <View style={[styles.returnBadge, { backgroundColor: theme.warning }]}>
-          <Text style={styles.returnBadgeText}>EM ANDAMENTO</Text>
-        </View>
-      ) : null}
-      {paused ? (
-        <View style={[styles.returnBadge, { backgroundColor: theme.danger }]}>
-          <Text style={styles.returnBadgeText}>PAUSADO</Text>
-        </View>
-      ) : null}
-      {inWave || waveName ? (
-        <View style={[styles.returnBadge, { backgroundColor: theme.info }]}>
-          <Text style={styles.returnBadgeText}>
-            {waveName ? `ONDA ${waveName}` : "EM ONDA"}
-          </Text>
-        </View>
-      ) : null}
-      <Text style={styles.erp}>{item.erpOrderId}</Text>
-      {"routeHint" in item && item.routeHint ? (
-        <Text style={styles.routeHint}>{item.routeHint}</Text>
-      ) : null}
-      {"proximityNeighborCount" in item &&
-      (item.proximityNeighborCount ?? 0) > 0 ? (
-        <Text style={styles.proxBadge}>
-          Próximo de {item.proximityNeighborCount} outro(s)
+    <Card accent={accent} onPress={onPress} style={styles.card}>
+      <View style={styles.cardTop}>
+        <Text style={styles.erp} numberOfLines={1}>
+          {item.erpOrderId}
         </Text>
-      ) : null}
-      {item.marketplaceLabel ? (
-        <Text style={styles.marketplace}>{item.marketplaceLabel}</Text>
-      ) : null}
-      <CollectionDeadlineRow deadline={item.collectionDeadline} />
-      {"customerName" in item && item.customerName ? (
-        <Text style={styles.customer}>{item.customerName}</Text>
-      ) : null}
-      {issueDetail ? <PickingIssueBlock detail={issueDetail} /> : null}
-      <View style={styles.meta}>
-        <Text style={styles.metaText}>
-          {problem && totalUnits > 0
-            ? `Separado ${qtyPicked}/${totalUnits} un.`
-            : itemCount > 0
-              ? `${itemCount} itens · ${totalUnits} un.`
-              : "Toque para continuar"}
-        </Text>
+        <Ionicons name="chevron-forward" size={24} color={theme.textSoft} />
+      </View>
+
+      <View style={styles.badges}>
+        {paused ? <Badge label="Pausado" tone="danger" solid /> : null}
+        {returned ? <Badge label="Retorno" tone="warning" solid /> : null}
+        {resuming ? <Badge label="Em andamento" tone="info" solid /> : null}
         {item.priority > 0 ? (
-          <Text style={styles.priority}>PRIORIDADE {item.priority}</Text>
+          <Badge label={`Prioridade ${item.priority}`} tone="danger" icon="flash" />
+        ) : null}
+        {inWave || waveName ? (
+          <Badge label={waveName ? waveName : "Em onda"} tone="info" icon="layers" />
+        ) : null}
+        {item.marketplaceLabel ? <Badge label={item.marketplaceLabel} /> : null}
+        <CollectionDeadlineRow deadline={item.collectionDeadline} compact />
+      </View>
+
+      {"customerName" in item && item.customerName ? (
+        <Text style={styles.customer} numberOfLines={1}>
+          {item.customerName}
+        </Text>
+      ) : null}
+
+      {issueDetail ? <PickingIssueBlock detail={issueDetail} /> : null}
+
+      <View style={styles.meta}>
+        {problem && totalUnits > 0 ? (
+          <Text style={styles.metaStrong}>
+            {qtyPicked}/{totalUnits} un.
+          </Text>
+        ) : itemCount > 0 ? (
+          <Text style={styles.metaStrong}>
+            {itemCount} itens · {totalUnits} un.
+          </Text>
+        ) : null}
+        {routeHint ? (
+          <Text style={styles.metaText} numberOfLines={1}>
+            {routeHint}
+          </Text>
+        ) : null}
+        {neighbors > 0 ? (
+          <Badge label={`+${neighbors} perto`} tone="primary" icon="git-merge" />
         ) : null}
       </View>
-      <Text style={styles.tapHint}>
-        {resume || problem || returned || paused || resuming
-          ? "TOQUE PARA CONTINUAR"
-          : "TOQUE PARA INICIAR"}
-      </Text>
-    </Pressable>
+    </Card>
   );
 }
 
 const styles = StyleSheet.create({
-  footer: { gap: spacing.sm },
   safe: { flex: 1, backgroundColor: theme.bg },
-  headerFixed: {
-    flexGrow: 0,
-    flexShrink: 0,
-  },
-  topBar: {
-    paddingHorizontal: spacing.md,
-    paddingTop: spacing.sm,
-    paddingBottom: spacing.sm,
-    gap: spacing.sm,
-  },
-  hubTitle: {
-    fontSize: typography.title,
-    fontWeight: "900",
-    color: theme.text,
-  },
-  tabScroll: {
-    flexGrow: 0,
-    maxHeight: 48,
-  },
-  tabRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingHorizontal: spacing.md,
-    paddingBottom: spacing.sm,
-    gap: spacing.sm,
-  },
-  tab: {
-    paddingVertical: 8,
-    paddingHorizontal: spacing.md,
-    borderRadius: 10,
-    backgroundColor: theme.surface,
-    borderWidth: 2,
-    borderColor: theme.border,
+  flex: { flex: 1 },
+  body: { flex: 1, minHeight: 0 },
+  headerAction: {
+    width: 40,
+    height: 40,
+    borderRadius: radius.md,
     alignItems: "center",
     justifyContent: "center",
-    flexShrink: 0,
-  },
-  tabActive: {
-    borderColor: theme.primary,
-    backgroundColor: theme.primary,
-  },
-  tabText: {
-    fontWeight: "800",
-    color: theme.text,
-    fontSize: 15,
-  },
-  tabTextActive: { color: "#fff" },
-  body: {
-    flex: 1,
-    minHeight: 0,
-  },
-  listFlex: {
-    flex: 1,
-  },
-  listHeader: {
-    paddingHorizontal: spacing.md,
-    paddingTop: spacing.sm,
-    gap: spacing.sm,
-    marginBottom: spacing.sm,
-  },
-  problemsSection: {
-    gap: spacing.sm,
-    marginBottom: spacing.md,
-  },
-  sectionTitle: {
-    fontWeight: "800",
-    fontSize: typography.body,
-    color: theme.text,
-  },
-  waveHint: {
-    fontSize: typography.caption,
-    color: theme.textMuted,
-    fontWeight: "600",
-  },
-  centered: {
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-    gap: spacing.md,
-  },
-  loadingText: { color: theme.textMuted, fontSize: typography.body },
-  count: {
-    fontWeight: "800",
-    fontSize: typography.body,
-    color: theme.text,
-  },
-  recBlock: { gap: spacing.xs },
-  recTitle: {
-    fontWeight: "800",
-    fontSize: typography.caption,
-    color: theme.primary,
-  },
-  recCard: {
-    backgroundColor: "#ecfdf5",
-    borderRadius: 10,
-    padding: spacing.sm,
-    borderWidth: 1,
-    borderColor: "#99f6e4",
-  },
-  recMeta: { fontWeight: "700", fontSize: typography.caption },
-  recOrders: {
-    marginTop: 4,
-    fontSize: typography.caption,
-    color: theme.textMuted,
-  },
-  recActions: {
-    marginTop: spacing.sm,
-    gap: spacing.xs,
-  },
-  routeHint: {
-    marginTop: 2,
-    fontSize: typography.caption,
-    color: theme.primary,
-    fontWeight: "600",
-  },
-  proxBadge: {
-    marginTop: 2,
-    fontSize: typography.caption,
-    color: "#0f766e",
-    fontWeight: "700",
+    backgroundColor: "rgba(255,255,255,0.08)",
   },
   list: {
-    paddingHorizontal: spacing.md,
-    paddingBottom: spacing.xl,
+    padding: spacing.md,
+    paddingBottom: spacing.xl * 2,
+    gap: spacing.sm,
     flexGrow: 1,
   },
-  card: {
-    backgroundColor: theme.surface,
-    borderRadius: 12,
-    padding: spacing.md,
-    marginBottom: spacing.sm,
-    borderWidth: 2,
-    borderColor: theme.border,
-  },
-  cardReturned: {
-    borderColor: "#f59e0b",
-    backgroundColor: "#fffbeb",
-  },
-  returnBadge: {
-    alignSelf: "flex-start",
-    backgroundColor: "#f59e0b",
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 6,
-    marginBottom: spacing.xs,
-  },
-  returnBadgeText: {
-    color: "#fff",
-    fontWeight: "900",
+  listHeader: { gap: spacing.sm, marginBottom: spacing.xs },
+  waveSection: { gap: spacing.sm },
+  recTop: { flexDirection: "row", alignItems: "center", gap: spacing.sm },
+  recRoute: { flex: 1, color: color, fontWeight: "700", fontSize: typography.caption },
+  recOrders: {
+    marginTop: spacing.sm,
     fontSize: typography.caption,
+    fontWeight: "700",
+    color: theme.text,
   },
+  recActions: { flexDirection: "row", gap: spacing.sm, marginTop: spacing.sm },
+  card: { gap: spacing.sm },
+  cardTop: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
+  erp: { flex: 1, fontSize: 28, fontWeight: "900", color: theme.text, letterSpacing: 0.3 },
+  badges: { flexDirection: "row", flexWrap: "wrap", gap: 6, alignItems: "center" },
+  customer: { color: theme.textMuted, fontWeight: "600" },
+  meta: { flexDirection: "row", alignItems: "center", gap: spacing.sm, flexWrap: "wrap" },
+  metaStrong: { fontWeight: "900", color: theme.text, fontSize: typography.body },
+  metaText: { flex: 1, color: theme.textMuted, fontSize: typography.caption, fontWeight: "600" },
   issueBlock: {
-    marginTop: spacing.sm,
     padding: spacing.sm,
-    borderRadius: 8,
-    backgroundColor: "#fff7ed",
-    borderWidth: 1,
-    borderColor: "#fdba74",
-    gap: 4,
+    borderRadius: radius.sm,
+    backgroundColor: theme.warningSoft,
+    gap: 2,
   },
-  issueBlockTitle: {
-    fontWeight: "900",
-    fontSize: typography.caption,
-    color: "#9a3412",
-  },
-  issueBlockLine: {
-    fontSize: typography.caption,
-    color: "#78350f",
-  },
-  issueBlockLabel: { fontWeight: "800" },
-  issueBlockDesc: {
-    marginTop: 2,
-    fontSize: typography.caption,
-    color: "#92400e",
-    fontStyle: "italic",
-  },
-  erp: {
-    fontSize: typography.hero,
-    fontWeight: "900",
-    color: theme.text,
-  },
-  customer: { color: theme.textMuted, marginTop: 4 },
-  marketplace: { color: theme.info, fontWeight: "700", marginTop: 2 },
-  meta: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    marginTop: spacing.sm,
-  },
-  metaText: { color: theme.textMuted, fontSize: typography.caption },
-  priority: {
-    color: theme.danger,
-    fontWeight: "900",
-    fontSize: typography.caption,
-  },
-  tapHint: {
-    marginTop: spacing.sm,
-    textAlign: "center",
-    fontWeight: "800",
-    color: theme.primary,
-    fontSize: typography.caption,
-  },
-  empty: { textAlign: "center", color: theme.textMuted, marginTop: spacing.lg },
-  waveSection: {
-    gap: spacing.xs,
-    marginBottom: spacing.sm,
-  },
-  waveSectionTitle: {
-    fontWeight: "900",
-    fontSize: typography.subtitle,
-    color: theme.text,
-    marginBottom: spacing.xs,
-  },
+  issueTitle: { fontWeight: "900", fontSize: typography.caption, color: "#92400E" },
+  issueLine: { fontSize: typography.caption, color: "#78350F" },
 });

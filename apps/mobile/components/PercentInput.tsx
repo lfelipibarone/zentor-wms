@@ -1,8 +1,9 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { Pressable, StyleSheet, Text, TextInput, View } from "react-native";
 import { FactoryButton } from "./FactoryButton";
+import { Chip } from "./QuantityInput";
 import { parsePercentText } from "@/lib/percent";
-import { theme, spacing, typography } from "@/lib/theme";
+import { theme, spacing, typography, radius } from "@/lib/theme";
 
 const QUICK_PERCENTS = [0, 25, 50, 75, 100];
 
@@ -46,35 +47,42 @@ export function PercentInput({
     <View style={styles.wrap}>
       <Text style={styles.label}>{label}</Text>
       {hint ? <Text style={styles.hint}>{hint}</Text> : null}
-      <View style={styles.inputRow}>
+      <View style={[styles.inputRow, valid && styles.inputRowValid]}>
         <TextInput
           style={styles.input}
           value={value}
           onChangeText={(t) => setValue(t.replace(/[^0-9]/g, "").slice(0, 3))}
           keyboardType="number-pad"
           placeholder="0"
-          placeholderTextColor={theme.textMuted}
+          placeholderTextColor={theme.textSoft}
           maxLength={3}
         />
         <Text style={styles.suffix}>%</Text>
       </View>
+      <View style={styles.gauge}>
+        <View
+          style={[
+            styles.gaugeFill,
+            {
+              width: `${parsed ?? 0}%`,
+              backgroundColor:
+                (parsed ?? 0) <= 25 ? theme.danger : (parsed ?? 0) <= 50 ? theme.warning : theme.success,
+            },
+          ]}
+        />
+      </View>
       <View style={styles.quickRow}>
         {QUICK_PERCENTS.filter((n) => n >= minPercent).map((n) => (
-          <FactoryButton
-            key={n}
-            label={`${n}%`}
-            variant={parsed === n ? "primary" : "secondary"}
-            onPress={() => setValue(String(n))}
-            style={styles.quickBtn}
-          />
+          <Chip key={n} label={`${n}`} active={parsed === n} onPress={() => setValue(String(n))} />
         ))}
       </View>
       {value !== "" && parsed === null ? (
-        <Text style={styles.error}>Informe um valor de 0 a 100.</Text>
+        <Text style={styles.error}>De 0 a 100</Text>
       ) : null}
       {children}
       <FactoryButton
         label={confirmLabel}
+        icon="checkmark"
         variant="success"
         disabled={!valid}
         loading={loading}
@@ -156,32 +164,41 @@ const styles = StyleSheet.create({
   compactChipActive: { backgroundColor: theme.primary, borderColor: theme.primary },
   compactChipText: { fontWeight: "800", color: theme.text, fontSize: typography.caption },
   compactChipTextActive: { color: theme.primaryText },
-  wrap: { gap: spacing.md },
+  wrap: { gap: spacing.sm },
   label: {
-    fontSize: typography.subtitle,
+    fontSize: typography.caption,
     fontWeight: "800",
-    color: theme.text,
+    color: theme.textMuted,
+    textTransform: "uppercase",
+    letterSpacing: 0.6,
   },
-  hint: { fontSize: typography.caption, color: theme.textMuted },
+  hint: { fontSize: typography.caption, color: theme.textMuted, fontWeight: "600" },
   inputRow: {
     flexDirection: "row",
     alignItems: "center",
     backgroundColor: theme.surface,
-    borderWidth: 3,
-    borderColor: theme.primary,
-    borderRadius: 12,
+    borderWidth: 2,
+    borderColor: theme.borderStrong,
+    borderRadius: radius.lg,
     paddingHorizontal: spacing.lg,
   },
+  inputRowValid: { borderColor: theme.success },
   input: {
     flex: 1,
     paddingVertical: spacing.md,
-    fontSize: 48,
+    fontSize: 44,
     fontWeight: "900",
     color: theme.text,
     textAlign: "center",
   },
-  suffix: { fontSize: 36, fontWeight: "900", color: theme.textMuted },
-  quickRow: { flexDirection: "row", flexWrap: "wrap", gap: spacing.sm },
-  quickBtn: { flex: 1, minWidth: "17%" as unknown as number, minHeight: 52, paddingHorizontal: 4 },
+  suffix: { fontSize: 32, fontWeight: "900", color: theme.textMuted },
+  gauge: {
+    height: 10,
+    borderRadius: radius.pill,
+    backgroundColor: theme.border,
+    overflow: "hidden",
+  },
+  gaugeFill: { height: "100%", borderRadius: radius.pill },
+  quickRow: { flexDirection: "row", gap: spacing.sm },
   error: { color: theme.danger, fontWeight: "700" },
 });

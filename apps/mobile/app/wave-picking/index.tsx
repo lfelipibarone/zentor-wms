@@ -16,7 +16,7 @@ import { useReleasedWaves, useWaveById } from "@/hooks/useWavePicking";
 import { useSplitWork } from "@/hooks/useWorkShares";
 import type { WaveLineSummary } from "@/lib/api";
 import { ApiError } from "@/lib/api";
-import { showErrorAlert, showInfoAlert } from "@/lib/app-alert";
+import { showErrorAlert, showToast } from "@/lib/app-alert";
 import { theme, spacing, typography } from "@/lib/theme";
 
 function statusLabel(line: WaveLineSummary) {
@@ -302,11 +302,11 @@ export default function WavePickingListScreen() {
               style={[styles.card, done && styles.cardDone]}
               onPress={() => {
                 if (blocked && !done) {
-                  showInfoAlert(blocked);
+                  showToast(blocked);
                   return;
                 }
                 if (done) {
-                  showInfoAlert(
+                  showToast(
                     item.sortStatus === "PICKED"
                       ? "Pick concluído — finalize o packing no painel web."
                       : "Linha já concluída.",

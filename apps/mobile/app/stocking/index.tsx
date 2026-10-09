@@ -1,7 +1,6 @@
 import { useCallback, useState } from "react";
 import {
   ActivityIndicator,
-  FlatList,
   Pressable,
   StyleSheet,
   Text,
@@ -133,12 +132,7 @@ export default function StockingScreen() {
 
   if (phase === "list") {
     return (
-      <ScreenShell scroll backToHome>
-        <Text style={styles.pageHint}>
-          Itens retirados do pulmão aguardando gôndola. Bipe sempre a gôndola de
-          destino antes de confirmar.
-        </Text>
-
+      <ScreenShell scroll module="ressuprimento" title="Abastecer estoque">
         {loadingList ? (
           <ActivityIndicator size="large" color={theme.primary} />
         ) : transfers.length === 0 ? (
@@ -146,12 +140,13 @@ export default function StockingScreen() {
             Nenhum transporte em trânsito. Use Transporte de carga no menu.
           </Text>
         ) : (
-          <FlatList
-            data={transfers}
-            keyExtractor={(item) => item.id}
-            scrollEnabled={false}
-            renderItem={({ item }) => (
-              <Pressable style={styles.card} onPress={() => openTransfer(item)}>
+          <View>
+            {transfers.map((item) => (
+              <Pressable
+                key={item.id}
+                style={styles.card}
+                onPress={() => openTransfer(item)}
+              >
                 <Text style={styles.cardTitle}>{item.product.sku}</Text>
                 <Text style={styles.meta}>{item.product.name}</Text>
                 <Text style={styles.meta}>
@@ -167,8 +162,8 @@ export default function StockingScreen() {
                   {formatAgo(item.durationSeconds)}
                 </Text>
               </Pressable>
-            )}
-          />
+            ))}
+          </View>
         )}
 
         {message ? <Text style={styles.message}>{message}</Text> : null}
@@ -182,7 +177,7 @@ export default function StockingScreen() {
   }
 
   return (
-    <ScreenShell scroll backToHome>
+    <ScreenShell scroll module="ressuprimento" title="Abastecer estoque">
       {selected ? (
         <View style={styles.card}>
           <Text style={styles.cardTitle}>{selected.product.sku}</Text>
@@ -242,11 +237,6 @@ export default function StockingScreen() {
 }
 
 const styles = StyleSheet.create({
-  pageHint: {
-    fontSize: typography.body,
-    color: theme.textMuted,
-    marginBottom: spacing.md,
-  },
   instruction: {
     fontSize: typography.body,
     color: theme.textMuted,

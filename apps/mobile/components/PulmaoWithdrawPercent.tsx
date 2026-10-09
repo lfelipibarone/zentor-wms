@@ -1,6 +1,7 @@
 import { StyleSheet, Text, View } from "react-native";
 import { FactoryButton } from "./FactoryButton";
 import { PercentInput } from "./PercentInput";
+import { OrDivider } from "./ui";
 import { theme, spacing, typography } from "@/lib/theme";
 
 export type PulmaoWithdrawResult = { remainingPercent: number; skuFinished: boolean };
@@ -24,19 +25,18 @@ export function PulmaoWithdrawPercent({
 }: PulmaoWithdrawPercentProps) {
   return (
     <View style={styles.wrap}>
-      <Text style={styles.current}>
-        {sku} ocupava {currentPercent}% de {pulmaoLabel}
-      </Text>
+      <Text style={styles.current}>Antes: {currentPercent}%</Text>
       <FactoryButton
         label={`Acabou o ${sku} aqui`}
+        icon="remove-circle"
         variant="danger"
+        size="md"
         loading={loading}
         onPress={() => onConfirm({ remainingPercent: 0, skuFinished: true })}
       />
-      <Text style={styles.or}>ou, se ainda sobrou:</Text>
+      <OrDivider label="ou sobrou" />
       <PercentInput
-        label="Quanto do SKU ficou no pulmão?"
-        hint="0% também tira o SKU da lista do pulmão."
+        label="Quanto ficou no pulmão?"
         resetKey={`${pulmaoLabel}-${sku}`}
         confirmLabel="Confirmar retirada"
         loading={loading}
@@ -50,8 +50,7 @@ const styles = StyleSheet.create({
   wrap: { gap: spacing.md },
   current: {
     fontSize: typography.body,
-    fontWeight: "700",
-    color: theme.text,
+    fontWeight: "800",
+    color: theme.textMuted,
   },
-  or: { textAlign: "center", color: theme.textMuted, fontSize: typography.caption },
 });

@@ -1,12 +1,6 @@
 import { useEffect, useState } from "react";
 import { router, useLocalSearchParams } from "expo-router";
-import {
-  ActivityIndicator,
-  Alert,
-  StyleSheet,
-  Text,
-  View,
-} from "react-native";
+import { Alert, StyleSheet, Text, View } from "react-native";
 import { FactoryButton } from "@/components/FactoryButton";
 import { PulmaoLocationPicker } from "@/components/PulmaoLocationPicker";
 import { ProductThumbnail } from "@/components/ProductThumbnail";
@@ -18,13 +12,24 @@ import { ScreenShell } from "@/components/ScreenShell";
 import { SplitWorkModal } from "@/components/SplitWorkModal";
 import { WorkShareCard, workBlockedMessage } from "@/components/WorkTimer";
 import {
+  Badge,
+  BigCode,
+  Card,
+  EmptyState,
+  Loading,
+  Notice,
+  ProgressBar,
+  Steps,
+} from "@/components/ui";
+import {
   useCompletePutaway,
   usePutawaySession,
   useStorePutawayItem,
 } from "@/hooks/usePutaway";
 import { useSplitWork } from "@/hooks/useWorkShares";
 import { ApiError, type LocationLookup } from "@/lib/api";
-import { theme, spacing, typography } from "@/lib/theme";
+import { modules } from "@/lib/modules";
+import { theme, spacing, typography, radius } from "@/lib/theme";
 
 type Phase = "scan-location" | "confirm-qty" | "confirm-pct";
 
@@ -139,34 +144,50 @@ export default function PutawaySessionScreen() {
 
   if (isLoading || !data) {
     return (
-      <ScreenShell backToHome scroll title="Armazenagem">
-        <ActivityIndicator size="large" color={theme.primary} />
+      <ScreenShell module="armazenagem" title="Armazenagem">
+        <Loading />
       </ScreenShell>
     );
   }
 
   if (finished) {
     return (
-      <ScreenShell backToHome scroll title="Armazenagem concluída" subtitle="Itens endereçados no pulmão">
+      <ScreenShell scroll module="armazenagem" title="Armazenagem concluída">
         <WorkShareCard work={work} />
         <PutawaySummary items={data.items} />
-        <FactoryButton label="OK" onPress={() => router.replace("/putaway")} />
+        <FactoryButton
+          label="OK"
+          icon="checkmark"
+          color={color}
+          onPress={() => router.replace("/putaway")}
+        />
       </ScreenShell>
     );
   }
 
+  const doneCount = myItems.filter((it) => it.completed).length;
+  const stepIndex = phase === "scan-location" ? 0 : phase === "confirm-qty" ? 1 : 2;
+  const feedbackError =
+    feedback != null && !feedback.includes("guardadas") && !feedback.startsWith("Local ");
+
   return (
     <ScreenShell
-      backToHome
       scroll
+      module="armazenagem"
       title="Armazenagem"
-      subtitle={
-        next
-          ? `${next.description ?? next.productCode} · faltam ${next.remaining}`
-          : "Conferir e finalizar"
+      headerRight={
+        <Text style={styles.headerCount}>
+          {doneCount}/{myItems.length}
+        </Text>
       }
     >
-      {feedback ? <Text style={styles.feedback}>{feedback}</Text> : null}
+      <ProgressBar value={doneCount} total={myItems.length} color={color} />
+
+      {feedback ? (
+        <Notice tone={feedbackError ? "danger" : "success"} onClose={() => setFeedback(null)}>
+          {feedback}
+        </Notice>
+      ) : null}
 
       <WorkShareCard work={work} />
 
@@ -183,191 +204,156 @@ export default function PutawaySessionScreen() {
       {needsAccept ? (
         <FactoryButton
           label="Aceitar armazenagem"
+          icon="hand-left"
+          color={color}
           onPress={() => setSplitOpen(true)}
           loading={splitWork.isPending}
         />
       ) : blocked ? (
-        <Text style={styles.blocked}>{blocked}</Text>
+        <Notice tone="warning">{blocked}</Notice>
       ) : shared && myDone ? (
         <>
-          <Text style={styles.done}>Sua parte foi armazenada ✓ — aguardando os colegas</Text>
-          <PutawaySummary items={myItems} title="Onde você guardou cada item" />
-          <FactoryButton label="Voltar à fila" variant="secondary" onPress={() => router.replace("/putaway")} />
+          <EmptyState icon="checkmark-circle" title="Sua parte foi armazenada" />
+          <PutawaySummary items={myItems} title="Onde você guardou" />
+          <FactoryButton
+            label="Voltar à fila"
+            icon="arrow-back"
+            variant="secondary"
+            onPress={() => router.replace("/putaway")}
+          />
+        </>
+      ) : data.allStored ? (
+        <>
+          <PutawaySummary items={data.items} title="Confira" />
+          <FactoryButton
+            label="Finalizar armazenagem"
+            icon="checkmark-done"
+            variant="success"
+            onPress={handleComplete}
+            loading={complete.isPending}
+          />
         </>
       ) : (
         <>
-          {next && !data.allStored ? (
-            <View style={styles.productRow}>
-              <ProductThumbnail
-                imageUrl={next.imageUrl}
-                alt={next.description ?? next.productCode ?? ""}
-                size={72}
-              />
-              <View style={styles.productMeta}>
-                <Text style={styles.productCode}>{next.productCode}</Text>
-                {next.description ? (
-                  <Text style={styles.productDesc}>{next.description}</Text>
-                ) : null}
-                <Text style={styles.productRemaining}>
-                  Faltam {next.remaining} un.
-                </Text>
-                {nextStored.map((loc) => (
-                  <Text key={loc.locationId} style={styles.storedLine}>
-                    Já guardado: {loc.quantity} un. em {loc.label}
-                  </Text>
-                ))}
+          {next ? (
+            <Card accent={color}>
+              <View style={styles.productRow}>
+                <ProductThumbnail
+                  imageUrl={next.imageUrl}
+                  alt={next.description ?? next.productCode ?? ""}
+                  size={72}
+                />
+                <View style={styles.productMeta}>
+                  <Text style={styles.productCode}>{next.productCode}</Text>
+                  {next.description ? (
+                    <Text style={styles.productDesc} numberOfLines={2}>
+                      {next.description}
+                    </Text>
+                  ) : null}
+                </View>
+                <View style={styles.qtyBox}>
+                  <Text style={styles.qtyValue}>{next.remaining}</Text>
+                  <Text style={styles.qtyLabel}>un.</Text>
+                </View>
               </View>
-            </View>
+              {nextStored.length > 0 ? (
+                <View style={styles.storedWrap}>
+                  {nextStored.map((loc) => (
+                    <Badge
+                      key={loc.locationId}
+                      icon="location"
+                      label={`${loc.quantity} un. em ${loc.label}`}
+                    />
+                  ))}
+                </View>
+              ) : null}
+            </Card>
           ) : null}
 
-          {data.allStored ? (
+          <Steps steps={["Pulmão", "Quantidade", "%"]} current={stepIndex} color={color} />
+
+          {phase === "scan-location" ? (
+            <PulmaoLocationPicker
+              defaultSku={next?.productCode ?? ""}
+              onSelect={handleLocationSelect}
+              disabled={store.isPending}
+            />
+          ) : next && selectedLocation ? (
             <>
-              <PutawaySummary items={data.items} title="Confira onde cada item foi guardado" />
+              <BigCode
+                label="Pulmão"
+                code={selectedLocation.label}
+                meta={`Ocupação ${selectedLocation.fillPercent}%`}
+                color={color}
+              />
+              <PulmaoStockList stocks={selectedLocation.stocks} />
+              {phase === "confirm-qty" ? (
+                <QuantityInput
+                  label="Unidades a guardar"
+                  max={next.remaining}
+                  onConfirm={handleConfirmQty}
+                />
+              ) : (
+                <>
+                  <PercentInput
+                    label={`% do ${next.productCode ?? "SKU"} no pulmão`}
+                    hint={
+                      currentSkuPercent != null
+                        ? `${pendingQty} un. · antes ${currentSkuPercent}%`
+                        : `${pendingQty} un.`
+                    }
+                    initialValue={currentSkuPercent}
+                    resetKey={`${selectedLocation.id}-${next.id}`}
+                    minPercent={1}
+                    confirmLabel="Guardar"
+                    loading={store.isPending}
+                    onConfirm={handleConfirmPercent}
+                  />
+                  <FactoryButton
+                    label="Corrigir quantidade"
+                    icon="arrow-undo"
+                    size="sm"
+                    variant="secondary"
+                    onPress={() => setPhase("confirm-qty")}
+                  />
+                </>
+              )}
               <FactoryButton
-                label="Finalizar armazenagem"
-                onPress={handleComplete}
-                loading={complete.isPending}
+                label="Trocar pulmão"
+                icon="swap-horizontal"
+                size="sm"
+                variant="secondary"
+                onPress={() => {
+                  setPhase("scan-location");
+                  setSelectedLocation(null);
+                  setPendingQty(null);
+                }}
               />
             </>
-          ) : (
-            <>
-              {phase === "scan-location" ? (
-                <>
-                  <Text style={styles.hint}>
-                    1. Escolha o local de pulmão (bip ou busca por SKU)
-                  </Text>
-                  <PulmaoLocationPicker
-                    defaultSku={next?.productCode ?? ""}
-                    onSelect={handleLocationSelect}
-                    disabled={store.isPending}
-                  />
-                </>
-              ) : next && selectedLocation ? (
-                <>
-                  <View style={styles.locCard}>
-                    <Text style={styles.locTitle}>{selectedLocation.label}</Text>
-                    <Text style={styles.locMeta}>Ocupação: {selectedLocation.fillPercent}%</Text>
-                    <PulmaoStockList stocks={selectedLocation.stocks} />
-                  </View>
-                  {phase === "confirm-qty" ? (
-                    <>
-                      <Text style={styles.hint}>
-                        2. Quantidade para {next.description ?? next.productCode}
-                      </Text>
-                      <QuantityInput
-                        label="Unidades a armazenar"
-                        max={next.remaining}
-                        onConfirm={handleConfirmQty}
-                      />
-                    </>
-                  ) : (
-                    <>
-                      <Text style={styles.hint}>
-                        3. {pendingQty} un. de {next.productCode} — quanto o SKU ocupa no pulmão?
-                      </Text>
-                      <PercentInput
-                        label="% do SKU neste pulmão"
-                        hint={
-                          currentSkuPercent != null
-                            ? `Antes ocupava ${currentSkuPercent}%. Informe o total depois de guardar.`
-                            : "Informe quanto este SKU ocupa do pulmão depois de guardar."
-                        }
-                        initialValue={currentSkuPercent}
-                        resetKey={`${selectedLocation.id}-${next.id}`}
-                        minPercent={1}
-                        confirmLabel="Guardar"
-                        loading={store.isPending}
-                        onConfirm={handleConfirmPercent}
-                      />
-                      <FactoryButton
-                        label="Corrigir quantidade"
-                        variant="secondary"
-                        onPress={() => setPhase("confirm-qty")}
-                      />
-                    </>
-                  )}
-                  <FactoryButton
-                    label="Trocar local"
-                    variant="secondary"
-                    onPress={() => {
-                      setPhase("scan-location");
-                      setSelectedLocation(null);
-                      setPendingQty(null);
-                    }}
-                  />
-                </>
-              ) : null}
-            </>
-          )}
+          ) : null}
         </>
       )}
     </ScreenShell>
   );
 }
 
+const color = modules.armazenagem.color;
+
 const styles = StyleSheet.create({
-  productRow: {
-    flexDirection: "row",
-    gap: spacing.md,
-    marginBottom: spacing.md,
-    alignItems: "center",
-  },
+  headerCount: { color: theme.headerTint, fontWeight: "900", fontSize: typography.body },
+  productRow: { flexDirection: "row", gap: spacing.md, alignItems: "center" },
   productMeta: { flex: 1, gap: 2 },
-  productCode: { fontWeight: "900", fontSize: typography.body },
-  productDesc: { color: theme.textMuted, fontSize: typography.caption },
-  productRemaining: {
-    color: theme.primary,
-    fontWeight: "800",
-    fontSize: typography.caption,
-    marginTop: 4,
+  productCode: { fontWeight: "900", fontSize: typography.body, color: theme.text },
+  productDesc: { color: theme.textMuted, fontSize: typography.caption, fontWeight: "600" },
+  qtyBox: {
+    minWidth: 64,
+    alignItems: "center",
+    paddingVertical: spacing.xs,
+    paddingHorizontal: spacing.sm,
+    borderRadius: radius.md,
+    backgroundColor: modules.armazenagem.soft,
   },
-  storedLine: {
-    color: theme.text,
-    fontWeight: "700",
-    fontSize: typography.caption,
-    marginTop: 2,
-  },
-  locCard: {
-    backgroundColor: theme.surface,
-    borderRadius: 12,
-    padding: spacing.md,
-    marginBottom: spacing.md,
-    borderWidth: 2,
-    borderColor: theme.primary,
-  },
-  locTitle: {
-    fontSize: typography.subtitle,
-    fontWeight: "900",
-    color: theme.primary,
-  },
-  locMeta: {
-    color: theme.textMuted,
-    fontSize: typography.caption,
-    marginTop: 4,
-  },
-  feedback: {
-    marginBottom: spacing.md,
-    padding: spacing.sm,
-    backgroundColor: theme.surface,
-    borderRadius: 8,
-    color: theme.text,
-  },
-  blocked: {
-    textAlign: "center",
-    fontWeight: "700",
-    color: theme.warning,
-    marginVertical: spacing.sm,
-  },
-  done: {
-    textAlign: "center",
-    fontWeight: "700",
-    color: theme.success,
-    marginBottom: spacing.sm,
-  },
-  hint: {
-    marginBottom: spacing.sm,
-    color: theme.textMuted,
-    fontSize: typography.caption,
-    fontWeight: "600",
-  },
+  qtyValue: { fontSize: 30, fontWeight: "900", color },
+  qtyLabel: { fontSize: typography.small, fontWeight: "800", color },
+  storedWrap: { flexDirection: "row", flexWrap: "wrap", gap: 6, marginTop: spacing.sm },
 });

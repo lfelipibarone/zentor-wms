@@ -1,6 +1,9 @@
 import { StyleSheet, Text, View } from "react-native";
+import { Ionicons } from "@expo/vector-icons";
+import { SectionTitle } from "@/components/ui";
 import type { PutawaySessionDto } from "@/lib/api";
-import { theme, spacing, typography } from "@/lib/theme";
+import { modules } from "@/lib/modules";
+import { theme, spacing, typography, radius } from "@/lib/theme";
 
 type Props = {
   items: PutawaySessionDto["items"];
@@ -11,7 +14,7 @@ type Props = {
 export function PutawaySummary({ items, title = "Onde foi guardado" }: Props) {
   return (
     <View style={styles.wrap}>
-      <Text style={styles.title}>{title}</Text>
+      <SectionTitle>{title}</SectionTitle>
       {items.map((it) => (
         <View key={it.id} style={styles.item}>
           <View style={styles.itemHeader}>
@@ -20,10 +23,10 @@ export function PutawaySummary({ items, title = "Onde foi guardado" }: Props) {
               {it.quantityStored}/{it.quantityExpected} un.
             </Text>
           </View>
-          {it.description ? <Text style={styles.desc}>{it.description}</Text> : null}
           {it.storedLocations.length > 0 ? (
             it.storedLocations.map((loc) => (
               <View key={loc.locationId} style={styles.locRow}>
+                <Ionicons name="location" size={16} color={modules.armazenagem.color} />
                 <Text style={styles.locLabel}>{loc.label}</Text>
                 <Text style={styles.locQty}>{loc.quantity} un.</Text>
               </View>
@@ -38,15 +41,10 @@ export function PutawaySummary({ items, title = "Onde foi guardado" }: Props) {
 }
 
 const styles = StyleSheet.create({
-  wrap: { gap: spacing.sm, marginBottom: spacing.md },
-  title: {
-    fontSize: typography.subtitle,
-    fontWeight: "900",
-    color: theme.text,
-  },
+  wrap: { gap: spacing.sm },
   item: {
     backgroundColor: theme.surface,
-    borderRadius: 12,
+    borderRadius: radius.lg,
     padding: spacing.md,
     borderWidth: 1,
     borderColor: theme.border,
@@ -55,14 +53,13 @@ const styles = StyleSheet.create({
   itemHeader: { flexDirection: "row", justifyContent: "space-between", gap: spacing.sm },
   sku: { fontWeight: "900", fontSize: typography.body, color: theme.text, flexShrink: 1 },
   qty: { fontWeight: "800", fontSize: typography.caption, color: theme.textMuted },
-  desc: { color: theme.textMuted, fontSize: typography.caption },
-  locRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    gap: spacing.sm,
-    paddingTop: 4,
+  locRow: { flexDirection: "row", alignItems: "center", gap: 6, paddingTop: 4 },
+  locLabel: {
+    flex: 1,
+    fontWeight: "800",
+    color: modules.armazenagem.color,
+    fontSize: typography.body,
   },
-  locLabel: { fontWeight: "800", color: theme.primary, fontSize: typography.body, flexShrink: 1 },
   locQty: { fontWeight: "800", color: theme.text, fontSize: typography.body },
   pending: { color: theme.textMuted, fontSize: typography.caption, fontStyle: "italic" },
 });

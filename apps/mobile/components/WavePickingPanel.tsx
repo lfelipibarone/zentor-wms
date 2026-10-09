@@ -1,30 +1,29 @@
 import { router } from "expo-router";
 import { useState } from "react";
-import {
-  ActivityIndicator,
-  FlatList,
-  Pressable,
-  StyleSheet,
-  Text,
-  View,
-} from "react-native";
+import { FlatList, ScrollView, StyleSheet, Text, View } from "react-native";
+import { Ionicons } from "@expo/vector-icons";
 import { FactoryButton } from "@/components/FactoryButton";
 import { CollectionDeadlineRow } from "@/components/CollectionDeadlineRow";
 import { ProductThumbnail } from "@/components/ProductThumbnail";
 import { SplitWorkModal } from "@/components/SplitWorkModal";
 import { WorkShareCard, workBlockedMessage } from "@/components/WorkTimer";
+import { Badge, Card, EmptyState, Loading, ProgressBar } from "@/components/ui";
 import { useCurrentWave, useReleaseWaveAccept } from "@/hooks/useWavePicking";
 import { useSplitWork } from "@/hooks/useWorkShares";
-import { showErrorAlert, showInfoAlert } from "@/lib/app-alert";
+import { showErrorAlert, showToast } from "@/lib/app-alert";
 import { ApiError } from "@/lib/api";
 import type { WaveLineSummary } from "@/lib/api";
-import { theme, spacing, typography } from "@/lib/theme";
+import { modules } from "@/lib/modules";
+import { theme, spacing, typography, radius } from "@/lib/theme";
+import type { Tone } from "@/lib/theme";
 
-function statusLabel(line: WaveLineSummary) {
-  if (line.sortStatus === "SORTED") return "Concluído";
-  if (line.sortStatus === "PICKED") return "Aguardando packing (web)";
-  if (line.quantityPicked > 0) return "Em andamento";
-  return "Pendente";
+const color = modules.picking.color;
+
+function lineStatus(line: WaveLineSummary): { label: string; tone: Tone } {
+  if (line.sortStatus === "SORTED") return { label: "Concluído", tone: "success" };
+  if (line.sortStatus === "PICKED") return { label: "No packing", tone: "info" };
+  if (line.quantityPicked > 0) return { label: "Em andamento", tone: "warning" };
+  return { label: "Pendente", tone: "neutral" };
 }
 
 export function WavePickingPanel() {
@@ -33,36 +32,34 @@ export function WavePickingPanel() {
   const [splitOpen, setSplitOpen] = useState(false);
   const releaseWave = useReleaseWaveAccept(data?.wave.id, data?.wave.part?.id);
 
-  if (isLoading) {
-    return (
-      <View style={styles.centered}>
-        <ActivityIndicator size="large" color={theme.primary} />
-        <Text style={styles.loadingText}>Carregando onda...</Text>
-      </View>
-    );
-  }
+  if (isLoading) return <Loading />;
 
   if (error || !data) {
     return (
-      <View style={styles.centered}>
-        <Text style={styles.error}>
-          {error instanceof Error
-            ? error.message
-            : "Nenhuma onda ativa. Libere uma onda no painel web."}
-        </Text>
-        <FactoryButton
-          label="Atualizar"
-          variant="secondary"
-          onPress={() => refetch()}
+      <ScrollView contentContainerStyle={styles.centered}>
+        <EmptyState
+          icon="layers-outline"
+          title={error instanceof Error ? error.message : "Nenhuma onda liberada"}
+          action={
+            <FactoryButton
+              label="Atualizar"
+              icon="refresh"
+              size="md"
+              variant="secondary"
+              onPress={() => refetch()}
+              loading={isRefetching}
+            />
+          }
         />
-      </View>
+      </ScrollView>
     );
   }
 
   const { wave, lines, work } = data;
   const blocked = workBlockedMessage(work);
-  const waveTitle = wave.part ? `${wave.name} · ${wave.part.name}` : wave.name;
   const pending = lines.filter((l) => l.sortStatus !== "SORTED");
+  const unitsTotal = lines.reduce((n, l) => n + l.quantityTotal, 0);
+  const unitsPicked = lines.reduce((n, l) => n + l.quantityPicked, 0);
   const canReleaseWave =
     wave.canWork && lines.every((l) => l.quantityPicked === 0);
 
@@ -77,31 +74,47 @@ export function WavePickingPanel() {
     }
   };
 
+  const waveCard = (
+    <View style={styles.waveCard}>
+      <View style={styles.waveTop}>
+        <View style={styles.waveIcon}>
+          <Ionicons name="layers" size={22} color="#fff" />
+        </View>
+        <View style={styles.flex}>
+          <Text style={styles.waveName} numberOfLines={2}>
+            {wave.name}
+          </Text>
+          {wave.part ? <Text style={styles.wavePart}>{wave.part.name}</Text> : null}
+        </View>
+      </View>
+      <View style={styles.waveStats}>
+        <Stat value={wave.orderCount} label="pedidos" />
+        <Stat value={lines.length} label="linhas" />
+        <Stat value={unitsTotal} label="un." />
+      </View>
+      <View style={styles.badges}>
+        <CollectionDeadlineRow deadline={wave.collectionDeadline} />
+        {(wave.marketplaces ?? []).map((m) => (
+          <Badge key={m} label={m} />
+        ))}
+      </View>
+    </View>
+  );
+
   if (wave.canAccept) {
     return (
-      <View style={styles.centered}>
-        <Text style={styles.waveName}>{waveTitle}</Text>
-        <CollectionDeadlineRow deadline={wave.collectionDeadline} />
-        <Text style={styles.waveMeta}>
-          {wave.orderCount} pedidos · {wave.gondolaPasses} passagens na gôndola
-        </Text>
-        {wave.marketplaces && wave.marketplaces.length > 0 ? (
-          <Text style={styles.marketplaces}>
-            {wave.marketplaces.join(" · ")}
-          </Text>
-        ) : null}
-        <Text style={styles.acceptHint}>
-          Mesmo SKU agrupado — pick consolidado no mobile; packing no painel
-          web.
-        </Text>
+      <ScrollView contentContainerStyle={styles.scroll}>
+        {waveCard}
         <FactoryButton
-          label={wave.part ? "Aceitar esta parte" : "Aceitar esta onda"}
+          label={wave.part ? "Aceitar parte" : "Aceitar onda"}
+          icon="hand-left"
+          color={color}
           onPress={() => setSplitOpen(true)}
           loading={splitWork.isPending}
         />
         <SplitWorkModal
           visible={splitOpen}
-          title={waveTitle}
+          title={wave.part ? `${wave.name} · ${wave.part.name}` : wave.name}
           subtitle={`${lines.length} linhas · ${wave.orderCount} pedidos`}
           itemCount={lines.filter((l) => l.quantityPicked === 0).length}
           loading={splitWork.isPending}
@@ -125,48 +138,51 @@ export function WavePickingPanel() {
               });
           }}
         />
-        <FactoryButton
-          label="Atualizar"
-          variant="secondary"
-          onPress={() => refetch()}
-        />
-      </View>
+      </ScrollView>
     );
   }
 
   if (!wave.canWork) {
     return (
-      <View style={styles.centered}>
-        <Text style={styles.waveName}>{waveTitle}</Text>
-        <Text style={styles.error}>
-          {wave.part ? "Parte aceita por" : "Onda aceita por"} {wave.acceptedByName ?? "outro operador"}.
-        </Text>
+      <ScrollView contentContainerStyle={styles.scroll}>
+        {waveCard}
+        <Card>
+          <View style={styles.lockedRow}>
+            <Ionicons name="lock-closed" size={20} color={theme.textMuted} />
+            <Text style={styles.lockedText}>
+              Com {wave.acceptedByName ?? "outro operador"}
+            </Text>
+          </View>
+        </Card>
         <FactoryButton
           label="Atualizar"
+          icon="refresh"
+          size="md"
           variant="secondary"
           onPress={() => refetch()}
+          loading={isRefetching}
         />
-      </View>
+      </ScrollView>
     );
   }
 
   const listHeader = (
     <View style={styles.listHeader}>
-      <Text style={styles.waveName}>{waveTitle}</Text>
-      <CollectionDeadlineRow deadline={wave.collectionDeadline} />
-      <Text style={styles.waveMeta}>
-        {wave.orderCount} pedidos · {pending.length} linhas pendentes
-      </Text>
-      {wave.marketplaces && wave.marketplaces.length > 0 ? (
-        <Text style={styles.marketplaces}>
-          {wave.marketplaces.join(" · ")}
+      {waveCard}
+      <View style={styles.progressRow}>
+        <Text style={styles.progressText}>
+          {unitsPicked}/{unitsTotal} un.
         </Text>
-      ) : null}
+        <Text style={styles.progressMuted}>{pending.length} linhas pendentes</Text>
+      </View>
+      <ProgressBar value={unitsPicked} total={unitsTotal} color={color} />
       <WorkShareCard work={work} />
       {canReleaseWave ? (
         <FactoryButton
           label="Cancelar aceite"
-          variant="secondary"
+          icon="close"
+          size="sm"
+          variant="ghost"
           onPress={handleReleaseWave}
           loading={releaseWave.isPending}
         />
@@ -176,31 +192,24 @@ export function WavePickingPanel() {
 
   return (
     <FlatList
-      style={styles.listFlex}
+      style={styles.flex}
       data={lines}
       keyExtractor={(item) => item.id}
       contentContainerStyle={styles.list}
       refreshing={isRefetching}
       onRefresh={refetch}
       ListHeaderComponent={listHeader}
-      ListFooterComponent={
-        <FactoryButton
-          label="Atualizar onda"
-          variant="secondary"
-          onPress={() => refetch()}
-          loading={isRefetching}
-        />
-      }
       renderItem={({ item }) => {
         const done =
           item.sortStatus === "PICKED" || item.sortStatus === "SORTED";
+        const status = lineStatus(item);
         const openLine = () => {
           if (blocked && !done) {
-            showInfoAlert(blocked);
+            showToast(blocked);
             return;
           }
           if (done) {
-            showInfoAlert(
+            showToast(
               item.sortStatus === "PICKED"
                 ? "Pick concluído — finalize o packing no painel web."
                 : "Linha já concluída.",
@@ -214,156 +223,113 @@ export function WavePickingPanel() {
         };
 
         return (
-          <Pressable
-            style={[styles.card, done && styles.cardDone]}
+          <Card
             onPress={openLine}
+            muted={done}
+            accent={done ? theme.success : item.quantityPicked > 0 ? theme.warning : color}
           >
-            <View style={styles.cardTop}>
+            <View style={styles.lineRow}>
               <ProductThumbnail
                 imageUrl={item.product.imageUrl}
                 alt={item.product.name}
-                size={48}
+                size={56}
               />
-              <View style={styles.cardTopText}>
-                <Text style={styles.sku}>{item.product.sku}</Text>
-                <Text style={styles.badge}>{statusLabel(item)}</Text>
+              <View style={styles.flex}>
+                <View style={styles.lineTop}>
+                  <Text style={styles.location} numberOfLines={1}>
+                    {item.pickLocation.label}
+                  </Text>
+                  <Badge label={status.label} tone={status.tone} />
+                </View>
+                <Text style={styles.sku} numberOfLines={1}>
+                  {item.product.sku}
+                </Text>
+                <Text style={styles.productName} numberOfLines={1}>
+                  {item.product.name}
+                </Text>
               </View>
             </View>
-            <CollectionDeadlineRow deadline={item.collectionDeadline} compact />
-            <Text style={styles.productName} numberOfLines={2}>
-              {item.product.name}
-            </Text>
-            <Text style={styles.location}>{item.pickLocation.label}</Text>
             <View style={styles.qtyRow}>
               <Text style={styles.qtyMain}>
-                {item.quantityPicked} / {item.quantityTotal} un.
+                {item.quantityPicked}
+                <Text style={styles.qtyOf}> / {item.quantityTotal} un.</Text>
               </Text>
+              <CollectionDeadlineRow deadline={item.collectionDeadline} compact />
+              {!done ? <Ionicons name="chevron-forward" size={24} color={theme.textSoft} /> : null}
             </View>
-            {item.remaining > 0 ? (
-              <Text style={styles.remaining}>
-                Faltam {item.remaining} un. na gôndola
-              </Text>
-            ) : item.sortStatus === "PICKED" ? (
-              <Text style={styles.hint}>
-                Pick concluído — packing no painel web
-              </Text>
-            ) : done ? (
-              <Text style={styles.hint}>Linha concluída</Text>
-            ) : (
-              <Text style={styles.tapLine}>TOQUE PARA SEPARAR</Text>
-            )}
-          </Pressable>
+          </Card>
         );
       }}
     />
   );
 }
 
+function Stat({ value, label }: { value: number; label: string }) {
+  return (
+    <View style={styles.stat}>
+      <Text style={styles.statValue}>{value}</Text>
+      <Text style={styles.statLabel}>{label}</Text>
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
-  listFlex: { flex: 1 },
-  centered: {
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-    padding: spacing.lg,
-  },
-  loadingText: { marginTop: spacing.md, color: theme.textMuted },
-  error: {
-    color: theme.danger,
-    textAlign: "center",
-    fontWeight: "700",
-    marginBottom: spacing.lg,
-  },
-  listHeader: {
-    paddingHorizontal: spacing.md,
-    paddingTop: spacing.sm,
-    marginBottom: spacing.md,
-    gap: spacing.sm,
-  },
-  waveName: {
-    fontSize: typography.title,
-    fontWeight: "900",
-    color: theme.primary,
-    textAlign: "center",
-  },
-  waveMeta: {
-    color: theme.textMuted,
-    marginTop: spacing.xs,
-    textAlign: "center",
-  },
-  marketplaces: {
-    color: theme.textMuted,
-    marginTop: spacing.xs,
-    textAlign: "center",
-    fontSize: typography.caption,
-    fontWeight: "600",
-  },
-  acceptHint: {
-    color: theme.textMuted,
-    textAlign: "center",
-    marginVertical: spacing.lg,
-    paddingHorizontal: spacing.md,
-  },
-  list: {
-    paddingHorizontal: spacing.md,
-    paddingBottom: spacing.xl,
-    flexGrow: 1,
-  },
-  card: {
+  flex: { flex: 1 },
+  centered: { flexGrow: 1, justifyContent: "center", padding: spacing.lg },
+  scroll: { padding: spacing.md, gap: spacing.md, paddingBottom: spacing.xl * 2 },
+  list: { padding: spacing.md, paddingBottom: spacing.xl * 2, gap: spacing.sm },
+  listHeader: { gap: spacing.sm, marginBottom: spacing.xs },
+  waveCard: {
     backgroundColor: theme.surface,
-    borderRadius: 16,
-    padding: spacing.lg,
-    marginBottom: spacing.sm,
-    borderWidth: 2,
-    borderColor: theme.primary,
-  },
-  cardDone: { borderColor: theme.border, opacity: 0.85 },
-  cardTop: {
-    flexDirection: "row",
-    alignItems: "center",
+    borderRadius: radius.lg,
+    borderWidth: 1.5,
+    borderColor: color,
+    padding: spacing.md,
     gap: spacing.md,
   },
-  cardTopText: {
+  waveTop: { flexDirection: "row", alignItems: "center", gap: spacing.sm },
+  waveIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: radius.md,
+    backgroundColor: color,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  waveName: { fontSize: typography.subtitle, fontWeight: "900", color: theme.text },
+  wavePart: { color: color, fontWeight: "800", fontSize: typography.caption },
+  waveStats: { flexDirection: "row", gap: spacing.sm },
+  stat: {
     flex: 1,
-    flexDirection: "row",
-    justifyContent: "space-between",
+    backgroundColor: modules.picking.soft,
+    borderRadius: radius.md,
+    paddingVertical: spacing.sm,
     alignItems: "center",
   },
-  sku: { fontWeight: "900", color: theme.info, fontSize: typography.subtitle },
-  badge: {
-    fontSize: typography.caption,
-    fontWeight: "800",
-    color: theme.primary,
-    backgroundColor: theme.bg,
-    paddingHorizontal: spacing.sm,
-    paddingVertical: 4,
-    borderRadius: 8,
-  },
-  productName: {
-    fontSize: typography.body,
-    fontWeight: "700",
-    color: theme.text,
-    marginTop: spacing.xs,
-  },
+  statValue: { fontSize: 24, fontWeight: "900", color: "#0F766E" },
+  statLabel: { fontSize: typography.small, fontWeight: "800", color: "#0F766E" },
+  badges: { flexDirection: "row", flexWrap: "wrap", gap: 6 },
+  lockedRow: { flexDirection: "row", alignItems: "center", gap: spacing.sm },
+  lockedText: { fontWeight: "800", color: theme.textMuted, fontSize: typography.body },
+  progressRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "baseline" },
+  progressText: { fontWeight: "900", fontSize: typography.body, color: theme.text },
+  progressMuted: { color: theme.textMuted, fontWeight: "700", fontSize: typography.caption },
+  lineRow: { flexDirection: "row", gap: spacing.sm, alignItems: "center" },
+  lineTop: { flexDirection: "row", alignItems: "center", gap: spacing.sm },
   location: {
-    fontFamily: "monospace",
-    color: theme.textMuted,
-    marginTop: spacing.xs,
+    flex: 1,
+    fontSize: typography.subtitle,
+    fontWeight: "900",
+    color: theme.text,
   },
+  sku: { fontWeight: "800", color: theme.info, fontSize: typography.caption + 1 },
+  productName: { color: theme.textMuted, fontSize: typography.caption },
   qtyRow: {
     flexDirection: "row",
-    justifyContent: "space-between",
-    marginTop: spacing.md,
-    alignItems: "flex-end",
-  },
-  qtyMain: { fontSize: 28, fontWeight: "900", color: theme.text },
-  remaining: { color: theme.warning, fontWeight: "700", marginTop: spacing.sm },
-  hint: { color: theme.success, fontWeight: "600", marginTop: spacing.sm },
-  tapLine: {
+    alignItems: "center",
+    gap: spacing.sm,
     marginTop: spacing.sm,
-    textAlign: "center",
-    fontWeight: "800",
-    color: theme.primary,
-    fontSize: typography.caption,
   },
+  qtyMain: { flex: 1, fontSize: 26, fontWeight: "900", color: theme.text },
+  qtyOf: { fontSize: typography.body, fontWeight: "700", color: theme.textMuted },
 });
