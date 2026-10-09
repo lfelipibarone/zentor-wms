@@ -23,7 +23,6 @@ import {
   sortPackingOrders,
   sortWavePackingLines,
 } from "./packing-queue-sort.js";
-import { listReplenishmentNeeds } from "./replenishment-queue.js";
 import { getRouteEngine } from "./route-engine/index.js";
 import { recordOrderStageChange } from "./order-stage-log.js";
 import { loadApproachWaveDefs } from "./approach-waves/store.js";
@@ -309,10 +308,9 @@ async function packingZoneFilter(tenantId: string, approachWaveId: string) {
 }
 
 export async function listUnifiedPackingQueue(tenantId: string, opts?: { approachWaveId?: string }) {
-  const [waveRaw, ordersResult, replenishmentNeeds] = await Promise.all([
+  const [waveRaw, ordersResult] = await Promise.all([
     listWavePackingLinesInternal(tenantId),
     listPackingQueue(tenantId),
-    listReplenishmentNeeds(tenantId),
   ]);
   const zone = opts?.approachWaveId ? await packingZoneFilter(tenantId, opts.approachWaveId) : null;
   const waveLines = zone ? zone.lines(waveRaw.lines) : waveRaw.lines;
@@ -325,7 +323,6 @@ export async function listUnifiedPackingQueue(tenantId: string, opts?: { approac
   const items: Array<
     | { kind: "wave_line"; sortKey: number; line: WaveLineQueue }
     | { kind: "order"; sortKey: number; order: (typeof ordersResult.orders)[0] }
-    | { kind: "replenishment"; sortKey: number; need: (typeof replenishmentNeeds)[0] }
   > = [];
 
   for (const line of waveLines) {
@@ -342,10 +339,6 @@ export async function listUnifiedPackingQueue(tenantId: string, opts?: { approac
   for (const order of queueOrders) {
     items.push({ kind: "order", sortKey: order.packingUrgency ?? 0, order });
   }
-  for (const need of replenishmentNeeds) {
-    items.push({ kind: "replenishment", sortKey: need.percentToFill, need });
-  }
-
   return { items };
 }
 

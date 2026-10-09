@@ -1,4 +1,5 @@
 import { apiFetch } from "@/lib/api/client";
+import type { StockMode } from "@/lib/api/warehouse";
 import type { PaginationMeta } from "@/lib/pagination";
 import { DEFAULT_PAGE_SIZE } from "@/lib/pagination";
 
@@ -739,10 +740,15 @@ export type ReplenishmentNeedSummary = {
   productId: string;
   sku: string;
   productName: string;
+  imageUrl: string | null;
   fillPercent: number;
   minPercent: number;
   /** Pontos de % que faltam para encher */
   percentToFill: number;
+  stockMode: StockMode;
+  stockQuantity: number | null;
+  minQuantity: number | null;
+  capacity: number;
   suggestedPulmao: {
     id: string;
     barcode: string;
@@ -750,12 +756,17 @@ export type ReplenishmentNeedSummary = {
     /** % deste SKU no pulmão */
     percent: number;
   } | null;
+  assignedToName: string | null;
+  assignmentStatus: "OPEN" | "WITHDRAWN" | null;
 };
+
+export function fetchReplenishmentNeeds() {
+  return apiFetch<{ needs: ReplenishmentNeedSummary[] }>("/api/stock/replenishment-needs");
+}
 
 export type PackingQueueItem =
   | { kind: "wave_line"; sortKey: number; line: PackingWaveLineSummary }
-  | { kind: "order"; sortKey: number; order: PackingOrder }
-  | { kind: "replenishment"; sortKey: number; need: ReplenishmentNeedSummary };
+  | { kind: "order"; sortKey: number; order: PackingOrder };
 
 export function scanPackingBasket(barcode: string) {
   return apiFetch<{ order: PackingOrder }>("/api/packing/baskets/scan", {

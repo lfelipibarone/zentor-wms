@@ -99,6 +99,39 @@ export async function listReplenishmentNeedsForMobile(
   return { needs: publicNeeds, myAssignmentCount: myAssignments.length };
 }
 
+export async function listReplenishmentNeedsForWeb(tenantId: string) {
+  const [needs, openAssignments] = await Promise.all([
+    listReplenishmentNeeds(tenantId),
+    prisma.replenishmentAssignment.findMany({
+      where: {
+        tenantId,
+        status: {
+          in: [
+            ReplenishmentAssignmentStatus.OPEN,
+            ReplenishmentAssignmentStatus.WITHDRAWN,
+          ],
+        },
+      },
+      select: {
+        pickFaceId: true,
+        status: true,
+        assignedTo: { select: { name: true } },
+      },
+    }),
+  ]);
+  const assignmentByFace = new Map(openAssignments.map((a) => [a.pickFaceId, a]));
+  return {
+    needs: needs.map((n) => {
+      const assignment = assignmentByFace.get(n.pickFaceId);
+      return {
+        ...n,
+        assignedToName: assignment?.assignedTo.name ?? null,
+        assignmentStatus: assignment?.status ?? null,
+      };
+    }),
+  };
+}
+
 export async function acceptReplenishmentNeed(
   tenantId: string,
   pickFaceId: string,

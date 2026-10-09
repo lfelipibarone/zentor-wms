@@ -18,7 +18,7 @@ import {
 } from "@/lib/api/operations";
 import { fetchTenantApproachWaves, type ApproachWaveSummary } from "@/lib/api/approach-waves";
 
-type QueueFilter = "all" | "wave" | "order" | "replenishment";
+type QueueFilter = "all" | "wave" | "order";
 
 const ZONE_STORAGE_KEY = "packing.approachWaveId";
 
@@ -48,8 +48,7 @@ function ordersFromItems(items: PackingQueueItem[]): PackingOrder[] {
 function filterItems(items: PackingQueueItem[], filter: QueueFilter) {
   if (filter === "all") return items;
   if (filter === "wave") return items.filter((i) => i.kind === "wave_line");
-  if (filter === "order") return items.filter((i) => i.kind === "order");
-  return items.filter((i) => i.kind === "replenishment");
+  return items.filter((i) => i.kind === "order");
 }
 
 export default function PackingPage() {
@@ -177,7 +176,6 @@ export default function PackingPage() {
     { id: "all", label: "Todos" },
     { id: "wave", label: "Ondas" },
     { id: "order", label: "Pedidos" },
-    { id: "replenishment", label: "Reposição" },
   ];
 
   const basketForm = (
@@ -218,7 +216,7 @@ export default function PackingPage() {
     <div className="mx-auto max-w-6xl space-y-6">
       <PageHeader
         title="Packing"
-        description="Ondas primeiro, depois pedidos. Reposição é informativa — execute no app mobile."
+        description="Ondas primeiro, depois pedidos."
       />
 
       {message ? (
@@ -296,26 +294,6 @@ export default function PackingPage() {
                       {entry.line.quantityPicked}/{entry.line.quantityTotal} un.
                     </p>
                   </button>
-                ) : entry.kind === "replenishment" ? (
-                  <div
-                    key={`rep-${entry.need.pickFaceId}`}
-                    className="rounded-xl border border-violet-200 bg-violet-50/80 p-4 shadow-sm"
-                  >
-                    <span className="rounded-md bg-violet-200/80 px-2 py-0.5 text-xs font-bold uppercase text-violet-900">
-                      Reposição · mobile
-                    </span>
-                    <p className="mt-2 font-mono font-bold">{entry.need.sku}</p>
-                    <p className="text-sm text-muted-foreground">
-                      {entry.need.routeLabel} · gôndola em {entry.need.fillPercent}% (mín.{" "}
-                      {entry.need.minPercent}%) · falta {entry.need.percentToFill}%
-                    </p>
-                    {entry.need.suggestedPulmao ? (
-                      <p className="mt-1 text-xs text-violet-800">
-                        Pulmão sugerido: {entry.need.suggestedPulmao.label} (
-                        {entry.need.suggestedPulmao.percent}% deste SKU)
-                      </p>
-                    ) : null}
-                  </div>
                 ) : (
                   <button
                     key={entry.order.id}

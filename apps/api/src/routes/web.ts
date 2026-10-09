@@ -1253,6 +1253,17 @@ export async function webRoutes(app: FastifyInstance) {
     },
   );
 
+  app.get(
+    "/api/stock/replenishment-needs",
+    { preHandler: guard(Permission.STOCK_VIEW) },
+    async (request) => {
+      const { listReplenishmentNeedsForWeb } = await import(
+        "../services/replenishment-assignment.js"
+      );
+      return listReplenishmentNeedsForWeb(tenantWhere(request).tenantId);
+    },
+  );
+
   app.get<{
     Querystring: { page?: string; pageSize?: string; type?: string };
   }>(
