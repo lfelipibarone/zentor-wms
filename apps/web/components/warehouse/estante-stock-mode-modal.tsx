@@ -3,20 +3,29 @@
 import { useState } from "react";
 import { setEstanteStockMode, type StockMode } from "@/lib/api/warehouse";
 
+export type EstanteColunaScope = { id: string; code: string; total: number };
+
 export function EstanteStockModeModal({
   estanteId,
   estanteLabel,
   total,
+  colunas,
+  initialColunaId = "",
   onClose,
   onSaved,
 }: {
   estanteId: string;
   estanteLabel: string;
   total: number;
+  colunas: EstanteColunaScope[];
+  /** "" = estante inteira */
+  initialColunaId?: string;
   onClose: () => void;
   onSaved: () => Promise<void>;
 }) {
   const [mode, setMode] = useState<StockMode>("QUANTITY");
+  const [colunaId, setColunaId] = useState(initialColunaId);
+  const coluna = colunas.find((c) => c.id === colunaId);
   const [capacity, setCapacity] = useState("");
   const [minQuantity, setMinQuantity] = useState("");
   const [saving, setSaving] = useState(false);
@@ -38,6 +47,7 @@ export function EstanteStockModeModal({
     try {
       await setEstanteStockMode(estanteId, {
         stockMode: mode,
+        ...(colunaId ? { colunaId } : {}),
         ...(mode === "QUANTITY" ? { capacity: cap, minQuantity: min } : {}),
       });
       await onSaved();
@@ -57,8 +67,25 @@ export function EstanteStockModeModal({
         <h2 id="estante-stock-mode-title" className="text-lg font-bold text-slate-900">
           Ocupação da estante <span className="font-mono">{estanteLabel}</span>
         </h2>
-        <p className="mt-1 text-sm text-slate-500">
-          Vale para as {total} gôndolas da estante. Pulmões não mudam.
+
+        <label className="mt-4 block text-sm">
+          Aplicar em
+          <select
+            className="mt-1 w-full rounded-lg border px-3 py-2"
+            value={colunaId}
+            onChange={(e) => setColunaId(e.target.value)}
+          >
+            <option value="">Estante inteira ({total} gôndolas)</option>
+            {colunas.map((c) => (
+              <option key={c.id} value={c.id}>
+                Coluna {c.code} ({c.total} gôndolas)
+              </option>
+            ))}
+          </select>
+        </label>
+        <p className="mt-1 text-xs text-slate-500">
+          Vale para {coluna ? `as ${coluna.total} gôndolas da coluna ${coluna.code}` : `as ${total} gôndolas da estante`}.
+          Pulmões não mudam. Depois dá para trocar uma gôndola sozinha em Editar.
         </p>
 
         <div className="mt-4 inline-flex rounded-lg bg-slate-100 p-0.5">

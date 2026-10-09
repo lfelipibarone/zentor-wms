@@ -831,18 +831,28 @@ export function registerWarehouseRoutes(app: FastifyInstance, guard: Guard) {
 
   app.patch<{
     Params: { estanteId: string };
-    Body: { stockMode?: "PERCENT" | "QUANTITY"; capacity?: number; minQuantity?: number };
+    Body: {
+      stockMode?: "PERCENT" | "QUANTITY";
+      capacity?: number;
+      minQuantity?: number;
+      colunaId?: string;
+    };
   }>(
     "/api/warehouse/estantes/:estanteId/stock-mode",
     { preHandler: guard(Permission.REGISTERS_VIEW) },
     async (request, reply) => {
       try {
-        return await setEstanteStockMode(tenantWhere(request).tenantId, request.params.estanteId, {
-          stockMode: request.body?.stockMode,
-          capacity: request.body?.capacity != null ? Number(request.body.capacity) : undefined,
-          minQuantity:
-            request.body?.minQuantity != null ? Number(request.body.minQuantity) : undefined,
-        });
+        return await setEstanteStockMode(
+          tenantWhere(request).tenantId,
+          request.params.estanteId,
+          {
+            stockMode: request.body?.stockMode,
+            capacity: request.body?.capacity != null ? Number(request.body.capacity) : undefined,
+            minQuantity:
+              request.body?.minQuantity != null ? Number(request.body.minQuantity) : undefined,
+          },
+          request.body?.colunaId || undefined,
+        );
       } catch (e) {
         return reply
           .status(400)

@@ -500,14 +500,21 @@ export async function setEstanteStockMode(
   tenantId: string,
   estanteId: string,
   change: Pick<StockModeChange, "stockMode" | "capacity" | "minQuantity">,
+  /** Só as gôndolas desta coluna */
+  colunaId?: string,
 ) {
   if (change.stockMode !== "PERCENT" && change.stockMode !== "QUANTITY") {
     throw new Error("Escolha % ou quantidade");
   }
   const faces = await prisma.location.findMany({
-    where: { tenantId, estanteId, type: LocationType.PICK_FACE },
+    where: {
+      tenantId,
+      estanteId,
+      type: LocationType.PICK_FACE,
+      ...(colunaId ? { colunaId } : {}),
+    },
   });
-  if (faces.length === 0) throw new Error("Estante sem gôndolas");
+  if (faces.length === 0) throw new Error(colunaId ? "Coluna sem gôndolas" : "Estante sem gôndolas");
   await prisma.$transaction(
     faces.flatMap((loc) => {
       const data = stockModeUpdateData(loc, change);

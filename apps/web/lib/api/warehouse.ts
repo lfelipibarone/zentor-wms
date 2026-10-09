@@ -354,7 +354,7 @@ export function updateWarehousePosition(
 
 export function setEstanteStockMode(
   estanteId: string,
-  body: { stockMode: StockMode; capacity?: number; minQuantity?: number },
+  body: { stockMode: StockMode; capacity?: number; minQuantity?: number; colunaId?: string },
 ) {
   return apiFetch<{ updated: number }>(`/api/warehouse/estantes/${estanteId}/stock-mode`, {
     method: "PATCH",

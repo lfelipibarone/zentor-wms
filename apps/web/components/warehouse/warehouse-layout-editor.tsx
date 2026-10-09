@@ -110,7 +110,8 @@ export function WarehouseLayoutEditor() {
   const [situacaoFilter, setSituacaoFilter] = useState<LayoutSituacao | "">("");
   const [estanteRows, setEstanteRows] = useState<LayoutRow[]>([]);
   const [estanteLoading, setEstanteLoading] = useState(false);
-  const [stockModeOpen, setStockModeOpen] = useState(false);
+  /** null = fechado; "" = estante inteira; senão o id da coluna */
+  const [stockModeScope, setStockModeScope] = useState<string | null>(null);
 
   useEffect(() => {
     const timer = setTimeout(() => setDebouncedSearch(search), 300);
@@ -539,7 +540,7 @@ export function WarehouseLayoutEditor() {
                   </p>
                   <button
                     type="button"
-                    onClick={() => setStockModeOpen(true)}
+                    onClick={() => setStockModeScope("")}
                     className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-3 text-sm font-medium text-slate-700 hover:border-slate-400"
                   >
                     <Gauge className="h-4 w-4" />
@@ -554,6 +555,7 @@ export function WarehouseLayoutEditor() {
                 situacao={situacaoFilter}
                 search={debouncedSearch}
                 onEdit={setEditRow}
+                onColunaStockMode={setStockModeScope}
               />
             </div>
           )
@@ -578,14 +580,22 @@ export function WarehouseLayoutEditor() {
         )}
       </DataState>
 
-      {stockModeOpen && selectedEstante ? (
+      {stockModeScope !== null && selectedEstante ? (
         <EstanteStockModeModal
           estanteId={selectedEstante.id}
           estanteLabel={selectedEstante.label}
           total={estanteRows.filter((r) => r.location?.type !== "PULMAO").length}
-          onClose={() => setStockModeOpen(false)}
+          colunas={selectedEstante.colunas.map((c) => ({
+            id: c.id,
+            code: c.code,
+            total: estanteRows.filter(
+              (r) => r.colunaId === c.id && r.location?.type !== "PULMAO",
+            ).length,
+          }))}
+          initialColunaId={stockModeScope}
+          onClose={() => setStockModeScope(null)}
           onSaved={async () => {
-            setStockModeOpen(false);
+            setStockModeScope(null);
             await reload();
           }}
         />

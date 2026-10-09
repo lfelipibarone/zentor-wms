@@ -23,6 +23,17 @@ function isPickFace(row: LayoutRow) {
   return row.location?.type !== "PULMAO";
 }
 
+function isQuantity(row: LayoutRow) {
+  return isPickFace(row) && row.location?.stockMode === "QUANTITY";
+}
+
+function colunaModeLabel(rows: LayoutRow[]) {
+  const faces = rows.filter(isPickFace);
+  const byQty = faces.filter(isQuantity).length;
+  if (byQty === 0) return "%";
+  return byQty === faces.length ? "un." : "misto";
+}
+
 export function isBelowMin(row: LayoutRow) {
   return (
     isPickFace(row) &&
@@ -87,7 +98,16 @@ function LinhaCell({
     >
       <div className="flex items-center justify-between gap-2 text-[11px] text-slate-500">
         <span className="font-semibold text-slate-700">Linha {row.linha}</span>
-        {!row.active ? <span className="text-slate-500">Inativa</span> : null}
+        {!row.active ? (
+          <span className="text-slate-500">Inativa</span>
+        ) : isQuantity(row) ? (
+          <span
+            className="rounded bg-sky-100 px-1 text-[10px] font-semibold text-sky-800"
+            title="Medida por quantidade"
+          >
+            un.
+          </span>
+        ) : null}
       </div>
       <p
         className={cn(
@@ -116,6 +136,7 @@ export function WarehouseEstanteGrid({
   situacao,
   search,
   onEdit,
+  onColunaStockMode,
 }: {
   rows: LayoutRow[];
   face: LocationFace | "";
@@ -123,6 +144,8 @@ export function WarehouseEstanteGrid({
   situacao: LayoutSituacao | "";
   search: string;
   onEdit: (row: LayoutRow) => void;
+  /** Abre "% ou quantidade" já na coluna */
+  onColunaStockMode?: (colunaId: string) => void;
 }) {
   const visible = rows.filter(
     (r) => (!face || r.face === face) && (!colunaId || r.colunaId === colunaId),
@@ -167,15 +190,27 @@ export function WarehouseEstanteGrid({
                     key={key}
                     className="w-44 shrink-0 space-y-1.5 rounded-xl border bg-slate-50/60 p-2"
                   >
-                    <div className="flex items-center justify-between px-1">
+                    <div className="flex items-center justify-between gap-1 px-1">
                       <span className="text-sm font-semibold text-slate-800">
                         Coluna {col.code}
                       </span>
-                      {alerts > 0 ? (
-                        <span className="rounded-full bg-amber-100 px-1.5 text-[11px] font-semibold text-amber-800">
-                          {alerts} baixo
-                        </span>
-                      ) : null}
+                      <div className="flex items-center gap-1">
+                        {alerts > 0 ? (
+                          <span className="rounded-full bg-amber-100 px-1.5 text-[11px] font-semibold text-amber-800">
+                            {alerts} baixo
+                          </span>
+                        ) : null}
+                        {onColunaStockMode && linhas[0]?.colunaId ? (
+                          <button
+                            type="button"
+                            onClick={() => onColunaStockMode(linhas[0]!.colunaId!)}
+                            title={`Medir a coluna ${col.code} por % ou quantidade`}
+                            className="rounded-md border border-slate-200 bg-white px-1.5 text-[11px] font-semibold text-slate-600 hover:border-[#0d9488] hover:text-[#0d9488]"
+                          >
+                            {colunaModeLabel(linhas)}
+                          </button>
+                        ) : null}
+                      </div>
                     </div>
                     {linhas.map((row) => (
                       <LinhaCell
