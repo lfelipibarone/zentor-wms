@@ -117,6 +117,17 @@ export async function acceptOrderForPicking(
     throw new OrderPickingAssignmentError("Pedido não está na fila", 409);
   }
 
+  if (
+    order.status === OrderStatus.PACKING_RETURNED_TO_PICKING &&
+    order.assignedPickerId &&
+    order.assignedPickerId !== userId
+  ) {
+    throw new OrderPickingAssignmentError(
+      "Pedido foi devolvido para outro separador corrigir",
+      409,
+    );
+  }
+
   const activeWaveLink = order.waveOrders.some(
     (wo) => wo.wave?.status === "RELEASED",
   );

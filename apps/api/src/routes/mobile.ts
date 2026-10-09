@@ -96,12 +96,13 @@ export async function mobileRoutes(app: FastifyInstance) {
       prisma.order.findMany({
         where: {
           tenantId,
-          status: {
-            in: [
-              OrderStatus.PENDING,
-              OrderStatus.PACKING_RETURNED_TO_PICKING,
-            ],
-          },
+          OR: [
+            { status: OrderStatus.PENDING },
+            {
+              status: OrderStatus.PACKING_RETURNED_TO_PICKING,
+              OR: [{ assignedPickerId: null }, { assignedPickerId: userId }],
+            },
+          ],
           ...waveExclusion,
         },
         orderBy: [

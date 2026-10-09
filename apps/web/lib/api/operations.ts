@@ -1,4 +1,5 @@
 import { apiFetch } from "@/lib/api/client";
+import type { StockMode } from "@/lib/api/warehouse";
 import type { PaginationMeta } from "@/lib/pagination";
 import { DEFAULT_PAGE_SIZE } from "@/lib/pagination";
 
@@ -739,10 +740,15 @@ export type ReplenishmentNeedSummary = {
   productId: string;
   sku: string;
   productName: string;
+  imageUrl: string | null;
   fillPercent: number;
   minPercent: number;
   /** Pontos de % que faltam para encher */
   percentToFill: number;
+  stockMode: StockMode;
+  stockQuantity: number | null;
+  minQuantity: number | null;
+  capacity: number;
   suggestedPulmao: {
     id: string;
     barcode: string;
@@ -750,12 +756,92 @@ export type ReplenishmentNeedSummary = {
     /** % deste SKU no pulmão */
     percent: number;
   } | null;
+  assignedToName: string | null;
+  assignmentStatus: "OPEN" | "WITHDRAWN" | null;
+};
+
+export function fetchReplenishmentNeeds() {
+  return apiFetch<{ needs: ReplenishmentNeedSummary[] }>("/api/stock/replenishment-needs");
+}
+
+export type PackingWaveQueueSummary = {
+  id: string;
+  name: string;
+  collectionDeadline: string | null;
+  orderCount: number;
+  pickerName: string | null;
+  linesTotal: number;
+  linesPicked: number;
+  linesSorted: number;
+  unitsTotal: number;
+  unitsPicked: number;
+  /** Linhas já coletadas aguardando distribuição nas cestas */
+  readyLines: PackingWaveLineSummary[];
 };
 
 export type PackingQueueItem =
-  | { kind: "wave_line"; sortKey: number; line: PackingWaveLineSummary }
-  | { kind: "order"; sortKey: number; order: PackingOrder }
-  | { kind: "replenishment"; sortKey: number; need: ReplenishmentNeedSummary };
+  | { kind: "wave"; sortKey: number; wave: PackingWaveQueueSummary }
+  | { kind: "order"; sortKey: number; order: PackingOrder };
+
+export type PackingWaveOverview = {
+  wave: {
+    id: string;
+    name: string;
+    status: string;
+    releasedAt: string | null;
+    acceptedByName: string | null;
+    collectionDeadline: string | null;
+  };
+  lines: Array<{
+    id: string;
+    sku: string;
+    productName: string;
+    imageUrl: string | null;
+    locationBarcode: string;
+    routeLabel: string;
+    quantityTotal: number;
+    quantityPicked: number;
+    quantitySorted: number;
+    sortStatus: string;
+    pickedByName: string | null;
+  }>;
+  orders: Array<{
+    id: string;
+    erpOrderId: string;
+    customerName: string | null;
+    marketplace: string | null;
+    status: string;
+    priority: number;
+    collectionDeadline: string | null;
+    basketCode: string | null;
+    hasLabel: boolean;
+    labelFormat: "zpl" | "pdf" | "unknown" | null;
+    unitsTotal: number;
+    unitsSorted: number;
+  }>;
+};
+
+export type LabelBatchOrder = {
+  id: string;
+  erpOrderId: string;
+  customerName: string | null;
+  marketplace: string | null;
+  collectionDeadline: string | null;
+  hasLabel: boolean;
+  basketCode: string | null;
+  waveName: string | null;
+};
+
+export function fetchLabelBatchOrders(waveId?: string) {
+  const qs = waveId ? `?waveId=${encodeURIComponent(waveId)}` : "";
+  return apiFetch<{ wave: { id: string; name: string } | null; orders: LabelBatchOrder[] }>(
+    `/api/packing/labels/orders${qs}`,
+  );
+}
+
+export function fetchPackingWaveOverview(waveId: string) {
+  return apiFetch<PackingWaveOverview>(`/api/packing/waves/${waveId}/overview`);
+}
 
 export function scanPackingBasket(barcode: string) {
   return apiFetch<{ order: PackingOrder }>("/api/packing/baskets/scan", {
@@ -823,7 +909,23 @@ export function reportPackingIssue(
     status: string;
     reported: boolean;
     summary: string;
+    returnedToName: string | null;
   }>(`/api/packing/orders/${orderId}/report-issue`, {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+export function reportWaveLineIssue(
+  lineId: string,
+  payload: { type: PackingIssueType; description?: string },
+) {
+  return apiFetch<{
+    lineId: string;
+    waveId: string;
+    summary: string;
+    returnedToName: string | null;
+  }>(`/api/packing/waves/lines/${lineId}/report-issue`, {
     method: "POST",
     body: JSON.stringify(payload),
   });
@@ -852,7 +954,7 @@ export function fetchWavePackingLine(lineId: string) {
       id: string;
       waveId: string;
       waveName: string;
-      product: { sku: string; name: string };
+      product: { sku: string; name: string; barcode: string | null };
       quantityPicked: number;
       quantityTotal: number;
       sortStatus: string;

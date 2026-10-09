@@ -17,9 +17,10 @@ import type { PaginationMeta } from "@/lib/pagination";
 import { fetchStockLocations } from "@/lib/api/operations";
 import { PercentBar } from "@/components/ops/percent-bar";
 import { PulmaoStocksCell } from "@/components/ops/pulmao-stocks-cell";
+import { ReplenishmentNeedsPanel } from "@/components/ops/replenishment-needs-panel";
 import { cn } from "@/lib/utils";
 
-type TypeFilter = "" | "PULMAO" | "PICK_FACE";
+type TypeFilter = "" | "PULMAO" | "PICK_FACE" | "REPLENISHMENT";
 
 export default function EstoquePage() {
   const [typeFilter, setTypeFilter] = useState<TypeFilter>("");
@@ -32,12 +33,14 @@ export default function EstoquePage() {
   const [pagination, setPagination] = useState<PaginationMeta | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const replenishment = typeFilter === "REPLENISHMENT";
 
   useEffect(() => {
     setPage(1);
   }, [typeFilter, lowOnly, q]);
 
   const load = useCallback(async () => {
+    if (typeFilter === "REPLENISHMENT") return;
     setLoading(true);
     setError(null);
     try {
@@ -74,6 +77,7 @@ export default function EstoquePage() {
             { key: "" as const, label: "Todos" },
             { key: "PULMAO" as const, label: "Pulmão" },
             { key: "PICK_FACE" as const, label: "Estoque de giro" },
+            { key: "REPLENISHMENT" as const, label: "Ressuprimento" },
           ] as const
         ).map((t) => (
           <button
@@ -90,14 +94,16 @@ export default function EstoquePage() {
             {t.label}
           </button>
         ))}
-        <label className="ml-auto flex items-center gap-2 text-sm">
-          <input
-            type="checkbox"
-            checked={lowOnly}
-            onChange={(e) => setLowOnly(e.target.checked)}
-          />
-          Somente abaixo do mínimo
-        </label>
+        {replenishment ? null : (
+          <label className="ml-auto flex items-center gap-2 text-sm">
+            <input
+              type="checkbox"
+              checked={lowOnly}
+              onChange={(e) => setLowOnly(e.target.checked)}
+            />
+            Somente abaixo do mínimo
+          </label>
+        )}
       </div>
 
       <div className="mb-4">
@@ -109,70 +115,74 @@ export default function EstoquePage() {
         />
       </div>
 
-      <DataState
-        loading={loading}
-        error={error}
-        empty={!loading && locations.length === 0}
-        emptyMessage="Nenhuma localização cadastrada."
-      >
-        <div className="overflow-hidden rounded-xl border bg-white shadow-sm">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>SKU</TableHead>
-                <TableHead>Tipo</TableHead>
-                <TableHead>Endereço</TableHead>
-                <TableHead>Ocupação</TableHead>
-                <TableHead className="text-right">Mínimo</TableHead>
-                <TableHead>Alerta</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {locations.map((l) => {
-                const isPulmao = l.type === "PULMAO";
-                const alert = !isPulmao && !!l.product && l.fillPercent <= l.minPercent;
-                return (
-                  <TableRow key={l.id} className={alert ? "bg-amber-50" : ""}>
-                    <TableCell>
-                      {isPulmao ? (
-                        <PulmaoStocksCell stocks={l.stocks} />
-                      ) : l.product ? (
-                        <>
-                          <span className="font-mono text-sm font-medium">
-                            {l.product.sku}
-                          </span>
-                          <span className="block text-xs text-muted-foreground">
-                            {l.product.name}
-                          </span>
-                        </>
-                      ) : (
-                        <span className="text-sm text-muted-foreground">—</span>
-                      )}
-                    </TableCell>
-                    <TableCell>
-                      {LOCATION_TYPE_LABEL[l.type] ?? l.type}
-                    </TableCell>
-                    <TableCell className="font-mono text-sm">{l.barcode}</TableCell>
-                    <TableCell>
-                      <PercentBar
-                        percent={l.fillPercent}
-                        minPercent={isPulmao ? null : l.minPercent}
-                      />
-                    </TableCell>
-                    <TableCell className="text-right tabular-nums">
-                      {isPulmao ? "—" : `${l.minPercent}%`}
-                    </TableCell>
-                    <TableCell>{isPulmao ? "—" : alert ? "Repor" : "OK"}</TableCell>
-                  </TableRow>
-                );
-              })}
-            </TableBody>
-          </Table>
-          {pagination && pagination.total > 0 ? (
-            <Pagination pagination={pagination} onPageChange={setPage} />
-          ) : null}
-        </div>
-      </DataState>
+      {replenishment ? (
+        <ReplenishmentNeedsPanel q={q} />
+      ) : (
+        <DataState
+          loading={loading}
+          error={error}
+          empty={!loading && locations.length === 0}
+          emptyMessage="Nenhuma localização cadastrada."
+        >
+          <div className="overflow-hidden rounded-xl border bg-white shadow-sm">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>SKU</TableHead>
+                  <TableHead>Tipo</TableHead>
+                  <TableHead>Endereço</TableHead>
+                  <TableHead>Ocupação</TableHead>
+                  <TableHead className="text-right">Mínimo</TableHead>
+                  <TableHead>Alerta</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {locations.map((l) => {
+                  const isPulmao = l.type === "PULMAO";
+                  const alert = !isPulmao && !!l.product && l.fillPercent <= l.minPercent;
+                  return (
+                    <TableRow key={l.id} className={alert ? "bg-amber-50" : ""}>
+                      <TableCell>
+                        {isPulmao ? (
+                          <PulmaoStocksCell stocks={l.stocks} />
+                        ) : l.product ? (
+                          <>
+                            <span className="font-mono text-sm font-medium">
+                              {l.product.sku}
+                            </span>
+                            <span className="block text-xs text-muted-foreground">
+                              {l.product.name}
+                            </span>
+                          </>
+                        ) : (
+                          <span className="text-sm text-muted-foreground">—</span>
+                        )}
+                      </TableCell>
+                      <TableCell>
+                        {LOCATION_TYPE_LABEL[l.type] ?? l.type}
+                      </TableCell>
+                      <TableCell className="font-mono text-sm">{l.barcode}</TableCell>
+                      <TableCell>
+                        <PercentBar
+                          percent={l.fillPercent}
+                          minPercent={isPulmao ? null : l.minPercent}
+                        />
+                      </TableCell>
+                      <TableCell className="text-right tabular-nums">
+                        {isPulmao ? "—" : `${l.minPercent}%`}
+                      </TableCell>
+                      <TableCell>{isPulmao ? "—" : alert ? "Repor" : "OK"}</TableCell>
+                    </TableRow>
+                  );
+                })}
+              </TableBody>
+            </Table>
+            {pagination && pagination.total > 0 ? (
+              <Pagination pagination={pagination} onPageChange={setPage} />
+            ) : null}
+          </div>
+        </DataState>
+      )}
     </div>
   );
 }

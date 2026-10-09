@@ -109,10 +109,13 @@ import {
   getWavePackingLine,
   listPackingQueue,
   listUnifiedPackingQueue,
+  getWavePackingOverview,
+  listLabelBatchOrders,
   listWavePackingLines,
   reportPackingIssue,
   scanPackingItem,
   sortWaveAllocationWeb,
+  returnWaveLineToPicker,
   startPacking,
   type PackingIssuePayload,
   type PackingIssueType,
@@ -1253,6 +1256,17 @@ export async function webRoutes(app: FastifyInstance) {
     },
   );
 
+  app.get(
+    "/api/stock/replenishment-needs",
+    { preHandler: guard(Permission.STOCK_VIEW) },
+    async (request) => {
+      const { listReplenishmentNeedsForWeb } = await import(
+        "../services/replenishment-assignment.js"
+      );
+      return listReplenishmentNeedsForWeb(tenantWhere(request).tenantId);
+    },
+  );
+
   app.get<{
     Querystring: { page?: string; pageSize?: string; type?: string };
   }>(
@@ -2121,6 +2135,33 @@ export async function webRoutes(app: FastifyInstance) {
     async (request) => listWavePackingLines(tenantWhere(request).tenantId),
   );
 
+  app.get<{ Querystring: { waveId?: string } }>(
+    "/api/packing/labels/orders",
+    { preHandler: guard(Permission.SHIPPING_VIEW) },
+    async (request) =>
+      listLabelBatchOrders(tenantWhere(request).tenantId, {
+        waveId: request.query.waveId?.trim() || undefined,
+      }),
+  );
+
+  app.get<{ Params: { waveId: string } }>(
+    "/api/packing/waves/:waveId/overview",
+    { preHandler: guard(Permission.SHIPPING_VIEW) },
+    async (request, reply) => {
+      try {
+        return await getWavePackingOverview(
+          tenantWhere(request).tenantId,
+          request.params.waveId,
+        );
+      } catch (e) {
+        if (e instanceof PackingSessionError) {
+          return reply.status(e.statusCode).send({ error: e.message });
+        }
+        throw e;
+      }
+    },
+  );
+
   app.get<{ Params: { lineId: string } }>(
     "/api/packing/waves/lines/:lineId",
     { preHandler: guard(Permission.SHIPPING_VIEW) },
@@ -2153,6 +2194,32 @@ export async function webRoutes(app: FastifyInstance) {
         );
       } catch (e) {
         if (e instanceof PickWaveError) {
+          return reply.status(e.statusCode).send({ error: e.message });
+        }
+        const message = e instanceof Error ? e.message : "Erro";
+        return reply.status(422).send({ error: message });
+      }
+    },
+  );
+
+  app.post<{
+    Params: { lineId: string };
+    Body: { type?: PackingIssueType; description?: string };
+  }>(
+    "/api/packing/waves/lines/:lineId/report-issue",
+    { preHandler: guard(Permission.SHIPPING_VIEW) },
+    async (request, reply) => {
+      const { type, description } = request.body ?? {};
+      if (!type) {
+        return reply.status(400).send({ error: "type obrigatório" });
+      }
+      try {
+        return await returnWaveLineToPicker(request.params.lineId, request.authUser!.id, {
+          type,
+          description,
+        });
+      } catch (e) {
+        if (e instanceof PackingSessionError) {
           return reply.status(e.statusCode).send({ error: e.message });
         }
         const message = e instanceof Error ? e.message : "Erro";
