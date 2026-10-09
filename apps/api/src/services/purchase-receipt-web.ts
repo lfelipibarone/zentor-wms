@@ -3,7 +3,6 @@ import {
   PurchaseReceiptKind,
   PurchaseReceiptSessionStatus,
   Prisma,
-  type Product,
   type PurchaseReceiptItem,
 } from "@prisma/client";
 import { prisma } from "../lib/prisma.js";
@@ -11,6 +10,7 @@ import { parsePagination, buildPaginationMeta } from "../lib/pagination.js";
 import { assertResourceTenant } from "../lib/tenant-context.js";
 import { resolvePickFaceForProduct, PickFaceError } from "./pick-face-resolve.js";
 import { formatPurchaseReceiptSession } from "./tiny-purchase-receipt.js";
+import { buildProductLookup, matchReceiptProduct } from "./receipt-product-match.js";
 import {
   putawayItemInclude,
   storedLocationsOf,
@@ -29,29 +29,6 @@ const STATUS_TAB_KEYS: PurchaseReceiptSessionStatus[] = [
   PurchaseReceiptSessionStatus.COMPLETED,
   PurchaseReceiptSessionStatus.ISSUE,
 ];
-
-function buildProductLookup(products: Product[]) {
-  const bySku = new Map<string, Product>();
-  const byBarcode = new Map<string, Product>();
-  for (const p of products) {
-    bySku.set(p.sku.toLowerCase(), p);
-    if (p.barcode) byBarcode.set(p.barcode.toLowerCase(), p);
-  }
-  return { bySku, byBarcode };
-}
-
-function matchProduct(
-  item: PurchaseReceiptItem,
-  lookup: ReturnType<typeof buildProductLookup>,
-): Product | null {
-  const code = item.productCode?.trim().toLowerCase();
-  const bc = item.barcode?.trim().toLowerCase();
-  if (code && lookup.bySku.has(code)) return lookup.bySku.get(code)!;
-  if (code && lookup.byBarcode.has(code)) return lookup.byBarcode.get(code)!;
-  if (bc && lookup.byBarcode.has(bc)) return lookup.byBarcode.get(bc)!;
-  if (bc && lookup.bySku.has(bc)) return lookup.bySku.get(bc)!;
-  return null;
-}
 
 async function resolveSuggestedLocation(
   tenantId: string,
@@ -117,7 +94,7 @@ async function enrichReceiptItems(
 
   return Promise.all(
     items.map(async (it) => {
-      const product = matchProduct(it, lookup);
+      const product = matchReceiptProduct(it, lookup);
       let suggestedLocation: string | null = null;
       if (product) {
         if (!suggestedCache.has(product.id)) {

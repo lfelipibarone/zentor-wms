@@ -3,12 +3,14 @@ import {
   LocationType,
   Prisma,
   PutawaySessionStatus,
+  PurchaseReceiptKind,
   PurchaseReceiptSessionStatus,
 } from "@prisma/client";
 import { prisma } from "../lib/prisma.js";
 import { findNfItemByScannedCode } from "./location-stock.js";
 import { formatRouteLabel } from "./packing-queue-sort.js";
 import { setPulmaoSkuPercent } from "./pulmao-inventory.js";
+import { findProductForReceiptLine } from "./receipt-product-match.js";
 import { parsePercent } from "./stock-percent.js";
 import {
   getRouteEngine,
@@ -93,6 +95,7 @@ export async function listPutawayQueue(tenantId?: string, userId?: string) {
   const sessions = await prisma.purchaseReceiptSession.findMany({
     where: {
       ...(tenantId ? { tenantId } : {}),
+      kind: PurchaseReceiptKind.ENTRY,
       status: PurchaseReceiptSessionStatus.COMPLETED,
       OR: [
         { putaway: null },
@@ -139,6 +142,9 @@ export async function ensurePutawaySession(purchaseReceiptId: string, userId: st
   });
   if (!receipt || receipt.status !== PurchaseReceiptSessionStatus.COMPLETED) {
     throw new Error("NF não está conferida");
+  }
+  if (receipt.kind !== PurchaseReceiptKind.ENTRY) {
+    throw new Error("Devolução já é guardada no pulmão ao finalizar — não passa pela armazenagem");
   }
 
   if (receipt.putaway) {
@@ -338,6 +344,10 @@ export async function storePutawayItem(params: {
 }) {
   const pulmaoPercent = parsePercent(params.pulmaoPercent, "% do SKU no pulmão");
   if (pulmaoPercent <= 0) throw new Error("Informe quanto o SKU ocupa no pulmão (mínimo 1%)");
+  const requested = Math.floor(Number(params.quantity));
+  if (!Number.isFinite(requested) || requested < 1) {
+    throw new Error("Informe a quantidade guardada (mínimo 1)");
+  }
 
   const session = await prisma.putawaySession.findUnique({
     where: { id: params.sessionId },
@@ -369,43 +379,29 @@ export async function storePutawayItem(params: {
   const code = params.productBarcode?.trim() ?? "";
   if (
     code &&
-    item.barcode &&
-    item.productCode &&
+    (item.barcode || item.productCode) &&
     !(await findNfItemByScannedCode(tenantId, [item], code))
   ) {
     throw new Error("Produto não confere com o item da NF");
   }
 
-  const sku = item.productCode ?? code;
-  if (!sku) throw new Error("Item sem código de produto");
-
-  let product = await prisma.product.findFirst({
-    where: {
-      tenantId,
-      OR: [
-        { sku },
-        ...(code ? [{ barcode: code }] : []),
-        ...(item.barcode ? [{ barcode: item.barcode }] : []),
-      ],
-      active: true,
-    },
-  });
+  let product = await findProductForReceiptLine(tenantId, item, code);
   if (!product) {
+    const sku = item.productCode?.trim() || item.barcode?.trim() || code;
+    if (!sku) throw new Error("Item da NF sem código — bipe o produto para guardar");
     product = await prisma.product.create({
       data: {
         tenantId,
         sku,
         name: item.description ?? sku,
-        barcode: item.barcode ?? (code || null),
+        barcode: item.barcode?.trim() || code || null,
       },
     });
   }
 
-  const qty = Math.min(
-    params.quantity,
-    Number(item.quantityExpected) - Number(item.quantityStored),
-  );
-  if (qty <= 0) throw new Error("Quantidade já armazenada");
+  const remaining = Number(item.quantityExpected) - Number(item.quantityStored);
+  if (remaining <= 0) throw new Error("Quantidade já armazenada");
+  const qty = Math.min(requested, remaining);
 
   const storeStartedAt = new Date();
 
@@ -427,7 +423,7 @@ export async function storePutawayItem(params: {
       data: {
         tenantId,
         type: InventoryMovementType.ENTRY,
-        quantity: qty,
+        quantity: Math.ceil(qty),
         percentBefore: previous,
         percentAfter: pulmaoPercent,
         userId: params.userId,
