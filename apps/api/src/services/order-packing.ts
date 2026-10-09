@@ -1,4 +1,5 @@
 import {
+  InventoryMovementType,
   OrderStatus,
   OrderTimeLogEvent,
   PickWaveLineSortStatus,
@@ -26,6 +27,7 @@ import {
 import { getRouteEngine } from "./route-engine/index.js";
 import { sortPendingItemsByEngine } from "./route-engine/route-helpers.js";
 import { detectLabelFormat } from "./tiny-shipping-labels.js";
+import { restoreFaceOnReturn } from "./location-level.js";
 import { recordOrderStageChange } from "./order-stage-log.js";
 import { loadApproachWaveDefs } from "./approach-waves/store.js";
 import { matchLocation, sequenceKeyIn, type ZoneLocation } from "./approach-waves/matching.js";
@@ -756,6 +758,94 @@ export async function reportPackingIssue(
     summary,
     returnedToName: picker?.name ?? null,
   };
+}
+
+/** Conferência do item da onda achou erro: zera a coleta da linha e devolve para quem separou. */
+export async function returnWaveLineToPicker(
+  lineId: string,
+  userId: string,
+  input: { type: PackingIssueType; description?: string },
+) {
+  const line = await prisma.pickWaveLine.findUnique({
+    where: { id: lineId },
+    include: {
+      wave: { select: { id: true, tenantId: true, name: true, status: true, acceptedById: true } },
+      part: { select: { acceptedById: true } },
+      product: { select: { sku: true, name: true } },
+      pickLocation: true,
+      allocations: { include: { orderItem: { select: { id: true, orderId: true, quantityPicked: true } } } },
+    },
+  });
+  if (!line) throw new PackingSessionError("Item da onda não encontrado", 404);
+  if (line.wave.status !== PickWaveStatus.RELEASED) {
+    throw new PackingSessionError("Onda não está ativa");
+  }
+  if (!PACKING_ISSUE_TYPE_LABEL[input.type]) {
+    throw new PackingSessionError("Tipo de problema inválido");
+  }
+  if (line.quantityPicked <= 0) {
+    throw new PackingSessionError("Este item ainda não foi coletado");
+  }
+  if (line.allocations.some((a) => a.quantitySorted > 0)) {
+    throw new PackingSessionError(
+      "Parte deste item já foi conferida nos pedidos. Reporte o erro dentro do pedido.",
+    );
+  }
+
+  const units = line.quantityPicked;
+  const description = input.description?.trim().slice(0, 280) ?? "";
+  const pickerId = line.pickedById ?? line.part?.acceptedById ?? line.wave.acceptedById;
+  const picker = pickerId
+    ? await prisma.user.findFirst({
+        where: { id: pickerId, tenantId: line.wave.tenantId, active: true },
+        select: { id: true, name: true },
+      })
+    : null;
+
+  await prisma.$transaction(async (tx) => {
+    for (const alloc of line.allocations) {
+      const fromWave = Math.min(alloc.orderItem.quantityPicked, alloc.quantity);
+      if (fromWave <= 0) continue;
+      await tx.orderItem.update({
+        where: { id: alloc.orderItem.id },
+        data: { quantityPicked: alloc.orderItem.quantityPicked - fromWave },
+      });
+    }
+    await tx.pickWaveLine.update({
+      where: { id: line.id },
+      data: {
+        quantityPicked: 0,
+        sortStatus: PickWaveLineSortStatus.PENDING,
+        pickCompletedAt: null,
+      },
+    });
+    const change = await restoreFaceOnReturn(tx, line.pickLocation, units);
+    await tx.inventoryMovement.create({
+      data: {
+        tenantId: line.wave.tenantId,
+        type: InventoryMovementType.ADJUSTMENT,
+        quantity: units,
+        userId,
+        productId: line.productId,
+        toLocationId: line.pickLocationId,
+        pickWaveLineId: line.id,
+        notes: `Devolvido pelo packing · ${PACKING_ISSUE_TYPE_LABEL[input.type]}${description ? ` · ${description}` : ""}`,
+        ...(change ? { percentBefore: change.before, percentAfter: change.after } : {}),
+      },
+    });
+  });
+
+  const summary = `${line.product.sku} · ${PACKING_ISSUE_TYPE_LABEL[input.type]} · ${units} un.`;
+  const notification = {
+    title: picker ? "Item da onda voltou para você corrigir" : "Item da onda retornou do packing",
+    body: `${line.wave.name} — ${summary}${description ? ` · ${description}` : ""}`,
+    category: "PICKING",
+    data: { waveId: line.wave.id, lineId: line.id, issueType: input.type, sku: line.product.sku },
+  };
+  if (picker) await createNotification({ userId: picker.id, ...notification });
+  else await notifyUsersWithPermission(Permission.MOBILE_ACCESS, notification, line.wave.tenantId);
+
+  return { lineId: line.id, waveId: line.wave.id, summary, returnedToName: picker?.name ?? null };
 }
 
 async function listWavePackingLinesInternal(tenantId: string) {

@@ -916,6 +916,21 @@ export function reportPackingIssue(
   });
 }
 
+export function reportWaveLineIssue(
+  lineId: string,
+  payload: { type: PackingIssueType; description?: string },
+) {
+  return apiFetch<{
+    lineId: string;
+    waveId: string;
+    summary: string;
+    returnedToName: string | null;
+  }>(`/api/packing/waves/lines/${lineId}/report-issue`, {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
 export function fetchWavePackingLines() {
   return apiFetch<{
     lines: Array<{

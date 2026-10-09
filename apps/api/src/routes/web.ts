@@ -115,6 +115,7 @@ import {
   reportPackingIssue,
   scanPackingItem,
   sortWaveAllocationWeb,
+  returnWaveLineToPicker,
   startPacking,
   type PackingIssuePayload,
   type PackingIssueType,
@@ -2193,6 +2194,32 @@ export async function webRoutes(app: FastifyInstance) {
         );
       } catch (e) {
         if (e instanceof PickWaveError) {
+          return reply.status(e.statusCode).send({ error: e.message });
+        }
+        const message = e instanceof Error ? e.message : "Erro";
+        return reply.status(422).send({ error: message });
+      }
+    },
+  );
+
+  app.post<{
+    Params: { lineId: string };
+    Body: { type?: PackingIssueType; description?: string };
+  }>(
+    "/api/packing/waves/lines/:lineId/report-issue",
+    { preHandler: guard(Permission.SHIPPING_VIEW) },
+    async (request, reply) => {
+      const { type, description } = request.body ?? {};
+      if (!type) {
+        return reply.status(400).send({ error: "type obrigatório" });
+      }
+      try {
+        return await returnWaveLineToPicker(request.params.lineId, request.authUser!.id, {
+          type,
+          description,
+        });
+      } catch (e) {
+        if (e instanceof PackingSessionError) {
           return reply.status(e.statusCode).send({ error: e.message });
         }
         const message = e instanceof Error ? e.message : "Erro";

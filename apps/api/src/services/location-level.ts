@@ -146,3 +146,19 @@ export async function decrementFaceOnPick(
     unitsAfter: data.stockQuantity,
   };
 }
+
+/** Desfaz a baixa do picking quando o item volta para a gôndola. Null se a gôndola é por %. */
+export async function restoreFaceOnReturn(
+  tx: Prisma.TransactionClient,
+  loc: LevelLocation,
+  units: number,
+) {
+  if (!isQuantityMode(loc) || units <= 0) return null;
+  const current = await tx.location.findUniqueOrThrow({
+    where: { id: loc.id },
+    select: { stockQuantity: true, fillPercent: true, capacity: true, minQuantity: true },
+  });
+  const data = quantityLevelData(current.stockQuantity + units, current);
+  await tx.location.update({ where: { id: loc.id }, data });
+  return { before: current.fillPercent, after: data.fillPercent };
+}

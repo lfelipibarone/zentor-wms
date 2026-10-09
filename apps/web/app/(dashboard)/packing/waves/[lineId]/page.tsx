@@ -2,10 +2,11 @@
 
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import { PageHeader } from "@/components/ops/page-header";
 import { CollectionDeadlineIndicator } from "@/components/ops/collection-deadline-indicator";
 import { DataState } from "@/components/ops/data-state";
+import { WaveLineIssueModal } from "@/components/ops/wave-line-issue-modal";
 import { apiFetch } from "@/lib/api/client";
 import { productMatchesCode } from "@wms/shared";
 import { fetchWavePackingLine } from "@/lib/api/operations";
@@ -14,6 +15,8 @@ import { cn } from "@/lib/utils";
 export default function PackingWaveLinePage() {
   const params = useParams<{ lineId: string }>();
   const lineId = params.lineId;
+  const router = useRouter();
+  const [issueOpen, setIssueOpen] = useState(false);
 
   const [line, setLine] = useState<
     Awaited<ReturnType<typeof fetchWavePackingLine>>["line"] | null
@@ -93,6 +96,9 @@ export default function PackingWaveLinePage() {
     }
   };
 
+  const canReport =
+    !!line && line.quantityPicked > 0 && line.allocations.every((a) => a.quantitySorted === 0);
+
   return (
     <div className="mx-auto max-w-xl space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-2">
@@ -101,6 +107,15 @@ export default function PackingWaveLinePage() {
           description={`${line?.waveName ?? "Onda"} · bipe o produto para conferir o que veio do picking e confirme as unidades de cada pedido.`}
         />
         <div className="flex gap-2">
+          {canReport ? (
+            <button
+              type="button"
+              onClick={() => setIssueOpen(true)}
+              className="rounded-lg border border-red-300 px-3 py-2 text-sm font-medium text-red-700 hover:bg-red-50"
+            >
+              Reportar erro
+            </button>
+          ) : null}
           {line ? (
             <Link
               href={`/packing/ondas/${line.waveId}`}
@@ -168,7 +183,18 @@ export default function PackingWaveLinePage() {
                   placeholder="Bipar produto"
                 />
                 {productError ? (
-                  <p className="mt-2 text-sm font-medium text-red-700">{productError}</p>
+                  <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
+                    <p className="text-sm font-medium text-red-700">{productError}</p>
+                    {canReport ? (
+                      <button
+                        type="button"
+                        onClick={() => setIssueOpen(true)}
+                        className="rounded-lg bg-red-600 px-3 py-1.5 text-xs font-semibold text-white"
+                      >
+                        Devolver para o separador
+                      </button>
+                    ) : null}
+                  </div>
                 ) : null}
               </form>
             )}
@@ -219,6 +245,16 @@ export default function PackingWaveLinePage() {
           </>
         ) : null}
       </DataState>
+
+      {issueOpen && line ? (
+        <WaveLineIssueModal
+          lineId={line.id}
+          sku={line.product.sku}
+          units={line.quantityPicked}
+          onClose={() => setIssueOpen(false)}
+          onSubmitted={() => router.push(`/packing/ondas/${line.waveId}`)}
+        />
+      ) : null}
     </div>
   );
 }
