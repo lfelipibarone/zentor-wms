@@ -1,10 +1,11 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Bookmark, Trash2, X, ZoomIn, ZoomOut } from "lucide-react";
+import { Bookmark, Trash2, X } from "lucide-react";
 import { formatMarketplace } from "@wms/shared";
 import { DataState } from "@/components/ops/data-state";
-import { FloorPlanCanvas } from "@/components/warehouse/floor-plan/floor-plan-canvas";
+import { BASE_CELL_PX, FloorPlanCanvas } from "@/components/warehouse/floor-plan/floor-plan-canvas";
+import { ZoomViewport } from "@/components/warehouse/floor-plan/zoom-viewport";
 import {
   alongAxis,
   computeReachability,
@@ -113,7 +114,6 @@ export function WaveMapBuilder({
   const [data, setData] = useState<WaveMapData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [zoom, setZoom] = useState(1);
 
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [focusKey, setFocusKey] = useState<string | null>(null);
@@ -482,49 +482,42 @@ export function WaveMapBuilder({
               <span className="flex items-center gap-1">
                 <span className="h-3.5 w-3.5 rounded-sm border" style={{ background: "#2563eb80", borderColor: SELECTED_COLOR }} /> selecionada
               </span>
-              <button
-                type="button"
-                title="Diminuir"
-                onClick={() => setZoom((z) => Math.max(0.5, +(z - 0.25).toFixed(2)))}
-                className="rounded border bg-white p-1"
-              >
-                <ZoomOut className="h-4 w-4" />
-              </button>
-              <button
-                type="button"
-                title="Aumentar"
-                onClick={() => setZoom((z) => Math.min(4, +(z + 0.25).toFixed(2)))}
-                className="rounded border bg-white p-1"
-              >
-                <ZoomIn className="h-4 w-4" />
-              </button>
             </div>
           </div>
 
           <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_22rem]">
-            <div className="max-h-[70vh] overflow-auto rounded-xl border bg-white p-2 shadow-sm">
-              <FloorPlanCanvas
-                widthCells={map.plan.widthCells}
-                heightCells={map.plan.heightCells}
-                elements={map.plan.elements}
-                estantes={estantes}
-                selectedId={null}
-                tool="select"
-                interactive={false}
-                zoom={zoom}
-                reachability={reachability}
-                issueElementIds={new Set()}
-                route={null}
-                overlay={overlay}
-                onSelect={() => {}}
-                onPlace={() => {}}
-                onElementChange={() => {}}
-                onDragEnd={() => {}}
-                onPointClick={(x, y) => {
-                  const slot = slotAt(slots, x, y);
-                  if (slot) toggleColuna(slot);
-                }}
-              />
+            <div className="overflow-hidden rounded-xl border bg-white shadow-sm">
+              <ZoomViewport
+                contentWidth={map.plan.widthCells * BASE_CELL_PX}
+                contentHeight={map.plan.heightCells * BASE_CELL_PX}
+                fitKey={map.barracao.id}
+                gridCellPx={BASE_CELL_PX}
+              >
+                {(zoom) => (
+                  <FloorPlanCanvas
+                    widthCells={map.plan.widthCells}
+                    heightCells={map.plan.heightCells}
+                    elements={map.plan.elements}
+                    estantes={estantes}
+                    selectedId={null}
+                    tool="select"
+                    interactive={false}
+                    zoom={zoom}
+                    reachability={reachability}
+                    issueElementIds={new Set()}
+                    route={null}
+                    overlay={overlay}
+                    onSelect={() => {}}
+                    onPlace={() => {}}
+                    onElementChange={() => {}}
+                    onDragEnd={() => {}}
+                    onPointClick={(x, y) => {
+                      const slot = slotAt(slots, x, y);
+                      if (slot) toggleColuna(slot);
+                    }}
+                  />
+                )}
+              </ZoomViewport>
             </div>
 
             <aside className="space-y-4 text-sm">

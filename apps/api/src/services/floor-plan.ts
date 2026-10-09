@@ -10,6 +10,7 @@ import {
   type FloorElementSpec,
   type FloorPlanSpec,
 } from "./route-engine/index.js";
+import type { PlanPoint } from "./route-engine/physical-engine.js";
 import { validateFloorPlan, type PlanValidation } from "./route-engine/validation.js";
 import { gondolaCode } from "./warehouse-layout.js";
 
@@ -305,7 +306,9 @@ export async function previewFloorPlanRoute(
   const stops: Array<{ locationId: string; label: string; x: number; y: number; distanceMeters: number }> = [];
   const unmapped: string[] = [];
   const path: Array<readonly [number, number]> = [];
-  let current = rt.startCell;
+  const firstCell = sorted.map((l) => engine.locate(l)?.cell).find((c): c is number => c != null);
+  const start = firstCell != null ? rt.nearest(rt.startPoints, firstCell) : null;
+  let current = start?.cell ?? -1;
   let totalSteps = 0;
 
   for (const loc of sorted) {
@@ -324,8 +327,9 @@ export async function previewFloorPlanRoute(
   }
 
   let toPackingMeters: number | null = null;
-  if (current >= 0 && rt.packingCell >= 0) {
-    const segment = rt.path(current, rt.packingCell);
+  const packing = current >= 0 ? rt.nearest(rt.packingPoints, current) : null;
+  if (packing) {
+    const segment = rt.path(current, packing.cell);
     if (segment.length) {
       totalSteps += segment.length - 1;
       toPackingMeters = (segment.length - 1) * rt.metersPerCell;
@@ -333,11 +337,19 @@ export async function previewFloorPlanRoute(
     }
   }
 
+  const pointLabel = (p: PlanPoint | null, points: PlanPoint[], fallback: string) => {
+    if (!p) return null;
+    if (p.label) return p.label;
+    return points.length > 1 ? `${fallback} ${points.findIndex((x) => x.elementId === p.elementId) + 1}` : fallback;
+  };
+
   return {
     orderLabel,
     stops,
     unmapped,
     path,
+    startLabel: pointLabel(start, rt.startPoints, "Início"),
+    packingLabel: pointLabel(packing, rt.packingPoints, "Packing"),
     toPackingMeters,
     totalMeters: totalSteps * rt.metersPerCell,
   };

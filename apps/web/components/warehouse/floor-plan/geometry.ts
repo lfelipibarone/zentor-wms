@@ -111,7 +111,44 @@ export const ELEMENT_LABELS: Record<FloorElementType, string> = {
 };
 
 /** Só pode existir um destes por planta; adicionar outro move o existente. */
-export const SINGLETON_TYPES = new Set<FloorElementType>(["START_POINT", "PACKING_POINT", "RECEIVING_AREA"]);
+export const SINGLETON_TYPES = new Set<FloorElementType>(["RECEIVING_AREA"]);
+
+/** Tipos que podem se repetir e aparecem numerados no mapa quando há mais de um ("Packing 2"). */
+export const NUMBERED_TYPES = new Set<FloorElementType>(["START_POINT", "PACKING_POINT", "DOCK"]);
+
+/** Nome exibido do elemento: rótulo, senão o tipo (numerado quando há mais de um do mesmo tipo). */
+export function elementDisplayName(e: FloorElement, elements: FloorElement[]): string {
+  if (e.label) return e.label;
+  const base = ELEMENT_LABELS[e.type];
+  if (!NUMBERED_TYPES.has(e.type)) return base;
+  const same = elements.filter((x) => x.type === e.type);
+  return same.length > 1 ? `${base} ${same.findIndex((x) => x.id === e.id) + 1}` : base;
+}
+
+/** Atalhos de obstáculo: rótulo e tamanho sugerido em metros. */
+export const OBSTACLE_PRESETS: Array<{ label: string; widthM: number; heightM: number }> = [
+  { label: "Pilar", widthM: 0.5, heightM: 0.5 },
+  { label: "Parede", widthM: 5, heightM: 0.5 },
+  { label: "Mesa", widthM: 2, heightM: 1 },
+  { label: "Escada", widthM: 1.5, heightM: 3 },
+  { label: "Escritório", widthM: 4, heightM: 3 },
+  { label: "Área bloqueada", widthM: 3, heightM: 3 },
+];
+
+export type ResizeHandle = "n" | "s" | "e" | "w" | "ne" | "nw" | "se" | "sw";
+
+/** Redimensiona pelo canto/lado arrastado até o ponto (px, py), encaixando na linha da grade mais próxima. */
+export function resizeFromHandle(o: FloorElement, handle: ResizeHandle, px: number, py: number): FloorElement {
+  let left = o.x;
+  let top = o.y;
+  let right = o.x + o.width;
+  let bottom = o.y + o.height;
+  if (handle.includes("e")) right = Math.max(left + 1, Math.round(px));
+  if (handle.includes("w")) left = Math.min(right - 1, Math.round(px));
+  if (handle.includes("s")) bottom = Math.max(top + 1, Math.round(py));
+  if (handle.includes("n")) top = Math.min(bottom - 1, Math.round(py));
+  return { ...o, x: left, y: top, width: right - left, height: bottom - top };
+}
 
 /** Áreas retangulares que podem trocar de tipo entre si no painel. */
 export const AREA_TYPES: FloorElementType[] = ["OBSTACLE", "RECEIVING_AREA", "DOCK"];
@@ -384,7 +421,7 @@ export type Reachability = {
   hasStart: boolean;
 };
 
-/** BFS a partir do Início para colorir pontos de acesso sem caminho em tempo real. */
+/** BFS a partir de todos os inícios para colorir pontos de acesso sem caminho em tempo real. */
 export function computeReachability(elements: FloorElement[], width: number, height: number): Reachability {
   const blocked = new Uint8Array(width * height);
   for (const e of elements) {
@@ -394,26 +431,27 @@ export function computeReachability(elements: FloorElement[], width: number, hei
     }
   }
   const dist = new Int32Array(width * height).fill(-1);
-  const start = elements.find((e) => e.type === "START_POINT");
-  const s = start ? start.y * width + start.x : -1;
-  if (s >= 0 && s < dist.length && !blocked[s]) {
-    const queue = new Int32Array(width * height);
-    let head = 0;
-    let tail = 0;
+  const starts = elements.filter((e) => e.type === "START_POINT");
+  const queue = new Int32Array(width * height);
+  let head = 0;
+  let tail = 0;
+  for (const start of starts) {
+    const s = start.y * width + start.x;
+    if (s < 0 || s >= dist.length || blocked[s] || dist[s]! >= 0) continue;
     queue[tail++] = s;
     dist[s] = 0;
-    while (head < tail) {
-      const c = queue[head++]!;
-      const x = c % width;
-      const neighbors = [x > 0 ? c - 1 : -1, x < width - 1 ? c + 1 : -1, c - width, c + width];
-      for (const n of neighbors) {
-        if (n < 0 || n >= dist.length || blocked[n] || dist[n] >= 0) continue;
-        dist[n] = dist[c]! + 1;
-        queue[tail++] = n;
-      }
+  }
+  while (head < tail) {
+    const c = queue[head++]!;
+    const x = c % width;
+    const neighbors = [x > 0 ? c - 1 : -1, x < width - 1 ? c + 1 : -1, c - width, c + width];
+    for (const n of neighbors) {
+      if (n < 0 || n >= dist.length || blocked[n] || dist[n]! >= 0) continue;
+      dist[n] = dist[c]! + 1;
+      queue[tail++] = n;
     }
   }
-  return { width, height, blocked, dist, hasStart: Boolean(start) };
+  return { width, height, blocked, dist, hasStart: starts.length > 0 };
 }
 
 export function isAccessReachable(r: Reachability, cell: { x: number; y: number } | null): boolean {

@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, type PointerEvent as ReactPointerEvent, type ReactNode } from "react";
+import { useRef, useState, type PointerEvent as ReactPointerEvent, type ReactNode } from "react";
 import type { FloorElement, FloorElementType, FloorPlanEstante, RoutePreview } from "@/lib/api/floor-plan";
 import {
   DANGER_COLOR,
@@ -10,28 +10,60 @@ import {
   alongAxis,
   clampElement,
   elementAt,
+  elementDisplayName,
   faceColunas,
   faceHalfRect,
   gondolaGeometry,
   gondolaView,
   isAccessReachable,
+  resizeFromHandle,
   slotIndexOnFloor,
   type Face,
   type Reachability,
+  type ResizeHandle,
 } from "./geometry";
 
 export type FloorTool = "select" | FloorElementType;
 
-const BASE_CELL_PX = 14;
+/** Pixels por célula com zoom 1. */
+export const BASE_CELL_PX = 14;
+
+/** Ferramentas que aceitam clicar e arrastar para desenhar a área no tamanho certo. */
+const DRAWABLE = new Set<FloorTool>(["OBSTACLE", "RECEIVING_AREA", "DOCK", "PACKING_POINT"]);
+
+/** Movimento máximo (px) para ainda contar como clique. */
+const CLICK_TOLERANCE = 5;
+
+const HANDLE_CURSOR: Record<ResizeHandle, string> = {
+  n: "ns-resize",
+  s: "ns-resize",
+  e: "ew-resize",
+  w: "ew-resize",
+  ne: "nesw-resize",
+  sw: "nesw-resize",
+  nw: "nwse-resize",
+  se: "nwse-resize",
+};
 
 type DragState = {
   id: string;
-  kind: "move" | "resize";
+  kind: "move" | ResizeHandle;
   offsetX: number;
   offsetY: number;
   origin: FloorElement;
   moved: boolean;
 };
+
+type DrawState = { type: FloorElementType; x0: number; y0: number; x1: number; y1: number };
+
+function drawRect(d: DrawState) {
+  return {
+    x: Math.min(d.x0, d.x1),
+    y: Math.min(d.y0, d.y1),
+    width: Math.abs(d.x1 - d.x0) + 1,
+    height: Math.abs(d.y1 - d.y0) + 1,
+  };
+}
 
 export function FloorPlanCanvas({
   widthCells,
@@ -65,13 +97,17 @@ export function FloorPlanCanvas({
   route: RoutePreview | null;
   overlay?: ReactNode;
   onSelect: (id: string | null) => void;
-  onPlace: (type: FloorElementType, x: number, y: number) => void;
+  /** `size` vem quando o usuário arrastou para desenhar a área. */
+  onPlace: (type: FloorElementType, x: number, y: number, size?: { width: number; height: number }) => void;
   onElementChange: (element: FloorElement) => void;
   onDragEnd: (changed: boolean) => void;
   onPointClick?: (x: number, y: number) => void;
 }) {
   const svgRef = useRef<SVGSVGElement>(null);
   const dragRef = useRef<DragState | null>(null);
+  const drawRef = useRef<DrawState | null>(null);
+  const [draw, setDraw] = useState<DrawState | null>(null);
+  const clickRef = useRef<{ x: number; y: number } | null>(null);
   const cellPx = BASE_CELL_PX * zoom;
 
   const pointAt = (ev: { clientX: number; clientY: number }) => {
@@ -104,32 +140,60 @@ export function FloorPlanCanvas({
   };
 
   const onPointerDown = (ev: ReactPointerEvent<SVGSVGElement>) => {
+    // Clique só vale no soltar: arrastar a partir daqui move o mapa (ZoomViewport).
     if (onPointClick && ev.button === 0) {
-      const p = pointAt(ev);
-      if (p.x >= 0 && p.y >= 0 && p.x < widthCells && p.y < heightCells) onPointClick(p.x, p.y);
+      clickRef.current = { x: ev.clientX, y: ev.clientY };
       return;
     }
     if (!interactive || ev.button !== 0) return;
     const c = cellAt(ev);
     if (c.x < 0 || c.y < 0 || c.x >= widthCells || c.y >= heightCells) return;
     if (tool !== "select") {
-      onPlace(tool, c.x, c.y);
+      ev.stopPropagation();
+      if (DRAWABLE.has(tool)) {
+        const d = { type: tool, x0: c.x, y0: c.y, x1: c.x, y1: c.y };
+        drawRef.current = d;
+        setDraw(d);
+        svgRef.current?.setPointerCapture(ev.pointerId);
+      } else {
+        onPlace(tool, c.x, c.y);
+      }
       return;
     }
     const hit = elementAt(elements, c.x, c.y);
     onSelect(hit?.id ?? null);
-    if (hit) startDrag(ev, hit, "move");
+    if (hit) {
+      ev.stopPropagation();
+      startDrag(ev, hit, "move");
+    }
   };
 
   const onPointerMove = (ev: ReactPointerEvent<SVGSVGElement>) => {
+    const d = drawRef.current;
+    if (d) {
+      const c = cellAt(ev);
+      const next = {
+        ...d,
+        x1: Math.max(0, Math.min(widthCells - 1, c.x)),
+        y1: Math.max(0, Math.min(heightCells - 1, c.y)),
+      };
+      if (next.x1 !== d.x1 || next.y1 !== d.y1) {
+        drawRef.current = next;
+        setDraw(next);
+      }
+      return;
+    }
     const drag = dragRef.current;
     if (!drag) return;
-    const c = cellAt(ev);
     const o = drag.origin;
-    const next =
-      drag.kind === "move"
-        ? { ...o, x: c.x - drag.offsetX, y: c.y - drag.offsetY }
-        : { ...o, width: Math.max(1, c.x - o.x + 1), height: Math.max(1, c.y - o.y + 1) };
+    let next: FloorElement;
+    if (drag.kind === "move") {
+      const c = cellAt(ev);
+      next = { ...o, x: c.x - drag.offsetX, y: c.y - drag.offsetY };
+    } else {
+      const p = pointAt(ev);
+      next = resizeFromHandle(o, drag.kind, p.x, p.y);
+    }
     const clamped = clampElement(next, widthCells, heightCells);
     if (clamped.x !== o.x || clamped.y !== o.y || clamped.width !== o.width || clamped.height !== o.height) {
       drag.moved = true;
@@ -137,13 +201,30 @@ export function FloorPlanCanvas({
     onElementChange(clamped);
   };
 
-  const onPointerUp = () => {
+  const onPointerUp = (ev: ReactPointerEvent<SVGSVGElement>) => {
+    const d = drawRef.current;
+    if (d) {
+      drawRef.current = null;
+      setDraw(null);
+      const r = drawRect(d);
+      if (r.width > 1 || r.height > 1) onPlace(d.type, r.x, r.y, { width: r.width, height: r.height });
+      else onPlace(d.type, d.x0, d.y0);
+      return;
+    }
+    const click = clickRef.current;
+    clickRef.current = null;
+    if (click && onPointClick && Math.hypot(ev.clientX - click.x, ev.clientY - click.y) < CLICK_TOLERANCE) {
+      const p = pointAt(ev);
+      if (p.x >= 0 && p.y >= 0 && p.x < widthCells && p.y < heightCells) onPointClick(p.x, p.y);
+    }
     const drag = dragRef.current;
     dragRef.current = null;
     if (drag) onDragEnd(drag.moved);
   };
 
   const selected = elements.find((e) => e.id === selectedId) ?? null;
+  /** Alças com tamanho constante na tela, independente do zoom. */
+  const handleSize = Math.min(0.7, Math.max(0.25, 8 / cellPx));
 
   return (
     <svg
@@ -153,7 +234,7 @@ export function FloorPlanCanvas({
       height={heightCells * cellPx}
       role="img"
       aria-label="Planta do barracão"
-      className="block select-none bg-white"
+      className="block select-none"
       style={{
         touchAction: "none",
         cursor: onPointClick ? "pointer" : interactive && tool !== "select" ? "crosshair" : "default",
@@ -164,20 +245,13 @@ export function FloorPlanCanvas({
       onPointerCancel={onPointerUp}
     >
       <defs>
-        <pattern id="fp-grid" width={1} height={1} patternUnits="userSpaceOnUse">
-          <path d="M1 0H0V1" fill="none" stroke="#e2e8f0" strokeWidth={0.04} />
-        </pattern>
-        <pattern id="fp-grid-major" width={10} height={10} patternUnits="userSpaceOnUse">
-          <rect width={10} height={10} fill="url(#fp-grid)" />
-          <path d="M10 0H0V10" fill="none" stroke="#cbd5e1" strokeWidth={0.08} />
-        </pattern>
         <pattern id="fp-hatch" width={0.5} height={0.5} patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
           <rect width={0.5} height={0.5} fill="#f1f5f9" />
           <path d="M0 0V0.5" stroke="#94a3b8" strokeWidth={0.12} />
         </pattern>
       </defs>
 
-      <rect x={0} y={0} width={widthCells} height={heightCells} fill="url(#fp-grid-major)" />
+      <rect x={0} y={0} width={widthCells} height={heightCells} fill="transparent" />
 
       {elements.map((e) =>
         e.type === "GONDOLA" ? (
@@ -192,11 +266,24 @@ export function FloorPlanCanvas({
           <MarkerShape
             key={e.id}
             element={e}
+            name={elementDisplayName(e, elements)}
             selected={interactive && e.id === selectedId}
             hasIssue={issueElementIds.has(e.id)}
           />
         ),
       )}
+
+      {draw ? (
+        <rect
+          {...drawRect(draw)}
+          fill="#0d9488"
+          fillOpacity={0.15}
+          stroke="#0d9488"
+          strokeWidth={0.08}
+          strokeDasharray="0.3 0.2"
+          pointerEvents="none"
+        />
+      ) : null}
 
       {interactive && selected?.type === "GONDOLA" ? (
         <AccessDots
@@ -207,18 +294,12 @@ export function FloorPlanCanvas({
       ) : null}
 
       {interactive && selected ? (
-        <rect
-          x={selected.x + selected.width - 0.55}
-          y={selected.y + selected.height - 0.55}
-          width={0.55}
-          height={0.55}
-          fill="#0d9488"
-          stroke="#fff"
-          strokeWidth={0.08}
-          style={{ cursor: "nwse-resize" }}
-          onPointerDown={(ev) => {
+        <ResizeHandles
+          element={selected}
+          size={handleSize}
+          onStart={(ev, handle) => {
             ev.stopPropagation();
-            startDrag(ev, selected, "resize");
+            startDrag(ev, selected, handle);
           }}
         />
       ) : null}
@@ -226,16 +307,6 @@ export function FloorPlanCanvas({
       {overlay}
 
       {route ? <RouteOverlay route={route} /> : null}
-
-      <rect
-        x={0.05}
-        y={0.05}
-        width={widthCells - 0.1}
-        height={heightCells - 0.1}
-        fill="none"
-        stroke="#475569"
-        strokeWidth={0.1}
-      />
     </svg>
   );
 }
@@ -344,12 +415,52 @@ function GondolaShape({
   );
 }
 
+function ResizeHandles({
+  element: e,
+  size,
+  onStart,
+}: {
+  element: FloorElement;
+  size: number;
+  onStart: (ev: ReactPointerEvent, handle: ResizeHandle) => void;
+}) {
+  const handles: ResizeHandle[] = ["nw", "ne", "sw", "se"];
+  if (e.width >= size * 3) handles.push("n", "s");
+  if (e.height >= size * 3) handles.push("e", "w");
+  // Alças por fora do elemento: o miolo continua livre para arrastar, mesmo em pontos de 1 célula.
+  return (
+    <g>
+      {handles.map((h) => {
+        const x = h.includes("w") ? e.x - size : h.includes("e") ? e.x + e.width : e.x + (e.width - size) / 2;
+        const y = h.includes("n") ? e.y - size : h.includes("s") ? e.y + e.height : e.y + (e.height - size) / 2;
+        return (
+          <rect
+            key={h}
+            x={x}
+            y={y}
+            width={size}
+            height={size}
+            rx={size * 0.2}
+            fill="#fff"
+            stroke="#0d9488"
+            strokeWidth={size * 0.22}
+            style={{ cursor: HANDLE_CURSOR[h] }}
+            onPointerDown={(ev) => onStart(ev, h)}
+          />
+        );
+      })}
+    </g>
+  );
+}
+
 function MarkerShape({
   element: e,
+  name,
   selected,
   hasIssue,
 }: {
   element: FloorElement;
+  name: string;
   selected: boolean;
   hasIssue: boolean;
 }) {
@@ -358,14 +469,17 @@ function MarkerShape({
   const label = e.label || null;
 
   if (e.type === "OBSTACLE") {
+    const fontSize = Math.min(0.6, e.height * 0.7);
+    const fits = label != null && label.length * fontSize * 0.55 <= e.width - 0.2;
     return (
       <g>
+        <title>{name}</title>
         <rect x={e.x} y={e.y} width={e.width} height={e.height} fill="url(#fp-hatch)" stroke={stroke} strokeWidth={strokeWidth} />
-        {label && e.width >= 3 ? (
+        {fits ? (
           <text
             x={e.x + e.width / 2}
             y={e.y + e.height / 2}
-            fontSize={0.6}
+            fontSize={fontSize}
             textAnchor="middle"
             dominantBaseline="central"
             fill="#475569"
@@ -408,9 +522,9 @@ function MarkerShape({
   }
 
   const fill = e.type === "START_POINT" ? "#0d9488" : e.type === "PACKING_POINT" ? "#ea580c" : "#475569";
-  const text = label ?? (e.type === "START_POINT" ? "Início" : e.type === "PACKING_POINT" ? "Packing" : "Doca");
   return (
     <g>
+      <title>{name}</title>
       <rect
         x={e.x}
         y={e.y}
@@ -430,7 +544,7 @@ function MarkerShape({
         fill="#0f172a"
         pointerEvents="none"
       >
-        {text}
+        {name}
       </text>
     </g>
   );

@@ -98,6 +98,9 @@ export interface RoutePreview {
   stops: Array<{ locationId: string; label: string; x: number; y: number; distanceMeters: number }>;
   unmapped: string[];
   path: Array<[number, number]>;
+  /** Saída e packing escolhidos (os mais próximos da 1ª e da última parada). */
+  startLabel: string | null;
+  packingLabel: string | null;
   toPackingMeters: number | null;
   totalMeters: number;
 }
