@@ -11,11 +11,12 @@ import {
 } from "react";
 import { Maximize2, ZoomIn, ZoomOut } from "lucide-react";
 
-const PAD = 12;
 const MIN_ZOOM = 0.2;
 const MAX_ZOOM = 6;
 /** Movimento mínimo (px) para um clique virar arrasto do mapa. */
 const PAN_THRESHOLD = 5;
+/** Quanto do mapa (px) sempre fica visível ao arrastar para fora. */
+const KEEP_VISIBLE = 60;
 
 const clampZoom = (z: number) => Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, z));
 
@@ -24,11 +25,20 @@ function isTypingTarget(target: EventTarget | null) {
   return Boolean(el && (el.tagName === "INPUT" || el.tagName === "SELECT" || el.tagName === "TEXTAREA" || el.isContentEditable));
 }
 
-type Pan = { pointerId: number; x: number; y: number; left: number; top: number; active: boolean };
+/** Roda de mouse (passos grandes e inteiros) vs. rolagem de dois dedos no trackpad (passos pequenos, com X). */
+function isMouseWheel(ev: WheelEvent) {
+  if (ev.deltaMode !== 0) return true;
+  return ev.deltaX === 0 && Number.isInteger(ev.deltaY) && Math.abs(ev.deltaY) >= 50;
+}
+
+type View = { zoom: number; x: number; y: number };
+type Pan = { pointerId: number; x: number; y: number; startX: number; startY: number; active: boolean };
+type GestureLike = Event & { scale: number; clientX: number; clientY: number };
 
 /**
- * Área com zoom e arrasto para o mapa. ⌘/Ctrl + rolagem (ou pinça no trackpad) aproxima no ponto do cursor;
- * arrastar o fundo, o botão do meio ou espaço + arrastar move o mapa. Cliques que o filho não tratar
+ * Moldura fixa com o mapa dentro (como um canvas): o tamanho da área nunca muda, só o conteúdo
+ * aproxima/afasta e se move. Roda do mouse ou pinça: zoom no ponto do cursor; rolagem de dois dedos
+ * ou arrastar o fundo (ou espaço + arrastar, botão do meio): mover. Cliques que o filho não tratar
  * (sem `stopPropagation`) podem virar arrasto.
  */
 export function ZoomViewport({
@@ -41,77 +51,106 @@ export function ZoomViewport({
   /** Tamanho do conteúdo em px com zoom 1. */
   contentWidth: number;
   contentHeight: number;
-  /** Ao mudar, reajusta o zoom para caber na tela. */
+  /** Ao mudar, reajusta o zoom para caber na moldura. */
   fitKey?: string;
   height?: string;
   children: (zoom: number) => ReactNode;
 }) {
   const ref = useRef<HTMLDivElement>(null);
-  const [zoom, setZoom] = useState(1);
-  const zoomRef = useRef(zoom);
-  const anchorRef = useRef<{ cx: number; cy: number; px: number; py: number } | null>(null);
+  const [view, setView] = useState<View>({ zoom: 1, x: 0, y: 0 });
+  const viewRef = useRef(view);
   const panRef = useRef<Pan | null>(null);
   const [panning, setPanning] = useState(false);
   const [spaceDown, setSpaceDown] = useState(false);
   const hoverRef = useRef(false);
+  const sizeRef = useRef({ w: contentWidth, h: contentHeight });
+  sizeRef.current = { w: contentWidth, h: contentHeight };
 
-  /** Zoom mantendo fixo o ponto da tela (px, py) relativo à área. */
-  const zoomAt = useCallback((next: number, px?: number, py?: number) => {
+  const apply = useCallback((next: View) => {
     const el = ref.current;
-    if (!el) return;
-    const z = clampZoom(next);
-    const x = px ?? el.clientWidth / 2;
-    const y = py ?? el.clientHeight / 2;
-    // Vários eventos antes do render (pinça no trackpad): o scroll ainda não foi ajustado, reaproveita a âncora.
-    const pending = anchorRef.current;
-    anchorRef.current = {
-      cx: pending ? pending.cx + (x - pending.px) / zoomRef.current : (el.scrollLeft + x - PAD) / zoomRef.current,
-      cy: pending ? pending.cy + (y - pending.py) / zoomRef.current : (el.scrollTop + y - PAD) / zoomRef.current,
-      px: x,
-      py: y,
-    };
-    zoomRef.current = z;
-    setZoom(z);
+    if (el) {
+      const w = sizeRef.current.w * next.zoom;
+      const h = sizeRef.current.h * next.zoom;
+      next = {
+        zoom: next.zoom,
+        x: Math.min(el.clientWidth - KEEP_VISIBLE, Math.max(KEEP_VISIBLE - w, next.x)),
+        y: Math.min(el.clientHeight - KEEP_VISIBLE, Math.max(KEEP_VISIBLE - h, next.y)),
+      };
+    }
+    viewRef.current = next;
+    setView(next);
   }, []);
+
+  /** Zoom mantendo fixo o ponto (px, py) da moldura. */
+  const zoomAt = useCallback(
+    (next: number, px?: number, py?: number) => {
+      const el = ref.current;
+      if (!el) return;
+      const v = viewRef.current;
+      const z = clampZoom(next);
+      const x = px ?? el.clientWidth / 2;
+      const y = py ?? el.clientHeight / 2;
+      apply({ zoom: z, x: x - ((x - v.x) / v.zoom) * z, y: y - ((y - v.y) / v.zoom) * z });
+    },
+    [apply],
+  );
 
   const fit = useCallback(() => {
     const el = ref.current;
-    if (!el || contentWidth <= 0 || contentHeight <= 0) return;
-    const z = Math.min((el.clientWidth - PAD * 2) / contentWidth, (el.clientHeight - PAD * 2) / contentHeight, 2.5);
-    const fitted = clampZoom(Math.round(z * 100) / 100);
-    anchorRef.current = null;
-    zoomRef.current = fitted;
-    setZoom(fitted);
-    el.scrollTo({ left: 0, top: 0 });
-  }, [contentWidth, contentHeight]);
+    const { w, h } = sizeRef.current;
+    if (!el || w <= 0 || h <= 0) return;
+    const pad = 16;
+    const z = clampZoom(Math.min((el.clientWidth - pad * 2) / w, (el.clientHeight - pad * 2) / h, 2.5));
+    apply({ zoom: z, x: (el.clientWidth - w * z) / 2, y: (el.clientHeight - h * z) / 2 });
+  }, [apply]);
 
   useLayoutEffect(() => {
     fit();
     // Reajusta só quando a planta muda (fitKey), não a cada edição de tamanho.
-  }, [fitKey]);
-
-  useLayoutEffect(() => {
-    const el = ref.current;
-    const a = anchorRef.current;
-    if (!el || !a) return;
-    el.scrollLeft = a.cx * zoom + PAD - a.px;
-    el.scrollTop = a.cy * zoom + PAD - a.py;
-    anchorRef.current = null;
-  }, [zoom]);
+  }, [fitKey, fit]);
 
   useEffect(() => {
     const el = ref.current;
     if (!el) return;
+    const local = (clientX: number, clientY: number) => {
+      const r = el.getBoundingClientRect();
+      return [clientX - r.left, clientY - r.top] as const;
+    };
     const onWheel = (ev: WheelEvent) => {
-      if (!ev.ctrlKey && !ev.metaKey) return;
       ev.preventDefault();
-      const rect = el.getBoundingClientRect();
-      const factor = Math.exp(-ev.deltaY * (ev.deltaMode === 1 ? 0.05 : 0.0025));
-      zoomAt(zoomRef.current * factor, ev.clientX - rect.left, ev.clientY - rect.top);
+      const [px, py] = local(ev.clientX, ev.clientY);
+      const v = viewRef.current;
+      if (ev.ctrlKey || ev.metaKey) {
+        zoomAt(v.zoom * Math.exp(-ev.deltaY * 0.01), px, py);
+      } else if (isMouseWheel(ev)) {
+        zoomAt(v.zoom * Math.exp(-ev.deltaY * (ev.deltaMode === 1 ? 0.05 : 0.0025)), px, py);
+      } else {
+        apply({ ...v, x: v.x - ev.deltaX, y: v.y - ev.deltaY });
+      }
+    };
+    // Safari: pinça no trackpad vem como gesture*, não como wheel; sem isso a página inteira aumenta.
+    let gestureBase = 1;
+    const onGestureStart = (ev: Event) => {
+      ev.preventDefault();
+      gestureBase = viewRef.current.zoom;
+    };
+    const onGestureChange = (ev: Event) => {
+      ev.preventDefault();
+      const g = ev as GestureLike;
+      const [px, py] = local(g.clientX, g.clientY);
+      zoomAt(gestureBase * g.scale, px, py);
     };
     el.addEventListener("wheel", onWheel, { passive: false });
-    return () => el.removeEventListener("wheel", onWheel);
-  }, [zoomAt]);
+    el.addEventListener("gesturestart", onGestureStart);
+    el.addEventListener("gesturechange", onGestureChange);
+    el.addEventListener("gestureend", onGestureStart);
+    return () => {
+      el.removeEventListener("wheel", onWheel);
+      el.removeEventListener("gesturestart", onGestureStart);
+      el.removeEventListener("gesturechange", onGestureChange);
+      el.removeEventListener("gestureend", onGestureStart);
+    };
+  }, [zoomAt, apply]);
 
   useEffect(() => {
     const onDown = (ev: KeyboardEvent) => {
@@ -120,9 +159,9 @@ export function ZoomViewport({
         ev.preventDefault();
         setSpaceDown(true);
       } else if (ev.key === "+" || ev.key === "=") {
-        zoomAt(zoomRef.current * 1.25);
+        zoomAt(viewRef.current.zoom * 1.25);
       } else if (ev.key === "-" || ev.key === "_") {
-        zoomAt(zoomRef.current / 1.25);
+        zoomAt(viewRef.current.zoom / 1.25);
       } else if (ev.key === "0") {
         fit();
       }
@@ -139,11 +178,10 @@ export function ZoomViewport({
   }, [zoomAt, fit]);
 
   const beginPan = (ev: ReactPointerEvent<HTMLDivElement>, active: boolean) => {
-    const el = ref.current;
-    if (!el) return;
-    panRef.current = { pointerId: ev.pointerId, x: ev.clientX, y: ev.clientY, left: el.scrollLeft, top: el.scrollTop, active };
+    const v = viewRef.current;
+    panRef.current = { pointerId: ev.pointerId, x: ev.clientX, y: ev.clientY, startX: v.x, startY: v.y, active };
     if (active) {
-      el.setPointerCapture(ev.pointerId);
+      ref.current?.setPointerCapture(ev.pointerId);
       setPanning(true);
     }
   };
@@ -162,18 +200,16 @@ export function ZoomViewport({
 
   const onPointerMove = (ev: ReactPointerEvent<HTMLDivElement>) => {
     const pan = panRef.current;
-    const el = ref.current;
-    if (!pan || !el || pan.pointerId !== ev.pointerId) return;
+    if (!pan || pan.pointerId !== ev.pointerId) return;
     const dx = ev.clientX - pan.x;
     const dy = ev.clientY - pan.y;
     if (!pan.active) {
       if (Math.hypot(dx, dy) < PAN_THRESHOLD) return;
       pan.active = true;
-      el.setPointerCapture(ev.pointerId);
+      ref.current?.setPointerCapture(ev.pointerId);
       setPanning(true);
     }
-    el.scrollLeft = pan.left - dx;
-    el.scrollTop = pan.top - dy;
+    apply({ ...viewRef.current, x: pan.startX + dx, y: pan.startY + dy });
   };
 
   const endPan = () => {
@@ -185,8 +221,13 @@ export function ZoomViewport({
     <div>
       <div
         ref={ref}
-        className="overflow-auto bg-slate-100/60"
-        style={{ height, cursor: panning ? "grabbing" : spaceDown ? "grab" : undefined }}
+        className="relative overflow-hidden bg-slate-100/60"
+        style={{
+          height,
+          touchAction: "none",
+          overscrollBehavior: "contain",
+          cursor: panning ? "grabbing" : spaceDown ? "grab" : undefined,
+        }}
         onPointerEnter={() => (hoverRef.current = true)}
         onPointerLeave={() => (hoverRef.current = false)}
         onPointerDownCapture={onPointerDownCapture}
@@ -196,19 +237,25 @@ export function ZoomViewport({
         onPointerCancel={endPan}
         onAuxClick={(ev) => ev.preventDefault()}
       >
-        <div className="w-max" style={{ padding: PAD, pointerEvents: panning || spaceDown ? "none" : undefined }}>
-          {children(zoom)}
+        <div
+          className="absolute left-0 top-0 w-max"
+          style={{
+            transform: `translate(${view.x}px, ${view.y}px)`,
+            pointerEvents: panning || spaceDown ? "none" : undefined,
+          }}
+        >
+          {children(view.zoom)}
         </div>
       </div>
       <div className="flex items-center justify-between gap-2 border-t bg-white px-3 py-1">
         <span className="truncate text-[11px] text-slate-400">
-          ⌘/Ctrl + rolar ou pinça: zoom · arraste o fundo (ou espaço + arrastar): mover · + / − / 0
+          Rodinha ou pinça: zoom · arraste o fundo (ou espaço + arrastar): mover · + / − / 0
         </span>
         <div className="flex flex-none items-center gap-0.5">
           <button
             type="button"
             title="Diminuir zoom (−)"
-            onClick={() => zoomAt(zoom / 1.25)}
+            onClick={() => zoomAt(view.zoom / 1.25)}
             className="rounded-md p-1.5 text-slate-600 hover:bg-slate-100"
           >
             <ZoomOut className="h-4 w-4" />
@@ -219,12 +266,12 @@ export function ZoomViewport({
             onClick={() => zoomAt(1)}
             className="w-12 rounded-md py-1 text-center text-xs font-medium text-slate-600 hover:bg-slate-100"
           >
-            {Math.round(zoom * 100)}%
+            {Math.round(view.zoom * 100)}%
           </button>
           <button
             type="button"
             title="Aumentar zoom (+)"
-            onClick={() => zoomAt(zoom * 1.25)}
+            onClick={() => zoomAt(view.zoom * 1.25)}
             className="rounded-md p-1.5 text-slate-600 hover:bg-slate-100"
           >
             <ZoomIn className="h-4 w-4" />
