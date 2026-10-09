@@ -15,21 +15,37 @@ export async function getPickProximityGroups(
   const clusters = await buildPickProximityGroups(tenantId, orders, {
     maxDistance: settings.proximityMaxDistance,
     maxDistanceMeters: settings.proximityMaxDistanceMeters,
-    maxGroups: opts?.limit ?? 10,
+    maxGroups: (opts?.limit ?? 10) * 3,
     maxOrdersPerGroup: 8,
   });
 
+  // pedido sozinho não é sugestão de agrupamento
+  const groups = clusters.filter((g) => g.orders.length >= 2).slice(0, opts?.limit ?? 10);
+
   return {
-    groups: clusters.map((g) => ({
-      id: g.id,
-      orderIds: g.orderIds,
-      orders: g.orders.map((o) => ({
-        id: o.id,
-        erpOrderId: o.erpOrderId,
-        marketplace: o.marketplace,
-      })),
-      routeHint: g.routeHint,
-      proximityScore: g.proximityScore,
-    })),
+    groups: groups.map((g) => {
+      const deadlines = g.orders
+        .map((o) => o.collectionDeadline?.getTime())
+        .filter((t): t is number => t != null);
+      return {
+        id: g.id,
+        orderIds: g.orderIds,
+        orders: g.orders.map((o) => ({
+          id: o.id,
+          erpOrderId: o.erpOrderId,
+          marketplace: o.marketplace,
+          customerName: o.customerName,
+        })),
+        routeHint: g.routeHint === "—" ? null : g.routeHint,
+        locationCount: g.locationCount ?? 0,
+        units: g.orders.reduce(
+          (s, o) =>
+            s + o.items.reduce((n, it) => n + Math.max(0, it.quantityOrdered - it.quantityPicked), 0),
+          0,
+        ),
+        earliestDeadline: deadlines.length ? new Date(Math.min(...deadlines)) : null,
+        proximityScore: g.proximityScore,
+      };
+    }),
   };
 }

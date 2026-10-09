@@ -2,6 +2,8 @@ import { createHash } from "node:crypto";
 import type { Order } from "@prisma/client";
 import {
   buildOrderPickProfiles,
+  formatRouteHint,
+  type PickLocationRef,
   orderUrgencyScore,
   profileProximityDistance,
   proximityLimitFor,
@@ -22,6 +24,8 @@ export type ProximityCluster<T extends Order = OrderWithItems> = {
   orders: T[];
   orderIds: string[];
   routeHint: string;
+  /** Gôndolas distintas que o grupo visita */
+  locationCount?: number;
   proximityScore: number;
 };
 
@@ -30,8 +34,16 @@ function stableClusterId(orderIds: string[]): string {
   return createHash("sha256").update(sorted.join(",")).digest("hex").slice(0, 12);
 }
 
+function clusterRefs(profiles: OrderPickProfile[]) {
+  const byId = new Map<string, PickLocationRef>();
+  for (const p of profiles) for (const r of p.locationRefs ?? []) byId.set(r.locationId, r);
+  return [...byId.values()];
+}
+
 function clusterRouteHint(profiles: OrderPickProfile[]): string {
   if (profiles.length === 0) return "—";
+  const refs = clusterRefs(profiles);
+  if (refs.length > 0) return formatRouteHint(refs);
   const hints = profiles.map((p) => p.routeHint);
   const unique = [...new Set(hints)];
   return unique.length === 1 ? unique[0]! : `${unique[0]} (+${unique.length - 1})`;
@@ -109,6 +121,7 @@ export function clusterOrdersByProximity<T extends OrderWithItems>(
       orders: group,
       orderIds: group.map((o) => o.id),
       routeHint: clusterRouteHint(groupProfiles),
+      locationCount: clusterRefs(groupProfiles).length,
       proximityScore: Math.max(0, opts.maxDistance - avgDist),
     });
   }

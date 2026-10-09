@@ -102,6 +102,7 @@ export function fetchOrders(params?: {
 
 export function fetchPendingOrdersForWave(params?: {
   q?: string;
+  page?: number;
   pageSize?: number;
   notInWave?: boolean;
   marketplace?: string;
@@ -109,6 +110,7 @@ export function fetchPendingOrdersForWave(params?: {
   return fetchOrders({
     status: "PENDING",
     q: params?.q,
+    page: params?.page,
     pageSize: params?.pageSize ?? 200,
     notInWave: params?.notInWave ?? true,
     marketplace: params?.marketplace,
@@ -121,11 +123,27 @@ export function fetchAvailableMarketplaces() {
   }>("/api/orders/marketplaces");
 }
 
+export function fetchWavePendingSummary() {
+  return apiFetch<{
+    total: number;
+    marketplaces: Array<{ value: string; label: string; count: number }>;
+  }>("/api/orders/wave-pending-summary");
+}
+
 export interface PickProximityGroup {
   id: string;
   orderIds: string[];
-  orders: Array<{ id: string; erpOrderId: string; marketplace: string | null }>;
-  routeHint: string;
+  orders: Array<{
+    id: string;
+    erpOrderId: string;
+    marketplace: string | null;
+    customerName?: string | null;
+  }>;
+  /** Região do galpão; null quando os itens ainda não têm gôndola */
+  routeHint: string | null;
+  locationCount?: number;
+  units?: number;
+  earliestDeadline?: string | null;
   proximityScore: number;
 }
 

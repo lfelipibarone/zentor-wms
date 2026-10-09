@@ -8,10 +8,11 @@ export interface PaginationMeta {
 export function parsePagination(
   query: { page?: string; pageSize?: string },
   defaultPageSize = 20,
+  maxPageSize = 100,
 ): { page: number; pageSize: number; skip: number; take: number } {
   const page = Math.max(1, Number(query.page) || 1);
   const pageSize = Math.min(
-    100,
+    maxPageSize,
     Math.max(5, Number(query.pageSize) || defaultPageSize),
   );
   return {
