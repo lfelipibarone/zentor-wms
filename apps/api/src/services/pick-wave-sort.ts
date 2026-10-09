@@ -91,16 +91,25 @@ export async function confirmSortAllocation(input: SortAllocationInput) {
   if (!input.webPacking) {
     await assertWaveOperatorForMutation(line.waveId, input.userId, line.partId);
   }
-  if (line.quantityPicked < line.quantityTotal) {
-    throw new PickWaveError("Conclua o pick na gôndola antes do packing");
-  }
-
   const alloc = line.allocations.find((a) => a.id === input.allocationId);
   if (!alloc) throw new PickWaveError("Alocação não encontrada", 404);
 
   const allocRemaining = alloc.quantity - alloc.quantitySorted;
   if (quantity > allocRemaining) {
     throw new PickWaveError(`Máximo para este pedido: ${allocRemaining}`);
+  }
+
+  // Linha parcial só acontece quando o packing devolveu um pedido ao separador:
+  // os outros pedidos seguem conferindo, o devolvido espera a nova coleta.
+  if (line.quantityPicked < line.quantityTotal) {
+    const pickedForAlloc = Math.min(alloc.orderItem.quantityPicked, alloc.quantity);
+    if (pickedForAlloc - alloc.quantitySorted < quantity) {
+      throw new PickWaveError(
+        alloc.quantitySorted === 0 && pickedForAlloc === 0
+          ? "Aguardando o separador coletar de novo para este pedido"
+          : "Conclua o pick na gôndola antes do packing",
+      );
+    }
   }
 
   let basketId = alloc.orderItem.order.basketId;
@@ -110,7 +119,7 @@ export async function confirmSortAllocation(input: SortAllocationInput) {
     });
     if (!basket) throw new PickWaveError("Cesta não encontrada", 404);
     basketId = basket.id;
-  } else if (!basketId) {
+  } else if (!basketId && !input.webPacking) {
     throw new PickWaveError("Bipe a cesta do pedido antes de confirmar");
   }
 

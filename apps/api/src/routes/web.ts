@@ -2204,12 +2204,12 @@ export async function webRoutes(app: FastifyInstance) {
 
   app.post<{
     Params: { lineId: string };
-    Body: { type?: PackingIssueType; description?: string };
+    Body: { type?: PackingIssueType; description?: string; allocationId?: string };
   }>(
     "/api/packing/waves/lines/:lineId/report-issue",
     { preHandler: guard(Permission.SHIPPING_VIEW) },
     async (request, reply) => {
-      const { type, description } = request.body ?? {};
+      const { type, description, allocationId } = request.body ?? {};
       if (!type) {
         return reply.status(400).send({ error: "type obrigatório" });
       }
@@ -2217,6 +2217,7 @@ export async function webRoutes(app: FastifyInstance) {
         return await returnWaveLineToPicker(request.params.lineId, request.authUser!.id, {
           type,
           description,
+          allocationId: allocationId || undefined,
         });
       } catch (e) {
         if (e instanceof PackingSessionError) {

@@ -918,7 +918,7 @@ export function reportPackingIssue(
 
 export function reportWaveLineIssue(
   lineId: string,
-  payload: { type: PackingIssueType; description?: string },
+  payload: { type: PackingIssueType; description?: string; allocationId?: string },
 ) {
   return apiFetch<{
     lineId: string;
@@ -954,7 +954,8 @@ export function fetchWavePackingLine(lineId: string) {
       id: string;
       waveId: string;
       waveName: string;
-      product: { sku: string; name: string; barcode: string | null };
+      product: { sku: string; name: string; barcode: string | null; imageUrl: string | null };
+      pickLocation: { barcode: string; label: string };
       quantityPicked: number;
       quantityTotal: number;
       sortStatus: string;
@@ -963,6 +964,7 @@ export function fetchWavePackingLine(lineId: string) {
         quantity: number;
         quantitySorted: number;
         remaining: number;
+        awaitingRepick: boolean;
         order: {
           id: string;
           erpOrderId: string;

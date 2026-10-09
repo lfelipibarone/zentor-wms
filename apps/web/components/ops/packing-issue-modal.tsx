@@ -11,6 +11,7 @@ import {
 
 interface PackingIssueModalProps {
   order: PackingOrder;
+  initialItemId?: string;
   onClose: () => void;
   onSubmitted: () => void;
 }
@@ -24,6 +25,7 @@ const TYPE_OPTIONS: PackingIssueType[] = [
 
 export function PackingIssueModal({
   order,
+  initialItemId,
   onClose,
   onSubmitted,
 }: PackingIssueModalProps) {
@@ -33,9 +35,9 @@ export function PackingIssueModal({
   );
 
   const [itemId, setItemId] = useState<string>(
-    reportableItems[0]?.id ?? "",
+    reportableItems.find((i) => i.id === initialItemId)?.id ?? reportableItems[0]?.id ?? "",
   );
-  const [type, setType] = useState<PackingIssueType>("MISSING");
+  const [type, setType] = useState<PackingIssueType>("WRONG_ITEM");
   const selectedItem = reportableItems.find((i) => i.id === itemId);
   const [quantity, setQuantity] = useState<string>(
     String(selectedItem?.quantityPicked ?? 1),

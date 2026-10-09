@@ -34,7 +34,9 @@ function lineState(line: WaveLine) {
     return { label: "Aguardando coleta", className: "bg-slate-100 text-slate-600", ready: false };
   }
   if (line.quantityPicked < line.quantityTotal) {
-    return { label: "Coleta parcial", className: "bg-amber-100 text-amber-800", ready: false };
+    // Conferência já começou e um pedido voltou ao separador: os demais seguem conferindo.
+    const inConference = line.quantitySorted > 0 && line.quantityPicked > line.quantitySorted;
+    return { label: "Coleta parcial", className: "bg-amber-100 text-amber-800", ready: inConference };
   }
   return { label: "Pronto p/ conferir", className: "bg-amber-200 text-amber-900", ready: true };
 }

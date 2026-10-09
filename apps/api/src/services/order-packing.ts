@@ -738,10 +738,27 @@ export async function reportPackingIssue(
     }
   });
 
+  const waveAlloc = await prisma.pickWaveAllocation.findFirst({
+    where: { orderItemId: item.id },
+    select: { waveLine: { select: { pickLocation: { select: { barcode: true } } } } },
+  });
+  const itemLocation = item.pickLocationId
+    ? await prisma.location.findUnique({ where: { id: item.pickLocationId }, select: { barcode: true } })
+    : null;
+  const locationBarcode = waveAlloc?.waveLine.pickLocation.barcode ?? itemLocation?.barcode ?? null;
+
   const summary = `${product.sku} · ${PACKING_ISSUE_TYPE_LABEL[input.type]} · ${qty} un.`;
   const notification = {
-    title: picker ? "Pedido voltou para você corrigir" : "Pedido retornou do packing",
-    body: `${order.erpOrderId} — ${summary}`,
+    title: `Erro no pedido ${order.erpOrderId}`,
+    body: [
+      `Pedido ${order.erpOrderId}`,
+      `${product.sku} ${product.name}`,
+      locationBarcode ? `local ${locationBarcode}` : null,
+      `${PACKING_ISSUE_TYPE_LABEL[input.type]} · ${qty} un.`,
+      description || null,
+    ]
+      .filter(Boolean)
+      .join(" · "),
     category: "PICKING",
     data: {
       orderId: order.id,
@@ -762,11 +779,14 @@ export async function reportPackingIssue(
   };
 }
 
-/** Conferência do item da onda achou erro: zera a coleta da linha e devolve para quem separou. */
+/**
+ * Conferência do item da onda achou erro: devolve para quem separou.
+ * Com `allocationId`, só as unidades daquele pedido voltam; sem, o item inteiro.
+ */
 export async function returnWaveLineToPicker(
   lineId: string,
   userId: string,
-  input: { type: PackingIssueType; description?: string },
+  input: { type: PackingIssueType; description?: string; allocationId?: string },
 ) {
   const line = await prisma.pickWaveLine.findUnique({
     where: { id: lineId },
@@ -775,7 +795,18 @@ export async function returnWaveLineToPicker(
       part: { select: { acceptedById: true } },
       product: { select: { sku: true, name: true } },
       pickLocation: true,
-      allocations: { include: { orderItem: { select: { id: true, orderId: true, quantityPicked: true } } } },
+      allocations: {
+        include: {
+          orderItem: {
+            select: {
+              id: true,
+              orderId: true,
+              quantityPicked: true,
+              order: { select: { erpOrderId: true } },
+            },
+          },
+        },
+      },
     },
   });
   if (!line) throw new PackingSessionError("Item da onda não encontrado", 404);
@@ -785,16 +816,27 @@ export async function returnWaveLineToPicker(
   if (!PACKING_ISSUE_TYPE_LABEL[input.type]) {
     throw new PackingSessionError("Tipo de problema inválido");
   }
-  if (line.quantityPicked <= 0) {
-    throw new PackingSessionError("Este item ainda não foi coletado");
-  }
-  if (line.allocations.some((a) => a.quantitySorted > 0)) {
-    throw new PackingSessionError(
-      "Parte deste item já foi conferida nos pedidos. Reporte o erro dentro do pedido.",
-    );
+  const totalSorted = line.allocations.reduce((sum, a) => sum + a.quantitySorted, 0);
+  const inHand = line.quantityPicked - totalSorted;
+  if (inHand <= 0) {
+    throw new PackingSessionError("Não há unidades coletadas deste item para devolver");
   }
 
-  const units = line.quantityPicked;
+  const target = input.allocationId
+    ? line.allocations.find((a) => a.id === input.allocationId)
+    : null;
+  if (input.allocationId && !target) {
+    throw new PackingSessionError("Pedido não pertence a este item da onda", 404);
+  }
+  if (!target && totalSorted > 0) {
+    throw new PackingSessionError(
+      "Parte deste item já foi conferida. Reporte o erro no pedido específico.",
+    );
+  }
+  const units = target ? Math.min(target.quantity - target.quantitySorted, inHand) : inHand;
+  if (units <= 0) throw new PackingSessionError("Este pedido já foi conferido");
+  const returned = target ? [{ alloc: target, units }] : line.allocations.map((a) => ({ alloc: a, units: a.quantity }));
+
   const description = input.description?.trim().slice(0, 280) ?? "";
   const pickerId = line.pickedById ?? line.part?.acceptedById ?? line.wave.acceptedById;
   const picker = pickerId
@@ -805,18 +847,18 @@ export async function returnWaveLineToPicker(
     : null;
 
   await prisma.$transaction(async (tx) => {
-    for (const alloc of line.allocations) {
-      const fromWave = Math.min(alloc.orderItem.quantityPicked, alloc.quantity);
-      if (fromWave <= 0) continue;
+    for (const { alloc, units: back } of returned) {
+      const fromItem = Math.min(alloc.orderItem.quantityPicked, back);
+      if (fromItem <= 0) continue;
       await tx.orderItem.update({
         where: { id: alloc.orderItem.id },
-        data: { quantityPicked: alloc.orderItem.quantityPicked - fromWave },
+        data: { quantityPicked: alloc.orderItem.quantityPicked - fromItem },
       });
     }
     await tx.pickWaveLine.update({
       where: { id: line.id },
       data: {
-        quantityPicked: 0,
+        quantityPicked: line.quantityPicked - units,
         sortStatus: PickWaveLineSortStatus.PENDING,
         pickCompletedAt: null,
       },
@@ -847,23 +889,43 @@ export async function returnWaveLineToPicker(
         productId: line.productId,
         toLocationId: line.pickLocationId,
         pickWaveLineId: line.id,
+        orderId: target?.orderItem.orderId ?? null,
         notes: `Devolvido pelo packing · ${PACKING_ISSUE_TYPE_LABEL[input.type]}${description ? ` · ${description}` : ""}`,
         ...(change ? { percentBefore: change.before, percentAfter: change.after } : {}),
       },
     });
   });
 
-  const summary = `${line.product.sku} · ${PACKING_ISSUE_TYPE_LABEL[input.type]} · ${units} un.`;
+  const where = `${line.product.sku} ${line.product.name} · local ${line.pickLocation.barcode}`;
+  const issue = `${PACKING_ISSUE_TYPE_LABEL[input.type]} · ${units} un.${description ? ` · ${description}` : ""}`;
+  const erpOrderId = target?.orderItem.order.erpOrderId ?? null;
   const notification = {
-    title: picker ? "Item da onda voltou para você corrigir" : "Item da onda retornou do packing",
-    body: `${line.wave.name} — ${summary}${description ? ` · ${description}` : ""}`,
+    title: erpOrderId
+      ? `Erro no pedido ${erpOrderId}`
+      : picker
+        ? "Item da onda voltou para você corrigir"
+        : "Item da onda retornou do packing",
+    body: erpOrderId
+      ? `Pedido ${erpOrderId} · ${where} · ${issue} (${line.wave.name})`
+      : `${line.wave.name} · ${where} · ${issue}`,
     category: "PICKING",
-    data: { waveId: line.wave.id, lineId: line.id, issueType: input.type, sku: line.product.sku },
+    data: {
+      waveId: line.wave.id,
+      lineId: line.id,
+      issueType: input.type,
+      sku: line.product.sku,
+      ...(target ? { orderId: target.orderItem.orderId, erpOrderId } : {}),
+    },
   };
   if (picker) await createNotification({ userId: picker.id, ...notification });
   else await notifyUsersWithPermission(Permission.MOBILE_ACCESS, notification, line.wave.tenantId);
 
-  return { lineId: line.id, waveId: line.wave.id, summary, returnedToName: picker?.name ?? null };
+  return {
+    lineId: line.id,
+    waveId: line.wave.id,
+    summary: `${line.product.sku} · ${issue}`,
+    returnedToName: picker?.name ?? null,
+  };
 }
 
 async function listWavePackingLinesInternal(tenantId: string) {

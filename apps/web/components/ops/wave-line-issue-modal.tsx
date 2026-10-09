@@ -13,13 +13,15 @@ const TYPE_OPTIONS: PackingIssueType[] = ["WRONG_ITEM", "WRONG_QUANTITY", "DAMAG
 export function WaveLineIssueModal({
   lineId,
   sku,
-  units,
+  location,
+  order,
   onClose,
   onSubmitted,
 }: {
   lineId: string;
   sku: string;
-  units: number;
+  location: string;
+  order: { allocationId: string; erpOrderId: string; units: number };
   onClose: () => void;
   onSubmitted: () => void;
 }) {
@@ -38,6 +40,7 @@ export function WaveLineIssueModal({
       const result = await reportWaveLineIssue(lineId, {
         type,
         description: description.trim() || undefined,
+        allocationId: order.allocationId,
       });
       setReturnedTo(result.returnedToName ?? null);
     } catch (err) {
@@ -67,9 +70,10 @@ export function WaveLineIssueModal({
             <AlertTriangle className="h-5 w-5 text-amber-700" />
           </div>
           <div className="flex-1">
-            <h2 className="text-lg font-bold text-slate-900">Reportar erro da separação</h2>
+            <h2 className="text-lg font-bold text-slate-900">Reportar erro no pedido {order.erpOrderId}</h2>
             <p className="mt-1 text-sm text-muted-foreground">
-              As {units} un. de {sku} voltam no app para o separador coletar de novo.
+              {sku} · local {location} · {order.units} un. O separador é avisado e coleta de novo para
+              este pedido.
             </p>
           </div>
         </div>
@@ -78,8 +82,8 @@ export function WaveLineIssueModal({
           <div className="mt-5 space-y-4">
             <p className="rounded-lg bg-emerald-50 px-3 py-3 text-sm text-emerald-800">
               {returnedTo
-                ? `${sku} devolvido para ${returnedTo} coletar de novo.`
-                : `${sku} voltou para a separação (não foi possível identificar quem separou).`}
+                ? `${returnedTo} foi avisado: pedido ${order.erpOrderId} · ${sku} · local ${location}.`
+                : `Pedido ${order.erpOrderId} voltou para a separação (não foi possível identificar quem separou).`}
             </p>
             <div className="flex justify-end">
               <button
@@ -87,14 +91,14 @@ export function WaveLineIssueModal({
                 onClick={onSubmitted}
                 className="rounded-lg bg-[#0d9488] px-4 py-2 text-sm font-semibold text-white"
               >
-                Voltar para a onda
+                OK
               </button>
             </div>
           </div>
         ) : (
           <form onSubmit={submit} className="mt-5 space-y-4">
             <label className="block text-sm">
-              <span className="mb-1 block font-medium text-slate-700">Tipo do problema</span>
+              <span className="mb-1 block font-medium text-slate-700">O que está errado</span>
               <select
                 value={type}
                 onChange={(e) => setType(e.target.value as PackingIssueType)}
@@ -140,7 +144,7 @@ export function WaveLineIssueModal({
                 className="inline-flex items-center gap-2 rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-white hover:bg-red-700 disabled:opacity-50"
               >
                 {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
-                Devolver para o separador
+                Avisar o separador
               </button>
             </div>
           </form>
