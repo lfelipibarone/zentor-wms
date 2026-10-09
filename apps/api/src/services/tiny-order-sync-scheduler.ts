@@ -205,7 +205,7 @@ async function tryAutoSyncOrdersForConnection(connection: {
 
   await setLastAutoSyncDate(connection.tenantId, todayKey);
   console.log(
-    `[tiny-sync] ${connection.tenantId}/${connection.id}: pedidos — ${result.created} criados, ${result.updated} atualizados, ${result.skipped} ignorados${result.resumed ? " (retomado)" : ""}`,
+    `[tiny-sync] ${connection.tenantId}/${connection.id}: pedidos — ${result.created} criados, ${result.updated} atualizados, ${result.skipped} ignorados, ${result.cancelledRemoved + result.closedRemoved} removidos da fila, ${result.cancelledFlagged} pausados por cancelamento${result.resumed ? " (retomado)" : ""}`,
   );
   return shouldResume;
 }

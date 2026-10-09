@@ -34,6 +34,9 @@ export const TINY_ORDER_SITUACOES_SYNC = new Set([0, 1, 3, 4, 7]);
 /** Situação cancelada no Tiny. */
 export const TINY_ORDER_SITUACAO_CANCELADA = 2;
 
+/** Situações em que o pedido já saiu do fluxo do WMS: Cancelada (2), Enviada (5), Entregue (6), Não entregue (9). */
+export const TINY_ORDER_SITUACOES_ENCERRADAS = new Set([2, 5, 6, 9]);
+
 const DEMO_ERP_PREFIXES = ["ERP-DEMO-", "ERP-MOB-"] as const;
 
 export function isDemoErpOrderId(erpOrderId: string): boolean {

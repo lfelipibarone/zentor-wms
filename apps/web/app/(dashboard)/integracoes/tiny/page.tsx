@@ -460,6 +460,16 @@ export default function TinyIntegracaoPage() {
         if (result.cancelledRemoved > 0) {
           parts.push(`${result.cancelledRemoved} cancelado(s) removido(s)`);
         }
+        if (result.closedRemoved > 0) {
+          parts.push(
+            `${result.closedRemoved} já enviado(s)/entregue(s) no Tiny removido(s)`,
+          );
+        }
+        if (result.cancelledFlagged > 0) {
+          parts.push(
+            `${result.cancelledFlagged} cancelado(s) em operação pausado(s)`,
+          );
+        }
         setSuccessMessage(`Pedidos sincronizados: ${parts.join(", ")}.`);
       }
       await loadSyncStatus();
