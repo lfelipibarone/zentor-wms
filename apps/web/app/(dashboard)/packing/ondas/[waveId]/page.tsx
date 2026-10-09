@@ -3,7 +3,11 @@
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
-import { RefreshCw } from "lucide-react";
+import { Loader2, Printer, RefreshCw, Tags } from "lucide-react";
+import type { ShippingLabelApiResult } from "@/components/ops/shipping-label-panel";
+import { apiFetch } from "@/lib/api/client";
+import { fetchShippingLabelText, triggerBlobDownload } from "@/lib/shipping-label-file";
+import { printZplWithQz } from "@/lib/shipping-label-qz";
 import { PageHeader } from "@/components/ops/page-header";
 import { CollectionDeadlineIndicator } from "@/components/ops/collection-deadline-indicator";
 import { DataState } from "@/components/ops/data-state";
@@ -33,6 +37,36 @@ function lineState(line: WaveLine) {
     return { label: "Coleta parcial", className: "bg-amber-100 text-amber-800", ready: true };
   }
   return { label: "Pronto p/ distribuir", className: "bg-amber-200 text-amber-900", ready: true };
+}
+
+function LabelStatus({
+  hasLabel,
+  format,
+  error,
+}: {
+  hasLabel: boolean;
+  format: PackingWaveOverview["orders"][number]["labelFormat"];
+  error?: string;
+}) {
+  const badge = "whitespace-nowrap rounded-md px-2 py-0.5 text-xs font-medium";
+  if (error) {
+    return (
+      <div className="max-w-[220px]">
+        <span className={cn(badge, "bg-red-100 text-red-700")}>
+          {hasLabel ? "Falha ao baixar" : "Falha ao gerar"}
+        </span>
+        <p className="mt-1 text-xs text-red-700">{error}</p>
+      </div>
+    );
+  }
+  if (hasLabel) {
+    return (
+      <span className={cn(badge, "bg-emerald-100 text-emerald-800")}>
+        Gerada{format === "pdf" ? " · PDF" : ""}
+      </span>
+    );
+  }
+  return <span className={cn(badge, "bg-slate-100 text-slate-600")}>Falta gerar</span>;
 }
 
 function Stat({ label, value }: { label: string; value: string }) {
@@ -67,8 +101,88 @@ export default function PackingWaveOverviewPage() {
     load();
   }, [load]);
 
+  const [labelErrors, setLabelErrors] = useState<Record<string, string>>({});
+  const [generating, setGenerating] = useState<{ done: number; total: number } | null>(null);
+  const [printing, setPrinting] = useState(false);
+  const [labelMessage, setLabelMessage] = useState<string | null>(null);
+
   const lines = data?.lines ?? [];
   const orders = data?.orders ?? [];
+  const missingLabels = orders.filter((o) => !o.hasLabel);
+  const printableLabels = orders.filter((o) => o.hasLabel && o.labelFormat !== "pdf");
+  const pdfLabels = orders.filter((o) => o.hasLabel && o.labelFormat === "pdf");
+  const labelBusy = generating !== null || printing;
+
+  const generateAll = async () => {
+    if (missingLabels.length === 0) return;
+    if (!window.confirm(`Gerar a etiqueta de ${missingLabels.length} pedido(s) no Tiny?`)) return;
+    setLabelMessage(null);
+    const errors: Record<string, string> = {};
+    let ok = 0;
+    for (const [i, order] of missingLabels.entries()) {
+      setGenerating({ done: i, total: missingLabels.length });
+      try {
+        const result = await apiFetch<ShippingLabelApiResult>(
+          `/api/packing/orders/${order.id}/shipping-labels`,
+          { method: "POST", body: "{}" },
+        );
+        if (result.status === "OK" && result.urls.length > 0) ok++;
+        else errors[order.id] = result.message ?? "Etiqueta indisponível";
+      } catch (e) {
+        errors[order.id] = e instanceof Error ? e.message : "Erro ao gerar etiqueta";
+      }
+    }
+    setGenerating(null);
+    setLabelErrors(errors);
+    const failed = Object.keys(errors).length;
+    setLabelMessage(
+      `${ok} etiqueta(s) gerada(s)${failed ? ` · ${failed} com erro (veja a coluna Etiqueta)` : ""}.`,
+    );
+    await load();
+  };
+
+  const printAll = async () => {
+    if (printableLabels.length === 0) return;
+    setPrinting(true);
+    setLabelMessage(null);
+    const zpls: string[] = [];
+    const errors: Record<string, string> = {};
+    for (const order of printableLabels) {
+      try {
+        zpls.push((await fetchShippingLabelText(order.id)).trim());
+      } catch (e) {
+        errors[order.id] = e instanceof Error ? e.message : "Erro ao baixar etiqueta";
+      }
+    }
+    setLabelErrors((prev) => {
+      const next = { ...prev };
+      for (const order of printableLabels) delete next[order.id];
+      return { ...next, ...errors };
+    });
+    const notes: string[] = [];
+    if (Object.keys(errors).length) notes.push(`${Object.keys(errors).length} não baixaram`);
+    if (pdfLabels.length) notes.push(`${pdfLabels.length} em PDF ficaram de fora (imprima pela conferência)`);
+    const suffix = notes.length ? ` · ${notes.join(" · ")}` : "";
+
+    if (zpls.length > 0) {
+      const combined = zpls.join("\n");
+      try {
+        const { printer } = await printZplWithQz(combined);
+        setLabelMessage(`${zpls.length} etiqueta(s) enviada(s) para ${printer}${suffix}.`);
+      } catch (e) {
+        const safeName = (data?.wave.name ?? "onda").replace(/[^\w.-]+/g, "_");
+        triggerBlobDownload(new Blob([combined], { type: "text/plain" }), `etiquetas-${safeName}.zpl`);
+        const raw = e instanceof Error ? e.message : "";
+        const reason = /connection|websocket/i.test(raw) || !raw ? "QZ Tray não está aberto neste computador" : raw;
+        setLabelMessage(
+          `Não deu para imprimir direto (${reason}). Baixei um arquivo com as ${zpls.length} etiqueta(s)${suffix}.`,
+        );
+      }
+    } else {
+      setLabelMessage(`Nenhuma etiqueta para imprimir${suffix}.`);
+    }
+    setPrinting(false);
+  };
   const unitsTotal = lines.reduce((s, l) => s + l.quantityTotal, 0);
   const unitsPicked = lines.reduce((s, l) => s + l.quantityPicked, 0);
   const unitsSorted = lines.reduce((s, l) => s + l.quantitySorted, 0);
@@ -183,31 +297,76 @@ export default function PackingWaveOverviewPage() {
             </section>
 
             <section className="space-y-2">
-              <h2 className="text-sm font-semibold text-slate-800">Pedidos da onda ({orders.length})</h2>
-              <div className="overflow-hidden rounded-xl border bg-white shadow-sm">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <h2 className="text-sm font-semibold text-slate-800">
+                  Pedidos da onda ({orders.length})
+                  <span className="ml-2 font-normal text-muted-foreground">
+                    {orders.length - missingLabels.length}/{orders.length} etiqueta(s) gerada(s)
+                  </span>
+                </h2>
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    onClick={generateAll}
+                    disabled={labelBusy || missingLabels.length === 0}
+                    className="inline-flex items-center gap-1.5 rounded-lg border bg-white px-3 py-2 text-sm font-medium disabled:opacity-50"
+                  >
+                    {generating ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <Tags className="h-4 w-4" />
+                    )}
+                    {generating
+                      ? `Gerando ${generating.done + 1}/${generating.total}…`
+                      : `Gerar todas as etiquetas${missingLabels.length ? ` (${missingLabels.length})` : ""}`}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={printAll}
+                    disabled={labelBusy || printableLabels.length === 0}
+                    className="inline-flex items-center gap-1.5 rounded-lg bg-[#0d9488] px-3 py-2 text-sm font-semibold text-white disabled:opacity-50"
+                  >
+                    {printing ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <Printer className="h-4 w-4" />
+                    )}
+                    {printing
+                      ? "Imprimindo…"
+                      : `Imprimir todas as etiquetas${printableLabels.length ? ` (${printableLabels.length})` : ""}`}
+                  </button>
+                </div>
+              </div>
+              {labelMessage ? (
+                <p className="rounded-lg bg-slate-100 px-3 py-2 text-sm text-slate-700">{labelMessage}</p>
+              ) : null}
+              <div className="overflow-x-auto rounded-xl border bg-white shadow-sm">
                 <Table>
                   <TableHeader>
                     <TableRow>
                       <TableHead>Pedido</TableHead>
                       <TableHead>Marketplace</TableHead>
                       <TableHead>Cesta</TableHead>
-                      <TableHead className="text-right">Unidades nas cestas</TableHead>
+                      <TableHead className="whitespace-nowrap text-right">Nas cestas</TableHead>
                       <TableHead>Situação</TableHead>
+                      <TableHead>Etiqueta</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {orders.map((o) => (
                       <TableRow key={o.id}>
                         <TableCell>
-                          <span className="font-mono text-sm font-medium">{o.erpOrderId}</span>
+                          <span className="whitespace-nowrap font-mono text-sm font-medium">{o.erpOrderId}</span>
                           {o.customerName ? (
-                            <span className="block text-xs text-muted-foreground">{o.customerName}</span>
+                            <span className="block whitespace-nowrap text-xs text-muted-foreground">
+                              {o.customerName}
+                            </span>
                           ) : null}
                         </TableCell>
-                        <TableCell>
+                        <TableCell className="whitespace-nowrap">
                           <MarketplaceBadge value={o.marketplace} />
                         </TableCell>
-                        <TableCell className="font-mono text-sm">{o.basketCode ?? "—"}</TableCell>
+                        <TableCell className="whitespace-nowrap font-mono text-sm">{o.basketCode ?? "—"}</TableCell>
                         <TableCell
                           className={cn(
                             "text-right tabular-nums",
@@ -216,8 +375,15 @@ export default function PackingWaveOverviewPage() {
                         >
                           {o.unitsSorted}/{o.unitsTotal}
                         </TableCell>
-                        <TableCell className="text-sm">
+                        <TableCell className="whitespace-nowrap text-sm">
                           {ORDER_STATUS_LABEL[o.status as keyof typeof ORDER_STATUS_LABEL] ?? o.status}
+                        </TableCell>
+                        <TableCell>
+                          <LabelStatus
+                            hasLabel={o.hasLabel}
+                            format={o.labelFormat}
+                            error={labelErrors[o.id]}
+                          />
                         </TableCell>
                       </TableRow>
                     ))}

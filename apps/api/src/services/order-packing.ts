@@ -25,6 +25,7 @@ import {
 } from "./packing-queue-sort.js";
 import { getRouteEngine } from "./route-engine/index.js";
 import { sortPendingItemsByEngine } from "./route-engine/route-helpers.js";
+import { detectLabelFormat } from "./tiny-shipping-labels.js";
 import { recordOrderStageChange } from "./order-stage-log.js";
 import { loadApproachWaveDefs } from "./approach-waves/store.js";
 import { matchLocation, sequenceKeyIn, type ZoneLocation } from "./approach-waves/matching.js";
@@ -870,6 +871,7 @@ export async function getWavePackingOverview(tenantId: string, waveId: string) {
               status: true,
               priority: true,
               collectionDeadline: true,
+              shippingLabel: true,
               basket: { select: { code: true } },
             },
           },
@@ -914,6 +916,8 @@ export async function getWavePackingOverview(tenantId: string, waveId: string) {
       priority: o.priority,
       collectionDeadline: o.collectionDeadline?.toISOString() ?? null,
       basketCode: o.basket?.code ?? null,
+      hasLabel: Boolean(o.shippingLabel),
+      labelFormat: o.shippingLabel ? detectLabelFormat(o.shippingLabel) : null,
       unitsTotal: unitsByOrder.get(o.id)?.total ?? 0,
       unitsSorted: unitsByOrder.get(o.id)?.sorted ?? 0,
     }))

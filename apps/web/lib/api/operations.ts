@@ -814,6 +814,8 @@ export type PackingWaveOverview = {
     priority: number;
     collectionDeadline: string | null;
     basketCode: string | null;
+    hasLabel: boolean;
+    labelFormat: "zpl" | "pdf" | "unknown" | null;
     unitsTotal: number;
     unitsSorted: number;
   }>;
