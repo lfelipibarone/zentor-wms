@@ -4,6 +4,7 @@ import {
   useCallback,
   useEffect,
   useLayoutEffect,
+  useMemo,
   useRef,
   useState,
   type PointerEvent as ReactPointerEvent,
@@ -14,6 +15,8 @@ import { Maximize2, ZoomIn, ZoomOut } from "lucide-react";
 const MAX_ZOOM = 6;
 /** Movimento mínimo (px) para um clique virar arrasto do mapa. */
 const PAN_THRESHOLD = 5;
+const MINIMAP_MAX_W = 168;
+const MINIMAP_MAX_H = 112;
 
 /** Posição no eixo: se o mapa cabe, fica centralizado; se não, não deixa a borda entrar na moldura. */
 function clampAxis(pos: number, content: number, frame: number) {
@@ -64,6 +67,8 @@ export function ZoomViewport({
   const [panning, setPanning] = useState(false);
   const [spaceDown, setSpaceDown] = useState(false);
   const hoverRef = useRef(false);
+  const [frame, setFrame] = useState({ w: 0, h: 0 });
+  const miniDragRef = useRef<number | null>(null);
   const sizeRef = useRef({ w: contentWidth, h: contentHeight });
   sizeRef.current = { w: contentWidth, h: contentHeight };
 
@@ -117,6 +122,7 @@ export function ZoomViewport({
     if (!el) return;
     // Moldura mudou de tamanho (janela, painel): mantém o mapa preso e reajusta o zoom mínimo.
     const ro = new ResizeObserver(() => {
+      setFrame({ w: el.clientWidth, h: el.clientHeight });
       const v = viewRef.current;
       if (v.zoom <= fitZoom() * 1.001) fit();
       else apply(v);
@@ -233,6 +239,28 @@ export function ZoomViewport({
     setPanning(false);
   };
 
+  const miniScale =
+    contentWidth > 0 && contentHeight > 0 ? Math.min(MINIMAP_MAX_W / contentWidth, MINIMAP_MAX_H / contentHeight) : 0;
+  const miniContent = useMemo(() => (miniScale > 0 ? children(miniScale) : null), [children, miniScale]);
+  const showMinimap = miniScale > 0 && frame.w > 0 && view.zoom > fitZoom() * 1.01;
+  const miniRect = {
+    left: (-view.x / view.zoom) * miniScale,
+    top: (-view.y / view.zoom) * miniScale,
+    width: (frame.w / view.zoom) * miniScale,
+    height: (frame.h / view.zoom) * miniScale,
+  };
+
+  /** Centraliza a visão no ponto do minimapa sob o ponteiro. */
+  const moveToMinimap = (ev: ReactPointerEvent<HTMLDivElement>) => {
+    const el = ref.current;
+    if (!el) return;
+    const r = ev.currentTarget.getBoundingClientRect();
+    const cx = (ev.clientX - r.left) / miniScale;
+    const cy = (ev.clientY - r.top) / miniScale;
+    const v = viewRef.current;
+    apply({ ...v, x: el.clientWidth / 2 - cx * v.zoom, y: el.clientHeight / 2 - cy * v.zoom });
+  };
+
   return (
     <div>
       <div className="bg-slate-100">
@@ -265,6 +293,33 @@ export function ZoomViewport({
           >
             {children(view.zoom)}
           </div>
+          {showMinimap && (
+            <div
+              title="Arraste o quadrado para andar pelo barracão"
+              className="absolute bottom-2 right-2 cursor-pointer overflow-hidden rounded-md border border-slate-300 bg-white shadow-md"
+              style={{ width: contentWidth * miniScale, height: contentHeight * miniScale }}
+              onPointerDown={(ev) => {
+                if (ev.button !== 0) return;
+                ev.stopPropagation();
+                miniDragRef.current = ev.pointerId;
+                ev.currentTarget.setPointerCapture(ev.pointerId);
+                moveToMinimap(ev);
+              }}
+              onPointerMove={(ev) => {
+                if (miniDragRef.current === ev.pointerId) moveToMinimap(ev);
+              }}
+              onPointerUp={() => (miniDragRef.current = null)}
+              onPointerCancel={() => (miniDragRef.current = null)}
+            >
+              <div className="pointer-events-none select-none" aria-hidden inert>
+                {miniContent}
+              </div>
+              <div
+                className="pointer-events-none absolute rounded-sm border-2 border-sky-500 bg-sky-400/15"
+                style={miniRect}
+              />
+            </div>
+          )}
         </div>
       </div>
       <div className="flex items-center justify-between gap-2 border-t bg-white px-3 py-1">
