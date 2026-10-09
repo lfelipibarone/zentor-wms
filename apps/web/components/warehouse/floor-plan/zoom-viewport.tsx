@@ -11,14 +11,15 @@ import {
 } from "react";
 import { Maximize2, ZoomIn, ZoomOut } from "lucide-react";
 
-const MIN_ZOOM = 0.2;
 const MAX_ZOOM = 6;
 /** Movimento mínimo (px) para um clique virar arrasto do mapa. */
 const PAN_THRESHOLD = 5;
-/** Quanto do mapa (px) sempre fica visível ao arrastar para fora. */
-const KEEP_VISIBLE = 60;
 
-const clampZoom = (z: number) => Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, z));
+/** Posição no eixo: se o mapa cabe, fica centralizado; se não, não deixa a borda entrar na moldura. */
+function clampAxis(pos: number, content: number, frame: number) {
+  if (content <= frame) return (frame - content) / 2;
+  return Math.min(0, Math.max(frame - content, pos));
+}
 
 function isTypingTarget(target: EventTarget | null) {
   const el = target as HTMLElement | null;
@@ -36,10 +37,10 @@ type Pan = { pointerId: number; x: number; y: number; startX: number; startY: nu
 type GestureLike = Event & { scale: number; clientX: number; clientY: number };
 
 /**
- * Moldura fixa com o mapa dentro (como um canvas): o tamanho da área nunca muda, só o conteúdo
- * aproxima/afasta e se move. Roda do mouse ou pinça: zoom no ponto do cursor; rolagem de dois dedos
- * ou arrastar o fundo (ou espaço + arrastar, botão do meio): mover. Cliques que o filho não tratar
- * (sem `stopPropagation`) podem virar arrasto.
+ * Moldura fixa no formato do barracão, com o mapa preso dentro: o menor zoom é o mapa inteiro
+ * preenchendo a moldura, e ao aproximar só dá para andar até as bordas. Roda do mouse ou pinça: zoom
+ * no ponto do cursor; rolagem de dois dedos ou arrastar o fundo (ou espaço + arrastar, botão do meio):
+ * mover. Cliques que o filho não tratar (sem `stopPropagation`) podem virar arrasto.
  */
 export function ZoomViewport({
   contentWidth,
@@ -66,20 +67,30 @@ export function ZoomViewport({
   const sizeRef = useRef({ w: contentWidth, h: contentHeight });
   sizeRef.current = { w: contentWidth, h: contentHeight };
 
-  const apply = useCallback((next: View) => {
+  /** Zoom em que o mapa inteiro preenche a moldura; é também o menor zoom permitido. */
+  const fitZoom = useCallback(() => {
     const el = ref.current;
-    if (el) {
-      const w = sizeRef.current.w * next.zoom;
-      const h = sizeRef.current.h * next.zoom;
-      next = {
-        zoom: next.zoom,
-        x: Math.min(el.clientWidth - KEEP_VISIBLE, Math.max(KEEP_VISIBLE - w, next.x)),
-        y: Math.min(el.clientHeight - KEEP_VISIBLE, Math.max(KEEP_VISIBLE - h, next.y)),
-      };
-    }
-    viewRef.current = next;
-    setView(next);
+    const { w, h } = sizeRef.current;
+    if (!el || w <= 0 || h <= 0) return 1;
+    return Math.min(el.clientWidth / w, el.clientHeight / h);
   }, []);
+
+  const apply = useCallback(
+    (next: View) => {
+      const el = ref.current;
+      if (el) {
+        const zoom = Math.min(MAX_ZOOM, Math.max(fitZoom(), next.zoom));
+        next = {
+          zoom,
+          x: clampAxis(next.x, sizeRef.current.w * zoom, el.clientWidth),
+          y: clampAxis(next.y, sizeRef.current.h * zoom, el.clientHeight),
+        };
+      }
+      viewRef.current = next;
+      setView(next);
+    },
+    [fitZoom],
+  );
 
   /** Zoom mantendo fixo o ponto (px, py) da moldura. */
   const zoomAt = useCallback(
@@ -87,27 +98,32 @@ export function ZoomViewport({
       const el = ref.current;
       if (!el) return;
       const v = viewRef.current;
-      const z = clampZoom(next);
+      const z = Math.min(MAX_ZOOM, Math.max(fitZoom(), next));
       const x = px ?? el.clientWidth / 2;
       const y = py ?? el.clientHeight / 2;
       apply({ zoom: z, x: x - ((x - v.x) / v.zoom) * z, y: y - ((y - v.y) / v.zoom) * z });
     },
-    [apply],
+    [apply, fitZoom],
   );
 
-  const fit = useCallback(() => {
-    const el = ref.current;
-    const { w, h } = sizeRef.current;
-    if (!el || w <= 0 || h <= 0) return;
-    const pad = 16;
-    const z = clampZoom(Math.min((el.clientWidth - pad * 2) / w, (el.clientHeight - pad * 2) / h, 2.5));
-    apply({ zoom: z, x: (el.clientWidth - w * z) / 2, y: (el.clientHeight - h * z) / 2 });
-  }, [apply]);
+  const fit = useCallback(() => apply({ zoom: fitZoom(), x: 0, y: 0 }), [apply, fitZoom]);
 
   useLayoutEffect(() => {
     fit();
-    // Reajusta só quando a planta muda (fitKey), não a cada edição de tamanho.
-  }, [fitKey, fit]);
+  }, [fitKey, contentWidth, contentHeight, fit]);
+
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    // Moldura mudou de tamanho (janela, painel): mantém o mapa preso e reajusta o zoom mínimo.
+    const ro = new ResizeObserver(() => {
+      const v = viewRef.current;
+      if (v.zoom <= fitZoom() * 1.001) fit();
+      else apply(v);
+    });
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [apply, fit, fitZoom]);
 
   useEffect(() => {
     const el = ref.current;
@@ -219,37 +235,41 @@ export function ZoomViewport({
 
   return (
     <div>
-      <div
-        ref={ref}
-        className="relative overflow-hidden bg-slate-100/60"
-        style={{
-          height,
-          touchAction: "none",
-          overscrollBehavior: "contain",
-          cursor: panning ? "grabbing" : spaceDown ? "grab" : undefined,
-        }}
-        onPointerEnter={() => (hoverRef.current = true)}
-        onPointerLeave={() => (hoverRef.current = false)}
-        onPointerDownCapture={onPointerDownCapture}
-        onPointerDown={onPointerDown}
-        onPointerMove={onPointerMove}
-        onPointerUp={endPan}
-        onPointerCancel={endPan}
-        onAuxClick={(ev) => ev.preventDefault()}
-      >
+      <div className="bg-slate-100">
         <div
-          className="absolute left-0 top-0 w-max"
+          ref={ref}
+          className="relative mx-auto overflow-hidden bg-white"
           style={{
-            transform: `translate(${view.x}px, ${view.y}px)`,
-            pointerEvents: panning || spaceDown ? "none" : undefined,
+            aspectRatio: contentWidth > 0 && contentHeight > 0 ? `${contentWidth} / ${contentHeight}` : undefined,
+            maxHeight: height,
+            minHeight: 200,
+            touchAction: "none",
+            overscrollBehavior: "contain",
+            cursor: panning ? "grabbing" : spaceDown ? "grab" : undefined,
           }}
+          onPointerEnter={() => (hoverRef.current = true)}
+          onPointerLeave={() => (hoverRef.current = false)}
+          onPointerDownCapture={onPointerDownCapture}
+          onPointerDown={onPointerDown}
+          onPointerMove={onPointerMove}
+          onPointerUp={endPan}
+          onPointerCancel={endPan}
+          onAuxClick={(ev) => ev.preventDefault()}
         >
-          {children(view.zoom)}
+          <div
+            className="absolute left-0 top-0 w-max"
+            style={{
+              transform: `translate(${view.x}px, ${view.y}px)`,
+              pointerEvents: panning || spaceDown ? "none" : undefined,
+            }}
+          >
+            {children(view.zoom)}
+          </div>
         </div>
       </div>
       <div className="flex items-center justify-between gap-2 border-t bg-white px-3 py-1">
         <span className="truncate text-[11px] text-slate-400">
-          Rodinha ou pinça: zoom · arraste o fundo (ou espaço + arrastar): mover · + / − / 0
+          Rodinha ou pinça: aproximar · arraste o fundo (ou espaço + arrastar): mover · 0: barracão inteiro
         </span>
         <div className="flex flex-none items-center gap-0.5">
           <button
@@ -260,14 +280,9 @@ export function ZoomViewport({
           >
             <ZoomOut className="h-4 w-4" />
           </button>
-          <button
-            type="button"
-            title="Voltar para 100%"
-            onClick={() => zoomAt(1)}
-            className="w-12 rounded-md py-1 text-center text-xs font-medium text-slate-600 hover:bg-slate-100"
-          >
-            {Math.round(view.zoom * 100)}%
-          </button>
+          <span title="100% = barracão inteiro" className="w-12 text-center text-xs font-medium text-slate-600">
+            {Math.round((view.zoom / fitZoom()) * 100)}%
+          </span>
           <button
             type="button"
             title="Aumentar zoom (+)"
@@ -278,7 +293,7 @@ export function ZoomViewport({
           </button>
           <button
             type="button"
-            title="Ajustar à tela (0)"
+            title="Ver o barracão inteiro (0)"
             onClick={fit}
             className="rounded-md p-1.5 text-slate-600 hover:bg-slate-100"
           >
