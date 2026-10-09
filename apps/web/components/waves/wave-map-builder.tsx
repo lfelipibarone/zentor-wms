@@ -491,6 +491,7 @@ export function WaveMapBuilder({
                 contentWidth={map.plan.widthCells * BASE_CELL_PX}
                 contentHeight={map.plan.heightCells * BASE_CELL_PX}
                 fitKey={map.barracao.id}
+                gridCellPx={BASE_CELL_PX}
               >
                 {(zoom) => (
                   <FloorPlanCanvas

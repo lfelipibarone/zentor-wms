@@ -234,7 +234,7 @@ export function FloorPlanCanvas({
       height={heightCells * cellPx}
       role="img"
       aria-label="Planta do barracão"
-      className="block select-none bg-white"
+      className="block select-none"
       style={{
         touchAction: "none",
         cursor: onPointClick ? "pointer" : interactive && tool !== "select" ? "crosshair" : "default",
@@ -245,20 +245,13 @@ export function FloorPlanCanvas({
       onPointerCancel={onPointerUp}
     >
       <defs>
-        <pattern id="fp-grid" width={1} height={1} patternUnits="userSpaceOnUse">
-          <path d="M1 0H0V1" fill="none" stroke="#e2e8f0" strokeWidth={0.04} />
-        </pattern>
-        <pattern id="fp-grid-major" width={10} height={10} patternUnits="userSpaceOnUse">
-          <rect width={10} height={10} fill="url(#fp-grid)" />
-          <path d="M10 0H0V10" fill="none" stroke="#cbd5e1" strokeWidth={0.08} />
-        </pattern>
         <pattern id="fp-hatch" width={0.5} height={0.5} patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
           <rect width={0.5} height={0.5} fill="#f1f5f9" />
           <path d="M0 0V0.5" stroke="#94a3b8" strokeWidth={0.12} />
         </pattern>
       </defs>
 
-      <rect x={0} y={0} width={widthCells} height={heightCells} fill="url(#fp-grid-major)" />
+      <rect x={0} y={0} width={widthCells} height={heightCells} fill="transparent" />
 
       {elements.map((e) =>
         e.type === "GONDOLA" ? (
@@ -314,16 +307,6 @@ export function FloorPlanCanvas({
       {overlay}
 
       {route ? <RouteOverlay route={route} /> : null}
-
-      <rect
-        x={0.05}
-        y={0.05}
-        width={widthCells - 0.1}
-        height={heightCells - 0.1}
-        fill="none"
-        stroke="#475569"
-        strokeWidth={0.1}
-      />
     </svg>
   );
 }

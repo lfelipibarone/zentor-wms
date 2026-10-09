@@ -583,6 +583,7 @@ export function FloorPlanEditor({ barracaoId, onSaved }: { barracaoId: string; o
                 contentHeight={dims.heightCells * BASE_CELL_PX}
                 fitKey={barracaoId}
                 height="68vh"
+                gridCellPx={BASE_CELL_PX}
               >
                 {(zoom) => (
                   <FloorPlanCanvas

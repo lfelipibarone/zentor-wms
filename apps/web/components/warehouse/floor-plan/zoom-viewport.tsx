@@ -52,11 +52,14 @@ export function ZoomViewport({
   contentHeight,
   fitKey,
   height = "70vh",
+  gridCellPx,
   children,
 }: {
   /** Tamanho do conteúdo em px com zoom 1. */
   contentWidth: number;
   contentHeight: number;
+  /** Lado da célula (px, zoom 1): continua a grade do piso por toda a moldura ao afastar. */
+  gridCellPx?: number;
   /** Ao mudar, reajusta o zoom para caber na moldura. */
   fitKey?: string;
   height?: string;
@@ -252,6 +255,22 @@ export function ZoomViewport({
     height: (frame.h / view.zoom) * miniScale,
   };
 
+  const gridStyle = (() => {
+    if (!gridCellPx) return {};
+    const minor = gridCellPx * view.zoom;
+    const major = minor * 10;
+    const line = (color: string) => [
+      `linear-gradient(to right, ${color} 1px, transparent 1px)`,
+      `linear-gradient(to bottom, ${color} 1px, transparent 1px)`,
+    ];
+    const showMinor = minor >= 5;
+    return {
+      backgroundImage: [...line("#cbd5e1"), ...(showMinor ? line("#e2e8f0") : [])].join(", "),
+      backgroundSize: [major, major, ...(showMinor ? [minor, minor] : [])].map((s) => `${s}px ${s}px`).join(", "),
+      backgroundPosition: `${view.x}px ${view.y}px`,
+    };
+  })();
+
   /** Centraliza a visão no ponto do minimapa sob o ponteiro. */
   const moveToMinimap = (ev: ReactPointerEvent<HTMLDivElement>) => {
     const el = ref.current;
@@ -268,8 +287,9 @@ export function ZoomViewport({
       <div className="bg-slate-100">
         <div
           ref={ref}
-          className="relative mx-auto overflow-hidden bg-slate-100"
+          className="relative mx-auto overflow-hidden bg-white"
           style={{
+            ...gridStyle,
             aspectRatio: contentWidth > 0 && contentHeight > 0 ? `${contentWidth} / ${contentHeight}` : undefined,
             maxHeight: height,
             minHeight: 200,
@@ -295,6 +315,7 @@ export function ZoomViewport({
           >
             {children(view.zoom)}
           </div>
+          <div className="pointer-events-none absolute inset-0 ring-2 ring-inset ring-slate-600" />
           {showMinimap && (
             <div
               title="Arraste o quadrado para andar pelo barracão"
