@@ -6,7 +6,7 @@ import {
   OrderTimeLogEvent,
   Prisma,
 } from "@prisma/client";
-import { Permission } from "@wms/shared";
+import { normalizeMarketplace, Permission } from "@wms/shared";
 import { prisma } from "../lib/prisma.js";
 import { createPermissionGuard } from "../lib/auth-guard.js";
 import { parsePagination, buildPaginationMeta } from "../lib/pagination.js";
@@ -273,7 +273,12 @@ export async function webRoutes(app: FastifyInstance) {
       const status = request.query.status as OrderStatus | undefined;
       const notInWave = request.query.notInWave === "true";
       const marketplace = request.query.marketplace?.trim();
-      const { page, pageSize, skip, take } = parsePagination(request.query);
+      // montar onda precisa enxergar a fila inteira, não só a primeira página
+      const { page, pageSize, skip, take } = parsePagination(
+        request.query,
+        20,
+        notInWave ? 500 : 100,
+      );
       const where: Prisma.OrderWhereInput = { ...tenantWhere(request) };
       if (status && Object.values(OrderStatus).includes(status)) {
         where.status = status;
@@ -293,7 +298,13 @@ export async function webRoutes(app: FastifyInstance) {
       const [orders, total] = await Promise.all([
         prisma.order.findMany({
           where,
-          orderBy: [{ priority: "desc" }, { createdAt: "desc" }],
+          orderBy: notInWave
+            ? [
+                { priority: "desc" },
+                { collectionDeadline: { sort: "asc", nulls: "last" } },
+                { createdAt: "asc" },
+              ]
+            : [{ priority: "desc" }, { createdAt: "desc" }],
           skip,
           take,
           include: {
@@ -379,6 +390,41 @@ export async function webRoutes(app: FastifyInstance) {
           value,
           label: marketplaceDisplayLabel(value),
         })),
+      };
+    },
+  );
+
+  /** Pedidos pendentes sem onda, por marketplace (atalhos da tela de montar onda). */
+  app.get(
+    "/api/orders/wave-pending-summary",
+    { preHandler: guard(Permission.SALES_VIEW) },
+    async (request) => {
+      const rows = await prisma.order.groupBy({
+        by: ["marketplace"],
+        where: { ...tenantWhere(request), status: OrderStatus.PENDING, waveOrders: { none: {} } },
+        _count: { _all: true },
+      });
+      const counts = new Map<string, number>();
+      for (const r of rows) {
+        const code = r.marketplace ? normalizeMarketplace(r.marketplace) : null;
+        const key = !r.marketplace
+          ? "SEM_MARKETPLACE"
+          : code && code !== "OUTROS" && r.marketplace === code
+            ? code
+            : "OUTROS";
+        counts.set(key, (counts.get(key) ?? 0) + r._count._all);
+      }
+      const label = (value: string) =>
+        value === "SEM_MARKETPLACE"
+          ? "Sem marketplace"
+          : value === "OUTROS"
+            ? "Outros"
+            : marketplaceDisplayLabel(value);
+      return {
+        total: rows.reduce((s, r) => s + r._count._all, 0),
+        marketplaces: [...counts.entries()]
+          .map(([value, count]) => ({ value, label: label(value), count }))
+          .sort((a, b) => b.count - a.count),
       };
     },
   );

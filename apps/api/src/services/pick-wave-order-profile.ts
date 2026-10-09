@@ -25,6 +25,8 @@ export type OrderPickProfile = {
   coords: RouteCoord[];
   centroid: RouteCoord;
   routeHint: string;
+  /** Gôndolas que o pedido visita (para descrever a região de um grupo) */
+  locationRefs?: PickLocationRef[];
   /** Mapa físico: localização do pedido mais central (medoide) e a distância em metros do motor. */
   routeAnchor?: RoutableLocation;
   routeDistance?: (a: RoutableLocation, b: RoutableLocation) => number;
@@ -61,7 +63,7 @@ export function proximityLimitFor(
     : settings.proximityMaxDistance;
 }
 
-function formatRouteHint(coords: RouteCoord[], refs: PickLocationRef[]): string {
+export function formatRouteHint(refs: PickLocationRef[]): string {
   if (refs.length === 0) return "—";
   const corridors = [...new Set(refs.map((r) => r.corridor))].sort();
   const rows = refs.map((r) => parseInt(r.row, 10)).filter((n) => !Number.isNaN(n));
@@ -73,7 +75,9 @@ function formatRouteHint(coords: RouteCoord[], refs: PickLocationRef[]): string 
       ? `Corredor ${corridors[0]} · linha ${String(minRow).padStart(2, "0")}`
       : `Corredor ${corridors[0]} · linhas ${String(minRow).padStart(2, "0")}–${String(maxRow).padStart(2, "0")}`;
   }
-  return `Corredores ${c}`;
+  return corridors.length > 3
+    ? `Corredores ${c} (+${corridors.length - 3})`
+    : `Corredores ${c}`;
 }
 
 function averageCoord(coords: RouteCoord[]): RouteCoord {
@@ -197,7 +201,8 @@ export async function buildOrderPickProfiles(
       pickLocationIds: [...locIdSet],
       coords: coordList,
       centroid,
-      routeHint: formatRouteHint(coordList, refs),
+      routeHint: formatRouteHint(refs),
+      locationRefs: refs,
       ...(physical && routeLocs.length > 0
         ? { routeAnchor: medoid(engine, routeLocs), routeDistance }
         : {}),

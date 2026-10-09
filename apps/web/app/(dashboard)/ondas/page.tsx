@@ -29,9 +29,11 @@ import {
   type WavePreview,
   type WaveRow,
 } from "@/lib/api/waves";
+import { ProximitySuggestions } from "@/components/waves/proximity-suggestions";
 import {
   fetchPendingOrdersForWave,
   fetchPickProximityGroups,
+  fetchWavePendingSummary,
   type OrderRow,
   type PickProximityGroup,
 } from "@/lib/api/operations";
@@ -52,6 +54,8 @@ const STATUS_LABEL: Record<string, string> = {
   RELEASED: "Ativa",
   CLOSED: "Encerrada",
 };
+
+const PENDING_PAGE_SIZE = 200;
 
 type TabKey = "active" | "build";
 const TABS: Array<{ key: TabKey; label: string }> = [
@@ -84,6 +88,13 @@ export default function OndasPage() {
   const [pendingOrders, setPendingOrders] = useState<OrderRow[]>([]);
   const [pendingLoading, setPendingLoading] = useState(false);
   const [pendingError, setPendingError] = useState<string | null>(null);
+  const [pendingTotal, setPendingTotal] = useState(0);
+  const [pendingPage, setPendingPage] = useState(1);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [mpSummary, setMpSummary] = useState<{
+    total: number;
+    marketplaces: Array<{ value: string; label: string; count: number }>;
+  } | null>(null);
   const [search, setSearch] = useState("");
   const [marketplaceFilter, setMarketplaceFilter] = useState("");
   const [partitionStrategy, setPartitionStrategy] =
@@ -123,10 +134,12 @@ export default function OndasPage() {
     setPendingError(null);
     try {
       const data = await fetchPendingOrdersForWave({
-        pageSize: 200,
+        pageSize: PENDING_PAGE_SIZE,
         marketplace: marketplaceFilter || undefined,
       });
       setPendingOrders(data.orders);
+      setPendingTotal(data.pagination.total);
+      setPendingPage(1);
     } catch (e) {
       setPendingError(
         e instanceof Error ? e.message : "Erro ao carregar pedidos",
@@ -135,6 +148,36 @@ export default function OndasPage() {
       setPendingLoading(false);
     }
   }, [marketplaceFilter]);
+
+  const loadMorePending = async () => {
+    setLoadingMore(true);
+    try {
+      const next = pendingPage + 1;
+      const data = await fetchPendingOrdersForWave({
+        page: next,
+        pageSize: PENDING_PAGE_SIZE,
+        marketplace: marketplaceFilter || undefined,
+      });
+      setPendingOrders((prev) => {
+        const seen = new Set(prev.map((o) => o.id));
+        return [...prev, ...data.orders.filter((o) => !seen.has(o.id))];
+      });
+      setPendingTotal(data.pagination.total);
+      setPendingPage(next);
+    } catch (e) {
+      setPendingError(e instanceof Error ? e.message : "Erro ao carregar pedidos");
+    } finally {
+      setLoadingMore(false);
+    }
+  };
+
+  const loadMpSummary = useCallback(async () => {
+    try {
+      setMpSummary(await fetchWavePendingSummary());
+    } catch {
+      setMpSummary(null);
+    }
+  }, []);
 
   const loadProximitySuggestions = useCallback(async () => {
     try {
@@ -152,8 +195,9 @@ export default function OndasPage() {
     if (tab === "build" && buildMode === "list") {
       loadPending();
       void loadProximitySuggestions();
+      void loadMpSummary();
     }
-  }, [tab, buildMode, loadPending, loadProximitySuggestions]);
+  }, [tab, buildMode, loadPending, loadProximitySuggestions, loadMpSummary]);
 
   const waveParams = () => ({
     marketplace: marketplaceFilter || undefined,
@@ -271,7 +315,7 @@ export default function OndasPage() {
     setManualPreview(null);
     setManualMessage(
       ids.length > 0
-        ? `${ids.length} pedido(s) do grupo "${group.routeHint}" selecionados — estão no topo da lista. Confira e clique em "Criar onda com selecionados".`
+        ? `${ids.length} pedido(s) do grupo "${group.routeHint ?? "sem gôndola definida"}" selecionados — estão no topo da lista. Confira e clique em "Criar onda com selecionados".`
         : "Os pedidos deste grupo não estão mais disponíveis. Clique em Atualizar.",
     );
   };
@@ -502,6 +546,12 @@ export default function OndasPage() {
             <BuildTab
               pendingOrders={filteredPending}
               totalOrders={pendingOrders.length}
+              totalAvailable={pendingTotal}
+              loadingMore={loadingMore}
+              onLoadMore={loadMorePending}
+              marketplace={marketplaceFilter}
+              onMarketplace={setMarketplaceFilter}
+              marketplaceSummary={mpSummary}
               loading={pendingLoading}
               error={pendingError}
               search={search}
@@ -522,7 +572,11 @@ export default function OndasPage() {
               manualMessage={manualMessage}
               onPreview={handleManualPreview}
               onRelease={handleManualRelease}
-              onReload={loadPending}
+              onReload={() => {
+                void loadPending();
+                void loadProximitySuggestions();
+                void loadMpSummary();
+              }}
             />
           )}
         </div>
@@ -766,6 +820,15 @@ function ActiveTab({
 interface BuildTabProps {
   pendingOrders: OrderRow[];
   totalOrders: number;
+  totalAvailable: number;
+  loadingMore: boolean;
+  onLoadMore: () => void;
+  marketplace: string;
+  onMarketplace: (v: string) => void;
+  marketplaceSummary: {
+    total: number;
+    marketplaces: Array<{ value: string; label: string; count: number }>;
+  } | null;
   loading: boolean;
   error: string | null;
   search: string;
@@ -792,6 +855,12 @@ interface BuildTabProps {
 function BuildTab({
   pendingOrders,
   totalOrders,
+  totalAvailable,
+  loadingMore,
+  onLoadMore,
+  marketplace,
+  onMarketplace,
+  marketplaceSummary,
   loading,
   error,
   search,
@@ -834,9 +903,43 @@ function BuildTab({
           Atualizar
         </button>
         <span className="text-sm text-muted-foreground">
-          {pendingOrders.length} pedido(s) disponível(is) (sem onda)
+          {totalAvailable > totalOrders
+            ? `Mostrando ${totalOrders} de ${totalAvailable} pedidos sem onda`
+            : `${totalAvailable} pedido(s) sem onda`}
         </span>
       </div>
+
+      {marketplaceSummary && marketplaceSummary.marketplaces.length > 1 ? (
+        <div className="flex flex-wrap gap-1.5">
+          {[
+            { value: "", label: "Todos", count: marketplaceSummary.total },
+            ...marketplaceSummary.marketplaces,
+          ].map((m) => {
+            const active = marketplace === m.value;
+            return (
+              <button
+                key={m.value || "all"}
+                type="button"
+                onClick={() => onMarketplace(m.value)}
+                className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-sm font-medium transition ${
+                  active
+                    ? "border-[#0d9488] bg-[#0d9488] text-white"
+                    : "border-slate-200 bg-white text-slate-700 hover:border-slate-300"
+                }`}
+              >
+                {m.label}
+                <span
+                  className={`rounded-full px-1.5 text-xs ${
+                    active ? "bg-white/20 text-white" : "bg-slate-100 text-slate-500"
+                  }`}
+                >
+                  {m.count}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+      ) : null}
 
       {manualMessage ? (
         <p className="rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-900">
@@ -844,42 +947,11 @@ function BuildTab({
         </p>
       ) : null}
 
-      {proximityGroups.length > 0 ? (
-        <section className="rounded-xl border bg-slate-50 p-4">
-          <h2 className="mb-2 text-sm font-semibold">
-            Sugestões de proximidade
-          </h2>
-          <ul className="space-y-2">
-            {proximityGroups.map((g) => {
-              const active = g.id === activeGroupId;
-              return (
-                <li
-                  key={g.id}
-                  className={`flex flex-wrap items-center justify-between gap-2 rounded-lg border px-3 py-2 text-sm ${
-                    active ? "border-teal-400 bg-teal-50" : "bg-white"
-                  }`}
-                >
-                  <span>
-                    {g.orders.length} pedido(s) · {g.routeHint}
-                    <span className="ml-2 font-mono text-xs text-slate-500">
-                      {g.orders.map((o) => o.erpOrderId).join(", ")}
-                    </span>
-                  </span>
-                  <button
-                    type="button"
-                    onClick={() => onSelectProximityGroup(g)}
-                    className={`rounded-md border px-2 py-1 text-xs font-medium ${
-                      active ? "border-teal-500 bg-teal-600 text-white" : "hover:bg-slate-50"
-                    }`}
-                  >
-                    {active ? "✓ Selecionado (clique para desfazer)" : "Selecionar grupo"}
-                  </button>
-                </li>
-              );
-            })}
-          </ul>
-        </section>
-      ) : null}
+      <ProximitySuggestions
+        groups={proximityGroups}
+        activeGroupId={activeGroupId}
+        onSelect={onSelectProximityGroup}
+      />
 
       <DataState
         loading={loading}
@@ -924,11 +996,14 @@ function BuildTab({
                         aria-label={`Selecionar pedido ${o.erpOrderId}`}
                       />
                     </TableCell>
-                    <TableCell className="font-medium">
+                    <TableCell className="whitespace-nowrap font-medium">
                       {o.erpOrderId}
                       {neighbors > 0 ? (
-                        <span className="ml-2 rounded bg-teal-100 px-1.5 py-0.5 text-xs font-normal text-teal-800">
-                          Próximo de {neighbors} outro(s)
+                        <span
+                          className="ml-2 rounded bg-teal-100 px-1.5 py-0.5 text-xs font-normal text-teal-800"
+                          title={`Itens perto de ${neighbors} outro(s) pedido(s) no galpão`}
+                        >
+                          +{neighbors} perto
                         </span>
                       ) : null}
                     </TableCell>
@@ -936,15 +1011,14 @@ function BuildTab({
                     <TableCell>
                       <MarketplaceBadge value={o.marketplace} />
                     </TableCell>
-                    <TableCell>
+                    <TableCell className="whitespace-nowrap">
                       {o.collectionDeadline
-                        ? new Date(o.collectionDeadline).toLocaleString(
-                            "pt-BR",
-                            {
-                              dateStyle: "short",
-                              timeStyle: "short",
-                            },
-                          )
+                        ? new Date(o.collectionDeadline).toLocaleString("pt-BR", {
+                            day: "2-digit",
+                            month: "2-digit",
+                            hour: "2-digit",
+                            minute: "2-digit",
+                          })
                         : "—"}
                     </TableCell>
                     <TableCell className="text-right">{o.itemCount}</TableCell>
@@ -955,6 +1029,19 @@ function BuildTab({
               })}
             </TableBody>
           </Table>
+          {totalAvailable > totalOrders ? (
+            <div className="flex items-center justify-center gap-3 border-t p-3 text-sm text-muted-foreground">
+              Mostrando {totalOrders} de {totalAvailable}
+              <button
+                type="button"
+                disabled={loadingMore}
+                onClick={onLoadMore}
+                className="rounded-lg border bg-white px-3 py-1.5 font-medium text-slate-700 hover:border-slate-300 disabled:opacity-50"
+              >
+                {loadingMore ? "Carregando…" : "Carregar mais"}
+              </button>
+            </div>
+          ) : null}
         </div>
       </DataState>
 
