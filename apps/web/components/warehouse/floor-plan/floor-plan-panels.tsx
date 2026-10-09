@@ -15,6 +15,7 @@ import {
   ELEMENT_LABELS,
   FACE_COLORS,
   FACE_SIDE,
+  OBSTACLE_PRESETS,
   ROUTE_COLOR,
   accessCell,
   colunasOnFloor,
@@ -523,25 +524,105 @@ export function ElementPropertiesPanel({
               onChange={(ev) => onChange({ label: ev.target.value || null })}
             />
           </label>
+          {element.type === "OBSTACLE" ? (
+            <div className="space-y-1">
+              <p className="text-xs text-slate-600">Tipo de obstáculo</p>
+              <div className="flex flex-wrap gap-1.5">
+                {OBSTACLE_PRESETS.map((p) => (
+                  <button
+                    key={p.label}
+                    type="button"
+                    title={`${p.label}: ${p.widthM} × ${p.heightM} m`}
+                    onClick={() =>
+                      onChange({
+                        label: p.label,
+                        width: Math.max(1, Math.round((p.widthM * 100) / cellSizeCm)),
+                        height: Math.max(1, Math.round((p.heightM * 100) / cellSizeCm)),
+                      })
+                    }
+                    className={`rounded-md border px-2 py-1 text-xs font-medium ${
+                      element.label === p.label ? "border-[#0d9488] bg-teal-50 text-teal-800" : "bg-white text-slate-700 hover:bg-slate-50"
+                    }`}
+                  >
+                    {p.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+          ) : null}
           <p className="text-xs text-slate-500">
             {element.type === "START_POINT"
-              ? "As rotas de separação começam aqui."
+              ? "Saída do separador: onde ele pega a cesta e começa o picking. Pode ter várias; a rota parte da mais próxima do primeiro item."
               : element.type === "PACKING_POINT"
-                ? "As rotas de separação terminam aqui."
+                ? "Entrega final: onde o separador deixa as cestas. Pode ter vários; a rota termina no packing mais próximo do último item."
                 : element.type === "DOCK"
                   ? "Onde o caminhão descarrega. Sem área de recebimento na planta, a armazenagem parte daqui."
                   : element.type === "RECEIVING_AREA"
                     ? "Onde a carga é conferida (bipada) e fica aguardando. A armazenagem no pulmão parte daqui, pelo corredor livre mais próximo da borda."
-                    : "Área bloqueada para circulação (pilar, escritório, parede)."}
+                    : "Área bloqueada: as rotas desviam dela."}
           </p>
         </>
       )}
 
-      <div className="grid grid-cols-4 gap-2">
+      <div className="grid grid-cols-2 gap-2">
         <NumberField label="X" value={element.x} min={0} max={400} onChange={(v) => onChange({ x: v })} />
         <NumberField label="Y" value={element.y} min={0} max={400} onChange={(v) => onChange({ y: v })} />
-        <NumberField label="Larg." value={element.width} min={1} max={400} onChange={(v) => onChange({ width: v })} />
-        <NumberField label="Alt." value={element.height} min={1} max={400} onChange={(v) => onChange({ height: v })} />
+        <SizeStepper
+          label="Largura"
+          value={element.width}
+          cellSizeCm={cellSizeCm}
+          onChange={(v) => onChange({ width: v })}
+        />
+        <SizeStepper
+          label="Altura"
+          value={element.height}
+          cellSizeCm={cellSizeCm}
+          onChange={(v) => onChange({ height: v })}
+        />
+      </div>
+      <p className="text-[11px] text-slate-400">
+        Arraste as alças dos cantos e lados no mapa, ou use Alt + setas, para aumentar e diminuir.
+      </p>
+    </div>
+  );
+}
+
+function SizeStepper({
+  label,
+  value,
+  cellSizeCm,
+  onChange,
+}: {
+  label: string;
+  value: number;
+  cellSizeCm: number;
+  onChange: (v: number) => void;
+}) {
+  const set = (v: number) => onChange(Math.max(1, Math.min(400, Math.round(v))));
+  const btn = "grid h-8 w-8 flex-none place-items-center rounded-md border bg-white text-base font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-40";
+  return (
+    <div className="text-xs text-slate-600">
+      <span>
+        {label} <span className="text-slate-400">· {formatMeters((value * cellSizeCm) / 100)}</span>
+      </span>
+      <div className="mt-1 flex items-center gap-1">
+        <button type="button" title={`Diminuir ${label.toLowerCase()}`} disabled={value <= 1} onClick={() => set(value - 1)} className={btn}>
+          −
+        </button>
+        <input
+          type="number"
+          min={1}
+          max={400}
+          value={value}
+          onChange={(ev) => {
+            const n = Number(ev.target.value);
+            if (Number.isFinite(n) && n >= 1) set(n);
+          }}
+          className="h-8 w-full min-w-0 rounded-md border px-1 text-center text-sm"
+        />
+        <button type="button" title={`Aumentar ${label.toLowerCase()}`} onClick={() => set(value + 1)} className={btn}>
+          +
+        </button>
       </div>
     </div>
   );
@@ -656,7 +737,7 @@ export function RoutePanel({
           <ol className="divide-y text-sm">
             <li className="flex items-center gap-2 py-1.5 text-slate-500">
               <span className="grid h-5 w-5 place-items-center rounded-full bg-slate-100 text-[11px]">·</span>
-              Início
+              {route.startLabel ?? "Início"}
             </li>
             {route.stops.map((s, i) => (
               <li key={`${s.locationId}-${i}`} className="flex items-center gap-2 py-1.5">
@@ -673,7 +754,7 @@ export function RoutePanel({
             {route.toPackingMeters != null ? (
               <li className="flex items-center gap-2 py-1.5 text-slate-500">
                 <span className="grid h-5 w-5 place-items-center rounded-full bg-slate-100 text-[11px]">·</span>
-                <span className="flex-1">Packing</span>
+                <span className="flex-1">{route.packingLabel ?? "Packing"}</span>
                 <span className="text-xs">{formatMeters(route.toPackingMeters)}</span>
               </li>
             ) : null}

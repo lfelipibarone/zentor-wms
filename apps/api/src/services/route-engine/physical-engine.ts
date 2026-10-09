@@ -17,6 +17,7 @@ import { DistanceFieldCache, tracePath } from "./pathfinding.js";
 import { solveOpenTour } from "./tour.js";
 import type {
   GondolaSlots,
+  FloorElementSpec,
   FloorPlanSpec,
   RoutableLocation,
   RouteEngine,
@@ -27,13 +28,17 @@ import type {
 /** Penalidade (m) quando um dos lados não está no mapa ou fica em outro barracão. */
 export const UNMAPPED_PENALTY_METERS = 500;
 
+export type PlanPoint = { elementId: string; label: string | null; cell: number };
+
 export class PlanRuntime {
   readonly grid: FloorGrid;
   readonly cache: DistanceFieldCache;
   readonly accessByKey: Map<string, AccessPoint>;
   readonly accessPoints: AccessPoint[];
-  readonly startCell: number;
-  readonly packingCell: number;
+  /** Saídas do separador (pode haver várias); a rota parte da mais próxima da 1ª parada. */
+  readonly startPoints: PlanPoint[];
+  /** Mesas de packing (entrega final); a rota termina na mais próxima da última parada. */
+  readonly packingPoints: PlanPoint[];
   /** Onde a armazenagem começa: área de recebimento, senão doca, senão início. */
   readonly receivingCell: number;
   readonly metersPerCell: number;
@@ -47,26 +52,48 @@ export class PlanRuntime {
     const index = buildAccessIndex(this.grid, plan.elements, slots);
     this.accessByKey = index.byKey;
     this.accessPoints = index.points;
-    const start = plan.elements.find((e) => e.type === "START_POINT");
-    const packing = plan.elements.find((e) => e.type === "PACKING_POINT");
+    const points = (type: FloorElementSpec["type"]) =>
+      plan.elements
+        .filter((e) => e.type === type)
+        .map((e) => ({ elementId: e.id, label: e.label ?? null, cell: elementAnchorCell(this.grid, e) }))
+        .filter((p) => p.cell >= 0);
+    this.startPoints = points("START_POINT");
+    this.packingPoints = points("PACKING_POINT");
     const receiving = plan.elements.find((e) => e.type === "RECEIVING_AREA");
     const dock = plan.elements.find((e) => e.type === "DOCK");
-    this.startCell = start ? elementAnchorCell(this.grid, start) : -1;
-    this.packingCell = packing ? elementAnchorCell(this.grid, packing) : -1;
     const receivingCell = receiving ? perimeterCell(this.grid, receiving) : -1;
     const dockCell = dock ? elementAnchorCell(this.grid, dock) : -1;
     this.receivingCell = receivingCell >= 0 ? receivingCell : dockCell >= 0 ? dockCell : this.startCell;
     this.metersPerCell = plan.cellSizeCm / 100;
   }
 
-  originCell(origin: RouteOrigin = "START"): number {
-    return origin === "RECEIVING" ? this.receivingCell : this.startCell;
+  get startCell(): number {
+    return this.startPoints[0]?.cell ?? -1;
+  }
+
+  get packingCell(): number {
+    return this.packingPoints[0]?.cell ?? -1;
+  }
+
+  originCells(origin: RouteOrigin = "START"): number[] {
+    if (origin === "RECEIVING") return this.receivingCell >= 0 ? [this.receivingCell] : [];
+    return this.startPoints.map((p) => p.cell);
+  }
+
+  /** Ponto mais próximo (em passos) da célula; null se nenhum alcança. */
+  nearest(points: PlanPoint[], cell: number): (PlanPoint & { steps: number }) | null {
+    let best: (PlanPoint & { steps: number }) | null = null;
+    for (const p of points) {
+      const s = this.cache.steps(p.cell, cell);
+      if (s >= 0 && (!best || s < best.steps)) best = { ...p, steps: s };
+    }
+    return best;
   }
 
   isReachable(cell: number): boolean {
     if (!isWalkable(this.grid, cell)) return false;
-    if (this.startCell < 0) return true;
-    return this.cache.steps(this.startCell, cell) >= 0;
+    if (this.startPoints.length === 0) return true;
+    return this.startPoints.some((p) => this.cache.steps(p.cell, cell) >= 0);
   }
 
   path(from: number, to: number): number[] {
@@ -150,9 +177,10 @@ export class PhysicalRouteEngine implements RouteEngine {
     for (const planId of planOrder) {
       const rt = this.runtimes.get(planId)!;
       const nodes = groups.get(planId)!;
-      const origin =
-        startPoint && startPoint.planId === planId ? startPoint.cell : rt.originCell(from);
-      const order = this.tour(rt, nodes.map((n) => n.cell), origin);
+      const origins =
+        startPoint && startPoint.planId === planId ? [startPoint.cell] : rt.originCells(from);
+      const ends = from === "START" ? rt.packingPoints.map((p) => p.cell) : [];
+      const order = this.tour(rt, nodes.map((n) => n.cell), origins, ends);
       for (const i of order) out.push(nodes[i]!.loc);
     }
 
@@ -160,16 +188,22 @@ export class PhysicalRouteEngine implements RouteEngine {
     return out;
   }
 
-  /** Índices de `cells` na ordem de visita a partir de `origin` (-1 = sem partida). */
-  tour(rt: PlanRuntime, cells: number[], origin: number): number[] {
+  /**
+   * Índices de `cells` na ordem de visita. Parte da origem mais próxima de cada nó (vazio = sem partida)
+   * e, se houver `ends`, prefere terminar perto do destino final mais próximo.
+   */
+  tour(rt: PlanRuntime, cells: number[], origins: number[], ends: number[] = []): number[] {
     const steps = (a: number, b: number) => {
       const s = rt.cache.steps(a, b);
       return s < 0 ? Number.MAX_SAFE_INTEGER / 4 : s;
     };
+    const nearest = (points: number[], cell: number) =>
+      points.length ? Math.min(...points.map((p) => steps(p, cell))) : 0;
     return solveOpenTour(
       cells.length,
-      (i) => (origin >= 0 ? steps(origin, cells[i]!) : 0),
+      (i) => nearest(origins, cells[i]!),
       (i, j) => steps(cells[i]!, cells[j]!),
+      ends.length ? { toEnd: (i) => nearest(ends, cells[i]!) } : undefined,
     );
   }
 }

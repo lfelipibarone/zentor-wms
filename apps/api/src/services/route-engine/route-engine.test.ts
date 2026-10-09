@@ -214,6 +214,33 @@ describe("PhysicalRouteEngine", () => {
     assert.deepEqual(sorted.map((l) => l.id), [near.id, far.id, "u"]);
   });
 
+  it("com várias saídas, parte da mais próxima; com vários packings, termina perto do mais próximo", () => {
+    const p = basePlan();
+    p.elements.push(el({ id: "start2", type: "START_POINT", x: 19, y: 2, width: 1, height: 1 }));
+    p.elements.push(el({ id: "pack2", type: "PACKING_POINT", x: 0, y: 2, width: 1, height: 1 }));
+    const rt = new PlanRuntime(p, slots);
+    assert.equal(rt.startPoints.length, 2);
+    assert.equal(rt.packingPoints.length, 2);
+    const grid = buildFloorGrid(p);
+    assert.equal(rt.nearest(rt.startPoints, cellIndex(grid, 10, 2))?.elementId, "start2");
+    assert.equal(rt.nearest(rt.packingPoints, cellIndex(grid, 4, 2))?.elementId, "pack2");
+
+    const engine = new PhysicalRouteEngine([rt]);
+    const left = loc("cA", "1", "A");
+    const right = loc("cA", "7", "A");
+    // Saída 2 (direita, em cima) e packing 2 (esquerda, em cima): direita → esquerda.
+    assert.deepEqual(engine.sortByRoute([left, right]).map((l) => l.id), [right.id, left.id]);
+  });
+
+  it("tour prefere terminar perto do destino final", () => {
+    const pos = [0, 10, 5];
+    const d = (i: number, j: number) => Math.abs(pos[i]! - pos[j]!);
+    const comFim = solveOpenTour(3, (i) => Math.abs(4 - pos[i]!), d, { toEnd: (i) => Math.abs(pos[i]!) });
+    assert.equal(comFim[comFim.length - 1], 0);
+    const comFimDireita = solveOpenTour(3, (i) => Math.abs(4 - pos[i]!), d, { toEnd: (i) => Math.abs(10 - pos[i]!) });
+    assert.equal(comFimDireita[comFimDireita.length - 1], 1);
+  });
+
   it("aplica penalidade quando só um lado está mapeado", () => {
     const engine = new PhysicalRouteEngine([new PlanRuntime(basePlan(), slots)]);
     assert.equal(

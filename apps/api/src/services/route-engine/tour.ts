@@ -1,12 +1,13 @@
 /**
  * Caminho aberto (sem retorno) sobre `n` nós: vizinho mais próximo seguido de 2-opt.
  * `fromStart(i)` é o custo do ponto de partida até o nó i (0 quando não há partida).
+ * `toEnd(i)` é o custo do nó i até o destino final (ex.: packing); sem ele o fim é livre.
  */
 export function solveOpenTour(
   n: number,
   fromStart: (i: number) => number,
   dist: (i: number, j: number) => number,
-  opts?: { maxTwoOptNodes?: number; maxPasses?: number },
+  opts?: { maxTwoOptNodes?: number; maxPasses?: number; toEnd?: (i: number) => number },
 ): number[] {
   if (n <= 1) return n === 1 ? [0] : [];
 
@@ -31,6 +32,7 @@ export function solveOpenTour(
   if (n > (opts?.maxTwoOptNodes ?? 150)) return route;
 
   const cost = (a: number, b: number) => (a < 0 ? fromStart(b) : dist(a, b));
+  const toEnd = opts?.toEnd ?? (() => 0);
   const maxPasses = opts?.maxPasses ?? 50;
   for (let pass = 0; pass < maxPasses; pass++) {
     let improved = false;
@@ -39,9 +41,9 @@ export function solveOpenTour(
       for (let j = i + 1; j < n; j++) {
         const after = j === n - 1 ? null : route[j + 1]!;
         const oldCost =
-          cost(before, route[i]!) + (after === null ? 0 : dist(route[j]!, after));
+          cost(before, route[i]!) + (after === null ? toEnd(route[j]!) : dist(route[j]!, after));
         const newCost =
-          cost(before, route[j]!) + (after === null ? 0 : dist(route[i]!, after));
+          cost(before, route[j]!) + (after === null ? toEnd(route[i]!) : dist(route[i]!, after));
         if (newCost + 1e-9 < oldCost) {
           route.splice(i, j - i + 1, ...route.slice(i, j + 1).reverse());
           improved = true;

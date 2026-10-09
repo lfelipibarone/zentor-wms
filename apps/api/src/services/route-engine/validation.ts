@@ -26,6 +26,7 @@ export type PlanIssue = {
     | "SLOTS_TOO_SMALL"
     | "FACE_NOT_MAPPED"
     | "RECEIVING_BLOCKED"
+    | "PACKING_UNREACHABLE"
     | "ACCESS_BLOCKED";
   message: string;
   elementIds?: string[];
@@ -175,6 +176,18 @@ export function validateFloorPlan(
       elementIds: [receiving.id],
     });
   }
+  for (const e of plan.elements) {
+    if (e.type !== "PACKING_POINT") continue;
+    const point = rt.packingPoints.find((p) => p.elementId === e.id);
+    if (point && rt.isReachable(point.cell)) continue;
+    issues.push({
+      severity: "warning",
+      code: "PACKING_UNREACHABLE",
+      message: `${e.label || "Packing"} sem caminho livre a partir de nenhum início`,
+      elementIds: [e.id],
+    });
+  }
+
   let reachable = 0;
   const blockedByElement = new Map<string, number>();
   for (const p of rt.accessPoints) {

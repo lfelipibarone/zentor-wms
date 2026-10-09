@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { ClipboardCheck, DoorOpen, Flag, MousePointer2, Package, Square, Warehouse, ZoomIn, ZoomOut } from "lucide-react";
+import { ClipboardCheck, DoorOpen, Flag, MousePointer2, Package, Square, Warehouse } from "lucide-react";
 import { DataState } from "@/components/ops/data-state";
 import {
   fetchFloorPlan,
@@ -24,7 +24,8 @@ import {
   type ApproachWave,
   type ApproachWaveKind,
 } from "@/lib/api/approach-waves";
-import { FloorPlanCanvas, type FloorTool } from "./floor-plan-canvas";
+import { BASE_CELL_PX, FloorPlanCanvas, type FloorTool } from "./floor-plan-canvas";
+import { ZoomViewport } from "./zoom-viewport";
 import { ApproachOverlay } from "./approach-overlay";
 import { ApproachWavesPanel, type ApproachPick } from "./approach-waves-panel";
 import { sameStop, stopFromPoint } from "./approach-geometry";
@@ -69,13 +70,25 @@ const MODE_LABELS: Record<Mode, string> = {
 const TOOLS: Array<{ id: FloorTool; title: string; icon: ReactNode }> = [
   { id: "select", title: "Selecionar e mover (V)", icon: <MousePointer2 className="h-4 w-4" /> },
   { id: "GONDOLA", title: "Gôndola (clique na planta)", icon: <Warehouse className="h-4 w-4" /> },
-  { id: "OBSTACLE", title: "Obstáculo (clique na planta)", icon: <Square className="h-4 w-4" /> },
-  { id: "START_POINT", title: "Ponto de início", icon: <Flag className="h-4 w-4" /> },
-  { id: "PACKING_POINT", title: "Packing", icon: <Package className="h-4 w-4" /> },
-  { id: "DOCK", title: "Doca", icon: <DoorOpen className="h-4 w-4" /> },
+  {
+    id: "OBSTACLE",
+    title: "Obstáculo: pilar, parede, mesa… (clique ou arraste para desenhar)",
+    icon: <Square className="h-4 w-4" />,
+  },
+  {
+    id: "START_POINT",
+    title: "Saída do separador (início do picking). Pode ter várias: a rota parte da mais próxima",
+    icon: <Flag className="h-4 w-4" />,
+  },
+  {
+    id: "PACKING_POINT",
+    title: "Packing (entrega final). Pode ter vários: a rota termina no mais próximo (clique ou arraste)",
+    icon: <Package className="h-4 w-4" />,
+  },
+  { id: "DOCK", title: "Doca (clique ou arraste)", icon: <DoorOpen className="h-4 w-4" /> },
   {
     id: "RECEIVING_AREA",
-    title: "Recebimento (conferência; a armazenagem parte daqui)",
+    title: "Recebimento (conferência; a armazenagem parte daqui). Clique ou arraste",
     icon: <ClipboardCheck className="h-4 w-4" />,
   },
 ];
@@ -98,7 +111,6 @@ export function FloorPlanEditor({ barracaoId, onSaved }: { barracaoId: string; o
   const [tool, setTool] = useState<FloorTool>("select");
   const [pendingEstanteId, setPendingEstanteId] = useState<string | null>(null);
   const [mode, setMode] = useState<Mode>("edit");
-  const [zoom, setZoom] = useState(1);
 
   const [validation, setValidation] = useState<FloorPlanValidation | null>(null);
   const [validating, setValidating] = useState(false);
@@ -248,16 +260,16 @@ export function FloorPlanEditor({ barracaoId, onSaved }: { barracaoId: string; o
     markDirty();
   };
 
-  const placeElement = (type: FloorElementType, x: number, y: number) => {
+  const placeElement = (type: FloorElementType, x: number, y: number, size?: { width: number; height: number }) => {
     const existing = SINGLETON_TYPES.has(type) ? elements.find((e) => e.type === type) : undefined;
     if (existing) {
-      replaceElement(clampElement({ ...existing, x, y }, dims.widthCells, dims.heightCells));
+      replaceElement(clampElement({ ...existing, x, y, ...size }, dims.widthCells, dims.heightCells));
       setSelectedId(existing.id);
     } else {
       const id = newElementId();
       const estante = type === "GONDOLA" && pendingEstanteId ? estanteById.get(pendingEstanteId) : undefined;
       const base = estante ? gondolaForEstante(estante, x, y, id) : createElement(type, x, y, id);
-      const created = clampElement(base, dims.widthCells, dims.heightCells);
+      const created = clampElement({ ...base, ...size }, dims.widthCells, dims.heightCells);
       setElements((prev) => [...prev, created]);
       setSelectedId(id);
     }
@@ -491,7 +503,9 @@ export function FloorPlanEditor({ barracaoId, onSaved }: { barracaoId: string; o
         const step = ev.shiftKey ? 5 : 1;
         const dx = ev.key === "ArrowLeft" ? -step : ev.key === "ArrowRight" ? step : 0;
         const dy = ev.key === "ArrowUp" ? -step : ev.key === "ArrowDown" ? step : 0;
-        patchSelected({ x: selected.x + dx, y: selected.y + dy });
+        // Alt + setas: aumenta/diminui largura (→ ←) e altura (↓ ↑).
+        if (ev.altKey) patchSelected({ width: Math.max(1, selected.width + dx), height: Math.max(1, selected.height + dy) });
+        else patchSelected({ x: selected.x + dx, y: selected.y + dy });
       }
     };
     window.addEventListener("keydown", onKey);
@@ -522,25 +536,6 @@ export function FloorPlanEditor({ barracaoId, onSaved }: { barracaoId: string; o
                 {MODE_LABELS[m2]}
               </button>
             ))}
-            <div className="ml-2 flex items-center gap-1">
-              <button
-                type="button"
-                title="Diminuir zoom"
-                onClick={() => setZoom((z) => Math.max(0.4, +(z - 0.2).toFixed(1)))}
-                className="rounded-md p-1.5 text-slate-600 hover:bg-slate-200"
-              >
-                <ZoomOut className="h-4 w-4" />
-              </button>
-              <span className="w-10 text-center text-xs text-slate-500">{Math.round(zoom * 100)}%</span>
-              <button
-                type="button"
-                title="Aumentar zoom"
-                onClick={() => setZoom((z) => Math.min(3, +(z + 0.2).toFixed(1)))}
-                className="rounded-md p-1.5 text-slate-600 hover:bg-slate-200"
-              >
-                <ZoomIn className="h-4 w-4" />
-              </button>
-            </div>
             <span className="flex-1" />
             {saveError ? <span className="text-sm text-red-600">{saveError}</span> : null}
             <span className="text-xs text-slate-500">
@@ -583,46 +578,56 @@ export function FloorPlanEditor({ barracaoId, onSaved }: { barracaoId: string; o
             </div>
 
             <div className="min-w-0">
-              <div className="max-h-[70vh] overflow-auto p-3">
-                <FloorPlanCanvas
-                  widthCells={dims.widthCells}
-                  heightCells={dims.heightCells}
-                  elements={elements}
-                  estantes={estanteById}
-                  selectedId={selectedId}
-                  tool={tool}
-                  interactive={mode === "edit"}
-                  zoom={zoom}
-                  reachability={reachability}
-                  issueElementIds={mode === "edit" ? issueElementIds : new Set()}
-                  route={mode === "route" ? route : null}
-                  onSelect={setSelectedId}
-                  onPlace={placeElement}
-                  onElementChange={replaceElement}
-                  onDragEnd={(changed) => {
-                    if (changed) markDirty();
-                  }}
-                  onPointClick={mode === "approach" ? onApproachClick : undefined}
-                  overlay={
-                    mode === "approach" ? (
-                      <ApproachOverlay
-                        waves={approachWaves}
-                        selectedIndex={approachSelected}
-                        elements={elements}
-                        estantes={estanteById}
-                      />
-                    ) : null
-                  }
-                />
-              </div>
+              <ZoomViewport
+                contentWidth={dims.widthCells * BASE_CELL_PX}
+                contentHeight={dims.heightCells * BASE_CELL_PX}
+                fitKey={barracaoId}
+                height="68vh"
+              >
+                {(zoom) => (
+                  <FloorPlanCanvas
+                    widthCells={dims.widthCells}
+                    heightCells={dims.heightCells}
+                    elements={elements}
+                    estantes={estanteById}
+                    selectedId={selectedId}
+                    tool={tool}
+                    interactive={mode === "edit"}
+                    zoom={zoom}
+                    reachability={reachability}
+                    issueElementIds={mode === "edit" ? issueElementIds : new Set()}
+                    route={mode === "route" ? route : null}
+                    onSelect={setSelectedId}
+                    onPlace={placeElement}
+                    onElementChange={replaceElement}
+                    onDragEnd={(changed) => {
+                      if (changed) markDirty();
+                    }}
+                    onPointClick={mode === "approach" ? onApproachClick : undefined}
+                    overlay={
+                      mode === "approach" ? (
+                        <ApproachOverlay
+                          waves={approachWaves}
+                          selectedIndex={approachSelected}
+                          elements={elements}
+                          estantes={estanteById}
+                        />
+                      ) : null
+                    }
+                  />
+                )}
+              </ZoomViewport>
               <div className="flex flex-wrap items-center gap-4 border-t px-4 py-2 text-xs text-slate-500">
                 <Legend color={FACE_COLORS.A} label="LD" />
                 <Legend color={FACE_COLORS.B} label="LE" />
                 <Legend color="#94a3b8" label="Obstáculo" />
+                <Legend color="#0d9488" label={`Saída do separador (${elements.filter((e) => e.type === "START_POINT").length})`} />
+                <Legend color="#ea580c" label={`Packing (${elements.filter((e) => e.type === "PACKING_POINT").length})`} />
                 <Legend color={ROUTE_COLOR} label="Rota" />
                 <span>
                   1 célula = {dims.cellSizeCm} cm · {formatMeters(dims.widthCells * m)} × {formatMeters(dims.heightCells * m)}
                 </span>
+                {mode === "edit" ? <span>Alt + setas: aumentar/diminuir o selecionado</span> : null}
                 {errorCount > 0 ? <span className="text-red-600">{errorCount} erro(s) na planta</span> : null}
               </div>
             </div>
