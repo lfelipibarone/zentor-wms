@@ -91,6 +91,12 @@ export default function PackingWaveOverviewPage() {
             <RefreshCw className="h-3.5 w-3.5" />
             Atualizar
           </button>
+          <Link
+            href={`/packing/etiquetas?onda=${waveId}`}
+            className="rounded-lg border bg-white px-3 py-2 text-sm font-medium"
+          >
+            Etiquetas da onda
+          </Link>
           <Link href="/packing" className="rounded-lg border bg-white px-3 py-2 text-sm font-medium">
             Voltar
           </Link>

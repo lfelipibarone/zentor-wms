@@ -801,6 +801,46 @@ export async function listWavePackingLines(tenantId: string) {
   };
 }
 
+/** Pedidos já conferidos no packing, candidatos à etiqueta em lote. */
+export async function listLabelBatchOrders(tenantId: string, opts?: { waveId?: string }) {
+  const orders = await prisma.order.findMany({
+    where: {
+      tenantId,
+      status: OrderStatus.DISPATCHING,
+      ...(opts?.waveId ? { waveOrders: { some: { waveId: opts.waveId } } } : {}),
+    },
+    orderBy: [{ collectionDeadline: { sort: "asc", nulls: "last" } }, { updatedAt: "desc" }],
+    take: 300,
+    select: {
+      id: true,
+      erpOrderId: true,
+      customerName: true,
+      marketplace: true,
+      collectionDeadline: true,
+      shippingLabel: true,
+      basket: { select: { code: true } },
+      waveOrders: { take: 1, select: { wave: { select: { name: true } } } },
+    },
+  });
+  const wave = opts?.waveId
+    ? await prisma.pickWave.findFirst({ where: { id: opts.waveId, tenantId }, select: { id: true, name: true } })
+    : null;
+
+  return {
+    wave,
+    orders: orders.map((o) => ({
+      id: o.id,
+      erpOrderId: o.erpOrderId,
+      customerName: o.customerName,
+      marketplace: o.marketplace,
+      collectionDeadline: o.collectionDeadline?.toISOString() ?? null,
+      hasLabel: Boolean(o.shippingLabel),
+      basketCode: o.basket?.code ?? null,
+      waveName: o.waveOrders[0]?.wave.name ?? null,
+    })),
+  };
+}
+
 /** Onda inteira para o packing: todas as linhas (coletadas ou não) e o andamento de cada pedido. */
 export async function getWavePackingOverview(tenantId: string, waveId: string) {
   const wave = await prisma.pickWave.findFirst({

@@ -99,7 +99,7 @@ export function getCollectionUrgency(
       hint:
         mins < 60
           ? `Coleta em ${mins} min`
-          : `Coleta em ${Math.floor(hoursUntil)}h${Math.round((hoursUntil % 1) * 60)}`,
+          : `Coleta em ${Math.floor(mins / 60)}h${String(mins % 60).padStart(2, "0")}`,
       hoursUntil,
       isOverdue: false,
       hasDeadline: true,

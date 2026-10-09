@@ -819,6 +819,24 @@ export type PackingWaveOverview = {
   }>;
 };
 
+export type LabelBatchOrder = {
+  id: string;
+  erpOrderId: string;
+  customerName: string | null;
+  marketplace: string | null;
+  collectionDeadline: string | null;
+  hasLabel: boolean;
+  basketCode: string | null;
+  waveName: string | null;
+};
+
+export function fetchLabelBatchOrders(waveId?: string) {
+  const qs = waveId ? `?waveId=${encodeURIComponent(waveId)}` : "";
+  return apiFetch<{ wave: { id: string; name: string } | null; orders: LabelBatchOrder[] }>(
+    `/api/packing/labels/orders${qs}`,
+  );
+}
+
 export function fetchPackingWaveOverview(waveId: string) {
   return apiFetch<PackingWaveOverview>(`/api/packing/waves/${waveId}/overview`);
 }
