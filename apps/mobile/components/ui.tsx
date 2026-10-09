@@ -407,6 +407,7 @@ const styles = StyleSheet.create({
   },
   noticeText: { flex: 1, fontWeight: "700", fontSize: typography.caption + 1 },
   field: {
+    minWidth: 0,
     borderWidth: 1.5,
     borderColor: theme.borderStrong,
     borderRadius: radius.md,

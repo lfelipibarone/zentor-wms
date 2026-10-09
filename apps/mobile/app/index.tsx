@@ -99,7 +99,12 @@ function HomeTile({ tile }: { tile: Tile }) {
         ) : null}
       </View>
       <View>
-        <Text style={styles.tileLabel} numberOfLines={2}>
+        <Text
+          style={styles.tileLabel}
+          numberOfLines={2}
+          adjustsFontSizeToFit
+          minimumFontScale={0.8}
+        >
           {mod.label}
         </Text>
         {tile.tag ? (
@@ -175,7 +180,8 @@ const styles = StyleSheet.create({
   },
   countText: { fontSize: typography.body, fontWeight: "900" },
   tileLabel: {
-    fontSize: typography.body + 1,
+    fontSize: typography.body - 1,
+    lineHeight: 20,
     fontWeight: "900",
     color: theme.text,
   },

@@ -148,7 +148,7 @@ export default function AtualizarGondolaScreen() {
               style={styles.flex}
               value={codeDraft}
               onChangeText={setCodeDraft}
-              placeholder="SKU, EAN ou gôndola"
+              placeholder="SKU ou código"
               autoCapitalize="characters"
               returnKeyType="search"
               onSubmitEditing={() => loadCode(codeDraft)}
