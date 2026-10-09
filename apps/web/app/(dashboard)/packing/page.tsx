@@ -348,8 +348,10 @@ function WaveQueueCard({
   onOpenLine: (lineId: string) => void;
 }) {
   const pickedPct = wave.unitsTotal > 0 ? Math.round((wave.unitsPicked / wave.unitsTotal) * 100) : 0;
-  const shown = wave.readyLines.slice(0, WAVE_CARD_LINE_LIMIT);
-  const hidden = wave.readyLines.length - shown.length;
+  const ready = wave.readyLines.filter((l) => l.quantityPicked >= l.quantityTotal);
+  const collecting = wave.readyLines.length - ready.length;
+  const shown = ready.slice(0, WAVE_CARD_LINE_LIMIT);
+  const hidden = ready.length - shown.length;
 
   return (
     <div className="rounded-xl border border-amber-200 bg-amber-50/80 p-4 shadow-sm">
@@ -373,7 +375,10 @@ function WaveQueueCard({
       </div>
 
       <p className="mt-3 text-xs font-semibold uppercase text-amber-900">
-        Prontos para distribuir ({wave.readyLines.length})
+        Prontos para conferir ({ready.length})
+        {collecting > 0 ? (
+          <span className="ml-1 font-normal normal-case text-amber-800">· {collecting} ainda em coleta</span>
+        ) : null}
       </p>
       <div className="mt-1 space-y-1">
         {shown.map((line) => (

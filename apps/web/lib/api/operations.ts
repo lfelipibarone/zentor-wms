@@ -909,6 +909,7 @@ export function reportPackingIssue(
     status: string;
     reported: boolean;
     summary: string;
+    returnedToName: string | null;
   }>(`/api/packing/orders/${orderId}/report-issue`, {
     method: "POST",
     body: JSON.stringify(payload),
@@ -938,7 +939,7 @@ export function fetchWavePackingLine(lineId: string) {
       id: string;
       waveId: string;
       waveName: string;
-      product: { sku: string; name: string };
+      product: { sku: string; name: string; barcode: string | null };
       quantityPicked: number;
       quantityTotal: number;
       sortStatus: string;

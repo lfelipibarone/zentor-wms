@@ -28,15 +28,15 @@ type WaveLine = PackingWaveOverview["lines"][number];
 
 function lineState(line: WaveLine) {
   if (line.sortStatus === "SORTED") {
-    return { label: "Distribuído", className: "bg-emerald-100 text-emerald-800", ready: false };
+    return { label: "Conferido", className: "bg-emerald-100 text-emerald-800", ready: false };
   }
   if (line.quantityPicked <= 0) {
     return { label: "Aguardando coleta", className: "bg-slate-100 text-slate-600", ready: false };
   }
   if (line.quantityPicked < line.quantityTotal) {
-    return { label: "Coleta parcial", className: "bg-amber-100 text-amber-800", ready: true };
+    return { label: "Coleta parcial", className: "bg-amber-100 text-amber-800", ready: false };
   }
-  return { label: "Pronto p/ distribuir", className: "bg-amber-200 text-amber-900", ready: true };
+  return { label: "Pronto p/ conferir", className: "bg-amber-200 text-amber-900", ready: true };
 }
 
 function LabelStatus({
@@ -112,6 +112,15 @@ export default function PackingWaveOverviewPage() {
   const printableLabels = orders.filter((o) => o.hasLabel && o.labelFormat !== "pdf");
   const pdfLabels = orders.filter((o) => o.hasLabel && o.labelFormat === "pdf");
   const labelBusy = generating !== null || printing;
+
+  const openOrderConference = async (orderId: string) => {
+    try {
+      await apiFetch(`/api/packing/orders/${orderId}/start`, { method: "POST", body: "{}" });
+      router.push(`/packing/${orderId}`);
+    } catch (e) {
+      setLabelMessage(e instanceof Error ? e.message : "Não foi possível abrir o pedido");
+    }
+  };
 
   const generateAll = async () => {
     if (missingLabels.length === 0) return;
@@ -193,7 +202,7 @@ export default function PackingWaveOverviewPage() {
       <div className="flex flex-wrap items-start justify-between gap-2">
         <PageHeader
           title={data?.wave.name ?? "Onda"}
-          description="Onda de picking completa: o que já foi coletado, o que falta e a distribuição nas cestas dos pedidos."
+          description="Onda de picking completa: o que já foi coletado, o que falta e a conferência de cada item e pedido."
         />
         <div className="flex gap-2">
           <button
@@ -232,7 +241,7 @@ export default function PackingWaveOverviewPage() {
               <Stat label="Pedidos" value={String(orders.length)} />
               <Stat label="Itens coletados" value={`${linesPicked}/${lines.length}`} />
               <Stat label="Unidades coletadas" value={`${unitsPicked}/${unitsTotal}`} />
-              <Stat label="Unidades nas cestas" value={`${unitsSorted}/${unitsTotal}`} />
+              <Stat label="Unidades conferidas" value={`${unitsSorted}/${unitsTotal}`} />
             </div>
 
             <section className="space-y-2">
@@ -244,7 +253,7 @@ export default function PackingWaveOverviewPage() {
                       <TableHead>SKU</TableHead>
                       <TableHead>Gôndola</TableHead>
                       <TableHead className="text-right">Coletado</TableHead>
-                      <TableHead className="whitespace-nowrap text-right">Nas cestas</TableHead>
+                      <TableHead className="whitespace-nowrap text-right">Conferido</TableHead>
                       <TableHead>Situação</TableHead>
                       <TableHead />
                     </TableRow>
@@ -284,7 +293,7 @@ export default function PackingWaveOverviewPage() {
                                 onClick={() => router.push(`/packing/waves/${line.id}`)}
                                 className="rounded-lg bg-[#0d9488] px-3 py-1.5 text-xs font-semibold text-white"
                               >
-                                Distribuir
+                                Conferir
                               </button>
                             ) : null}
                           </TableCell>
@@ -347,9 +356,10 @@ export default function PackingWaveOverviewPage() {
                       <TableHead>Pedido</TableHead>
                       <TableHead>Marketplace</TableHead>
                       <TableHead>Cesta</TableHead>
-                      <TableHead className="whitespace-nowrap text-right">Nas cestas</TableHead>
+                      <TableHead className="whitespace-nowrap text-right">Conferido</TableHead>
                       <TableHead>Situação</TableHead>
                       <TableHead>Etiqueta</TableHead>
+                      <TableHead />
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -384,6 +394,17 @@ export default function PackingWaveOverviewPage() {
                             format={o.labelFormat}
                             error={labelErrors[o.id]}
                           />
+                        </TableCell>
+                        <TableCell className="text-right">
+                          {o.status === "PICKED_AWAITING_CONFERENCE" ? (
+                            <button
+                              type="button"
+                              onClick={() => openOrderConference(o.id)}
+                              className="rounded-lg bg-[#0d9488] px-3 py-1.5 text-xs font-semibold text-white"
+                            >
+                              Conferir
+                            </button>
+                          ) : null}
                         </TableCell>
                       </TableRow>
                     ))}

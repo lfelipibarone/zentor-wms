@@ -65,6 +65,13 @@ async function tryAcceptOneOrder(
       message: "Pedido está em uma onda ativa — use separação em onda",
     };
   }
+  if (
+    order.status === OrderStatus.PACKING_RETURNED_TO_PICKING &&
+    order.assignedPickerId &&
+    order.assignedPickerId !== userId
+  ) {
+    return { ok: false, message: "Pedido foi devolvido para outro separador corrigir" };
+  }
 
   const fromStatus = order.status;
 

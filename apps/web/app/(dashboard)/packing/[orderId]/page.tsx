@@ -168,7 +168,7 @@ export default function PackingOrderDetailPage() {
               disabled={saving}
               className="rounded-lg border border-red-300 bg-white px-3 py-2 text-sm font-medium text-red-700 hover:bg-red-50 disabled:opacity-50"
             >
-              Relatar problema
+              Reportar erro
             </button>
           ) : null}
           <button

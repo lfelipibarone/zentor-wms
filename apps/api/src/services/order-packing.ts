@@ -6,7 +6,7 @@ import {
   Prisma,
 } from "@prisma/client";
 import { prisma } from "../lib/prisma.js";
-import { notifyUsersWithPermission } from "./notifications.js";
+import { createNotification, notifyUsersWithPermission } from "./notifications.js";
 import { Permission, productMatchesCode } from "@wms/shared";
 import { getWaveLineDetail } from "./pick-wave.js";
 import { confirmSortAllocation } from "./pick-wave-sort.js";
@@ -600,6 +600,33 @@ export interface PackingIssuePayload {
   description?: string;
 }
 
+/** Quem coletou o item: separador da linha da onda, quem aceitou a onda ou quem separou o pedido avulso. */
+async function findItemPicker(
+  tenantId: string,
+  orderId: string,
+  orderItemId: string,
+  assignedPickerId: string | null,
+) {
+  const alloc = await prisma.pickWaveAllocation.findFirst({
+    where: { orderItemId },
+    select: { waveLine: { select: { pickedById: true, wave: { select: { acceptedById: true } } } } },
+  });
+  let pickerId = alloc?.waveLine.pickedById ?? alloc?.waveLine.wave.acceptedById ?? assignedPickerId;
+  if (!pickerId) {
+    const lastPick = await prisma.orderTimeLog.findFirst({
+      where: { orderId, event: { in: [OrderTimeLogEvent.START, OrderTimeLogEvent.END] } },
+      orderBy: { createdAt: "desc" },
+      select: { userId: true },
+    });
+    pickerId = lastPick?.userId ?? null;
+  }
+  if (!pickerId) return null;
+  return prisma.user.findFirst({
+    where: { id: pickerId, tenantId, active: true },
+    select: { id: true, name: true },
+  });
+}
+
 export async function reportPackingIssue(
   orderId: string,
   userId: string,
@@ -656,6 +683,7 @@ export async function reportPackingIssue(
   const newPacked = Math.min(item.quantityPacked, newPicked);
 
   const packingState = await getPackingOperationalState(orderId);
+  const picker = await findItemPicker(order.tenantId, orderId, item.id, order.assignedPickerId);
 
   await prisma.$transaction(async (tx) => {
     const { detachOrderFromWaveForPackingReturn } = await import(
@@ -680,7 +708,7 @@ export async function reportPackingIssue(
       where: { id: orderId },
       data: {
         status: OrderStatus.PACKING_RETURNED_TO_PICKING,
-        assignedPickerId: null,
+        assignedPickerId: picker?.id ?? null,
       },
     });
     await recordOrderStageChange(tx, {
@@ -707,8 +735,8 @@ export async function reportPackingIssue(
   });
 
   const summary = `${product.sku} · ${PACKING_ISSUE_TYPE_LABEL[input.type]} · ${qty} un.`;
-  await notifyUsersWithPermission(Permission.MOBILE_ACCESS, {
-    title: "Pedido retornou do packing",
+  const notification = {
+    title: picker ? "Pedido voltou para você corrigir" : "Pedido retornou do packing",
     body: `${order.erpOrderId} — ${summary}`,
     category: "PICKING",
     data: {
@@ -717,13 +745,16 @@ export async function reportPackingIssue(
       issueType: input.type,
       sku: product.sku,
     },
-  });
+  };
+  if (picker) await createNotification({ userId: picker.id, ...notification });
+  else await notifyUsersWithPermission(Permission.MOBILE_ACCESS, notification, order.tenantId);
 
   return {
     orderId,
     status: OrderStatus.PACKING_RETURNED_TO_PICKING,
     reported: true,
     summary,
+    returnedToName: picker?.name ?? null,
   };
 }
 

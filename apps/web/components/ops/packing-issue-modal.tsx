@@ -43,6 +43,8 @@ export function PackingIssueModal({
   const [description, setDescription] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  /** undefined = ainda não enviado; null = voltou para a fila geral */
+  const [returnedTo, setReturnedTo] = useState<string | null | undefined>(undefined);
 
   const handleItemChange = (newId: string) => {
     setItemId(newId);
@@ -71,15 +73,15 @@ export function PackingIssueModal({
     setSubmitting(true);
     setError(null);
     try {
-      await reportPackingIssue(order.id, {
+      const result = await reportPackingIssue(order.id, {
         itemId: selectedItem.id,
         quantity: qty,
         type,
         description: description.trim() || undefined,
       });
-      onSubmitted();
+      setReturnedTo(result.returnedToName ?? null);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Erro ao reportar problema");
+      setError(e instanceof Error ? e.message : "Erro ao reportar erro");
     } finally {
       setSubmitting(false);
     }
@@ -90,7 +92,9 @@ export function PackingIssueModal({
       role="presentation"
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
       onClick={(e) => {
-        if (e.target === e.currentTarget && !submitting) onClose();
+        if (e.target !== e.currentTarget || submitting) return;
+        if (returnedTo !== undefined) onSubmitted();
+        else onClose();
       }}
     >
       <div className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-xl bg-white p-6 shadow-xl">
@@ -100,16 +104,33 @@ export function PackingIssueModal({
           </div>
           <div className="flex-1">
             <h2 className="text-lg font-bold text-slate-900">
-              Relatar problema na conferência
+              Reportar erro da separação
             </h2>
             <p className="mt-1 text-sm text-muted-foreground">
-              O pedido voltará para a fila de separação no mobile para que o
-              operador corrija o item.
+              O pedido volta no app para o separador que coletou o item, para
+              ele corrigir.
             </p>
           </div>
         </div>
 
-        {reportableItems.length === 0 ? (
+        {returnedTo !== undefined ? (
+          <div className="mt-5 space-y-4">
+            <p className="rounded-lg bg-emerald-50 px-3 py-3 text-sm text-emerald-800">
+              {returnedTo
+                ? `Pedido ${order.erpOrderId} devolvido para ${returnedTo} corrigir.`
+                : `Pedido ${order.erpOrderId} voltou para a fila de separação (não foi possível identificar quem separou).`}
+            </p>
+            <div className="flex justify-end">
+              <button
+                type="button"
+                onClick={onSubmitted}
+                className="rounded-lg bg-[#0d9488] px-4 py-2 text-sm font-semibold text-white"
+              >
+                Voltar para o packing
+              </button>
+            </div>
+          </div>
+        ) : reportableItems.length === 0 ? (
           <p className="mt-4 rounded-lg bg-slate-50 p-3 text-sm text-muted-foreground">
             Nenhum item separado para reportar.
           </p>
@@ -212,7 +233,7 @@ export function PackingIssueModal({
                 {submitting ? (
                   <Loader2 className="h-4 w-4 animate-spin" />
                 ) : null}
-                Devolver para separação
+                Devolver para o separador
               </button>
             </div>
           </form>
