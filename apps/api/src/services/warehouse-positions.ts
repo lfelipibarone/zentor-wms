@@ -1,6 +1,7 @@
 import { LocationFace, LocationType } from "@prisma/client";
 import { prisma } from "../lib/prisma.js";
 import { DEFAULT_MIN_PERCENT, parsePercent } from "./stock-percent.js";
+import { stockModeUpdateData, type StockModeChange } from "./location-level.js";
 import {
   assertLocationTypeChange,
   assertMaxPickFaceLocations,
@@ -295,6 +296,9 @@ export interface UpdateWarehousePositionInput {
   capacity?: number;
   minPercent?: number;
   fillPercent?: number;
+  stockMode?: "PERCENT" | "QUANTITY";
+  stockQuantity?: number;
+  minQuantity?: number;
   active?: boolean;
   proximityCorredorId?: string | null;
   proximityEstanteId?: string | null;
@@ -386,6 +390,25 @@ export async function updateWarehousePosition(
     }
   }
 
+  const modeData = stockModeUpdateData(
+    {
+      ...location,
+      type,
+      minPercent:
+        input.minPercent !== undefined
+          ? clampPercent(input.minPercent, DEFAULT_MIN_PERCENT)
+          : location.minPercent,
+      fillPercent:
+        input.fillPercent !== undefined ? clampPercent(input.fillPercent, 0) : location.fillPercent,
+    },
+    {
+      stockMode: input.stockMode,
+      capacity: input.capacity,
+      stockQuantity: input.stockQuantity,
+      minQuantity: input.minQuantity,
+    },
+  );
+
   const updated = await prisma.$transaction(async (tx) => {
     if (
       input.linhaCode !== undefined ||
@@ -436,6 +459,7 @@ export async function updateWarehousePosition(
           ? { fillPercent: clampPercent(input.fillPercent, 0) }
           : {}),
         ...(input.active !== undefined ? { active: input.active } : {}),
+        ...(modeData ?? {}),
       },
       include: {
         product: { select: { sku: true, name: true } },
@@ -469,4 +493,33 @@ export async function updateWarehousePosition(
   }
 
   return { location: updated, resumedOrders };
+}
+
+/** Aplica o modo de ocupação (% ou quantidade) a todas as gôndolas de uma estante. */
+export async function setEstanteStockMode(
+  tenantId: string,
+  estanteId: string,
+  change: Pick<StockModeChange, "stockMode" | "capacity" | "minQuantity">,
+  /** Só as gôndolas desta coluna */
+  colunaId?: string,
+) {
+  if (change.stockMode !== "PERCENT" && change.stockMode !== "QUANTITY") {
+    throw new Error("Escolha % ou quantidade");
+  }
+  const faces = await prisma.location.findMany({
+    where: {
+      tenantId,
+      estanteId,
+      type: LocationType.PICK_FACE,
+      ...(colunaId ? { colunaId } : {}),
+    },
+  });
+  if (faces.length === 0) throw new Error(colunaId ? "Coluna sem gôndolas" : "Estante sem gôndolas");
+  await prisma.$transaction(
+    faces.flatMap((loc) => {
+      const data = stockModeUpdateData(loc, change);
+      return data ? [prisma.location.update({ where: { id: loc.id }, data })] : [];
+    }),
+  );
+  return { updated: faces.length };
 }

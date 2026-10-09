@@ -27,12 +27,20 @@ export interface WarehouseLayoutLocation {
   minPercent: number;
   /** % atual (no pulmão, soma das % dos SKUs) */
   fillPercent: number;
+  /** Gôndola: ocupação em % ou em unidades */
+  stockMode?: StockMode;
+  /** Modo QUANTITY: unidades na gôndola */
+  stockQuantity?: number | null;
+  /** Modo QUANTITY: mínimo em unidades */
+  minQuantity?: number | null;
   proximityCorredorId?: string | null;
   proximityEstanteId?: string | null;
   proximityLinhaId?: string | null;
   proximityReferences?: WarehouseProximityReference[];
   product?: { id: string; sku: string; name: string | null } | null;
 }
+
+export type StockMode = "PERCENT" | "QUANTITY";
 
 export interface WarehouseLinhaNode extends WarehouseNode {
   colunaId?: string;
@@ -330,6 +338,9 @@ export function updateWarehousePosition(
     productId?: string | null;
     minPercent?: number;
     fillPercent?: number;
+    stockMode?: StockMode;
+    stockQuantity?: number;
+    minQuantity?: number;
   },
 ) {
   return apiFetch<{ location: WarehouseLayoutLocation }>(
@@ -339,6 +350,16 @@ export function updateWarehousePosition(
       body: JSON.stringify(body),
     },
   );
+}
+
+export function setEstanteStockMode(
+  estanteId: string,
+  body: { stockMode: StockMode; capacity?: number; minQuantity?: number; colunaId?: string },
+) {
+  return apiFetch<{ updated: number }>(`/api/warehouse/estantes/${estanteId}/stock-mode`, {
+    method: "PATCH",
+    body: JSON.stringify(body),
+  });
 }
 
 export interface WarehouseBatchItem {

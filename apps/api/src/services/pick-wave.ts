@@ -8,6 +8,7 @@ import {
   type Prisma,
 } from "@prisma/client";
 import { prisma } from "../lib/prisma.js";
+import { stockModeFields } from "./location-level.js";
 import { allocateQuantityAcrossPickFaces } from "./pick-allocation.js";
 import { PickWaveError } from "./pick-wave-error.js";
 
@@ -1306,6 +1307,7 @@ export function mapWaveLineSummary(
       label: formatLocation(line.pickLocation),
       fillPercent: line.pickLocation.fillPercent,
       minPercent: line.pickLocation.minPercent,
+      ...stockModeFields(line.pickLocation),
     },
     quantityTotal: line.quantityTotal,
     quantityPicked: line.quantityPicked,

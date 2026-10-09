@@ -2,8 +2,10 @@ import {
   CargoTransferStatus,
   InventoryMovementType,
   LocationType,
+  type LocationStockMode,
 } from "@prisma/client";
 import { prisma } from "../lib/prisma.js";
+import { isQuantityMode, parseUnits, quantityLevelData, stockModeFields } from "./location-level.js";
 import { findProductByBarcode } from "./location-stock.js";
 import { getPulmaoSkuPercent, setPulmaoSkuPercent } from "./pulmao-inventory.js";
 import { parsePercent, StockPercentError } from "./stock-percent.js";
@@ -48,6 +50,11 @@ type TransferRow = {
     barcode: string;
     corridor: string;
     row: string;
+    type: LocationType;
+    stockMode: LocationStockMode;
+    stockQuantity: number;
+    capacity: number;
+    minQuantity: number;
   } | null;
   withdrawnBy: { id: string; name: string };
 };
@@ -93,6 +100,7 @@ export function mapCargoTransferSummary(transfer: TransferRow) {
           id: transfer.targetPickFace.id,
           barcode: transfer.targetPickFace.barcode,
           label: formatLocationLabel(transfer.targetPickFace),
+          ...stockModeFields(transfer.targetPickFace),
         }
       : null,
     withdrawnByName: transfer.withdrawnBy.name,
@@ -116,7 +124,19 @@ const transferInclude = {
     select: { id: true, barcode: true, corridor: true, row: true },
   },
   targetPickFace: {
-    select: { id: true, barcode: true, corridor: true, row: true, estanteId: true, face: true },
+    select: {
+      id: true,
+      barcode: true,
+      corridor: true,
+      row: true,
+      estanteId: true,
+      face: true,
+      type: true,
+      stockMode: true,
+      stockQuantity: true,
+      capacity: true,
+      minQuantity: true,
+    },
   },
   withdrawnBy: { select: { id: true, name: true } },
 } as const;
@@ -417,9 +437,10 @@ export async function depositCargoTransfer(input: {
   toLocationBarcode: string;
   productBarcode?: string;
   /** % que a gôndola ficou depois de abastecer */
-  percent: unknown;
+  percent?: unknown;
+  /** Gôndola por quantidade: unidades que ficaram depois de abastecer */
+  quantity?: unknown;
 }) {
-  const percent = parseTransferPercent(input.percent, "% que a gôndola ficou");
   const transfer = await prisma.cargoTransfer.findFirst({
     where: {
       id: input.transferId,
@@ -469,6 +490,19 @@ export async function depositCargoTransfer(input: {
     }
   }
 
+  let units: number | null = null;
+  let percent: number;
+  if (isQuantityMode(toLoc)) {
+    try {
+      units = parseUnits(input.quantity, "Quantidade que ficou na gôndola");
+    } catch (e) {
+      throw new CargoTransferError(e instanceof Error ? e.message : "Quantidade inválida");
+    }
+    percent = quantityLevelData(units, toLoc).fillPercent;
+  } else {
+    percent = parseTransferPercent(input.percent, "% que a gôndola ficou");
+  }
+
   const depositedAt = new Date();
 
   const result = await prisma.$transaction(async (tx) => {
@@ -476,7 +510,7 @@ export async function depositCargoTransfer(input: {
       where: { id: toLoc.id },
       data: {
         productId: transfer.productId,
-        fillPercent: percent,
+        ...(units !== null ? quantityLevelData(units, toLoc) : { fillPercent: percent }),
       },
     });
 
@@ -515,6 +549,7 @@ export async function depositCargoTransfer(input: {
       toLocation: {
         barcode: toLoc.barcode,
         fillPercent: percent,
+        stockQuantity: units,
       },
     };
   });

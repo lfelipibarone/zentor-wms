@@ -15,10 +15,11 @@ import { ScreenShell } from "@/components/ScreenShell";
 import { Badge, Card, Loading, Notice, SectionTitle } from "@/components/ui";
 import { useAdjustLocationStock } from "@/hooks/useAdjustLocationStock";
 import { useWaveLine, useWaveLinePick } from "@/hooks/useWavePicking";
-import { showErrorAlert } from "@/lib/app-alert";
+import { showErrorAlert, showToast } from "@/lib/app-alert";
 import { ApiError } from "@/lib/api";
 import { modules } from "@/lib/modules";
-import { formatPercent } from "@/lib/percent";
+import { formatLevel, formatMinLevel, isQuantityMode } from "@/lib/percent";
+import type { GondolaLevel } from "@/components/PercentInput";
 import { theme, spacing, typography, radius } from "@/lib/theme";
 
 export default function WavePickScreen() {
@@ -53,22 +54,23 @@ export default function WavePickScreen() {
     locationId: line.pickLocation.id,
     locationLabel: line.pickLocation.label,
     currentPercent: line.pickLocation.fillPercent,
+    level: line.pickLocation,
     productBarcode: line.product.barcode,
     productName: line.product.name,
     waveLineId: lineId,
   };
 
-  const handleAdjustStock = async (percent: number, reason: string) => {
+  const handleAdjustStock = async (level: GondolaLevel, reason: string) => {
     try {
       const result = await adjustStock.mutateAsync({
         locationId: line.pickLocation.id,
-        percent,
+        ...level,
         productBarcode: line.product.barcode,
         reason,
         waveLineId: lineId,
       });
       setAdjustOpen(false);
-      say(`Gôndola ajustada: ${formatPercent(result.location.fillPercent)}`);
+      say(`Gôndola ajustada: ${formatLevel(result.location)}`);
 
       const waveUpdate = result.reconciliation.waveLines.find(
         (w) => w.waveLineId === lineId,
@@ -102,6 +104,11 @@ export default function WavePickScreen() {
         `Pick registrado: ${result.quantityPicked}/${result.quantityTotal}`,
       );
       if (result.readyForSort) {
+        if (isQuantityMode(result.location)) {
+          showToast(`Pick concluído · gôndola com ${formatLevel(result.location)}`);
+          router.replace("/picking");
+          return;
+        }
         say("Pick concluído — informe a % que ficou na gôndola.");
         setAfterPickOpen(true);
       }
@@ -110,11 +117,11 @@ export default function WavePickScreen() {
     }
   };
 
-  const handleAfterPickPercent = async (percent: number, reason: string) => {
+  const handleAfterPickPercent = async (level: GondolaLevel, reason: string) => {
     try {
       await adjustStock.mutateAsync({
         locationId: line.pickLocation.id,
-        percent,
+        ...level,
         productBarcode: line.product.barcode,
         reason,
         waveLineId: lineId,
@@ -140,10 +147,8 @@ export default function WavePickScreen() {
           {line.pickLocation.label}
         </Text>
         <Text style={styles.locStock}>
-          Gôndola {formatPercent(line.pickLocation.fillPercent)}
-          {line.pickLocation.minPercent != null
-            ? ` · mín. ${formatPercent(line.pickLocation.minPercent)}`
-            : ""}
+          Gôndola {formatLevel(line.pickLocation)}
+          {formatMinLevel(line.pickLocation) ? ` · mín. ${formatMinLevel(line.pickLocation)}` : ""}
         </Text>
         {locationOk ? (
           <View style={styles.locOk}>

@@ -5,6 +5,7 @@ import { FactoryButton } from "@/components/FactoryButton";
 import { PulmaoStockList } from "@/components/PulmaoStockList";
 import { ScreenShell } from "@/components/ScreenShell";
 import { useLookupLocation } from "@/hooks/useLookup";
+import { formatLevel, formatMinLevel, isQuantityMode } from "@/lib/percent";
 import { theme, spacing, typography } from "@/lib/theme";
 
 export default function LookupScreen() {
@@ -53,9 +54,12 @@ export default function LookupScreen() {
             <Text style={styles.qtyLabel}>
               {data.type === "PULMAO" ? "OCUPAÇÃO DO PULMÃO" : "GÔNDOLA"}
             </Text>
-            <Text style={styles.qtyValue}>{data.fillPercent}%</Text>
+            <Text style={styles.qtyValue}>{formatLevel(data)}</Text>
             {data.type !== "PULMAO" ? (
-              <Text style={styles.qtySub}>Mínimo: {data.minPercent}%</Text>
+              <Text style={styles.qtySub}>
+                Mínimo: {formatMinLevel(data) ?? "—"}
+                {isQuantityMode(data) ? ` · ${data.fillPercent}% cheia` : ""}
+              </Text>
             ) : null}
           </View>
 

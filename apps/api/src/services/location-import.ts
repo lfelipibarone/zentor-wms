@@ -1,5 +1,6 @@
 import { LocationFace, LocationType, Prisma } from "@prisma/client";
 import { prisma } from "../lib/prisma.js";
+import { isQuantityMode } from "./location-level.js";
 import { DEFAULT_MIN_PERCENT } from "./stock-percent.js";
 import {
   assertLocationTypeChange,
@@ -255,7 +256,13 @@ export async function importLocations(
         row: input.row,
       });
 
-      const existingSelect = { id: true, barcode: true, type: true, fillPercent: true } as const;
+      const existingSelect = {
+        id: true,
+        barcode: true,
+        type: true,
+        fillPercent: true,
+        stockMode: true,
+      } as const;
       const byBarcode = await prisma.location.findFirst({
         where: { tenantId, barcode: input.barcode },
         select: existingSelect,
@@ -316,7 +323,9 @@ export async function importLocations(
           data: {
             ...baseData,
             barcode: input.barcode,
-            ...(importedPercent !== undefined ? { fillPercent: importedPercent } : {}),
+            ...(importedPercent !== undefined && !isQuantityMode(existing)
+              ? { fillPercent: importedPercent }
+              : {}),
             ...(input.active !== undefined ? { active: input.active } : {}),
             productId: input.productSku ? productId : undefined,
           },

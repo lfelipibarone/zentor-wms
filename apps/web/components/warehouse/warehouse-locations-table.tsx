@@ -10,6 +10,7 @@ import {
 } from "@/components/ui/table";
 import { EMPTY, type LayoutRow } from "@/lib/warehouse-layout-rows";
 import { PercentBar } from "@/components/ops/percent-bar";
+import { unitsLabel } from "@/lib/stock-mode";
 
 function tipoBadge(label: string, variant: "pulmao" | "pick") {
   const styles =
@@ -112,6 +113,7 @@ export function WarehouseLocationsTable({
                     <PercentBar
                       percent={row.fillPercent}
                       minPercent={row.location?.type === "PULMAO" ? null : row.minPercent}
+                      label={unitsLabel(row.location?.stockQuantity, row.location?.stockMode)}
                     />
                   ) : (
                     <span className="text-slate-400">{EMPTY}</span>
@@ -120,7 +122,8 @@ export function WarehouseLocationsTable({
                 <TableCell className="text-right tabular-nums text-sm">
                   {row.location?.type === "PULMAO" || row.minPercent == null
                     ? EMPTY
-                    : `${row.minPercent}%`}
+                    : (unitsLabel(row.location?.minQuantity, row.location?.stockMode) ??
+                      `${row.minPercent}%`)}
                 </TableCell>
                 <TableCell className="text-center text-sm">
                   {row.active ? "Sim" : "Não"}

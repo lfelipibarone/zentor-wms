@@ -7,6 +7,7 @@ import {
   type ReconcileResult,
 } from "./pick-location-reconcile.js";
 import { needsReplenishment, parsePercent, recordPercentMovement, StockPercentError } from "./stock-percent.js";
+import { isQuantityMode, parseUnits, quantityLevelData, stockModeFields } from "./location-level.js";
 
 export class LocationAdjustError extends Error {
   constructor(
@@ -28,7 +29,9 @@ export type AdjustLocationInput = {
   locationId?: string;
   barcode?: string;
   /** Gôndola: % que ela ficou. Pulmão: % que o SKU ocupa (0 = acabou, sai da lista). */
-  percent: unknown;
+  percent?: unknown;
+  /** Gôndola por quantidade: unidades que ficaram. */
+  quantity?: unknown;
   productBarcode?: string;
   reason?: string;
   orderId?: string;
@@ -47,6 +50,10 @@ export type AdjustLocationResult = {
     fillPercent: number;
     minPercent: number;
     needsReplenishment: boolean;
+    stockMode: string;
+    stockQuantity: number | null;
+    minQuantity: number | null;
+    capacity: number;
     label: string;
     product: {
       id: string;
@@ -64,14 +71,6 @@ export type AdjustLocationResult = {
 export async function adjustLocationPercent(
   input: AdjustLocationInput,
 ): Promise<AdjustLocationResult> {
-  let percent: number;
-  try {
-    percent = parsePercent(input.percent);
-  } catch (e) {
-    if (e instanceof StockPercentError) throw new LocationAdjustError(e.message);
-    throw e;
-  }
-
   const location = input.locationId
     ? await prisma.location.findFirst({
         where: { id: input.locationId, tenantId: input.tenantId, active: true },
@@ -91,6 +90,21 @@ export async function adjustLocationPercent(
   }
 
   const isPulmao = location.type === LocationType.PULMAO;
+  const byQuantity = isQuantityMode(location);
+
+  let percent: number;
+  let units: number | null = null;
+  try {
+    if (byQuantity) {
+      units = parseUnits(input.quantity);
+      percent = quantityLevelData(units, location).fillPercent;
+    } else {
+      percent = parsePercent(input.percent);
+    }
+  } catch (e) {
+    if (e instanceof StockPercentError) throw new LocationAdjustError(e.message);
+    throw e;
+  }
 
   let pulmaoProduct: Product | null = null;
   if (isPulmao) {
@@ -133,7 +147,7 @@ export async function adjustLocationPercent(
     } else {
       await tx.location.update({
         where: { id: location.id },
-        data: { fillPercent: percent },
+        data: units !== null ? quantityLevelData(units, location) : { fillPercent: percent },
       });
     }
     await recordPercentMovement(tx, {
@@ -143,7 +157,8 @@ export async function adjustLocationPercent(
       locationId: location.id,
       before: previousPercent,
       after: percent,
-      reference: "Atualização de %",
+      reference: units !== null ? "Contagem da gôndola" : "Atualização de %",
+      quantity: units !== null ? Math.abs(units - location.stockQuantity) : undefined,
       notes: noteParts.join("; ") || null,
       orderId: input.orderId ?? null,
       pickWaveLineId: input.waveLineId ?? null,
@@ -176,6 +191,7 @@ export async function adjustLocationPercent(
       fillPercent: updated.fillPercent,
       minPercent: updated.minPercent,
       needsReplenishment: !isPulmao && needsReplenishment(updated.fillPercent, updated.minPercent),
+      ...stockModeFields(updated),
       label: formatLocation(updated),
       product: shownProduct
         ? {

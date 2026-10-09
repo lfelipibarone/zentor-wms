@@ -26,7 +26,8 @@ import {
 import { showErrorAlert } from "@/lib/app-alert";
 import { api, ApiError } from "@/lib/api";
 import { modules } from "@/lib/modules";
-import { formatPercent } from "@/lib/percent";
+import { formatLevel, formatMinLevel, isQuantityMode } from "@/lib/percent";
+import type { GondolaLevel } from "@/components/PercentInput";
 import { theme, spacing, typography, radius } from "@/lib/theme";
 import { OrderStatus } from "@wms/shared";
 
@@ -85,6 +86,7 @@ export default function PickScreen() {
           locationId: next.pickLocation.id,
           locationLabel: next.pickLocation.label,
           currentPercent: next.pickLocation.fillPercent ?? 0,
+          level: next.pickLocation,
           productBarcode: next.product?.barcode ?? null,
           productName: next.product?.name ?? null,
           orderId,
@@ -92,12 +94,12 @@ export default function PickScreen() {
         }
       : null;
 
-  const handleAdjustStock = async (percent: number, reason: string) => {
+  const handleAdjustStock = async (level: GondolaLevel, reason: string) => {
     if (!adjustContext) return;
     try {
       const result = await adjustStock.mutateAsync({
         locationId: adjustContext.locationId,
-        percent,
+        ...level,
         productBarcode: adjustContext.productBarcode,
         reason,
         orderId,
@@ -114,7 +116,7 @@ export default function PickScreen() {
         );
         resetItemFlow();
       } else {
-        setFeedback(`Gôndola ajustada: ${formatPercent(result.location.fillPercent)}`);
+        setFeedback(`Gôndola ajustada: ${formatLevel(result.location)}`);
       }
 
       if (result.reconciliation.warnings.length > 0) {
@@ -169,7 +171,8 @@ export default function PickScreen() {
     const pickedContext = adjustContext;
     try {
       const result = await pickItem.mutateAsync({ itemId, quantity: qty });
-      if (result.completed && pickedContext) {
+      const countedByUnits = isQuantityMode(result.location);
+      if (result.completed && pickedContext && !countedByUnits) {
         setAfterPick({
           ...pickedContext,
           currentPercent: result.location?.fillPercent ?? pickedContext.currentPercent,
@@ -178,19 +181,23 @@ export default function PickScreen() {
       await refetch();
       resetItemFlow();
       if (result.completed) {
-        setFeedback("Item concluído ✓");
+        setFeedback(
+          countedByUnits
+            ? `Item concluído · gôndola com ${formatLevel(result.location)} ✓`
+            : "Item concluído ✓",
+        );
       }
     } catch (e) {
       setFeedback(e instanceof ApiError ? e.message : "Erro ao registrar pick");
     }
   };
 
-  const handleAfterPickPercent = async (percent: number, reason: string) => {
+  const handleAfterPickPercent = async (level: GondolaLevel, reason: string) => {
     if (!afterPick) return;
     try {
       const result = await adjustStock.mutateAsync({
         locationId: afterPick.locationId,
-        percent,
+        ...level,
         productBarcode: afterPick.productBarcode,
         reason,
         orderId,
@@ -199,8 +206,8 @@ export default function PickScreen() {
       setAfterPick(null);
       setFeedback(
         result.location.needsReplenishment
-          ? `Gôndola em ${formatPercent(percent)} — enviada para reposição ✓`
-          : `Gôndola em ${formatPercent(percent)} ✓`,
+          ? `Gôndola em ${formatLevel(result.location)} — enviada para reposição ✓`
+          : `Gôndola em ${formatLevel(result.location)} ✓`,
       );
       if (result.reconciliation.warnings.length > 0) {
         Alert.alert(
@@ -358,10 +365,8 @@ export default function PickScreen() {
         </Text>
         {next.pickLocation?.fillPercent != null ? (
           <Text style={styles.locStock}>
-            Gôndola {formatPercent(next.pickLocation.fillPercent)}
-            {next.pickLocation.minPercent != null
-              ? ` · mín. ${formatPercent(next.pickLocation.minPercent)}`
-              : ""}
+            Gôndola {formatLevel(next.pickLocation)}
+            {formatMinLevel(next.pickLocation) ? ` · mín. ${formatMinLevel(next.pickLocation)}` : ""}
           </Text>
         ) : null}
         {next.stockMismatchHint ? (

@@ -30,6 +30,12 @@ enum LocationType {
   PULMAO // Estoque de reserva / reabastecimento
 }
 
+/// Como a ocupação da gôndola é medida
+enum LocationStockMode {
+  PERCENT // operador informa a %
+  QUANTITY // unidades contadas; picking dá baixa automática
+}
+
 /// Lado da gôndola: A = frente, B = verso (acessado pelo corredor oposto)
 enum LocationFace {
   A
@@ -552,10 +558,16 @@ model Location {
   productId           String?
   /// Ocupação em % (0–100), informada pelo operador. No pulmão, soma das % dos SKUs (pode passar de 100).
   fillPercent         Int          @default(0) @map("currentQuantity")
-  /// Capacidade em unidades (só informativa; o estoque é controlado em %)
+  /// Capacidade em unidades. No modo QUANTITY é o que vale 100%.
   capacity            Int
   /// % mínima da gôndola; abaixo ou igual entra no ressuprimento
   minPercent          Int          @default(20) @map("minThreshold")
+  /// Gôndola: ocupação controlada em % ou em unidades. Pulmão é sempre PERCENT.
+  stockMode           LocationStockMode @default(PERCENT)
+  /// Modo QUANTITY: unidades na gôndola. fillPercent/minPercent são derivados daqui e da capacidade.
+  stockQuantity       Int          @default(0)
+  /// Modo QUANTITY: mínimo em unidades; igual ou abaixo entra no ressuprimento
+  minQuantity         Int          @default(0)
   active              Boolean      @default(true)
   createdAt           DateTime     @default(now())
   updatedAt           DateTime     @updatedAt

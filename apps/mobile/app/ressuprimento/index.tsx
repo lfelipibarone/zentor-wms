@@ -4,7 +4,7 @@ import { useFocusEffect } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { BarcodeScanner } from "@/components/BarcodeScanner";
 import { FactoryButton } from "@/components/FactoryButton";
-import { PercentInput } from "@/components/PercentInput";
+import { GondolaLevelInput, type GondolaLevel } from "@/components/PercentInput";
 import {
   PulmaoWithdrawPercent,
   type PulmaoWithdrawResult,
@@ -33,6 +33,7 @@ import {
 } from "@/lib/api";
 import { showErrorAlert, showToast } from "@/lib/app-alert";
 import { modules } from "@/lib/modules";
+import { formatLevel, isQuantityMode } from "@/lib/percent";
 import { pulmaoPercentOf, pulmaoStocksSummary } from "@/lib/pulmao";
 import { theme, spacing, typography, radius } from "@/lib/theme";
 
@@ -67,7 +68,7 @@ export default function RessuprimentoScreen() {
   const [loading, setLoading] = useState(false);
   const [productImageUrl, setProductImageUrl] = useState<string | null>(null);
   /** Gôndola bipada no depósito; falta informar a % que ela ficou */
-  const [depositBarcode, setDepositBarcode] = useState<string | null>(null);
+  const [depositFace, setDepositFace] = useState<LocationLookup | null>(null);
 
   const load = useCallback(async () => {
     setLoadingList(true);
@@ -184,7 +185,7 @@ export default function RessuprimentoScreen() {
         targetPickFaceId: selected.pickFaceId,
       });
       setActiveTransfer(result.transfer);
-      setDepositBarcode(null);
+      setDepositFace(null);
       setPhase("deposit");
       showToast(
         result.fromLocation.skuPercent === 0
@@ -219,7 +220,7 @@ export default function RessuprimentoScreen() {
         showErrorAlert("Bipe uma gôndola do estoque de giro");
         return;
       }
-      setDepositBarcode(loc.barcode);
+      setDepositFace(loc);
       setFaceOptions([]);
     } catch (e) {
       showErrorAlert(apiErr(e, "Gôndola não encontrada"));
@@ -228,21 +229,27 @@ export default function RessuprimentoScreen() {
     }
   };
 
-  const confirmDeposit = async (percent: number) => {
-    if (!activeTransfer || !depositBarcode) return;
+  const confirmDeposit = async (level: GondolaLevel) => {
+    if (!activeTransfer || !depositFace) return;
     setLoading(true);
     try {
       const result = await api.depositCargoTransfer(activeTransfer.id, {
-        toLocationBarcode: depositBarcode,
+        toLocationBarcode: depositFace.barcode,
         productBarcode: activeTransfer.product.sku,
-        percent,
+        ...level,
       });
       setPhase("done");
-      showToast(`Reabastecido · gôndola ${result.toLocation.barcode} em ${result.toLocation.fillPercent}%`);
+      showToast(
+        `Reabastecido · gôndola ${result.toLocation.barcode} com ${
+          result.toLocation.stockQuantity != null
+            ? `${result.toLocation.stockQuantity} un.`
+            : `${result.toLocation.fillPercent}%`
+        }`,
+      );
       setSelected(null);
       setActiveTransfer(null);
       setPulmao(null);
-      setDepositBarcode(null);
+      setDepositFace(null);
     } catch (e) {
       showErrorAlert(apiErr(e, "Erro no depósito"));
     } finally {
@@ -281,7 +288,7 @@ export default function RessuprimentoScreen() {
     setFaceOptions([]);
     setSkuDraft("");
     setProductImageUrl(null);
-    setDepositBarcode(null);
+    setDepositFace(null);
     void load();
   };
 
@@ -349,7 +356,11 @@ export default function RessuprimentoScreen() {
                     <Text style={styles.needLoc} numberOfLines={1}>
                       {item.routeLabel}
                     </Text>
-                    <FillGauge fill={item.fillPercent} min={item.minPercent} />
+                    <FillGauge
+                      fill={item.fillPercent}
+                      min={item.minPercent}
+                      text={isQuantityMode(item) ? `${item.stockQuantity} un.` : undefined}
+                    />
                   </View>
                   <View style={styles.productRow}>
                     <ProductThumbnail imageUrl={item.imageUrl} alt={item.productName} size={48} />
@@ -532,12 +543,20 @@ export default function RessuprimentoScreen() {
           <BigCode label="Levar para" code={activeTransfer.targetPickFace.label} color={color} />
         ) : null}
 
-        {depositBarcode ? (
+        {depositFace ? (
           <>
-            <PercentInput
-              label={`Gôndola ${depositBarcode} — quanto ficou?`}
-              initialValue={100}
-              resetKey={depositBarcode}
+            <GondolaLevelInput
+              location={depositFace}
+              percentLabel={`Gôndola ${depositFace.barcode} — quanto ficou?`}
+              unitsLabel={`Gôndola ${depositFace.barcode} — quantas unidades ficou?`}
+              hint={
+                isQuantityMode(depositFace)
+                  ? `Tinha ${depositFace.stockQuantity} un. antes de abastecer`
+                  : undefined
+              }
+              initialPercent={100}
+              initialUnits={depositFace.capacity ?? null}
+              resetKey={depositFace.barcode}
               confirmLabel="Confirmar depósito"
               loading={loading}
               onConfirm={confirmDeposit}
@@ -547,7 +566,7 @@ export default function RessuprimentoScreen() {
               icon="swap-horizontal"
               size="sm"
               variant="secondary"
-              onPress={() => setDepositBarcode(null)}
+              onPress={() => setDepositFace(null)}
             />
           </>
         ) : (
@@ -582,7 +601,7 @@ export default function RessuprimentoScreen() {
               <OptionRow
                 key={loc.id}
                 title={loc.label}
-                meta={`Gôndola em ${loc.fillPercent}%`}
+                meta={`Gôndola com ${formatLevel(loc)}`}
                 highlight={loc.isSuggested}
                 onPress={() => void chooseDepositGondola(loc.barcode)}
               />
@@ -617,7 +636,7 @@ export default function RessuprimentoScreen() {
 }
 
 /** Barra de ocupação da gôndola com a marca do mínimo */
-function FillGauge({ fill, min }: { fill: number; min: number }) {
+function FillGauge({ fill, min, text }: { fill: number; min: number; text?: string }) {
   const barColor = fill <= min / 2 ? theme.danger : theme.warning;
   return (
     <View style={styles.gaugeWrap}>
@@ -625,7 +644,7 @@ function FillGauge({ fill, min }: { fill: number; min: number }) {
         <View style={[styles.gaugeFill, { width: `${Math.min(100, fill)}%`, backgroundColor: barColor }]} />
         <View style={[styles.gaugeMin, { left: `${Math.min(100, min)}%` }]} />
       </View>
-      <Text style={[styles.gaugeText, { color: barColor }]}>{fill}%</Text>
+      <Text style={[styles.gaugeText, { color: barColor }]}>{text ?? `${fill}%`}</Text>
     </View>
   );
 }
