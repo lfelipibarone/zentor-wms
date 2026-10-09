@@ -41,8 +41,9 @@ type Slot = {
   rect: { x: number; y: number; width: number; height: number };
 };
 
-const SELECTED_COLOR = "#0d9488";
-const DEMAND_COLOR = "#f59e0b";
+const SELECTED_COLOR = "#2563eb";
+const HAS_ORDERS_COLOR = "#16a34a";
+const NO_ORDERS_COLOR = "#ef4444";
 
 function faceEstanteId(e: FloorElement, face: Face): string | null {
   return (face === "B" ? e.estanteIdB || e.estanteId : e.estanteId) || null;
@@ -361,31 +362,73 @@ export function WaveMapBuilder({
     [map],
   );
 
-  const maxDemand = useMemo(() => Math.max(1, ...[...ordersByColuna.values()].map((s) => s.size)), [ordersByColuna]);
-
   const overlay = (
     <g>
       {slots.map((s) => {
         const state = colunaState(s.key);
         const count = ordersByColuna.get(s.key)?.size ?? 0;
-        if (!state && count === 0 && s.key !== focusKey) return null;
-        const fill = state ? SELECTED_COLOR : DEMAND_COLOR;
-        const opacity = state === "whole" ? 0.6 : state === "partial" ? 0.35 : 0.15 + 0.45 * (count / maxDemand);
+        const { x, y, width, height } = s.rect;
+        const inset = 0.04;
+        const short = Math.min(width, height);
+        const fill = state ? SELECTED_COLOR : count > 0 ? HAS_ORDERS_COLOR : NO_ORDERS_COLOR;
+        const opacity = state === "whole" ? 0.5 : state === "partial" ? 0.28 : count > 0 ? 0.3 : 0.1;
+        const badgeR = Math.min(0.3, short * 0.24);
         return (
-          <rect
-            key={s.key}
-            x={s.rect.x + 0.03}
-            y={s.rect.y + 0.03}
-            width={Math.max(0.05, s.rect.width - 0.06)}
-            height={Math.max(0.05, s.rect.height - 0.06)}
-            fill={state || count > 0 ? fill : "none"}
-            fillOpacity={state || count > 0 ? opacity : 0}
-            stroke={s.key === focusKey ? "#0f172a" : state ? SELECTED_COLOR : "none"}
-            strokeWidth={s.key === focusKey ? 0.12 : 0.06}
-            strokeDasharray={state === "partial" ? "0.2 0.12" : undefined}
-          >
-            <title>{`${s.label} — ${count} pedido(s)`}</title>
-          </rect>
+          <g key={s.key}>
+            <rect
+              x={x + inset}
+              y={y + inset}
+              width={Math.max(0.05, width - inset * 2)}
+              height={Math.max(0.05, height - inset * 2)}
+              fill="#fff"
+            />
+            <rect
+              x={x + inset}
+              y={y + inset}
+              width={Math.max(0.05, width - inset * 2)}
+              height={Math.max(0.05, height - inset * 2)}
+              fill={fill}
+              fillOpacity={opacity}
+              stroke={s.key === focusKey ? "#0f172a" : state ? SELECTED_COLOR : "none"}
+              strokeWidth={s.key === focusKey ? 0.12 : 0.07}
+              strokeDasharray={state === "partial" ? "0.2 0.12" : undefined}
+            >
+              <title>{`${s.label} — ${count} pedido(s)`}</title>
+            </rect>
+            <text
+              x={x + width / 2}
+              y={y + height / 2}
+              fontSize={Math.min(0.5, short * 0.42)}
+              textAnchor="middle"
+              dominantBaseline="central"
+              fill={count > 0 || state ? "#0f172a" : "#94a3b8"}
+              fontWeight={count > 0 || state ? 600 : 400}
+              pointerEvents="none"
+            >
+              {s.coluna}
+            </text>
+            {count > 0 ? (
+              <g pointerEvents="none">
+                <circle
+                  cx={x + width - badgeR - 0.07}
+                  cy={y + badgeR + 0.07}
+                  r={badgeR}
+                  fill={state ? SELECTED_COLOR : HAS_ORDERS_COLOR}
+                />
+                <text
+                  x={x + width - badgeR - 0.07}
+                  y={y + badgeR + 0.07}
+                  fontSize={badgeR * (count > 99 ? 0.8 : count > 9 ? 1.05 : 1.3)}
+                  fontWeight={700}
+                  textAnchor="middle"
+                  dominantBaseline="central"
+                  fill="#fff"
+                >
+                  {count}
+                </text>
+              </g>
+            ) : null}
+          </g>
         );
       })}
     </g>
@@ -424,10 +467,20 @@ export function WaveMapBuilder({
             </span>
             <div className="ml-auto flex items-center gap-3 text-xs text-slate-600">
               <span className="flex items-center gap-1">
-                <span className="h-3 w-3 rounded-sm" style={{ background: DEMAND_COLOR, opacity: 0.6 }} /> tem pedido
+                <span className="h-3.5 w-3.5 rounded-sm" style={{ background: "#16a34a4d" }} />
+                <span
+                  className="flex h-3.5 w-3.5 items-center justify-center rounded-full text-[8px] font-bold text-white"
+                  style={{ background: HAS_ORDERS_COLOR }}
+                >
+                  2
+                </span>
+                tem pedido · nº de pedidos
               </span>
               <span className="flex items-center gap-1">
-                <span className="h-3 w-3 rounded-sm" style={{ background: SELECTED_COLOR, opacity: 0.7 }} /> selecionada
+                <span className="h-3.5 w-3.5 rounded-sm" style={{ background: "#ef44441a" }} /> sem pedido
+              </span>
+              <span className="flex items-center gap-1">
+                <span className="h-3.5 w-3.5 rounded-sm border" style={{ background: "#2563eb80", borderColor: SELECTED_COLOR }} /> selecionada
               </span>
               <button
                 type="button"
@@ -491,11 +544,11 @@ export function WaveMapBuilder({
                             type="button"
                             onClick={() => toggleLinha(focus, l)}
                             className={`rounded-md border px-2 py-1 text-xs font-medium ${
-                              on ? "border-teal-500 bg-teal-600 text-white" : "bg-white text-slate-700 hover:bg-slate-50"
+                              on ? "border-blue-600 bg-blue-600 text-white" : "bg-white text-slate-700 hover:bg-slate-50"
                             }`}
                           >
                             L{l}
-                            {n > 0 ? <span className={on ? "ml-1 text-teal-100" : "ml-1 text-amber-700"}>· {n}</span> : null}
+                            {n > 0 ? <span className={on ? "ml-1 text-blue-100" : "ml-1 text-green-700"}>· {n}</span> : null}
                           </button>
                         );
                       })}
