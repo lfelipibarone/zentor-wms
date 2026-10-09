@@ -1,6 +1,7 @@
 import type { Prisma } from "@prisma/client";
 import { LocationType, OrderStatus } from "@prisma/client";
 import { prisma } from "../lib/prisma.js";
+import { stockModeFields } from "./location-level.js";
 import { buildPaginationMeta } from "../lib/pagination.js";
 import { enrichOrderPriority } from "./marketplace-priority.js";
 import { findProductByBarcode } from "./location-stock.js";
@@ -341,6 +342,7 @@ export async function listProductLocations(
       row: loc.row,
       fillPercent: loc.fillPercent,
       minPercent: loc.minPercent,
+      ...stockModeFields(loc),
       isSuggested: loc.id === suggestedId,
     })),
   };

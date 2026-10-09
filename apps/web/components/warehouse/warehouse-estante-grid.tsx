@@ -1,6 +1,7 @@
 "use client";
 
 import { PercentBar } from "@/components/ops/percent-bar";
+import { unitsLabel } from "@/lib/stock-mode";
 import type { LayoutSituacao, LocationFace } from "@/lib/api/warehouse";
 import { EMPTY, type LayoutRow } from "@/lib/warehouse-layout-rows";
 import { cn } from "@/lib/utils";
@@ -101,6 +102,7 @@ function LinhaCell({
           className="mt-1 min-w-0"
           percent={row.fillPercent}
           minPercent={isPickFace(row) ? row.minPercent : null}
+          label={unitsLabel(row.location?.stockQuantity, row.location?.stockMode)}
         />
       ) : null}
     </button>

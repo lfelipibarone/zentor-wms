@@ -2,7 +2,7 @@ import { useState } from "react";
 import { StyleSheet, Text, View } from "react-native";
 import { BarcodeScanner } from "@/components/BarcodeScanner";
 import { FactoryButton } from "@/components/FactoryButton";
-import { PercentInput } from "@/components/PercentInput";
+import { GondolaLevelInput, type GondolaLevel } from "@/components/PercentInput";
 import { ProductThumbnail } from "@/components/ProductThumbnail";
 import { ScreenShell } from "@/components/ScreenShell";
 import {
@@ -18,6 +18,7 @@ import { useAdjustLocationStock } from "@/hooks/useAdjustLocationStock";
 import { api, ApiError, type ProductLocationOption } from "@/lib/api";
 import { showErrorAlert } from "@/lib/app-alert";
 import { modules } from "@/lib/modules";
+import { formatLevel, formatMinLevel } from "@/lib/percent";
 import { theme, spacing, typography } from "@/lib/theme";
 
 type FoundProduct = {
@@ -32,7 +33,7 @@ function normalizeCode(code: string) {
   return code.trim().toUpperCase();
 }
 
-/** Lê o QR do produto (ou o código da gôndola) e grava a % que a gôndola está. */
+/** Lê o QR do produto (ou o código da gôndola) e grava o nível dela (% ou unidades). */
 export default function AtualizarGondolaScreen() {
   const [scannerOpen, setScannerOpen] = useState(false);
   const [codeDraft, setCodeDraft] = useState("");
@@ -80,6 +81,10 @@ export default function AtualizarGondolaScreen() {
           label: loc.label,
           fillPercent: loc.fillPercent,
           minPercent: loc.minPercent,
+          stockMode: loc.stockMode,
+          stockQuantity: loc.stockQuantity,
+          minQuantity: loc.minQuantity,
+          capacity: loc.capacity,
           isSuggested: true,
         };
         setProduct(loc.product);
@@ -107,23 +112,23 @@ export default function AtualizarGondolaScreen() {
     }
   };
 
-  const savePercent = async (percent: number) => {
+  const saveLevel = async (level: GondolaLevel) => {
     if (!product || !face) return;
     try {
       const result = await adjust.mutateAsync({
         locationId: face.id,
-        percent,
+        ...level,
         productBarcode: product.barcode ?? product.sku,
         reason: "Atualização pelo QR do produto",
       });
       setMessage(
-        `${product.sku} · ${face.label}: ${result.location.fillPercent}%` +
+        `${product.sku} · ${face.label}: ${formatLevel(result.location)}` +
           (result.location.needsReplenishment ? " · foi para reposição" : "") +
           " ✓",
       );
       reset();
     } catch (e) {
-      showErrorAlert(e instanceof ApiError ? e.message : "Erro ao salvar a %");
+      showErrorAlert(e instanceof ApiError ? e.message : "Erro ao salvar a gôndola");
     }
   };
 
@@ -185,7 +190,7 @@ export default function AtualizarGondolaScreen() {
                 <OptionRow
                   key={loc.id}
                   title={loc.label}
-                  meta={`${loc.fillPercent}% · mín. ${loc.minPercent}%`}
+                  meta={levelMeta(loc)}
                   onPress={() => setFace(loc)}
                 />
               ))}
@@ -197,16 +202,17 @@ export default function AtualizarGondolaScreen() {
               <BigCode
                 label="Gôndola"
                 code={face.label}
-                meta={`Agora ${face.fillPercent}% · mín. ${face.minPercent}%`}
+                meta={`Agora ${levelMeta(face)}`}
                 color={color}
               />
-              <PercentInput
-                label="Quanto tem agora?"
-                initialValue={face.fillPercent}
+              <GondolaLevelInput
+                location={face}
+                percentLabel="Quanto tem agora?"
+                initialPercent={face.fillPercent}
                 resetKey={face.id}
                 confirmLabel="Salvar"
                 loading={adjust.isPending}
-                onConfirm={savePercent}
+                onConfirm={saveLevel}
               />
               {faces.length > 1 ? (
                 <FactoryButton
@@ -244,6 +250,11 @@ export default function AtualizarGondolaScreen() {
 }
 
 const color = modules.gondola.color;
+
+function levelMeta(loc: ProductLocationOption) {
+  const min = formatMinLevel(loc);
+  return min ? `${formatLevel(loc)} · mín. ${min}` : formatLevel(loc);
+}
 
 const styles = StyleSheet.create({
   flex: { flex: 1 },

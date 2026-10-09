@@ -1,8 +1,9 @@
 import { useState } from "react";
 import { Modal, ScrollView, StyleSheet, Text, View } from "react-native";
 import { FactoryButton } from "./FactoryButton";
-import { PercentInput } from "./PercentInput";
-import { formatPercent } from "@/lib/percent";
+import { GondolaLevelInput, type GondolaLevel } from "./PercentInput";
+import type { StockModeFields } from "@/lib/api";
+import { formatLevel, isQuantityMode } from "@/lib/percent";
 import { theme, spacing, typography } from "@/lib/theme";
 
 const REASON_PRESETS = [
@@ -17,6 +18,8 @@ export type AdjustStockContext = {
   locationLabel: string;
   /** % registrada hoje */
   currentPercent: number;
+  /** Modo da gôndola; por quantidade o ajuste é em unidades */
+  level?: StockModeFields;
   productBarcode?: string | null;
   productName?: string | null;
   orderId?: string;
@@ -33,7 +36,7 @@ interface AdjustStockModalProps {
    * Correção manual: pede motivo e permite cancelar.
    */
   mode?: "correction" | "after-pick";
-  onSubmit: (percent: number, reason: string) => void;
+  onSubmit: (level: GondolaLevel, reason: string) => void;
   onClose?: () => void;
 }
 
@@ -47,6 +50,8 @@ export function AdjustStockModal({
 }: AdjustStockModalProps) {
   const [reason, setReason] = useState("Contagem física");
   const afterPick = mode === "after-pick";
+  const location = { ...context?.level, fillPercent: context?.currentPercent ?? null };
+  const byUnits = isQuantityMode(location);
 
   return (
     <Modal visible={visible} transparent animationType="fade">
@@ -54,7 +59,11 @@ export function AdjustStockModal({
         <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled">
           <View style={styles.card}>
             <Text style={styles.title}>
-              {afterPick ? "Quanto ficou na gôndola?" : "Corrigir % da gôndola"}
+              {afterPick
+                ? "Quanto ficou na gôndola?"
+                : byUnits
+                  ? "Corrigir unidades da gôndola"
+                  : "Corrigir % da gôndola"}
             </Text>
             {context ? (
               <>
@@ -65,19 +74,21 @@ export function AdjustStockModal({
                   </Text>
                 ) : null}
                 <Text style={styles.systemQty}>
-                  Registrado: {formatPercent(context.currentPercent)}
+                  Registrado: {formatLevel(location)}
                 </Text>
               </>
             ) : null}
 
-            <PercentInput
-              label={afterPick ? "Olhe a gôndola e informe a %" : "% atual da gôndola"}
-              hint={afterPick ? "0% = gôndola vazia. Obrigatório para seguir." : undefined}
-              initialValue={afterPick ? null : context?.currentPercent ?? null}
+            <GondolaLevelInput
+              location={location}
+              percentLabel={afterPick ? "Olhe a gôndola e informe a %" : "% atual da gôndola"}
+              unitsLabel={afterPick ? "Conte as unidades na gôndola" : "Unidades na gôndola"}
+              hint={afterPick ? "0 = gôndola vazia. Obrigatório para seguir." : undefined}
+              initialPercent={afterPick ? null : context?.currentPercent ?? null}
               resetKey={`${context?.locationId}-${visible}`}
               confirmLabel={afterPick ? "Salvar e seguir" : "Confirmar ajuste"}
               loading={loading}
-              onConfirm={(pct) => onSubmit(pct, afterPick ? "Após coleta" : reason)}
+              onConfirm={(level) => onSubmit(level, afterPick ? "Após coleta" : reason)}
             >
               {afterPick ? null : (
                 <View style={styles.presets}>
@@ -92,7 +103,7 @@ export function AdjustStockModal({
                   ))}
                 </View>
               )}
-            </PercentInput>
+            </GondolaLevelInput>
 
             {!afterPick && onClose ? (
               <FactoryButton
@@ -103,7 +114,9 @@ export function AdjustStockModal({
               />
             ) : null}
             <Text style={styles.footerHint}>
-              Abaixo da % mínima, a gôndola entra na fila de reposição.
+              {byUnits
+                ? "No mínimo ou abaixo, a gôndola entra na fila de reposição."
+                : "Abaixo da % mínima, a gôndola entra na fila de reposição."}
             </Text>
           </View>
         </ScrollView>

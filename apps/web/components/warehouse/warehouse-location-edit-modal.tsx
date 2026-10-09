@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import {
   updateWarehousePosition,
   type LocationFace,
+  type StockMode,
   type WarehouseLayoutLocation,
   type WarehouseSegment,
   type WarehouseProximityReference,
@@ -62,6 +63,20 @@ export function WarehouseLocationEditModal({
   const [productId, setProductId] = useState(currentProduct?.id ?? "");
   const [minPercent, setMinPercent] = useState(String(row.location?.minPercent ?? 20));
   const [fillPercent, setFillPercent] = useState(String(row.location?.fillPercent ?? 0));
+  const [stockMode, setStockMode] = useState<StockMode>(row.location?.stockMode ?? "PERCENT");
+  const [capacity, setCapacity] = useState(String(row.location?.capacity ?? 100));
+  const [stockQuantity, setStockQuantity] = useState(
+    String(
+      row.location?.stockQuantity ??
+        Math.round(((row.location?.fillPercent ?? 0) * (row.location?.capacity ?? 100)) / 100),
+    ),
+  );
+  const [minQuantity, setMinQuantity] = useState(
+    String(
+      row.location?.minQuantity ??
+        Math.round(((row.location?.minPercent ?? 20) * (row.location?.capacity ?? 100)) / 100),
+    ),
+  );
   const [saving, setSaving] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const isPulmao = type === "PULMAO";
@@ -82,11 +97,25 @@ export function WarehouseLocationEditModal({
     [currentProduct],
   );
 
-  const fillValue = Number(fillPercent);
+  const byQuantity = stockMode === "QUANTITY";
+  const capacityValue = Math.max(1, Number(capacity) || 1);
+  const fillValue = byQuantity
+    ? Math.min(100, Math.round((Number(stockQuantity) * 100) / capacityValue))
+    : Number(fillPercent);
+  const minValue = byQuantity
+    ? Math.min(100, Math.round((Number(minQuantity) * 100) / capacityValue))
+    : Number(minPercent);
   const percentsValid = [minPercent, fillPercent].every((v) => {
     const n = Number(v);
     return v.trim() !== "" && Number.isInteger(n) && n >= 0 && n <= 100;
   });
+  const quantitiesValid =
+    [stockQuantity, minQuantity].every((v) => {
+      const n = Number(v);
+      return v.trim() !== "" && Number.isInteger(n) && n >= 0;
+    }) &&
+    Number.isInteger(Number(capacity)) &&
+    Number(capacity) >= 1;
 
   const save = async () => {
     if (!code.trim()) {
@@ -97,8 +126,12 @@ export function WarehouseLocationEditModal({
       setErr("Código de barras obrigatório");
       return;
     }
-    if (!isPulmao && productId && !percentsValid) {
+    if (!isPulmao && productId && !byQuantity && !percentsValid) {
       setErr("% mínima e % atual devem ser inteiros de 0 a 100");
+      return;
+    }
+    if (!isPulmao && byQuantity && !quantitiesValid) {
+      setErr("Capacidade, mínimo e quantidade devem ser números inteiros (capacidade maior que zero)");
       return;
     }
 
@@ -116,9 +149,16 @@ export function WarehouseLocationEditModal({
           ? { productId: null }
           : {
               productId: productId || null,
-              ...(productId
-                ? { minPercent: Number(minPercent), fillPercent: Number(fillPercent) }
-                : {}),
+              stockMode,
+              ...(byQuantity
+                ? {
+                    capacity: Number(capacity),
+                    minQuantity: Number(minQuantity),
+                    stockQuantity: Number(stockQuantity),
+                  }
+                : productId
+                  ? { minPercent: Number(minPercent), fillPercent: Number(fillPercent) }
+                  : {}),
             }),
         active,
       });
@@ -230,7 +270,65 @@ export function WarehouseLocationEditModal({
             ) : null}
           </div>
 
-          {productId ? (
+          <div className="space-y-1.5">
+            <p className="text-sm">Como medir a ocupação</p>
+            <div className="inline-flex rounded-lg bg-slate-100 p-0.5">
+              {(
+                [
+                  { id: "PERCENT", label: "Porcentagem" },
+                  { id: "QUANTITY", label: "Quantidade" },
+                ] as const
+              ).map((opt) => (
+                <button
+                  key={opt.id}
+                  type="button"
+                  onClick={() => setStockMode(opt.id)}
+                  className={`rounded-md px-3 py-1.5 text-sm font-medium ${
+                    stockMode === opt.id
+                      ? "bg-white text-slate-900 shadow-sm"
+                      : "text-slate-500 hover:text-slate-800"
+                  }`}
+                >
+                  {opt.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {byQuantity ? (
+            <div className="grid grid-cols-3 gap-2">
+              <label className="block text-sm">
+                Capacidade (un.)
+                <input
+                  type="number"
+                  min={1}
+                  className="mt-1 w-full rounded-lg border px-3 py-2"
+                  value={capacity}
+                  onChange={(e) => setCapacity(e.target.value)}
+                />
+              </label>
+              <label className="block text-sm">
+                Mínimo (un.)
+                <input
+                  type="number"
+                  min={0}
+                  className="mt-1 w-full rounded-lg border px-3 py-2"
+                  value={minQuantity}
+                  onChange={(e) => setMinQuantity(e.target.value)}
+                />
+              </label>
+              <label className="block text-sm">
+                Tem agora (un.)
+                <input
+                  type="number"
+                  min={0}
+                  className="mt-1 w-full rounded-lg border px-3 py-2"
+                  value={stockQuantity}
+                  onChange={(e) => setStockQuantity(e.target.value)}
+                />
+              </label>
+            </div>
+          ) : productId ? (
             <div className="grid grid-cols-2 gap-2">
               <label className="block text-sm">
                 % mínima (repor)
@@ -260,7 +358,7 @@ export function WarehouseLocationEditModal({
           {productId && Number.isFinite(fillValue) ? (
             <div>
               <div className="mb-1 text-xs text-slate-600">Ocupação</div>
-              <PercentBar percent={fillValue} minPercent={Number(minPercent)} />
+              <PercentBar percent={fillValue} minPercent={minValue} />
             </div>
           ) : null}
           </WarehouseFormStep>

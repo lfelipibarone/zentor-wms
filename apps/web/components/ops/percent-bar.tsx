@@ -4,10 +4,13 @@ import { cn } from "@/lib/utils";
 export function PercentBar({
   percent,
   minPercent,
+  label,
   className,
 }: {
   percent: number;
   minPercent?: number | null;
+  /** Texto no lugar da % (ex.: "12 un." na gôndola por quantidade) */
+  label?: string;
   className?: string;
 }) {
   const value = Math.max(0, Math.round(percent));
@@ -26,11 +29,11 @@ export function PercentBar({
       </div>
       <span
         className={cn(
-          "w-10 text-right text-sm font-semibold tabular-nums",
+          "min-w-10 whitespace-nowrap text-right text-sm font-semibold tabular-nums",
           empty ? "text-red-600" : low ? "text-amber-700" : "text-slate-700",
         )}
       >
-        {value}%
+        {label ?? `${value}%`}
       </span>
     </div>
   );

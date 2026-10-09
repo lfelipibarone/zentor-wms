@@ -11,6 +11,8 @@ import {
   ensurePickingStartLog,
 } from "./order-time-log-helpers.js";
 import { assertWaveShareStarted, finishShareIfDone } from "./work-share.js";
+import { decrementFaceOnPick, stockModeFields } from "./location-level.js";
+import { reconcilePickTargetsAfterStockChange } from "./pick-location-reconcile.js";
 
 export interface ConsolidatedPickInput {
   lineId: string;
@@ -105,7 +107,7 @@ export async function confirmConsolidatedPick(input: ConsolidatedPickInput) {
         ? PickWaveLineSortStatus.PENDING
         : line.sortStatus;
 
-  await prisma.$transaction(async (tx) => {
+  const level = await prisma.$transaction(async (tx) => {
     for (const upd of allocationUpdates) {
       const alloc = line.allocations.find((a) => a.id === upd.id)!;
       const newPicked = alloc.orderItem.quantityPicked + upd.addPick;
@@ -117,6 +119,7 @@ export async function confirmConsolidatedPick(input: ConsolidatedPickInput) {
 
     const now = new Date();
     const firstOrderId = line.allocations[0]?.orderItem?.orderId ?? null;
+    const change = await decrementFaceOnPick(tx, line.pickLocation, quantity);
 
     await tx.inventoryMovement.create({
       data: {
@@ -131,6 +134,7 @@ export async function confirmConsolidatedPick(input: ConsolidatedPickInput) {
         startedAt: line.pickStartedAt ?? now,
         completedAt: now,
         notes: `Pick consolidado onda · linha ${line.id}`,
+        ...(change ? { percentBefore: change.before, percentAfter: change.after } : {}),
       },
     });
 
@@ -168,9 +172,17 @@ export async function confirmConsolidatedPick(input: ConsolidatedPickInput) {
         await ensurePickingEndLog(tx, orderId, input.userId);
       }
     }
+    return change;
   });
 
   if (shareId) await finishShareIfDone(shareId);
+
+  if (level && level.unitsAfter <= 0 && level.unitsBefore > 0) {
+    await reconcilePickTargetsAfterStockChange(line.wave.tenantId, line.productId, {
+      adjustedLocationId: line.pickLocationId,
+      waveLineId: line.id,
+    });
+  }
 
   const updated = await prisma.pickWaveLine.findUnique({
     where: { id: line.id },
@@ -186,6 +198,7 @@ export async function confirmConsolidatedPick(input: ConsolidatedPickInput) {
       id: updated!.pickLocation.id,
       fillPercent: updated!.pickLocation.fillPercent,
       minPercent: updated!.pickLocation.minPercent,
+      ...stockModeFields(updated!.pickLocation),
     },
   };
 }

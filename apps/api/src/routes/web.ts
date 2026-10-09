@@ -35,6 +35,7 @@ import {
   resumePausedOrdersAfterPickFace,
 } from "../services/product-locations.js";
 import { selectableProductWhere } from "../services/product-selectable.js";
+import { isQuantityMode, quantityLevelData } from "../services/location-level.js";
 import { pulmaoStocksInclude, setPulmaoSkuPercent } from "../services/pulmao-inventory.js";
 import {
   DEFAULT_MIN_PERCENT,
@@ -1363,18 +1364,24 @@ export async function webRoutes(app: FastifyInstance) {
       if (!productId || !toLocationId) {
         return reply.status(400).send({ error: "Produto e local são obrigatórios" });
       }
-      let percent: number;
-      try {
-        percent = parsePercent(request.body?.percent);
-      } catch (e) {
-        if (e instanceof StockPercentError) return reply.status(400).send({ error: e.message });
-        throw e;
-      }
       const quantity = Math.max(0, Math.floor(Number(request.body?.quantity ?? 0)) || 0);
       const loc = await prisma.location.findFirst({
         where: { id: toLocationId, ...tenantWhere(request) },
       });
       if (!loc) return reply.status(404).send({ error: "Localização não encontrada" });
+      const byQuantity = isQuantityMode(loc);
+      if (byQuantity && quantity <= 0) {
+        return reply.status(400).send({ error: "Informe quantas unidades entraram na gôndola" });
+      }
+      let percent: number;
+      try {
+        percent = byQuantity
+          ? quantityLevelData(loc.stockQuantity + quantity, loc).fillPercent
+          : parsePercent(request.body?.percent);
+      } catch (e) {
+        if (e instanceof StockPercentError) return reply.status(400).send({ error: e.message });
+        throw e;
+      }
       if (loc.type === LocationType.PICK_FACE && loc.productId && loc.productId !== productId) {
         return reply.status(400).send({ error: "Gôndola alocada para outro produto" });
       }
@@ -1395,7 +1402,12 @@ export async function webRoutes(app: FastifyInstance) {
           percentBefore = loc.fillPercent;
           await tx.location.update({
             where: { id: toLocationId },
-            data: { fillPercent: percent, productId },
+            data: {
+              ...(byQuantity
+                ? quantityLevelData(loc.stockQuantity + quantity, loc)
+                : { fillPercent: percent }),
+              productId,
+            },
           });
         }
         return tx.inventoryMovement.create({

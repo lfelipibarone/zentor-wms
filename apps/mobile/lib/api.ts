@@ -91,7 +91,17 @@ export interface OrderQueueResponse {
   proximityGroups: ProximityGroupDto[];
 }
 
-export interface PickLocationDto {
+export type StockMode = "PERCENT" | "QUANTITY";
+
+/** Gôndola por quantidade: unidades contadas (null quando é por %). */
+export interface StockModeFields {
+  stockMode?: StockMode;
+  stockQuantity?: number | null;
+  minQuantity?: number | null;
+  capacity?: number;
+}
+
+export interface PickLocationDto extends StockModeFields {
   id: string;
   corridor: string;
   row: string;
@@ -142,7 +152,7 @@ export interface PickingSession {
 }
 
 export interface AdjustLocationResult {
-  location: {
+  location: StockModeFields & {
     id: string;
     barcode: string;
     type: string;
@@ -180,7 +190,7 @@ export interface AdjustLocationResult {
   };
 }
 
-export interface LocationLookup {
+export interface LocationLookup extends StockModeFields {
   id: string;
   corridor: string;
   row: string;
@@ -240,7 +250,7 @@ export interface RequestReplenishmentResult {
   message: string;
 }
 
-export interface ReplenishmentNeed {
+export interface ReplenishmentNeed extends StockModeFields {
   id: string;
   pickFaceId: string;
   pickFaceBarcode: string;
@@ -315,7 +325,7 @@ export interface ProblemWave {
   problemOrders: ProblemWaveOrder[];
 }
 
-export interface ProductLocationOption {
+export interface ProductLocationOption extends StockModeFields {
   id: string;
   barcode: string;
   label: string;
@@ -342,7 +352,9 @@ export interface CargoTransferSummary {
   };
   fromLocation: { id: string; barcode: string; label: string };
   toLocation: { id: string; barcode: string; label: string } | null;
-  targetPickFace: { id: string; barcode: string; label: string } | null;
+  targetPickFace:
+    | (StockModeFields & { id: string; barcode: string; label: string; fillPercent?: number })
+    | null;
   withdrawnByName: string;
 }
 
@@ -405,7 +417,9 @@ export const api = {
     request<{
       quantityPicked: number;
       completed: boolean;
-      location: { id: string; fillPercent: number; minPercent: number } | null;
+      location:
+        | (StockModeFields & { id: string; fillPercent: number; minPercent: number })
+        | null;
     }>(
       `/mobile/orders/${orderId}/items/${itemId}/pick`,
       {
@@ -455,10 +469,11 @@ export const api = {
       body: JSON.stringify({ productBarcode, percent }),
     }),
 
-  /** Gôndola: % que ela ficou. Pulmão: % do SKU (0 = acabou). */
+  /** Gôndola: % que ela ficou (ou unidades, se for por quantidade). Pulmão: % do SKU (0 = acabou). */
   adjustLocationPercent: (params: {
     locationId: string;
-    percent: number;
+    percent?: number;
+    quantity?: number;
     productBarcode?: string | null;
     reason?: string;
     orderId?: string;
@@ -471,6 +486,7 @@ export const api = {
         method: "POST",
         body: JSON.stringify({
           percent: params.percent,
+          quantity: params.quantity,
           productBarcode: params.productBarcode ?? undefined,
           reason: params.reason,
           orderId: params.orderId,
@@ -584,12 +600,14 @@ export const api = {
       toLocationBarcode: string;
       productBarcode?: string;
       /** % que a gôndola ficou */
-      percent: number;
+      percent?: number;
+      /** Gôndola por quantidade: unidades que ela tem agora */
+      quantity?: number;
     },
   ) =>
     request<{
       transfer: CargoTransferSummary;
-      toLocation: { barcode: string; fillPercent: number };
+      toLocation: { barcode: string; fillPercent: number; stockQuantity?: number | null };
     }>(`/mobile/cargo-transfers/${id}/deposit`, {
       method: "POST",
       body: JSON.stringify(body),
@@ -754,7 +772,9 @@ export const api = {
       quantityTotal: number;
       sortStatus: string;
       readyForSort: boolean;
-      location: { id: string; fillPercent: number; minPercent: number } | null;
+      location:
+        | (StockModeFields & { id: string; fillPercent: number; minPercent: number })
+        | null;
     }>(`/mobile/waves/lines/${lineId}/pick`, {
       method: "POST",
       body: JSON.stringify(body),
@@ -1097,7 +1117,7 @@ export interface WaveLineSummary {
     barcode: string | null;
     imageUrl?: string | null;
   };
-  pickLocation: {
+  pickLocation: StockModeFields & {
     id: string;
     barcode: string;
     label: string;

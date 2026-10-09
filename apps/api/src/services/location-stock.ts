@@ -5,6 +5,7 @@ import {
 } from "@prisma/client";
 import { productMatchesCode } from "@wms/shared";
 import { prisma } from "../lib/prisma.js";
+import { isQuantityMode } from "./location-level.js";
 import { parsePercent, StockPercentError } from "./stock-percent.js";
 
 export class LocationStockError extends Error {
@@ -100,6 +101,11 @@ export async function stockLocation(
 
   if (location.type !== LocationType.PICK_FACE) {
     throw new LocationStockError("Abastecimento apenas em gôndolas (pick face)");
+  }
+  if (isQuantityMode(location)) {
+    throw new LocationStockError(
+      "Esta gôndola é contada em unidades. Use Atualizar gôndola ou o Ressuprimento.",
+    );
   }
 
   const product = await findProductByBarcode(location.tenantId, productBarcode);

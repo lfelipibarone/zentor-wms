@@ -5,6 +5,7 @@ import Link from "next/link";
 import {
   Columns3,
   FileSpreadsheet,
+  Gauge,
   FileUp,
   LayoutGrid,
   List,
@@ -23,6 +24,7 @@ import {
   SelectDropdown,
 } from "@/components/warehouse/layout-filter-controls";
 import { Pagination } from "@/components/ui/pagination";
+import { EstanteStockModeModal } from "@/components/warehouse/estante-stock-mode-modal";
 import { WarehouseLocationEditModal } from "@/components/warehouse/warehouse-location-edit-modal";
 import { WarehouseLocationsTable } from "@/components/warehouse/warehouse-locations-table";
 import { WarehouseBarracaoCreateForm } from "@/components/warehouse/warehouse-barracao-create-form";
@@ -108,6 +110,7 @@ export function WarehouseLayoutEditor() {
   const [situacaoFilter, setSituacaoFilter] = useState<LayoutSituacao | "">("");
   const [estanteRows, setEstanteRows] = useState<LayoutRow[]>([]);
   const [estanteLoading, setEstanteLoading] = useState(false);
+  const [stockModeOpen, setStockModeOpen] = useState(false);
 
   useEffect(() => {
     const timer = setTimeout(() => setDebouncedSearch(search), 300);
@@ -278,6 +281,14 @@ export function WarehouseLayoutEditor() {
       }),
     [estanteRows, tipoFilter],
   );
+
+  const estanteModeLabel = useMemo(() => {
+    const faces = estanteRows.filter((r) => r.location && r.location.type !== "PULMAO");
+    const byQty = faces.filter((r) => r.location?.stockMode === "QUANTITY").length;
+    if (faces.length === 0 || byQty === 0) return "%";
+    if (byQty === faces.length) return "quantidade";
+    return `misto (${byQty} por quantidade)`;
+  }, [estanteRows]);
 
   const hasExtraFilters =
     (viewMode === "lista" && !!estanteFilter) ||
@@ -515,16 +526,26 @@ export function WarehouseLayoutEditor() {
           ) : (
             <div className="rounded-xl border bg-white p-4 shadow-sm">
               {selectedEstante ? (
-                <p className="mb-3 text-sm text-slate-600">
-                  <span className="font-mono font-semibold text-slate-900">
-                    Estante {selectedEstante.label}
-                  </span>{" "}
-                  · {selectedEstante.colunas.length} colunas · {selectedEstante.total} posições
-                  {selectedEstante.semSku > 0 ? ` · ${selectedEstante.semSku} sem SKU` : ""}
-                  {selectedEstante.abaixoMin > 0
-                    ? ` · ${selectedEstante.abaixoMin} abaixo do mínimo`
-                    : ""}
-                </p>
+                <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+                  <p className="text-sm text-slate-600">
+                    <span className="font-mono font-semibold text-slate-900">
+                      Estante {selectedEstante.label}
+                    </span>{" "}
+                    · {selectedEstante.colunas.length} colunas · {selectedEstante.total} posições
+                    {selectedEstante.semSku > 0 ? ` · ${selectedEstante.semSku} sem SKU` : ""}
+                    {selectedEstante.abaixoMin > 0
+                      ? ` · ${selectedEstante.abaixoMin} abaixo do mínimo`
+                      : ""}
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => setStockModeOpen(true)}
+                    className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-3 text-sm font-medium text-slate-700 hover:border-slate-400"
+                  >
+                    <Gauge className="h-4 w-4" />
+                    Ocupação: {estanteModeLabel}
+                  </button>
+                </div>
               ) : null}
               <WarehouseEstanteGrid
                 rows={gridRows}
@@ -556,6 +577,19 @@ export function WarehouseLayoutEditor() {
           </div>
         )}
       </DataState>
+
+      {stockModeOpen && selectedEstante ? (
+        <EstanteStockModeModal
+          estanteId={selectedEstante.id}
+          estanteLabel={selectedEstante.label}
+          total={estanteRows.filter((r) => r.location?.type !== "PULMAO").length}
+          onClose={() => setStockModeOpen(false)}
+          onSaved={async () => {
+            setStockModeOpen(false);
+            await reload();
+          }}
+        />
+      ) : null}
 
       {editRow ? (
         <WarehouseLocationEditModal

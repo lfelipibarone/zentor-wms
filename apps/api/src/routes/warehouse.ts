@@ -11,6 +11,7 @@ import {
 import {
   createWarehousePosition,
   updateWarehousePosition,
+  setEstanteStockMode,
 } from "../services/warehouse-positions.js";
 import {
   listWarehouseEstanteRows,
@@ -829,6 +830,28 @@ export function registerWarehouseRoutes(app: FastifyInstance, guard: Guard) {
   );
 
   app.patch<{
+    Params: { estanteId: string };
+    Body: { stockMode?: "PERCENT" | "QUANTITY"; capacity?: number; minQuantity?: number };
+  }>(
+    "/api/warehouse/estantes/:estanteId/stock-mode",
+    { preHandler: guard(Permission.REGISTERS_VIEW) },
+    async (request, reply) => {
+      try {
+        return await setEstanteStockMode(tenantWhere(request).tenantId, request.params.estanteId, {
+          stockMode: request.body?.stockMode,
+          capacity: request.body?.capacity != null ? Number(request.body.capacity) : undefined,
+          minQuantity:
+            request.body?.minQuantity != null ? Number(request.body.minQuantity) : undefined,
+        });
+      } catch (e) {
+        return reply
+          .status(400)
+          .send({ error: e instanceof Error ? e.message : "Erro ao alterar a estante" });
+      }
+    },
+  );
+
+  app.patch<{
     Params: { linhaId: string };
     Body: {
       linhaCode?: string;
@@ -841,6 +864,9 @@ export function registerWarehouseRoutes(app: FastifyInstance, guard: Guard) {
       capacity?: number;
       minPercent?: number;
       fillPercent?: number;
+      stockMode?: "PERCENT" | "QUANTITY";
+      stockQuantity?: number;
+      minQuantity?: number;
       active?: boolean;
       proximityCorredorId?: string | null;
       proximityEstanteId?: string | null;

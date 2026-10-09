@@ -5,7 +5,8 @@ export function useAdjustLocationStock() {
   return useMutation({
     mutationFn: (params: {
       locationId: string;
-      percent: number;
+      percent?: number;
+      quantity?: number;
       productBarcode?: string | null;
       reason?: string;
       orderId?: string;

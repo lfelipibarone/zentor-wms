@@ -3,6 +3,7 @@ import { prisma } from "../lib/prisma.js";
 import { formatRouteLabel } from "./packing-queue-sort.js";
 import { getRouteEngine } from "./route-engine/index.js";
 import { needsReplenishment, percentToFill } from "./stock-percent.js";
+import { stockModeFields } from "./location-level.js";
 
 export type ReplenishmentNeed = {
   id: string;
@@ -17,6 +18,10 @@ export type ReplenishmentNeed = {
   minPercent: number;
   /** Pontos de % que faltam para encher a gôndola */
   percentToFill: number;
+  stockMode: string;
+  stockQuantity: number | null;
+  minQuantity: number | null;
+  capacity: number;
   suggestedPulmao: {
     id: string;
     barcode: string;
@@ -98,6 +103,7 @@ export async function listReplenishmentNeeds(
         fillPercent: face.fillPercent,
         minPercent: face.minPercent,
         percentToFill: percentToFill(face.fillPercent),
+        ...stockModeFields(face),
         suggestedPulmao: bestPulmao
           ? {
               id: bestPulmao.location.id,

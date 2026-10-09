@@ -1,5 +1,6 @@
 import type { LocationFace, LocationType, Prisma } from "@prisma/client";
 import { prisma } from "../lib/prisma.js";
+import { stockModeFields } from "./location-level.js";
 import { listLocationProximityReferencesByLocationIds } from "./location-proximity-references.js";
 import { gondolaCode } from "./warehouse-layout.js";
 import { needsReplenishment } from "./stock-percent.js";
@@ -92,6 +93,10 @@ export interface WarehouseLayoutListRow {
     barcode: string;
     minPercent: number;
     fillPercent: number;
+    stockMode: string;
+    stockQuantity: number | null;
+    minQuantity: number | null;
+    capacity: number;
     proximityCorredorId?: string | null;
     proximityEstanteId?: string | null;
     proximityLinhaId?: string | null;
@@ -281,6 +286,7 @@ function mapLinha(
           barcode: loc.barcode,
           minPercent: loc.minPercent,
           fillPercent: loc.fillPercent,
+          ...stockModeFields(loc),
           proximityCorredorId: loc.proximityCorredorId,
           proximityEstanteId: loc.proximityEstanteId,
           proximityLinhaId: loc.proximityLinhaId,
