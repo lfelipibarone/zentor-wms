@@ -8,9 +8,15 @@ import {
   parseTinyApiPedido,
   parseTinyPedidoSituacao,
   TINY_ORDER_SITUACAO_CANCELADA,
+  TINY_ORDER_SITUACOES_ENCERRADAS,
   TINY_ORDER_SITUACOES_SYNC,
   upsertOrderFromTiny,
 } from "./tiny-integration.js";
+import {
+  applyTinySituacaoToOrder,
+  TINY_RECONCILE_ORDER_STATUSES,
+  type TinyReconcileOutcome,
+} from "./tiny-order-reconcile.js";
 import {
   clearTinySyncCheckpoint,
   isTinySyncCheckpointResumable,
@@ -18,6 +24,7 @@ import {
   TINY_ORDERS_CHECKPOINT_KEY,
   TINY_ORDERS_LAST_SYNC_KEY,
   writeTinySyncCheckpoint,
+  type TinyOrderSyncPhase,
   type TinySyncCheckpointState,
 } from "./tiny-sync-checkpoint.js";
 import {
@@ -28,6 +35,7 @@ import {
 const TINY_MAX_SYNC_DAYS = 90;
 const TINY_LIST_PAGE_SIZE = 100;
 const TINY_LIST_MAX_OFFSET = 5000;
+const TINY_RECONCILE_BATCH_SIZE = 100;
 const TINY_SYNCABLE_SITUACOES = [...TINY_ORDER_SITUACOES_SYNC].sort(
   (a, b) => a - b,
 );
@@ -61,6 +69,10 @@ export type SyncSalesOrdersResult = {
   wavesRemoved: number;
   demoRemoved: number;
   cancelledRemoved: number;
+  /** Pedidos removidos da fila por já estarem Enviados/Entregues/Não entregues no Tiny. */
+  closedRemoved: number;
+  /** Pedidos em operação pausados por cancelamento no Tiny. */
+  cancelledFlagged: number;
   errors: Array<{ erpOrderId: string; message: string }>;
   tinyConnected: boolean;
   resumed: boolean;
@@ -177,25 +189,6 @@ export async function cleanupTenantOrdersAndWaves(
   return wipeAllTenantOrdersAndWaves(db, tenantId);
 }
 
-async function removeCancelledTinyPending(
-  tenantId: string,
-  pedidoId: number,
-): Promise<boolean> {
-  const erpOrderId = tinyErpOrderId(pedidoId);
-  const existing = await prisma.order.findFirst({
-    where: {
-      tenantId,
-      erpOrderId,
-      status: OrderStatus.PENDING,
-    },
-    select: { id: true },
-  });
-  if (!existing) return false;
-
-  await prisma.order.delete({ where: { id: existing.id } });
-  return true;
-}
-
 export async function syncSalesOrdersFromTiny(params: {
   tenantId: string;
   userId?: string;
@@ -214,6 +207,8 @@ export async function syncSalesOrdersFromTiny(params: {
     wavesRemoved: 0,
     demoRemoved: 0,
     cancelledRemoved: 0,
+    closedRemoved: 0,
+    cancelledFlagged: 0,
     errors: [],
     tinyConnected: false,
     resumed: false,
@@ -306,17 +301,21 @@ export async function syncSalesOrdersFromTiny(params: {
     : new Date().toISOString();
 
   let situacaoIndex = resume ? (savedCheckpoint!.situacaoIndex ?? 0) : 0;
-  let phase: "syncable" | "cancelled" = resume
+  let phase: TinyOrderSyncPhase = resume
     ? (savedCheckpoint!.phase ?? "syncable")
     : "syncable";
   let offset = resume ? savedCheckpoint!.offset : 0;
   let total = resume ? (savedCheckpoint!.total ?? Infinity) : Infinity;
+  let reconcileCursor =
+    resume && phase === "reconcile" ? (savedCheckpoint!.cursor ?? null) : null;
   let checkpointSaved = false;
+  /** Pedidos cuja situação no Tiny já foi verificada nesta execução. */
+  const checkedThisRun = new Set<string>();
 
   const persistCheckpoint = async (
     next: Pick<
       TinySyncCheckpointState,
-      "situacaoIndex" | "phase" | "offset" | "total" | "situacao"
+      "situacaoIndex" | "phase" | "offset" | "total" | "situacao" | "cursor"
     >,
     opts?: { pauseReason?: "rate_limit" | "interrupted" },
   ) => {
@@ -332,17 +331,47 @@ export async function syncSalesOrdersFromTiny(params: {
       situacaoIndex: next.situacaoIndex,
       situacao: next.situacao,
       phase: next.phase,
+      cursor: next.cursor ?? null,
       stats: {
         created: result.created,
         updated: result.updated,
         skipped: result.skipped,
         listedFromTiny: result.listedFromTiny,
         cancelledRemoved: result.cancelledRemoved,
+        closedRemoved: result.closedRemoved,
+        cancelledFlagged: result.cancelledFlagged,
       },
       pauseReason: opts?.pauseReason,
     };
     await writeTinySyncCheckpoint(params.tenantId, TINY_ORDERS_CHECKPOINT_KEY, state);
     checkpointSaved = true;
+  };
+
+  const countReconcileOutcome = (
+    outcome: TinyReconcileOutcome,
+    situacao: number | null,
+  ) => {
+    if (outcome === "removed") {
+      if (situacao === TINY_ORDER_SITUACAO_CANCELADA) {
+        result.cancelledRemoved += 1;
+      } else {
+        result.closedRemoved += 1;
+      }
+    } else if (outcome === "flagged") {
+      result.cancelledFlagged += 1;
+    } else {
+      result.skipped += 1;
+    }
+  };
+
+  const applySituacao = async (erpOrderId: string, situacao: number | null) => {
+    const outcome = await applyTinySituacaoToOrder({
+      tenantId: params.tenantId,
+      erpOrderId,
+      situacao,
+      userId: params.userId,
+    });
+    countReconcileOutcome(outcome, situacao);
   };
 
   const processSyncablePedido = async (pedidoId: number) => {
@@ -356,12 +385,11 @@ export async function syncSalesOrdersFromTiny(params: {
       const full = await client.getPedido(pedidoId);
       const fullSituacao = parseTinyPedidoSituacao(full);
 
-      if (fullSituacao === TINY_ORDER_SITUACAO_CANCELADA) {
-        if (await removeCancelledTinyPending(params.tenantId, pedidoId)) {
-          result.cancelledRemoved += 1;
-        } else {
-          result.skipped += 1;
-        }
+      if (
+        fullSituacao !== null &&
+        TINY_ORDER_SITUACOES_ENCERRADAS.has(fullSituacao)
+      ) {
+        await applySituacao(erpOrderId, fullSituacao);
         return;
       }
 
@@ -405,10 +433,25 @@ export async function syncSalesOrdersFromTiny(params: {
   };
 
   const processCancelledPedido = async (pedidoId: number) => {
-    if (await removeCancelledTinyPending(params.tenantId, pedidoId)) {
-      result.cancelledRemoved += 1;
-    } else {
+    const erpOrderId = tinyErpOrderId(pedidoId);
+    checkedThisRun.add(erpOrderId);
+    await applySituacao(erpOrderId, TINY_ORDER_SITUACAO_CANCELADA);
+  };
+
+  const reconcileOrder = async (erpOrderId: string) => {
+    const pedidoId = Number(erpOrderId.slice("TINY-".length));
+    if (!Number.isFinite(pedidoId) || pedidoId <= 0) {
       result.skipped += 1;
+      return;
+    }
+    try {
+      const full = await client.getPedido(pedidoId);
+      await applySituacao(erpOrderId, parseTinyPedidoSituacao(full));
+    } catch (e) {
+      if (isTinyRateLimitError(e)) throw e;
+      const message =
+        e instanceof Error ? e.message : "Erro ao conciliar pedido";
+      result.errors.push({ erpOrderId, message });
     }
   };
 
@@ -417,6 +460,8 @@ export async function syncSalesOrdersFromTiny(params: {
     let pageTotal = total;
 
     while (pageOffset < pageTotal) {
+      offset = pageOffset;
+      total = pageTotal;
       await persistCheckpoint({
         situacaoIndex,
         phase: "syncable",
@@ -437,6 +482,7 @@ export async function syncSalesOrdersFromTiny(params: {
       for (const raw of page.items) {
         const pedidoId = num(asRecord(raw)?.id);
         if (!pedidoId) continue;
+        checkedThisRun.add(tinyErpOrderId(pedidoId));
         await processSyncablePedido(pedidoId);
       }
 
@@ -469,6 +515,8 @@ export async function syncSalesOrdersFromTiny(params: {
     let pageTotal = total;
 
     while (pageOffset < pageTotal) {
+      offset = pageOffset;
+      total = pageTotal;
       await persistCheckpoint({
         situacaoIndex: TINY_SYNCABLE_SITUACOES.length,
         phase: "cancelled",
@@ -512,6 +560,51 @@ export async function syncSalesOrdersFromTiny(params: {
     }
   };
 
+  /**
+   * Revisa no Tiny todo pedido TINY-* ainda aberto no WMS (sem limite de data)
+   * que não apareceu como importável nas listagens desta execução.
+   */
+  const reconcileOpenOrders = async () => {
+    const baseWhere: Prisma.OrderWhereInput = {
+      tenantId: params.tenantId,
+      erpOrderId: { startsWith: "TINY-" },
+      status: { in: TINY_RECONCILE_ORDER_STATUSES },
+    };
+    const afterCursor = (): Prisma.OrderWhereInput =>
+      reconcileCursor
+        ? { ...baseWhere, id: { gt: reconcileCursor } }
+        : baseWhere;
+
+    total = offset + (await prisma.order.count({ where: afterCursor() }));
+
+    for (;;) {
+      await persistCheckpoint({
+        situacaoIndex: TINY_SYNCABLE_SITUACOES.length,
+        phase: "reconcile",
+        offset,
+        total,
+        cursor: reconcileCursor,
+      });
+
+      const batch = await prisma.order.findMany({
+        where: afterCursor(),
+        orderBy: { id: "asc" },
+        take: TINY_RECONCILE_BATCH_SIZE,
+        select: { id: true, erpOrderId: true },
+      });
+      if (batch.length === 0) break;
+
+      for (const order of batch) {
+        if (!checkedThisRun.has(order.erpOrderId)) {
+          checkedThisRun.add(order.erpOrderId);
+          await reconcileOrder(order.erpOrderId);
+        }
+        reconcileCursor = order.id;
+        offset += 1;
+      }
+    }
+  };
+
   try {
     if (phase === "syncable") {
       for (; situacaoIndex < TINY_SYNCABLE_SITUACOES.length; situacaoIndex++) {
@@ -524,26 +617,35 @@ export async function syncSalesOrdersFromTiny(params: {
         await syncSyncableSituacao(situacao, startOffset);
         offset = 0;
       }
+      phase = "cancelled";
     }
 
-    phase = "cancelled";
-    const cancelledStartOffset =
-      resume &&
-      savedCheckpoint!.phase === "cancelled" &&
-      situacaoIndex >= TINY_SYNCABLE_SITUACOES.length
-        ? offset
-        : 0;
-    total = Infinity;
-    await syncCancelledPedidos(cancelledStartOffset);
+    if (phase === "cancelled") {
+      const cancelledStartOffset =
+        resume &&
+        savedCheckpoint!.phase === "cancelled" &&
+        situacaoIndex >= TINY_SYNCABLE_SITUACOES.length
+          ? offset
+          : 0;
+      total = Infinity;
+      await syncCancelledPedidos(cancelledStartOffset);
+      phase = "reconcile";
+      offset = 0;
+      reconcileCursor = null;
+    }
+
+    await reconcileOpenOrders();
 
     await clearTinySyncCheckpoint(params.tenantId, TINY_ORDERS_CHECKPOINT_KEY);
     await setLastSyncAt(params.tenantId);
   } catch (e) {
     const situacao =
-      phase === "cancelled"
-        ? TINY_ORDER_SITUACAO_CANCELADA
-        : TINY_SYNCABLE_SITUACOES[situacaoIndex] ??
-          TINY_SYNCABLE_SITUACOES[0]!;
+      phase === "syncable"
+        ? (TINY_SYNCABLE_SITUACOES[situacaoIndex] ??
+          TINY_SYNCABLE_SITUACOES[0]!)
+        : phase === "cancelled"
+          ? TINY_ORDER_SITUACAO_CANCELADA
+          : undefined;
     await persistCheckpoint(
       {
         situacaoIndex,
@@ -551,6 +653,7 @@ export async function syncSalesOrdersFromTiny(params: {
         offset,
         total,
         situacao,
+        cursor: reconcileCursor,
       },
       {
         pauseReason: isTinyRateLimitError(e) ? "rate_limit" : "interrupted",
@@ -591,7 +694,7 @@ export async function syncSalesOrdersFromTiny(params: {
       "Use «Recomeçar do zero» para forçar reimportação completa.";
   } else if (result.listedFromTiny === 0) {
     result.warning =
-      `Nenhum pedido importável nos últimos ${effectiveDays} dias. O WMS importa apenas Aberta (0), Faturada (1), Aprovada (3), Preparando envio (4) e Pronto envio (7). Pedidos já enviados (5) ou entregues (6) são ignorados. Confira se há pedidos pendentes no ERP e se o OAuth tem permissão de Pedidos de Venda.`;
+      `Nenhum pedido importável nos últimos ${effectiveDays} dias. O WMS importa apenas Aberta (0), Faturada (1), Aprovada (3), Preparando envio (4) e Pronto envio (7). Pedidos já enviados (5) ou entregues (6) não são importados e saem da fila do WMS se ainda estiverem pendentes. Confira se há pedidos pendentes no ERP e se o OAuth tem permissão de Pedidos de Venda.`;
   } else if (result.errors.length > 0) {
     result.warning = `${result.errors.length} pedido(s) com erro ao importar. Veja errors[] no resultado.`;
   } else if (result.created === 0 && result.updated === 0) {
@@ -604,7 +707,7 @@ export async function syncSalesOrdersFromTiny(params: {
     source: "TINY",
     eventType: "sync_orders",
     status: result.errors.length > 0 ? "ERROR" : "OK",
-    message: `Criados: ${result.created}, atualizados: ${result.updated}, ignorados: ${result.skipped}${result.resumed ? ", retomado" : ""}`,
+    message: `Criados: ${result.created}, atualizados: ${result.updated}, ignorados: ${result.skipped}, cancelados removidos: ${result.cancelledRemoved}, enviados/entregues removidos: ${result.closedRemoved}, cancelados em operação pausados: ${result.cancelledFlagged}${result.resumed ? ", retomado" : ""}`,
     payload: {
       created: result.created,
       updated: result.updated,
@@ -614,6 +717,8 @@ export async function syncSalesOrdersFromTiny(params: {
       wavesRemoved: result.wavesRemoved,
       demoRemoved: result.demoRemoved,
       cancelledRemoved: result.cancelledRemoved,
+      closedRemoved: result.closedRemoved,
+      cancelledFlagged: result.cancelledFlagged,
       errorCount: result.errors.length,
       days: effectiveDays,
       resumed: result.resumed,

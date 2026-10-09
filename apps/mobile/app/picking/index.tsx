@@ -1,20 +1,16 @@
 import { useEffect, useState } from "react";
 import { router } from "expo-router";
-import { Alert, FlatList, Pressable, StyleSheet, Text, View } from "react-native";
+import { FlatList, Pressable, StyleSheet, Text, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useQuery } from "@tanstack/react-query";
 import { OrderStatus } from "@wms/shared";
-import {
-  useCreateWaveFromOrders,
-  useMobileConfig,
-  useOrderQueue,
-} from "@/hooks/usePicking";
+import { useOrderQueue } from "@/hooks/usePicking";
 import { AppHeader } from "@/components/AppHeader";
 import { FactoryButton } from "@/components/FactoryButton";
 import { CollectionDeadlineRow } from "@/components/CollectionDeadlineRow";
 import { WavePickingPanel } from "@/components/WavePickingPanel";
 import { Badge, Card, EmptyState, Loading, SectionTitle, SegmentedTabs } from "@/components/ui";
-import { showErrorAlert, showToast } from "@/lib/app-alert";
+import { showErrorAlert } from "@/lib/app-alert";
 import { modules } from "@/lib/modules";
 import { theme, spacing, typography, radius } from "@/lib/theme";
 import {
@@ -162,7 +158,6 @@ export default function PickingHubScreen() {
             refreshing={isRefetching}
             onRefresh={refetch}
             onPressOrder={handleOrderPress}
-            onGoToWaves={() => setTab("wave")}
           />
         )}
       </View>
@@ -176,18 +171,13 @@ function OrdersQueuePanel({
   refreshing,
   onRefresh,
   onPressOrder,
-  onGoToWaves,
 }: {
   orders: QueueOrder[];
   proximityGroups: ProximityGroupDto[];
   refreshing: boolean;
   onRefresh: () => void;
   onPressOrder: (o: QueueOrder) => void;
-  onGoToWaves: () => void;
 }) {
-  const { data: config } = useMobileConfig();
-  const createWave = useCreateWaveFromOrders();
-
   const handleAcceptBatch = async (group: ProximityGroupDto) => {
     const firstId = group.orderIds[0];
     if (!firstId) return;
@@ -217,54 +207,6 @@ function OrdersQueuePanel({
     }
   };
 
-  const runCreateWave = async (
-    orderIds: string[],
-    appendToWaveId?: string,
-  ) => {
-    try {
-      const result = await createWave.mutateAsync({ orderIds, appendToWaveId });
-      await onRefresh();
-      showToast(
-        `Onda criada com ${result.orderCount} pedido(s) e ${result.lineCount} linha(s).`,
-      );
-      onGoToWaves();
-    } catch (e) {
-      showErrorAlert(
-        e instanceof ApiError ? e.message : "Erro ao criar onda",
-      );
-    }
-  };
-
-  const handleCreateWave = async (group: ProximityGroupDto) => {
-    try {
-      const { wave: openWave } = await api.getOpenWave();
-      if (openWave) {
-        Alert.alert(
-          "Onda aberta",
-          `Adicionar ${group.orderIds.length} pedido(s) à onda "${openWave.name}" ou criar nova onda?`,
-          [
-            { text: "Cancelar", style: "cancel" },
-            {
-              text: "Criar nova",
-              onPress: () => void runCreateWave(group.orderIds),
-            },
-            {
-              text: "Adicionar à atual",
-              onPress: () =>
-                void runCreateWave(group.orderIds, openWave.id),
-            },
-          ],
-        );
-        return;
-      }
-      await runCreateWave(group.orderIds);
-    } catch (e) {
-      showErrorAlert(
-        e instanceof ApiError ? e.message : "Erro ao verificar ondas",
-      );
-    }
-  };
-
   const header =
     proximityGroups.length > 0 ? (
       <View style={styles.listHeader}>
@@ -281,17 +223,6 @@ function OrdersQueuePanel({
               {g.orders.map((o) => o.erpOrderId).join(" · ")}
             </Text>
             <View style={styles.recActions}>
-              {config?.waveEnabled ? (
-                <FactoryButton
-                  label="Criar onda"
-                  icon="layers"
-                  size="md"
-                  color={color}
-                  style={styles.flex}
-                  onPress={() => void handleCreateWave(g)}
-                  loading={createWave.isPending}
-                />
-              ) : null}
               <FactoryButton
                 label="Abrir 1º"
                 icon="open-outline"

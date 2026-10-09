@@ -8,18 +8,27 @@ export const TINY_PRODUCTS_LAST_SYNC_KEY = "tiny.products.lastSyncAt";
 export const TINY_ORDERS_CHECKPOINT_KEY = "tiny.orders.syncCheckpoint";
 export const TINY_ORDERS_LAST_SYNC_KEY = "tiny.orders.lastSyncAt";
 
-/** Fases do sync de pedidos: 5 situações syncáveis + cancelados. */
-export const TINY_ORDER_SYNC_PHASE_COUNT = 6;
+/** Fases do sync de pedidos: 5 situações syncáveis + cancelados + conciliação. */
+export const TINY_ORDER_SYNC_PHASE_COUNT = 7;
+
+export type TinyOrderSyncPhase = "syncable" | "cancelled" | "reconcile";
 
 const TINY_ORDER_SITUACAO_LABELS: Record<number, string> = {
   0: "Aberta",
   1: "Faturada",
+  2: "Cancelada",
   3: "Aprovada",
   4: "Preparando envio",
   5: "Enviada",
   6: "Entregue",
   7: "Pronto envio",
-  8: "Cancelada",
+  8: "Dados incompletos",
+  9: "Não entregue",
+};
+
+const TINY_ORDER_PHASE_LABELS: Partial<Record<TinyOrderSyncPhase, string>> = {
+  cancelled: "Cancelados",
+  reconcile: "Conciliação de status",
 };
 
 export type TinySyncCheckpointStats = {
@@ -29,6 +38,8 @@ export type TinySyncCheckpointStats = {
   skippedExisting?: number;
   listedFromTiny?: number;
   cancelledRemoved?: number;
+  closedRemoved?: number;
+  cancelledFlagged?: number;
 };
 
 export type TinySyncCheckpointState = {
@@ -43,7 +54,9 @@ export type TinySyncCheckpointState = {
   situacaoIndex?: number;
   situacao?: number;
   days?: number;
-  phase?: "syncable" | "cancelled";
+  phase?: TinyOrderSyncPhase;
+  /** Conciliação: último Order.id processado */
+  cursor?: string | null;
   stats?: TinySyncCheckpointStats;
   pauseReason?: "rate_limit" | "interrupted";
 };
@@ -63,7 +76,7 @@ export type TinySyncJobView = {
   total: number | null;
   stats: TinySyncCheckpointStats | null;
   /** Pedidos: detalhes da fase atual */
-  phase?: "syncable" | "cancelled";
+  phase?: TinyOrderSyncPhase;
   situacaoIndex?: number;
   situacaoLabel?: string;
   days?: number;
@@ -90,22 +103,30 @@ export function computeTinySyncProgressPercent(
     );
   }
 
-  const syncablePhases = TINY_ORDER_SYNC_PHASE_COUNT - 1;
-  if (checkpoint.phase === "cancelled") {
-    const p = phaseProgress(checkpoint.offset, checkpoint.total);
-    return Math.min(
-      100,
-      Math.round(((syncablePhases + p) / TINY_ORDER_SYNC_PHASE_COUNT) * 100),
-    );
-  }
-
-  const situacaoIndex = checkpoint.situacaoIndex ?? 0;
   const p = phaseProgress(checkpoint.offset, checkpoint.total);
   return Math.min(
     100,
     Math.round(
-      ((situacaoIndex + p) / TINY_ORDER_SYNC_PHASE_COUNT) * 100,
+      ((orderPhaseIndex(checkpoint) + p) / TINY_ORDER_SYNC_PHASE_COUNT) * 100,
     ),
+  );
+}
+
+/** Índice 0-based da fase atual do sync de pedidos. */
+function orderPhaseIndex(checkpoint: TinySyncCheckpointState): number {
+  if (checkpoint.phase === "reconcile") return TINY_ORDER_SYNC_PHASE_COUNT - 1;
+  if (checkpoint.phase === "cancelled") return TINY_ORDER_SYNC_PHASE_COUNT - 2;
+  return checkpoint.situacaoIndex ?? 0;
+}
+
+function orderPhaseLabel(checkpoint: TinySyncCheckpointState): string {
+  const phaseLabel = checkpoint.phase
+    ? TINY_ORDER_PHASE_LABELS[checkpoint.phase]
+    : undefined;
+  return (
+    phaseLabel ??
+    TINY_ORDER_SITUACAO_LABELS[checkpoint.situacao ?? -1] ??
+    `Situação ${checkpoint.situacao ?? "?"}`
   );
 }
 
@@ -123,15 +144,8 @@ export function buildTinySyncProgressLabel(
     return `Produtos: offset ${checkpoint.offset}${totalLabel}${pctLabel}`;
   }
 
-  const situacaoLabel =
-    checkpoint.phase === "cancelled"
-      ? "Cancelados"
-      : (TINY_ORDER_SITUACAO_LABELS[checkpoint.situacao ?? -1] ??
-        `Situação ${checkpoint.situacao ?? "?"}`);
-  const phaseNum =
-    checkpoint.phase === "cancelled"
-      ? TINY_ORDER_SYNC_PHASE_COUNT
-      : (checkpoint.situacaoIndex ?? 0) + 1;
+  const situacaoLabel = orderPhaseLabel(checkpoint);
+  const phaseNum = orderPhaseIndex(checkpoint) + 1;
   const totalLabel =
     checkpoint.total && checkpoint.total > 0
       ? ` — ${checkpoint.offset}/${checkpoint.total}`
@@ -196,10 +210,7 @@ function buildJobView(params: {
   if (kind === "orders") {
     base.phase = checkpoint.phase;
     base.situacaoIndex = checkpoint.situacaoIndex;
-    base.situacaoLabel =
-      checkpoint.phase === "cancelled"
-        ? "Cancelados"
-        : TINY_ORDER_SITUACAO_LABELS[checkpoint.situacao ?? -1];
+    base.situacaoLabel = orderPhaseLabel(checkpoint);
     base.days = checkpoint.days;
   }
 

@@ -649,27 +649,6 @@ export const api = {
   getMobileConfig: () =>
     request<{ waveEnabled: boolean }>("/mobile/config"),
 
-  getOpenWave: () =>
-    request<{
-      wave: {
-        id: string;
-        name: string;
-        orderCount: number;
-        lineCount: number;
-      } | null;
-    }>("/mobile/waves/open"),
-
-  createWaveFromOrders: (orderIds: string[], appendToWaveId?: string) =>
-    request<{
-      waveId: string;
-      orderCount: number;
-      lineCount: number;
-      waveCount?: number;
-    }>("/mobile/waves/create-from-orders", {
-      method: "POST",
-      body: JSON.stringify({ orderIds, appendToWaveId }),
-    }),
-
   listReleasedWaves: () =>
     request<{
       waves: Array<{

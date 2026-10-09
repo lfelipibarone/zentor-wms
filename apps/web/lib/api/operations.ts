@@ -130,36 +130,6 @@ export function fetchWavePendingSummary() {
   }>("/api/orders/wave-pending-summary");
 }
 
-export interface PickProximityGroup {
-  id: string;
-  orderIds: string[];
-  orders: Array<{
-    id: string;
-    erpOrderId: string;
-    marketplace: string | null;
-    customerName?: string | null;
-  }>;
-  /** Região do galpão; null quando os itens ainda não têm gôndola */
-  routeHint: string | null;
-  locationCount?: number;
-  units?: number;
-  earliestDeadline?: string | null;
-  proximityScore: number;
-}
-
-export function fetchPickProximityGroups(params?: {
-  marketplace?: string;
-  limit?: number;
-}) {
-  const sp = new URLSearchParams();
-  if (params?.marketplace) sp.set("marketplace", params.marketplace);
-  if (params?.limit) sp.set("limit", String(params.limit));
-  const q = sp.toString();
-  return apiFetch<{ groups: PickProximityGroup[] }>(
-    `/api/orders/pick-proximity-groups${q ? `?${q}` : ""}`,
-  );
-}
-
 export type BoardKind = "all" | "order" | "wave";
 
 export type BoardOrderEntry = OrderRow & { kind: "order" };
@@ -467,6 +437,8 @@ export type SyncTinySalesOrdersResult = {
   wavesRemoved: number;
   demoRemoved: number;
   cancelledRemoved: number;
+  closedRemoved: number;
+  cancelledFlagged: number;
   errors: Array<{ erpOrderId: string; message: string }>;
   tinyConnected: boolean;
   resumed?: boolean;
@@ -522,8 +494,10 @@ export type TinySyncJobStatus = {
     skippedExisting?: number;
     listedFromTiny?: number;
     cancelledRemoved?: number;
+    closedRemoved?: number;
+    cancelledFlagged?: number;
   } | null;
-  phase?: "syncable" | "cancelled";
+  phase?: "syncable" | "cancelled" | "reconcile";
   situacaoIndex?: number;
   situacaoLabel?: string;
   days?: number;

@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { MarketplaceBadge } from "@/components/ops/marketplace-badge";
 import { MarketplaceFilter } from "@/components/ops/marketplace-filter";
@@ -29,13 +29,12 @@ import {
   type WavePreview,
   type WaveRow,
 } from "@/lib/api/waves";
-import { ProximitySuggestions } from "@/components/waves/proximity-suggestions";
+import { Pagination } from "@/components/ui/pagination";
+import type { PaginationMeta } from "@/lib/pagination";
 import {
   fetchPendingOrdersForWave,
-  fetchPickProximityGroups,
   fetchWavePendingSummary,
   type OrderRow,
-  type PickProximityGroup,
 } from "@/lib/api/operations";
 
 const PARTITION_STRATEGIES: Array<{
@@ -55,7 +54,7 @@ const STATUS_LABEL: Record<string, string> = {
   CLOSED: "Encerrada",
 };
 
-const PENDING_PAGE_SIZE = 200;
+const PENDING_PAGE_SIZES = [50, 100, 200];
 
 type TabKey = "active" | "build";
 const TABS: Array<{ key: TabKey; label: string }> = [
@@ -73,7 +72,6 @@ export default function OndasPage() {
   const { can } = useAuth();
   const [tab, setTab] = useState<TabKey>("active");
   const [buildMode, setBuildMode] = useState<BuildMode>("map");
-  const [activeGroupId, setActiveGroupId] = useState<string | null>(null);
   /** Pedidos vindos do grupo ou do mapa: ficam no topo da lista até limpar a seleção */
   const [pinned, setPinned] = useState<Set<string>>(new Set());
 
@@ -88,9 +86,11 @@ export default function OndasPage() {
   const [pendingOrders, setPendingOrders] = useState<OrderRow[]>([]);
   const [pendingLoading, setPendingLoading] = useState(false);
   const [pendingError, setPendingError] = useState<string | null>(null);
-  const [pendingTotal, setPendingTotal] = useState(0);
+  const [pendingPagination, setPendingPagination] = useState<PaginationMeta | null>(null);
   const [pendingPage, setPendingPage] = useState(1);
-  const [loadingMore, setLoadingMore] = useState(false);
+  const [pendingPageSize, setPendingPageSize] = useState(PENDING_PAGE_SIZES[0]!);
+  const [debouncedSearch, setDebouncedSearch] = useState("");
+  const pendingRequest = useRef(0);
   const [mpSummary, setMpSummary] = useState<{
     total: number;
     marketplaces: Array<{ value: string; label: string; count: number }>;
@@ -99,9 +99,6 @@ export default function OndasPage() {
   const [marketplaceFilter, setMarketplaceFilter] = useState("");
   const [partitionStrategy, setPartitionStrategy] =
     useState<WavePartitionStrategy>("BY_PRODUCT");
-  const [proximityGroups, setProximityGroups] = useState<PickProximityGroup[]>(
-    [],
-  );
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [manualPreview, setManualPreview] = useState<WavePreview | null>(null);
   const [manualPreviewLoading, setManualPreviewLoading] = useState(false);
@@ -129,47 +126,38 @@ export default function OndasPage() {
     load();
   }, [load]);
 
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedSearch(search.trim()), 350);
+    return () => clearTimeout(t);
+  }, [search]);
+
+  useEffect(() => {
+    setPendingPage(1);
+  }, [marketplaceFilter, debouncedSearch, pendingPageSize]);
+
   const loadPending = useCallback(async () => {
+    const requestId = ++pendingRequest.current;
     setPendingLoading(true);
     setPendingError(null);
     try {
       const data = await fetchPendingOrdersForWave({
-        pageSize: PENDING_PAGE_SIZE,
+        page: pendingPage,
+        pageSize: pendingPageSize,
+        q: debouncedSearch || undefined,
         marketplace: marketplaceFilter || undefined,
       });
+      if (requestId !== pendingRequest.current) return;
       setPendingOrders(data.orders);
-      setPendingTotal(data.pagination.total);
-      setPendingPage(1);
+      setPendingPagination(data.pagination);
     } catch (e) {
+      if (requestId !== pendingRequest.current) return;
       setPendingError(
         e instanceof Error ? e.message : "Erro ao carregar pedidos",
       );
     } finally {
-      setPendingLoading(false);
+      if (requestId === pendingRequest.current) setPendingLoading(false);
     }
-  }, [marketplaceFilter]);
-
-  const loadMorePending = async () => {
-    setLoadingMore(true);
-    try {
-      const next = pendingPage + 1;
-      const data = await fetchPendingOrdersForWave({
-        page: next,
-        pageSize: PENDING_PAGE_SIZE,
-        marketplace: marketplaceFilter || undefined,
-      });
-      setPendingOrders((prev) => {
-        const seen = new Set(prev.map((o) => o.id));
-        return [...prev, ...data.orders.filter((o) => !seen.has(o.id))];
-      });
-      setPendingTotal(data.pagination.total);
-      setPendingPage(next);
-    } catch (e) {
-      setPendingError(e instanceof Error ? e.message : "Erro ao carregar pedidos");
-    } finally {
-      setLoadingMore(false);
-    }
-  };
+  }, [marketplaceFilter, pendingPage, pendingPageSize, debouncedSearch]);
 
   const loadMpSummary = useCallback(async () => {
     try {
@@ -179,25 +167,15 @@ export default function OndasPage() {
     }
   }, []);
 
-  const loadProximitySuggestions = useCallback(async () => {
-    try {
-      const data = await fetchPickProximityGroups({
-        marketplace: marketplaceFilter || undefined,
-        limit: 10,
-      });
-      setProximityGroups(data.groups);
-    } catch {
-      setProximityGroups([]);
-    }
-  }, [marketplaceFilter]);
-
   useEffect(() => {
     if (tab === "build" && buildMode === "list") {
-      loadPending();
-      void loadProximitySuggestions();
-      void loadMpSummary();
+      void loadPending();
     }
-  }, [tab, buildMode, loadPending, loadProximitySuggestions, loadMpSummary]);
+  }, [tab, buildMode, loadPending]);
+
+  useEffect(() => {
+    if (tab === "build" && buildMode === "list") void loadMpSummary();
+  }, [tab, buildMode, loadMpSummary]);
 
   const waveParams = () => ({
     marketplace: marketplaceFilter || undefined,
@@ -256,18 +234,16 @@ export default function OndasPage() {
   };
 
   const filteredPending = useMemo(() => {
-    const q = search.trim().toLowerCase();
-    const list = !q
-      ? pendingOrders
-      : pendingOrders.filter((o) => {
-          const erp = (o.erpOrderId ?? "").toLowerCase();
-          const cust = (o.customerName ?? "").toLowerCase();
-          const mkt = (o.marketplace ?? "").toLowerCase();
-          return erp.includes(q) || cust.includes(q) || mkt.includes(q);
-        });
-    if (pinned.size === 0) return list;
-    return [...list].sort((a, b) => Number(pinned.has(b.id)) - Number(pinned.has(a.id)));
-  }, [pendingOrders, search, pinned]);
+    if (pinned.size === 0) return pendingOrders;
+    return [...pendingOrders].sort((a, b) => Number(pinned.has(b.id)) - Number(pinned.has(a.id)));
+  }, [pendingOrders, pinned]);
+
+  const selectedOffPage = useMemo(() => {
+    const onPage = new Set(pendingOrders.map((o) => o.id));
+    let n = 0;
+    for (const id of selected) if (!onPage.has(id)) n++;
+    return n;
+  }, [pendingOrders, selected]);
 
   const allFilteredSelected = useMemo(() => {
     if (filteredPending.length === 0) return false;
@@ -298,42 +274,9 @@ export default function OndasPage() {
   const clearSelection = () => {
     setSelected(new Set());
     setPinned(new Set());
-    setActiveGroupId(null);
   };
 
-  const selectProximityGroup = (group: PickProximityGroup) => {
-    if (activeGroupId === group.id) {
-      clearSelection();
-      setManualMessage(null);
-      return;
-    }
-    const available = new Set(pendingOrders.map((o) => o.id));
-    const ids = group.orderIds.filter((id) => available.has(id));
-    setSelected(new Set(ids));
-    setPinned(new Set(ids));
-    setActiveGroupId(group.id);
-    setManualPreview(null);
-    setManualMessage(
-      ids.length > 0
-        ? `${ids.length} pedido(s) do grupo "${group.routeHint ?? "sem gôndola definida"}" selecionados — estão no topo da lista. Confira e clique em "Criar onda com selecionados".`
-        : "Os pedidos deste grupo não estão mais disponíveis. Clique em Atualizar.",
-    );
-  };
-
-  const toggleOrder = (id: string) => {
-    setActiveGroupId(null);
-    toggle(id);
-  };
-
-  const neighborCountByOrder = useMemo(() => {
-    const map = new Map<string, number>();
-    for (const g of proximityGroups) {
-      for (const id of g.orderIds) {
-        map.set(id, Math.max(0, g.orderIds.length - 1));
-      }
-    }
-    return map;
-  }, [proximityGroups]);
+  const toggleOrder = toggle;
 
   const handleManualPreview = async () => {
     if (selected.size === 0) return;
@@ -359,7 +302,6 @@ export default function OndasPage() {
   const finishManualWaveAction = async (messageText: string) => {
     setManualMessage(null);
     setMessage(messageText);
-    setActiveGroupId(null);
     setPinned(new Set());
     setSelected(new Set());
     setManualPreview(null);
@@ -536,7 +478,6 @@ export default function OndasPage() {
               onUseInList={(ids) => {
                 setSelected(new Set(ids));
                 setPinned(new Set(ids));
-                setActiveGroupId(null);
                 setManualPreview(null);
                 setManualMessage(`${ids.length} pedido(s) vindos do mapa selecionados — estão no topo da lista.`);
                 setBuildMode("list");
@@ -545,10 +486,11 @@ export default function OndasPage() {
           ) : (
             <BuildTab
               pendingOrders={filteredPending}
-              totalOrders={pendingOrders.length}
-              totalAvailable={pendingTotal}
-              loadingMore={loadingMore}
-              onLoadMore={loadMorePending}
+              pagination={pendingPagination}
+              onPageChange={setPendingPage}
+              pageSize={pendingPageSize}
+              onPageSize={setPendingPageSize}
+              selectedOffPage={selectedOffPage}
               marketplace={marketplaceFilter}
               onMarketplace={setMarketplaceFilter}
               marketplaceSummary={mpSummary}
@@ -557,10 +499,6 @@ export default function OndasPage() {
               search={search}
               onSearch={setSearch}
               partitionStrategy={partitionStrategy}
-              proximityGroups={proximityGroups}
-              activeGroupId={activeGroupId}
-              neighborCountByOrder={neighborCountByOrder}
-              onSelectProximityGroup={selectProximityGroup}
               selected={selected}
               allFilteredSelected={allFilteredSelected}
               onToggle={toggleOrder}
@@ -574,7 +512,6 @@ export default function OndasPage() {
               onRelease={handleManualRelease}
               onReload={() => {
                 void loadPending();
-                void loadProximitySuggestions();
                 void loadMpSummary();
               }}
             />
@@ -819,10 +756,11 @@ function ActiveTab({
 
 interface BuildTabProps {
   pendingOrders: OrderRow[];
-  totalOrders: number;
-  totalAvailable: number;
-  loadingMore: boolean;
-  onLoadMore: () => void;
+  pagination: PaginationMeta | null;
+  onPageChange: (page: number) => void;
+  pageSize: number;
+  onPageSize: (size: number) => void;
+  selectedOffPage: number;
   marketplace: string;
   onMarketplace: (v: string) => void;
   marketplaceSummary: {
@@ -834,10 +772,6 @@ interface BuildTabProps {
   search: string;
   onSearch: (v: string) => void;
   partitionStrategy: WavePartitionStrategy;
-  proximityGroups: PickProximityGroup[];
-  activeGroupId: string | null;
-  neighborCountByOrder: Map<string, number>;
-  onSelectProximityGroup: (g: PickProximityGroup) => void;
   selected: Set<string>;
   allFilteredSelected: boolean;
   onToggle: (id: string) => void;
@@ -854,10 +788,11 @@ interface BuildTabProps {
 
 function BuildTab({
   pendingOrders,
-  totalOrders,
-  totalAvailable,
-  loadingMore,
-  onLoadMore,
+  pagination,
+  onPageChange,
+  pageSize,
+  onPageSize,
+  selectedOffPage,
   marketplace,
   onMarketplace,
   marketplaceSummary,
@@ -866,10 +801,6 @@ function BuildTab({
   search,
   onSearch,
   partitionStrategy,
-  proximityGroups,
-  activeGroupId,
-  neighborCountByOrder,
-  onSelectProximityGroup,
   selected,
   allFilteredSelected,
   onToggle,
@@ -903,9 +834,7 @@ function BuildTab({
           Atualizar
         </button>
         <span className="text-sm text-muted-foreground">
-          {totalAvailable > totalOrders
-            ? `Mostrando ${totalOrders} de ${totalAvailable} pedidos sem onda`
-            : `${totalAvailable} pedido(s) sem onda`}
+          {pagination ? `${pagination.total} pedido(s) sem onda` : ""}
         </span>
       </div>
 
@@ -947,12 +876,6 @@ function BuildTab({
         </p>
       ) : null}
 
-      <ProximitySuggestions
-        groups={proximityGroups}
-        activeGroupId={activeGroupId}
-        onSelect={onSelectProximityGroup}
-      />
-
       <DataState
         loading={loading}
         error={error}
@@ -982,7 +905,6 @@ function BuildTab({
             <TableBody>
               {pendingOrders.map((o) => {
                 const isSelected = selected.has(o.id);
-                const neighbors = neighborCountByOrder.get(o.id) ?? 0;
                 return (
                   <TableRow
                     key={o.id}
@@ -998,14 +920,6 @@ function BuildTab({
                     </TableCell>
                     <TableCell className="whitespace-nowrap font-medium">
                       {o.erpOrderId}
-                      {neighbors > 0 ? (
-                        <span
-                          className="ml-2 rounded bg-teal-100 px-1.5 py-0.5 text-xs font-normal text-teal-800"
-                          title={`Itens perto de ${neighbors} outro(s) pedido(s) no galpão`}
-                        >
-                          +{neighbors} perto
-                        </span>
-                      ) : null}
                     </TableCell>
                     <TableCell>{o.customerName ?? "—"}</TableCell>
                     <TableCell>
@@ -1029,17 +943,25 @@ function BuildTab({
               })}
             </TableBody>
           </Table>
-          {totalAvailable > totalOrders ? (
-            <div className="flex items-center justify-center gap-3 border-t p-3 text-sm text-muted-foreground">
-              Mostrando {totalOrders} de {totalAvailable}
-              <button
-                type="button"
-                disabled={loadingMore}
-                onClick={onLoadMore}
-                className="rounded-lg border bg-white px-3 py-1.5 font-medium text-slate-700 hover:border-slate-300 disabled:opacity-50"
-              >
-                {loadingMore ? "Carregando…" : "Carregar mais"}
-              </button>
+          {pagination && pagination.total > 0 ? (
+            <div className="flex flex-wrap items-center justify-between gap-2 border-t">
+              <label className="flex items-center gap-2 px-4 text-sm text-muted-foreground">
+                Por página
+                <select
+                  value={pageSize}
+                  onChange={(e) => onPageSize(Number(e.target.value))}
+                  className="rounded-md border bg-white px-2 py-1 text-sm"
+                >
+                  {PENDING_PAGE_SIZES.map((n) => (
+                    <option key={n} value={n}>
+                      {n}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <div className="flex-1 [&>div]:border-t-0">
+                <Pagination pagination={pagination} onPageChange={onPageChange} />
+              </div>
             </div>
           ) : null}
         </div>
@@ -1087,6 +1009,11 @@ function BuildTab({
       <div className="sticky bottom-0 z-10 flex flex-wrap items-center justify-between gap-3 rounded-xl border bg-white p-3 shadow-md">
         <div className="text-sm">
           <strong>{selectedCount}</strong> pedido(s) selecionado(s)
+          {selectedOffPage > 0 ? (
+            <span className="ml-1 text-muted-foreground">
+              · {selectedOffPage} em outras páginas
+            </span>
+          ) : null}
           {selectedCount > 0 ? (
             <button
               type="button"

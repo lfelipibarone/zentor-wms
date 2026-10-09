@@ -95,4 +95,19 @@ describe("tiny-sync-checkpoint", () => {
     assert.ok(pct !== null && pct > 0 && pct < 100);
     assert.match(buildTinySyncProgressLabel(ordersCp), /Faturada/);
   });
+
+  it("mostra a fase de conciliação como última etapa", () => {
+    const reconcileCp = {
+      ...base,
+      kind: "orders" as const,
+      offset: 50,
+      total: 100,
+      phase: "reconcile" as const,
+      cursor: "order-50",
+      days: 30,
+    };
+    const pct = computeTinySyncProgressPercent(reconcileCp);
+    assert.ok(pct !== null && pct > 85 && pct < 100);
+    assert.match(buildTinySyncProgressLabel(reconcileCp), /Conciliação de status \(7\/7\)/);
+  });
 });
