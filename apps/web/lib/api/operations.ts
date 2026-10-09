@@ -764,9 +764,64 @@ export function fetchReplenishmentNeeds() {
   return apiFetch<{ needs: ReplenishmentNeedSummary[] }>("/api/stock/replenishment-needs");
 }
 
+export type PackingWaveQueueSummary = {
+  id: string;
+  name: string;
+  collectionDeadline: string | null;
+  orderCount: number;
+  pickerName: string | null;
+  linesTotal: number;
+  linesPicked: number;
+  linesSorted: number;
+  unitsTotal: number;
+  unitsPicked: number;
+  /** Linhas já coletadas aguardando distribuição nas cestas */
+  readyLines: PackingWaveLineSummary[];
+};
+
 export type PackingQueueItem =
-  | { kind: "wave_line"; sortKey: number; line: PackingWaveLineSummary }
+  | { kind: "wave"; sortKey: number; wave: PackingWaveQueueSummary }
   | { kind: "order"; sortKey: number; order: PackingOrder };
+
+export type PackingWaveOverview = {
+  wave: {
+    id: string;
+    name: string;
+    status: string;
+    releasedAt: string | null;
+    acceptedByName: string | null;
+    collectionDeadline: string | null;
+  };
+  lines: Array<{
+    id: string;
+    sku: string;
+    productName: string;
+    imageUrl: string | null;
+    locationBarcode: string;
+    routeLabel: string;
+    quantityTotal: number;
+    quantityPicked: number;
+    quantitySorted: number;
+    sortStatus: string;
+    pickedByName: string | null;
+  }>;
+  orders: Array<{
+    id: string;
+    erpOrderId: string;
+    customerName: string | null;
+    marketplace: string | null;
+    status: string;
+    priority: number;
+    collectionDeadline: string | null;
+    basketCode: string | null;
+    unitsTotal: number;
+    unitsSorted: number;
+  }>;
+};
+
+export function fetchPackingWaveOverview(waveId: string) {
+  return apiFetch<PackingWaveOverview>(`/api/packing/waves/${waveId}/overview`);
+}
 
 export function scanPackingBasket(barcode: string) {
   return apiFetch<{ order: PackingOrder }>("/api/packing/baskets/scan", {

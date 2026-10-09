@@ -81,12 +81,22 @@ export default function PackingWaveLinePage() {
           title={line?.waveName ?? "Onda"}
           description="Distribua as unidades coletadas nas cestas dos pedidos."
         />
-        <Link
-          href="/packing"
-          className="rounded-lg border px-3 py-2 text-sm font-medium"
-        >
-          Voltar
-        </Link>
+        <div className="flex gap-2">
+          {line ? (
+            <Link
+              href={`/packing/ondas/${line.waveId}`}
+              className="rounded-lg border px-3 py-2 text-sm font-medium"
+            >
+              Onda completa
+            </Link>
+          ) : null}
+          <Link
+            href="/packing"
+            className="rounded-lg border px-3 py-2 text-sm font-medium"
+          >
+            Voltar
+          </Link>
+        </div>
       </div>
 
       {message ? (

@@ -15,6 +15,7 @@ import {
   scanPackingBasket,
   type PackingOrder,
   type PackingQueueItem,
+  type PackingWaveQueueSummary,
 } from "@/lib/api/operations";
 import { fetchTenantApproachWaves, type ApproachWaveSummary } from "@/lib/api/approach-waves";
 
@@ -47,7 +48,7 @@ function ordersFromItems(items: PackingQueueItem[]): PackingOrder[] {
 
 function filterItems(items: PackingQueueItem[], filter: QueueFilter) {
   if (filter === "all") return items;
-  if (filter === "wave") return items.filter((i) => i.kind === "wave_line");
+  if (filter === "wave") return items.filter((i) => i.kind === "wave");
   return items.filter((i) => i.kind === "order");
 }
 
@@ -271,29 +272,13 @@ export default function PackingPage() {
           >
             <div className="space-y-2">
               {visible.map((entry) =>
-                entry.kind === "wave_line" ? (
-                  <button
-                    key={`wave-${entry.line.id}`}
-                    type="button"
-                    onClick={() => router.push(`/packing/waves/${entry.line.id}`)}
-                    className="w-full rounded-xl border border-amber-200 bg-amber-50/80 p-4 text-left shadow-sm transition hover:border-amber-400"
-                  >
-                    <div className="flex flex-wrap items-start justify-between gap-2">
-                      <span className="rounded-md bg-amber-200/80 px-2 py-0.5 text-xs font-bold uppercase text-amber-900">
-                        Onda
-                      </span>
-                      <CollectionDeadlineIndicator
-                        deadline={entry.line.collectionDeadline}
-                        className="max-w-[55%] justify-end text-xs"
-                      />
-                    </div>
-                    <p className="mt-2 font-semibold">{entry.line.waveName}</p>
-                    <p className="font-mono text-sm">{entry.line.sku}</p>
-                    <p className="text-sm text-muted-foreground">
-                      {entry.line.routeLabel ?? entry.line.locationBarcode} ·{" "}
-                      {entry.line.quantityPicked}/{entry.line.quantityTotal} un.
-                    </p>
-                  </button>
+                entry.kind === "wave" ? (
+                  <WaveQueueCard
+                    key={`wave-${entry.wave.id}`}
+                    wave={entry.wave}
+                    onOpenWave={() => router.push(`/packing/ondas/${entry.wave.id}`)}
+                    onOpenLine={(lineId) => router.push(`/packing/waves/${lineId}`)}
+                  />
                 ) : (
                   <button
                     key={entry.order.id}
@@ -339,6 +324,80 @@ export default function PackingPage() {
 
         <div className="order-1 lg:order-2">{basketForm}</div>
       </div>
+    </div>
+  );
+}
+
+const WAVE_CARD_LINE_LIMIT = 4;
+
+function WaveQueueCard({
+  wave,
+  onOpenWave,
+  onOpenLine,
+}: {
+  wave: PackingWaveQueueSummary;
+  onOpenWave: () => void;
+  onOpenLine: (lineId: string) => void;
+}) {
+  const pickedPct = wave.unitsTotal > 0 ? Math.round((wave.unitsPicked / wave.unitsTotal) * 100) : 0;
+  const shown = wave.readyLines.slice(0, WAVE_CARD_LINE_LIMIT);
+  const hidden = wave.readyLines.length - shown.length;
+
+  return (
+    <div className="rounded-xl border border-amber-200 bg-amber-50/80 p-4 shadow-sm">
+      <div className="flex flex-wrap items-start justify-between gap-2">
+        <span className="rounded-md bg-amber-200/80 px-2 py-0.5 text-xs font-bold uppercase text-amber-900">
+          Onda
+        </span>
+        <CollectionDeadlineIndicator
+          deadline={wave.collectionDeadline}
+          className="max-w-[55%] justify-end text-xs"
+        />
+      </div>
+      <p className="mt-2 font-semibold">{wave.name}</p>
+      <p className="text-sm text-muted-foreground">
+        {wave.orderCount} pedido(s) · coleta {wave.linesPicked}/{wave.linesTotal} itens · packing{" "}
+        {wave.linesSorted}/{wave.linesTotal}
+        {wave.pickerName ? ` · ${wave.pickerName}` : ""}
+      </p>
+      <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-amber-100">
+        <div className="h-full rounded-full bg-amber-500" style={{ width: `${pickedPct}%` }} />
+      </div>
+
+      <p className="mt-3 text-xs font-semibold uppercase text-amber-900">
+        Prontos para distribuir ({wave.readyLines.length})
+      </p>
+      <div className="mt-1 space-y-1">
+        {shown.map((line) => (
+          <button
+            key={line.id}
+            type="button"
+            onClick={() => onOpenLine(line.id)}
+            className="flex w-full items-center justify-between gap-2 rounded-lg border border-amber-200 bg-white px-3 py-2 text-left text-sm transition hover:border-amber-400"
+          >
+            <span className="min-w-0">
+              <span className="font-mono font-semibold">{line.sku}</span>
+              <span className="ml-2 text-muted-foreground">
+                {line.routeLabel ?? line.locationBarcode}
+              </span>
+            </span>
+            <span className="shrink-0 tabular-nums text-muted-foreground">
+              {line.quantityPicked}/{line.quantityTotal} un.
+            </span>
+          </button>
+        ))}
+        {hidden > 0 ? (
+          <p className="px-1 text-xs text-muted-foreground">+{hidden} item(ns) na onda completa</p>
+        ) : null}
+      </div>
+
+      <button
+        type="button"
+        onClick={onOpenWave}
+        className="mt-3 w-full rounded-lg border border-amber-300 bg-white py-2 text-sm font-semibold text-amber-900 transition hover:bg-amber-100"
+      >
+        Ver onda completa
+      </button>
     </div>
   );
 }

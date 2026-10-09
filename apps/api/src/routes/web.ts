@@ -109,6 +109,7 @@ import {
   getWavePackingLine,
   listPackingQueue,
   listUnifiedPackingQueue,
+  getWavePackingOverview,
   listWavePackingLines,
   reportPackingIssue,
   scanPackingItem,
@@ -2130,6 +2131,24 @@ export async function webRoutes(app: FastifyInstance) {
     "/api/packing/waves/lines",
     { preHandler: guard(Permission.SHIPPING_VIEW) },
     async (request) => listWavePackingLines(tenantWhere(request).tenantId),
+  );
+
+  app.get<{ Params: { waveId: string } }>(
+    "/api/packing/waves/:waveId/overview",
+    { preHandler: guard(Permission.SHIPPING_VIEW) },
+    async (request, reply) => {
+      try {
+        return await getWavePackingOverview(
+          tenantWhere(request).tenantId,
+          request.params.waveId,
+        );
+      } catch (e) {
+        if (e instanceof PackingSessionError) {
+          return reply.status(e.statusCode).send({ error: e.message });
+        }
+        throw e;
+      }
+    },
   );
 
   app.get<{ Params: { lineId: string } }>(

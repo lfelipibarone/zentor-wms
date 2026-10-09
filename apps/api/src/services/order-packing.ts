@@ -24,6 +24,7 @@ import {
   sortWavePackingLines,
 } from "./packing-queue-sort.js";
 import { getRouteEngine } from "./route-engine/index.js";
+import { sortPendingItemsByEngine } from "./route-engine/route-helpers.js";
 import { recordOrderStageChange } from "./order-stage-log.js";
 import { loadApproachWaveDefs } from "./approach-waves/store.js";
 import { matchLocation, sequenceKeyIn, type ZoneLocation } from "./approach-waves/matching.js";
@@ -320,21 +321,69 @@ export async function listUnifiedPackingQueue(tenantId: string, opts?: { approac
     collectionDeadline: string | null;
   };
 
+  type WaveQueue = {
+    id: string;
+    name: string;
+    collectionDeadline: string | null;
+    orderCount: number;
+    pickerName: string | null;
+    linesTotal: number;
+    linesPicked: number;
+    linesSorted: number;
+    unitsTotal: number;
+    unitsPicked: number;
+    readyLines: WaveLineQueue[];
+  };
+
   const items: Array<
-    | { kind: "wave_line"; sortKey: number; line: WaveLineQueue }
+    | { kind: "wave"; sortKey: number; wave: WaveQueue }
     | { kind: "order"; sortKey: number; order: (typeof ordersResult.orders)[0] }
   > = [];
 
+  const waveIds = [...new Set(waveLines.map((l) => l.waveId))];
+  const waveTotals = waveIds.length
+    ? await prisma.pickWave.findMany({
+        where: { id: { in: waveIds } },
+        select: {
+          id: true,
+          acceptedBy: { select: { name: true } },
+          _count: { select: { orders: true } },
+          lines: { select: { quantityTotal: true, quantityPicked: true, sortStatus: true } },
+        },
+      })
+    : [];
+  const totalsById = new Map(waveTotals.map((w) => [w.id, w]));
+
+  const waves = new Map<string, { sortKey: number; wave: WaveQueue }>();
   for (const line of waveLines) {
     const { collectionDeadline, pickLocation: _pick, ...lineRest } = line;
-    items.push({
-      kind: "wave_line",
+    const queueLine = { ...lineRest, collectionDeadline: collectionDeadline?.toISOString() ?? null };
+    const existing = waves.get(line.waveId);
+    if (existing) {
+      existing.wave.readyLines.push(queueLine);
+      continue;
+    }
+    const totals = totalsById.get(line.waveId);
+    const allLines = totals?.lines ?? [];
+    waves.set(line.waveId, {
       sortKey: line.waveUrgency,
-      line: {
-        ...lineRest,
-        collectionDeadline: collectionDeadline?.toISOString() ?? null,
+      wave: {
+        id: line.waveId,
+        name: line.waveName,
+        collectionDeadline: queueLine.collectionDeadline,
+        orderCount: totals?._count.orders ?? 0,
+        pickerName: totals?.acceptedBy?.name ?? null,
+        linesTotal: allLines.length,
+        linesPicked: allLines.filter((l) => l.quantityPicked >= l.quantityTotal).length,
+        linesSorted: allLines.filter((l) => l.sortStatus === PickWaveLineSortStatus.SORTED).length,
+        unitsTotal: allLines.reduce((sum, l) => sum + l.quantityTotal, 0),
+        unitsPicked: allLines.reduce((sum, l) => sum + l.quantityPicked, 0),
+        readyLines: [queueLine],
       },
     });
+  }
+  for (const { sortKey, wave } of waves.values()) {
+    items.push({ kind: "wave", sortKey, wave });
   }
   for (const order of queueOrders) {
     items.push({ kind: "order", sortKey: order.packingUrgency ?? 0, order });
@@ -749,6 +798,98 @@ export async function listWavePackingLines(tenantId: string) {
     lines: lines.map(
       ({ pickLocation: _p, collectionDeadline: _c, ...rest }) => rest,
     ),
+  };
+}
+
+/** Onda inteira para o packing: todas as linhas (coletadas ou não) e o andamento de cada pedido. */
+export async function getWavePackingOverview(tenantId: string, waveId: string) {
+  const wave = await prisma.pickWave.findFirst({
+    where: { id: waveId, tenantId },
+    include: {
+      acceptedBy: { select: { name: true } },
+      lines: {
+        include: {
+          product: { select: { sku: true, name: true, imageUrl: true } },
+          pickLocation: {
+            select: { corridor: true, row: true, barcode: true, estanteId: true, face: true },
+          },
+          pickedBy: { select: { name: true } },
+          allocations: {
+            select: { quantity: true, quantitySorted: true, orderItem: { select: { orderId: true } } },
+          },
+        },
+      },
+      orders: {
+        include: {
+          order: {
+            select: {
+              id: true,
+              erpOrderId: true,
+              customerName: true,
+              marketplace: true,
+              status: true,
+              priority: true,
+              collectionDeadline: true,
+              basket: { select: { code: true } },
+            },
+          },
+        },
+      },
+    },
+  });
+  if (!wave) throw new PackingSessionError("Onda não encontrada", 404);
+
+  const { collectionDeadline } = aggregateWaveUrgency(wave.orders.map((wo) => wo.order));
+  const engine = await getRouteEngine(tenantId);
+  const lines = sortPendingItemsByEngine(engine, wave.lines, () => true).map((l) => ({
+    id: l.id,
+    sku: l.product.sku,
+    productName: l.product.name,
+    imageUrl: l.product.imageUrl,
+    locationBarcode: l.pickLocation.barcode,
+    routeLabel: formatRouteLabel(l.pickLocation),
+    quantityTotal: l.quantityTotal,
+    quantityPicked: l.quantityPicked,
+    quantitySorted: l.allocations.reduce((sum, a) => sum + a.quantitySorted, 0),
+    sortStatus: l.sortStatus,
+    pickedByName: l.pickedBy?.name ?? null,
+  }));
+
+  const unitsByOrder = new Map<string, { total: number; sorted: number }>();
+  for (const l of wave.lines) {
+    for (const a of l.allocations) {
+      const acc = unitsByOrder.get(a.orderItem.orderId) ?? { total: 0, sorted: 0 };
+      acc.total += a.quantity;
+      acc.sorted += a.quantitySorted;
+      unitsByOrder.set(a.orderItem.orderId, acc);
+    }
+  }
+  const orders = wave.orders
+    .map(({ order: o }) => ({
+      id: o.id,
+      erpOrderId: o.erpOrderId,
+      customerName: o.customerName,
+      marketplace: o.marketplace,
+      status: o.status,
+      priority: o.priority,
+      collectionDeadline: o.collectionDeadline?.toISOString() ?? null,
+      basketCode: o.basket?.code ?? null,
+      unitsTotal: unitsByOrder.get(o.id)?.total ?? 0,
+      unitsSorted: unitsByOrder.get(o.id)?.sorted ?? 0,
+    }))
+    .sort((a, b) => b.priority - a.priority || a.erpOrderId.localeCompare(b.erpOrderId));
+
+  return {
+    wave: {
+      id: wave.id,
+      name: wave.name,
+      status: wave.status,
+      releasedAt: wave.releasedAt?.toISOString() ?? null,
+      acceptedByName: wave.acceptedBy?.name ?? null,
+      collectionDeadline: collectionDeadline?.toISOString() ?? null,
+    },
+    lines,
+    orders,
   };
 }
 
