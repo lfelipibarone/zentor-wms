@@ -860,7 +860,6 @@ export async function returnWaveLineToPicker(
       data: {
         quantityPicked: line.quantityPicked - units,
         sortStatus: PickWaveLineSortStatus.PENDING,
-        pickCompletedAt: null,
       },
     });
     const finishedShare = await tx.workShare.findFirst({
@@ -928,10 +927,13 @@ export async function returnWaveLineToPicker(
   };
 }
 
+/** Onda só vai para o packing quando o separador terminou de coletar tudo (cestas na mesa). */
+const WAVE_PICK_FINISHED = { lines: { every: { pickCompletedAt: { not: null } } } } satisfies Prisma.PickWaveWhereInput;
+
 async function listWavePackingLinesInternal(tenantId: string) {
   const lines = await prisma.pickWaveLine.findMany({
     where: {
-      wave: { tenantId, status: PickWaveStatus.RELEASED },
+      wave: { tenantId, status: PickWaveStatus.RELEASED, ...WAVE_PICK_FINISHED },
       quantityPicked: { gt: 0 },
       sortStatus: { not: PickWaveLineSortStatus.SORTED },
     },
@@ -1132,6 +1134,7 @@ export async function getWavePackingOverview(tenantId: string, waveId: string) {
       releasedAt: wave.releasedAt?.toISOString() ?? null,
       acceptedByName: wave.acceptedBy?.name ?? null,
       collectionDeadline: collectionDeadline?.toISOString() ?? null,
+      pickFinished: wave.lines.length > 0 && wave.lines.every((l) => l.pickCompletedAt != null),
     },
     lines,
     orders,

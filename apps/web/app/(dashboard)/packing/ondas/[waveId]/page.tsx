@@ -26,17 +26,24 @@ import { cn } from "@/lib/utils";
 
 type WaveLine = PackingWaveOverview["lines"][number];
 
-function lineState(line: WaveLine) {
+function lineState(line: WaveLine, pickFinished: boolean) {
   if (line.sortStatus === "SORTED") {
     return { label: "Conferido", className: "bg-emerald-100 text-emerald-800", ready: false };
   }
-  if (line.quantityPicked <= 0) {
-    return { label: "Aguardando coleta", className: "bg-slate-100 text-slate-600", ready: false };
+  if (!pickFinished) {
+    return line.quantityPicked >= line.quantityTotal
+      ? { label: "Coletado", className: "bg-sky-100 text-sky-800", ready: false }
+      : line.quantityPicked > 0
+        ? { label: "Coleta parcial", className: "bg-amber-100 text-amber-800", ready: false }
+        : { label: "Aguardando coleta", className: "bg-slate-100 text-slate-600", ready: false };
   }
   if (line.quantityPicked < line.quantityTotal) {
-    // Conferência já começou e um pedido voltou ao separador: os demais seguem conferindo.
-    const inConference = line.quantitySorted > 0 && line.quantityPicked > line.quantitySorted;
-    return { label: "Coleta parcial", className: "bg-amber-100 text-amber-800", ready: inConference };
+    // Packing devolveu um pedido ao separador: os demais seguem conferindo.
+    return {
+      label: "Recoleta pedida",
+      className: "bg-red-100 text-red-800",
+      ready: line.quantityPicked > line.quantitySorted,
+    };
   }
   return { label: "Pronto p/ conferir", className: "bg-amber-200 text-amber-900", ready: true };
 }
@@ -238,6 +245,12 @@ export default function PackingWaveOverviewPage() {
                 <span className="font-medium text-slate-700">Onda encerrada</span>
               ) : null}
             </div>
+            {data.wave.status === "RELEASED" && !data.wave.pickFinished ? (
+              <p className="rounded-lg bg-sky-50 px-3 py-2 text-sm text-sky-900">
+                Onda ainda em separação. A conferência libera quando o separador finalizar e deixar as
+                cestas na mesa do packing.
+              </p>
+            ) : null}
 
             <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
               <Stat label="Pedidos" value={String(orders.length)} />
@@ -262,7 +275,7 @@ export default function PackingWaveOverviewPage() {
                   </TableHeader>
                   <TableBody>
                     {lines.map((line) => {
-                      const state = lineState(line);
+                      const state = lineState(line, data.wave.pickFinished);
                       return (
                         <TableRow key={line.id}>
                           <TableCell>
