@@ -1352,6 +1352,9 @@ export async function getWaveLineDetail(lineId: string) {
       quantity: a.quantity,
       quantitySorted: a.quantitySorted,
       remaining: a.quantity - a.quantitySorted,
+      awaitingRepick:
+        line.quantityPicked < line.quantityTotal &&
+        Math.min(a.orderItem.quantityPicked, a.quantity) - a.quantitySorted < a.quantity - a.quantitySorted,
       order: {
         id: a.orderItem.order.id,
         erpOrderId: a.orderItem.order.erpOrderId,

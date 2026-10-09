@@ -2,93 +2,66 @@
 
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
-import { useParams, useRouter } from "next/navigation";
+import { useParams } from "next/navigation";
 import { PageHeader } from "@/components/ops/page-header";
 import { CollectionDeadlineIndicator } from "@/components/ops/collection-deadline-indicator";
 import { DataState } from "@/components/ops/data-state";
 import { WaveLineIssueModal } from "@/components/ops/wave-line-issue-modal";
 import { apiFetch } from "@/lib/api/client";
-import { productMatchesCode } from "@wms/shared";
 import { fetchWavePackingLine } from "@/lib/api/operations";
 import { cn } from "@/lib/utils";
+
+type WaveLine = Awaited<ReturnType<typeof fetchWavePackingLine>>["line"];
 
 export default function PackingWaveLinePage() {
   const params = useParams<{ lineId: string }>();
   const lineId = params.lineId;
-  const router = useRouter();
-  const [issueOpen, setIssueOpen] = useState(false);
 
-  const [line, setLine] = useState<
-    Awaited<ReturnType<typeof fetchWavePackingLine>>["line"] | null
-  >(null);
-  const [collectionDeadline, setCollectionDeadline] = useState<string | null>(
-    null,
-  );
-  const [basketBarcode, setBasketBarcode] = useState("");
+  const [line, setLine] = useState<WaveLine | null>(null);
+  const [collectionDeadline, setCollectionDeadline] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
-  const [productCode, setProductCode] = useState("");
-  const [productOk, setProductOk] = useState(false);
-  const [productError, setProductError] = useState<string | null>(null);
+  const [reporting, setReporting] = useState<WaveLine["allocations"][number] | null>(null);
 
-  const checkProduct = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!line || !productCode.trim()) return;
-    if (productMatchesCode(line.product, productCode)) {
-      setProductOk(true);
-      setProductError(null);
-    } else {
-      setProductError(
-        `Produto errado: "${productCode.trim()}" não é ${line.product.sku}. Confira o que veio do picking.`,
-      );
-      setProductCode("");
-    }
-  };
+  const refresh = useCallback(async () => {
+    const data = await fetchWavePackingLine(lineId);
+    setLine(data.line);
+    setCollectionDeadline(data.collectionDeadline ?? null);
+    return data.line;
+  }, [lineId]);
 
   const load = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
-      const data = await fetchWavePackingLine(lineId);
-      setLine(data.line);
-      setCollectionDeadline(data.collectionDeadline ?? null);
+      await refresh();
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Erro ao carregar linha");
+      setError(e instanceof Error ? e.message : "Erro ao carregar item");
     } finally {
       setLoading(false);
     }
-  }, [lineId]);
+  }, [refresh]);
 
   useEffect(() => {
     load();
   }, [load]);
 
-  const confirmWaveAlloc = async (
-    allocationId: string,
-    quantity: number,
-    basket?: string,
-  ) => {
+  const confirmAlloc = async (allocationId: string, quantity: number) => {
     setSaving(true);
     setMessage(null);
     try {
       await apiFetch(`/api/packing/waves/lines/${lineId}/sort`, {
         method: "POST",
-        body: JSON.stringify({
-          allocationId,
-          quantity,
-          basketBarcode: basket?.trim() || undefined,
-        }),
+        body: JSON.stringify({ allocationId, quantity }),
       });
-      const data = await fetchWavePackingLine(lineId);
-      setLine(data.line);
-      setCollectionDeadline(data.collectionDeadline ?? null);
-      if (data.line.sortStatus === "SORTED") {
-        setMessage("Item conferido em todos os pedidos");
-      } else {
-        setMessage("Unidades conferidas na cesta do pedido");
-      }
+      const updated = await refresh();
+      setMessage(
+        updated.sortStatus === "SORTED"
+          ? "Item conferido em todos os pedidos"
+          : "Quantidade confirmada",
+      );
     } catch (e) {
       setMessage(e instanceof Error ? e.message : "Erro na conferência");
     } finally {
@@ -96,26 +69,14 @@ export default function PackingWaveLinePage() {
     }
   };
 
-  const canReport =
-    !!line && line.quantityPicked > 0 && line.allocations.every((a) => a.quantitySorted === 0);
-
   return (
     <div className="mx-auto max-w-xl space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <PageHeader
           title={line ? `Conferir ${line.product.sku}` : "Conferir item"}
-          description={`${line?.waveName ?? "Onda"} · bipe o produto para conferir o que veio do picking e confirme as unidades de cada pedido.`}
+          description={`${line?.waveName ?? "Onda"} · confira a quantidade de cada pedido. Se estiver errado, toque em Reportar.`}
         />
         <div className="flex gap-2">
-          {canReport ? (
-            <button
-              type="button"
-              onClick={() => setIssueOpen(true)}
-              className="rounded-lg border border-red-300 px-3 py-2 text-sm font-medium text-red-700 hover:bg-red-50"
-            >
-              Reportar erro
-            </button>
-          ) : null}
           {line ? (
             <Link
               href={`/packing/ondas/${line.waveId}`}
@@ -124,135 +85,114 @@ export default function PackingWaveLinePage() {
               Onda completa
             </Link>
           ) : null}
-          <Link
-            href="/packing"
-            className="rounded-lg border px-3 py-2 text-sm font-medium"
-          >
+          <Link href="/packing" className="rounded-lg border px-3 py-2 text-sm font-medium">
             Voltar
           </Link>
         </div>
       </div>
 
-      {message ? (
-        <p className="rounded-lg bg-slate-100 px-3 py-2 text-sm">{message}</p>
-      ) : null}
+      {message ? <p className="rounded-lg bg-slate-100 px-3 py-2 text-sm">{message}</p> : null}
 
       <DataState loading={loading} error={error} empty={false}>
         {line ? (
           <>
-            <div className="rounded-xl border border-amber-200 bg-amber-50/60 p-4 shadow-sm">
-              <p className="text-xs font-semibold uppercase text-amber-800">
-                Onda · conferência
-              </p>
-              <p className="mt-1 font-mono text-sm font-bold">{line.product.sku}</p>
-              <p className="text-sm">{line.product.name}</p>
-              <p className="text-sm text-muted-foreground">
-                {line.quantityPicked}/{line.quantityTotal} un. coletadas
-              </p>
-              <div className="mt-3">
-                <CollectionDeadlineIndicator
-                  deadline={collectionDeadline}
-                  variant="detail"
+            <div className="flex gap-4 rounded-xl border border-amber-200 bg-amber-50/60 p-4 shadow-sm">
+              {line.product.imageUrl ? (
+                <img
+                  src={line.product.imageUrl}
+                  alt={line.product.name}
+                  className="h-20 w-20 shrink-0 rounded-lg border bg-white object-contain"
                 />
+              ) : null}
+              <div className="min-w-0 flex-1">
+                <p className="font-mono text-sm font-bold">{line.product.sku}</p>
+                <p className="text-sm">{line.product.name}</p>
+                <p className="text-sm text-muted-foreground">
+                  Local {line.pickLocation.barcode} · {line.quantityPicked}/{line.quantityTotal} un.
+                  coletadas
+                </p>
+                <div className="mt-3">
+                  <CollectionDeadlineIndicator deadline={collectionDeadline} variant="detail" />
+                </div>
               </div>
             </div>
 
-            {productOk ? (
-              <p className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-800">
-                Produto conferido: {line.product.sku}
-              </p>
-            ) : (
-              <form
-                onSubmit={checkProduct}
-                className="rounded-xl border-2 border-[#0d9488] bg-white p-4 shadow-sm"
-              >
-                <label className="text-sm font-semibold text-slate-800">
-                  1. Bipe o produto coletado
-                </label>
-                <p className="text-xs text-muted-foreground">
-                  Código de barras, SKU ou QR da etiqueta do produto.
-                </p>
-                <input
-                  autoFocus
-                  className="mt-2 w-full rounded-lg border px-3 py-2 font-mono text-sm"
-                  value={productCode}
-                  onChange={(e) => {
-                    setProductCode(e.target.value);
-                    setProductError(null);
-                  }}
-                  placeholder="Bipar produto"
-                />
-                {productError ? (
-                  <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
-                    <p className="text-sm font-medium text-red-700">{productError}</p>
-                    {canReport ? (
-                      <button
-                        type="button"
-                        onClick={() => setIssueOpen(true)}
-                        className="rounded-lg bg-red-600 px-3 py-1.5 text-xs font-semibold text-white"
-                      >
-                        Devolver para o separador
-                      </button>
-                    ) : null}
-                  </div>
-                ) : null}
-              </form>
-            )}
-
-            <div className={cn("rounded-xl border bg-white p-4 shadow-sm", !productOk && "opacity-50")}>
-              <label className="text-xs text-muted-foreground">
-                {productOk ? "2. " : ""}Cesta (bip)
-              </label>
-              <input
-                className="mt-1 w-full rounded-lg border px-3 py-2 text-sm font-mono"
-                value={basketBarcode}
-                onChange={(e) => setBasketBarcode(e.target.value)}
-                placeholder="Código da cesta"
-              />
-            </div>
-
             <div className="space-y-3">
-              {line.allocations.map((alloc) => (
-                <div key={alloc.id} className="rounded-xl border bg-white p-4 shadow-sm">
-                  <p className="font-mono font-bold">{alloc.order.erpOrderId}</p>
-                  <p className="text-sm text-muted-foreground">
-                    {alloc.quantitySorted}/{alloc.quantity} un.
-                    {alloc.order.basketCode
-                      ? ` · cesta ${alloc.order.basketCode}`
-                      : ""}
-                  </p>
-                  {alloc.remaining > 0 ? (
-                    <button
-                      type="button"
-                      disabled={saving || !productOk}
-                      className="mt-3 w-full rounded-lg bg-[#0d9488] py-2.5 text-sm font-semibold text-white disabled:opacity-50"
-                      onClick={() =>
-                        confirmWaveAlloc(
-                          alloc.id,
-                          alloc.remaining,
-                          basketBarcode || alloc.order.basketCode || undefined,
-                        )
-                      }
-                    >
-                      Confirmar {alloc.remaining} un.
-                    </button>
-                  ) : (
-                    <p className="mt-2 text-sm font-medium text-emerald-700">OK</p>
-                  )}
-                </div>
-              ))}
+              {line.allocations.map((alloc) => {
+                const done = alloc.remaining <= 0;
+                return (
+                  <div
+                    key={alloc.id}
+                    className={cn(
+                      "rounded-xl border bg-white p-4 shadow-sm",
+                      done && "border-emerald-300 bg-emerald-50",
+                      alloc.awaitingRepick && "border-red-200 bg-red-50/50",
+                    )}
+                  >
+                    <div className="flex items-baseline justify-between gap-2">
+                      <p className="font-mono font-bold">{alloc.order.erpOrderId}</p>
+                      <p className="text-sm text-muted-foreground">
+                        {alloc.order.basketCode ? `cesta ${alloc.order.basketCode}` : "sem cesta"}
+                      </p>
+                    </div>
+                    <p className="mt-1 text-2xl font-bold tabular-nums">
+                      {alloc.quantity} un.
+                      {alloc.quantitySorted > 0 && !done ? (
+                        <span className="ml-2 text-sm font-normal text-muted-foreground">
+                          ({alloc.quantitySorted} já conferida)
+                        </span>
+                      ) : null}
+                    </p>
+
+                    {done ? (
+                      <p className="mt-2 text-sm font-medium text-emerald-700">Conferido</p>
+                    ) : alloc.awaitingRepick ? (
+                      <p className="mt-2 text-sm font-medium text-red-700">
+                        Aguardando o separador coletar de novo
+                      </p>
+                    ) : (
+                      <div className="mt-3 flex gap-2">
+                        <button
+                          type="button"
+                          disabled={saving}
+                          className="flex-1 rounded-lg bg-[#0d9488] py-2.5 text-sm font-semibold text-white disabled:opacity-50"
+                          onClick={() => confirmAlloc(alloc.id, alloc.remaining)}
+                        >
+                          Confirmar {alloc.remaining} un.
+                        </button>
+                        <button
+                          type="button"
+                          disabled={saving}
+                          className="rounded-lg border border-red-300 px-4 py-2.5 text-sm font-semibold text-red-700 hover:bg-red-50 disabled:opacity-50"
+                          onClick={() => setReporting(alloc)}
+                        >
+                          Reportar
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
             </div>
           </>
         ) : null}
       </DataState>
 
-      {issueOpen && line ? (
+      {reporting && line ? (
         <WaveLineIssueModal
           lineId={line.id}
           sku={line.product.sku}
-          units={line.quantityPicked}
-          onClose={() => setIssueOpen(false)}
-          onSubmitted={() => router.push(`/packing/ondas/${line.waveId}`)}
+          location={line.pickLocation.barcode}
+          order={{
+            allocationId: reporting.id,
+            erpOrderId: reporting.order.erpOrderId,
+            units: reporting.remaining,
+          }}
+          onClose={() => setReporting(null)}
+          onSubmitted={() => {
+            setReporting(null);
+            void refresh();
+          }}
         />
       ) : null}
     </div>

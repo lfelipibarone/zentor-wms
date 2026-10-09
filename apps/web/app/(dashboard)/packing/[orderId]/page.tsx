@@ -31,6 +31,7 @@ export default function PackingOrderDetailPage() {
   const [message, setMessage] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [issueModalOpen, setIssueModalOpen] = useState(false);
+  const [issueItemId, setIssueItemId] = useState<string | undefined>(undefined);
   const packedProgressRef = useRef(false);
   const reportedRef = useRef(false);
   const labelPanelRef = useRef<ShippingLabelPanelHandle>(null);
@@ -164,7 +165,10 @@ export default function PackingOrderDetailPage() {
           {order ? (
             <button
               type="button"
-              onClick={() => setIssueModalOpen(true)}
+              onClick={() => {
+                setIssueItemId(undefined);
+                setIssueModalOpen(true);
+              }}
               disabled={saving}
               className="rounded-lg border border-red-300 bg-white px-3 py-2 text-sm font-medium text-red-700 hover:bg-red-50 disabled:opacity-50"
             >
@@ -184,6 +188,7 @@ export default function PackingOrderDetailPage() {
       {order && issueModalOpen ? (
         <PackingIssueModal
           order={order}
+          initialItemId={issueItemId}
           onClose={() => setIssueModalOpen(false)}
           onSubmitted={() => {
             reportedRef.current = true;
@@ -269,16 +274,29 @@ export default function PackingOrderDetailPage() {
                           Conferido {item.quantityPacked}/{item.quantityPicked}
                         </p>
                         {item.remaining > 0 ? (
-                          <button
-                            type="button"
-                            disabled={saving}
-                            onClick={() =>
-                              handleConfirmLine(item.id, item.remaining)
-                            }
-                            className="mt-auto self-start rounded-lg bg-[#0d9488] px-4 py-2 text-sm font-semibold text-white"
-                          >
-                            OK · {item.remaining} un.
-                          </button>
+                          <div className="mt-auto flex flex-wrap gap-2">
+                            <button
+                              type="button"
+                              disabled={saving}
+                              onClick={() =>
+                                handleConfirmLine(item.id, item.remaining)
+                              }
+                              className="rounded-lg bg-[#0d9488] px-4 py-2 text-sm font-semibold text-white"
+                            >
+                              OK · {item.remaining} un.
+                            </button>
+                            <button
+                              type="button"
+                              disabled={saving}
+                              onClick={() => {
+                                setIssueItemId(item.id);
+                                setIssueModalOpen(true);
+                              }}
+                              className="rounded-lg border border-red-300 px-4 py-2 text-sm font-semibold text-red-700 hover:bg-red-50"
+                            >
+                              Reportar
+                            </button>
+                          </div>
                         ) : (
                           <p className="mt-auto text-sm font-medium text-emerald-800">
                             Item completo
