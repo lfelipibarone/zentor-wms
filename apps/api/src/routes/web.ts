@@ -552,21 +552,6 @@ export async function webRoutes(app: FastifyInstance) {
     },
   );
 
-  app.get<{ Querystring: { marketplace?: string; limit?: string } }>(
-    "/api/orders/pick-proximity-groups",
-    { preHandler: guard(Permission.SALES_VIEW) },
-    async (request) => {
-      const limit = Number(request.query.limit);
-      const { getPickProximityGroups } = await import(
-        "../services/pick-proximity-recommendations.js"
-      );
-      return getPickProximityGroups(tenantWhere(request).tenantId, {
-        marketplace: request.query.marketplace,
-        limit: Number.isFinite(limit) && limit > 0 ? limit : 10,
-      });
-    },
-  );
-
   app.get(
     "/api/waves/settings",
     { preHandler: guard(Permission.SETTINGS_MANAGE) },

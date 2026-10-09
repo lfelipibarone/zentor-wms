@@ -40,23 +40,6 @@ export function useAcceptOrdersBatch() {
   });
 }
 
-export function useCreateWaveFromOrders() {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: ({
-      orderIds,
-      appendToWaveId,
-    }: {
-      orderIds: string[];
-      appendToWaveId?: string;
-    }) => api.createWaveFromOrders(orderIds, appendToWaveId),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: pickingKeys.queue });
-      qc.invalidateQueries({ queryKey: ["wave", "current"] });
-    },
-  });
-}
-
 export function useMobileConfig() {
   return useQuery({
     queryKey: ["mobile-config"],
