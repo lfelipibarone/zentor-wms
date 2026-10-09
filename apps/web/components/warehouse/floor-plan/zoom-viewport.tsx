@@ -182,7 +182,7 @@ export function ZoomViewport({
   };
 
   return (
-    <div className="relative">
+    <div>
       <div
         ref={ref}
         className="overflow-auto bg-slate-100/60"
@@ -200,11 +200,11 @@ export function ZoomViewport({
           {children(zoom)}
         </div>
       </div>
-      <div className="pointer-events-none absolute inset-x-3 bottom-3 flex items-end justify-between gap-2">
-        <span className="hidden rounded-md bg-white/90 px-2 py-1 text-[11px] text-slate-500 shadow-sm ring-1 ring-slate-200 md:inline">
+      <div className="flex items-center justify-between gap-2 border-t bg-white px-3 py-1">
+        <span className="truncate text-[11px] text-slate-400">
           ⌘/Ctrl + rolar ou pinça: zoom · arraste o fundo (ou espaço + arrastar): mover · + / − / 0
         </span>
-        <div className="pointer-events-auto ml-auto flex items-center gap-0.5 rounded-lg bg-white p-0.5 shadow-md ring-1 ring-slate-200">
+        <div className="flex flex-none items-center gap-0.5">
           <button
             type="button"
             title="Diminuir zoom (−)"
