@@ -377,7 +377,7 @@ function WaveQueueCard({
       <p className="mt-3 text-xs font-semibold uppercase text-amber-900">
         Prontos para conferir ({ready.length})
         {collecting > 0 ? (
-          <span className="ml-1 font-normal normal-case text-amber-800">· {collecting} ainda em coleta</span>
+          <span className="ml-1 font-normal normal-case text-amber-800">· {collecting} aguardando recoleta</span>
         ) : null}
       </p>
       <div className="mt-1 space-y-1">

@@ -90,6 +90,13 @@ export async function confirmSortAllocation(input: SortAllocationInput) {
   }
   if (!input.webPacking) {
     await assertWaveOperatorForMutation(line.waveId, input.userId, line.partId);
+  } else {
+    const stillPicking = await prisma.pickWaveLine.count({
+      where: { waveId: line.waveId, pickCompletedAt: null },
+    });
+    if (stillPicking > 0) {
+      throw new PickWaveError("A onda ainda está em separação. Confira quando o separador finalizar.");
+    }
   }
   const alloc = line.allocations.find((a) => a.id === input.allocationId);
   if (!alloc) throw new PickWaveError("Alocação não encontrada", 404);

@@ -791,6 +791,7 @@ export type PackingWaveOverview = {
     releasedAt: string | null;
     acceptedByName: string | null;
     collectionDeadline: string | null;
+    pickFinished: boolean;
   };
   lines: Array<{
     id: string;
