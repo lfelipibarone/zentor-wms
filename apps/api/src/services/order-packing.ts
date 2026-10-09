@@ -5,6 +5,8 @@ import {
   PickWaveLineSortStatus,
   PickWaveStatus,
   Prisma,
+  WorkShareKind,
+  WorkShareStatus,
 } from "@prisma/client";
 import { prisma } from "../lib/prisma.js";
 import { createNotification, notifyUsersWithPermission } from "./notifications.js";
@@ -819,6 +821,22 @@ export async function returnWaveLineToPicker(
         pickCompletedAt: null,
       },
     });
+    const finishedShare = await tx.workShare.findFirst({
+      where: {
+        kind: WorkShareKind.PICK_WAVE,
+        status: WorkShareStatus.FINISHED,
+        ...(line.partId ? { wavePartId: line.partId } : { waveId: line.waveId, wavePartId: null }),
+        ...(picker ? { assignedToId: picker.id } : {}),
+      },
+      orderBy: { finishedAt: "desc" },
+      select: { id: true },
+    });
+    if (finishedShare) {
+      await tx.workShare.update({
+        where: { id: finishedShare.id },
+        data: { status: WorkShareStatus.STARTED, finishedAt: null },
+      });
+    }
     const change = await restoreFaceOnReturn(tx, line.pickLocation, units);
     await tx.inventoryMovement.create({
       data: {
