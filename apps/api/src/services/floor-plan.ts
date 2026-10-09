@@ -106,7 +106,7 @@ async function assertBarracao(tenantId: string, barracaoId: string) {
   return barracao;
 }
 
-async function listBarracaoEstantes(tenantId: string, barracaoId: string) {
+export async function listBarracaoEstantes(tenantId: string, barracaoId: string) {
   const estantes = await prisma.warehouseEstante.findMany({
     where: { tenantId, corredor: { setor: { barracaoId } } },
     orderBy: [{ pickOrder: "asc" }, { code: "asc" }],

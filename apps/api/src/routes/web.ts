@@ -50,6 +50,7 @@ import { registerWarehouseRoutes } from "./warehouse.js";
 import { registerFloorPlanRoutes } from "./floor-plan.js";
 import { registerProductRoutes } from "./products.js";
 import { registerApproachWaveRoutes } from "./approach-waves.js";
+import { registerWaveMapRoutes } from "./wave-map.js";
 import type { WavePartitionStrategy } from "../services/pick-wave-partition.js";
 import {
   PickWaveError,
@@ -134,6 +135,7 @@ export async function webRoutes(app: FastifyInstance) {
   registerWarehouseRoutes(app, guard);
   registerFloorPlanRoutes(app, guard);
   registerApproachWaveRoutes(app, guard);
+  registerWaveMapRoutes(app, guard);
 
   // --- Pesquisa rápida ---
   app.get<{ Querystring: { q?: string } }>(
@@ -454,6 +456,7 @@ export async function webRoutes(app: FastifyInstance) {
           orderCount: w._count.orders,
           lineCount: w._count.lines,
           createdAt: w.createdAt,
+          template: w.template,
         })),
       };
     },
@@ -564,6 +567,7 @@ export async function webRoutes(app: FastifyInstance) {
       appendToWaveId?: string;
       marketplace?: string;
       partitionStrategy?: string;
+      templateId?: string;
     };
   }>(
     "/api/waves/release",
@@ -584,6 +588,10 @@ export async function webRoutes(app: FastifyInstance) {
             partitionStrategy:
               typeof body.partitionStrategy === "string"
                 ? (body.partitionStrategy as WavePartitionStrategy)
+                : undefined,
+            templateId:
+              typeof body.templateId === "string" && body.templateId
+                ? body.templateId
                 : undefined,
           },
         );

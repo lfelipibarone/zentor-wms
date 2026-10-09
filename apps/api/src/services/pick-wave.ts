@@ -414,7 +414,7 @@ async function createReleasedWave(
   releasedById: string,
   orders: OrderWithItems[],
   waveLabel: string,
-  meta?: { marketplace?: string | null; partitionStrategy?: string | null },
+  meta?: { marketplace?: string | null; partitionStrategy?: string | null; templateId?: string | null },
 ) {
   const lineBuilds = await buildWaveLinesFromOrders(orders, tenantId);
   if (lineBuilds.length === 0) {
@@ -432,6 +432,7 @@ async function createReleasedWave(
         status: PickWaveStatus.RELEASED,
         marketplace: meta?.marketplace ?? null,
         partitionStrategy: meta?.partitionStrategy ?? null,
+        templateId: meta?.templateId ?? null,
         releasedAt: new Date(),
         releasedById,
         orders: {
@@ -469,6 +470,8 @@ export async function releasePickWaves(
     auto?: boolean;
     marketplace?: string;
     partitionStrategy?: WavePartitionStrategy;
+    /** Onda fixa de origem: nomeia a onda e fica registrada nela */
+    templateId?: string;
   },
 ): Promise<{
   waves: Array<{ waveId: string; orderCount: number; lineCount: number; name: string }>;
@@ -490,6 +493,15 @@ export async function releasePickWaves(
   if (strategy === "BY_APPROACH" && (await loadApproachWaveDefs(tenantId, "PICKING")).length === 0) {
     throw new PickWaveError(NO_APPROACH_WAVES_MESSAGE);
   }
+
+  const template = opts?.templateId
+    ? await prisma.pickWaveTemplate.findFirst({
+        where: { id: opts.templateId, tenantId },
+        select: { id: true, name: true, active: true },
+      })
+    : null;
+  if (opts?.templateId && !template) throw new PickWaveError("Onda fixa não encontrada");
+  if (template && !template.active) throw new PickWaveError("Esta onda fixa está desativada");
 
   const orders = await buildWaveCandidateOrders(tenantId, {
     orderIds: opts?.orderIds,
@@ -530,7 +542,9 @@ export async function releasePickWaves(
   for (let i = 0; i < groups.length; i++) {
     const group = groups[i]!;
     const suffix = groups.length > 1 ? ` (${i + 1}/${groups.length})` : "";
-    const waveLabel = `Onda ${baseDate} ${baseTime}${suffix}`;
+    const waveLabel = template
+      ? `${template.name} · ${baseDate} ${baseTime}${suffix}`
+      : `Onda ${baseDate} ${baseTime}${suffix}`;
     const { wave, lineCount } = await createReleasedWave(
       tenantId,
       releasedById,
@@ -539,6 +553,7 @@ export async function releasePickWaves(
       {
         marketplace: waveMarketplace,
         partitionStrategy: strategy,
+        templateId: template?.id ?? null,
       },
     );
     created.push({
@@ -566,6 +581,7 @@ export async function releasePickWave(
     appendToWaveId?: string;
     marketplace?: string;
     partitionStrategy?: WavePartitionStrategy;
+    templateId?: string;
   },
 ): Promise<{ waveId: string; orderCount: number; lineCount: number; waveCount?: number }> {
   if (opts?.appendToWaveId) {
@@ -1363,6 +1379,7 @@ export async function listPickWaves(tenantId: string) {
       _count: { select: { orders: true, lines: true } },
       releasedBy: { select: { name: true } },
       acceptedBy: { select: { name: true } },
+      template: { select: { id: true, name: true, color: true } },
     },
   });
 }

@@ -199,6 +199,7 @@ model Tenant {
   floorElements               WarehouseFloorElement[]
   approachWaves               ApproachWave[]
   workShares                  WorkShare[]
+  pickWaveTemplates           PickWaveTemplate[]
 
   @@map("tenants")
 }
@@ -396,6 +397,7 @@ model WarehouseBarracao {
   locations     Location[]
   floorPlan     WarehouseFloorPlan?
   approachWaves ApproachWave[]
+  waveTemplates PickWaveTemplate[]
 
   @@unique([tenantId, code])
   @@index([tenantId])
@@ -1035,6 +1037,8 @@ model PickWave {
   status            PickWaveStatus @default(DRAFT)
   marketplace       String?
   partitionStrategy String?
+  /// Onda fixa de origem (nulo = onda temporária, só com os pedidos daquele momento)
+  templateId        String?
   releasedAt        DateTime?
   releasedById      String?
   acceptedById      String?
@@ -1042,9 +1046,10 @@ model PickWave {
   createdAt         DateTime       @default(now())
   updatedAt         DateTime       @updatedAt
 
-  tenant     Tenant          @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  releasedBy User?           @relation("WaveReleasedBy", fields: [releasedById], references: [id], onDelete: SetNull)
-  acceptedBy User?           @relation("WaveAcceptedBy", fields: [acceptedById], references: [id], onDelete: SetNull)
+  tenant     Tenant            @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  template   PickWaveTemplate? @relation(fields: [templateId], references: [id], onDelete: SetNull)
+  releasedBy User?             @relation("WaveReleasedBy", fields: [releasedById], references: [id], onDelete: SetNull)
+  acceptedBy User?             @relation("WaveAcceptedBy", fields: [acceptedById], references: [id], onDelete: SetNull)
   orders     PickWaveOrder[]
   lines      PickWaveLine[]
   parts      PickWavePart[]
@@ -1055,7 +1060,29 @@ model PickWave {
   @@index([status])
   @@index([releasedAt])
   @@index([acceptedById])
+  @@index([templateId])
   @@map("pick_waves")
+}
+
+/// Onda fixa: colunas/linhas escolhidas no mapa; cada vez que é gerada pega os pedidos pendentes com item nelas.
+model PickWaveTemplate {
+  id         String   @id @default(cuid())
+  tenantId   String
+  barracaoId String
+  name       String
+  color      String
+  active     Boolean  @default(true)
+  /// [{ estanteId, face, coluna, linha }]; linha nula = coluna inteira
+  selection  Json
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  tenant   Tenant            @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  barracao WarehouseBarracao @relation(fields: [barracaoId], references: [id], onDelete: Cascade)
+  waves    PickWave[]
+
+  @@index([tenantId, barracaoId])
+  @@map("pick_wave_templates")
 }
 
 /// Parte do lote de uma onda de aproximação de picking; cada parte é aceita por um separador.

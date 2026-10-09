@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { MarketplaceBadge } from "@/components/ops/marketplace-badge";
 import { MarketplaceFilter } from "@/components/ops/marketplace-filter";
+import { WaveMapBuilder } from "@/components/waves/wave-map-builder";
 import { PageHeader } from "@/components/ops/page-header";
 import { DataState } from "@/components/ops/data-state";
 import { useAuth } from "@/components/auth/auth-provider";
@@ -58,9 +59,19 @@ const TABS: Array<{ key: TabKey; label: string }> = [
   { key: "build", label: "Montar onda" },
 ];
 
+type BuildMode = "map" | "list";
+const BUILD_MODES: Array<{ key: BuildMode; label: string }> = [
+  { key: "map", label: "Pelo mapa (colunas e linhas)" },
+  { key: "list", label: "Pela lista de pedidos" },
+];
+
 export default function OndasPage() {
   const { can } = useAuth();
   const [tab, setTab] = useState<TabKey>("active");
+  const [buildMode, setBuildMode] = useState<BuildMode>("map");
+  const [activeGroupId, setActiveGroupId] = useState<string | null>(null);
+  /** Pedidos vindos do grupo ou do mapa: ficam no topo da lista até limpar a seleção */
+  const [pinned, setPinned] = useState<Set<string>>(new Set());
 
   const [waves, setWaves] = useState<WaveRow[]>([]);
   const [loading, setLoading] = useState(true);
@@ -138,11 +149,11 @@ export default function OndasPage() {
   }, [marketplaceFilter]);
 
   useEffect(() => {
-    if (tab === "build") {
+    if (tab === "build" && buildMode === "list") {
       loadPending();
       void loadProximitySuggestions();
     }
-  }, [tab, loadPending, loadProximitySuggestions]);
+  }, [tab, buildMode, loadPending, loadProximitySuggestions]);
 
   const waveParams = () => ({
     marketplace: marketplaceFilter || undefined,
@@ -202,14 +213,17 @@ export default function OndasPage() {
 
   const filteredPending = useMemo(() => {
     const q = search.trim().toLowerCase();
-    if (!q) return pendingOrders;
-    return pendingOrders.filter((o) => {
-      const erp = (o.erpOrderId ?? "").toLowerCase();
-      const cust = (o.customerName ?? "").toLowerCase();
-      const mkt = (o.marketplace ?? "").toLowerCase();
-      return erp.includes(q) || cust.includes(q) || mkt.includes(q);
-    });
-  }, [pendingOrders, search]);
+    const list = !q
+      ? pendingOrders
+      : pendingOrders.filter((o) => {
+          const erp = (o.erpOrderId ?? "").toLowerCase();
+          const cust = (o.customerName ?? "").toLowerCase();
+          const mkt = (o.marketplace ?? "").toLowerCase();
+          return erp.includes(q) || cust.includes(q) || mkt.includes(q);
+        });
+    if (pinned.size === 0) return list;
+    return [...list].sort((a, b) => Number(pinned.has(b.id)) - Number(pinned.has(a.id)));
+  }, [pendingOrders, search, pinned]);
 
   const allFilteredSelected = useMemo(() => {
     if (filteredPending.length === 0) return false;
@@ -237,10 +251,34 @@ export default function OndasPage() {
     });
   };
 
-  const clearSelection = () => setSelected(new Set());
+  const clearSelection = () => {
+    setSelected(new Set());
+    setPinned(new Set());
+    setActiveGroupId(null);
+  };
 
   const selectProximityGroup = (group: PickProximityGroup) => {
-    setSelected(new Set(group.orderIds));
+    if (activeGroupId === group.id) {
+      clearSelection();
+      setManualMessage(null);
+      return;
+    }
+    const available = new Set(pendingOrders.map((o) => o.id));
+    const ids = group.orderIds.filter((id) => available.has(id));
+    setSelected(new Set(ids));
+    setPinned(new Set(ids));
+    setActiveGroupId(group.id);
+    setManualPreview(null);
+    setManualMessage(
+      ids.length > 0
+        ? `${ids.length} pedido(s) do grupo "${group.routeHint}" selecionados — estão no topo da lista. Confira e clique em "Criar onda com selecionados".`
+        : "Os pedidos deste grupo não estão mais disponíveis. Clique em Atualizar.",
+    );
+  };
+
+  const toggleOrder = (id: string) => {
+    setActiveGroupId(null);
+    toggle(id);
   };
 
   const neighborCountByOrder = useMemo(() => {
@@ -275,7 +313,10 @@ export default function OndasPage() {
   };
 
   const finishManualWaveAction = async (messageText: string) => {
-    setManualMessage(messageText);
+    setManualMessage(null);
+    setMessage(messageText);
+    setActiveGroupId(null);
+    setPinned(new Set());
     setSelected(new Set());
     setManualPreview(null);
     setAppendModal(null);
@@ -385,24 +426,30 @@ export default function OndasPage() {
             onChange={setMarketplaceFilter}
           />
         </div>
-        <div>
-          <label className="mb-1 block text-xs font-medium text-muted-foreground">
-            Modo de onda
-          </label>
-          <select
-            value={partitionStrategy}
-            onChange={(e) =>
-              setPartitionStrategy(e.target.value as WavePartitionStrategy)
-            }
-            className="rounded-lg border bg-white px-3 py-2 text-sm"
-          >
-            {PARTITION_STRATEGIES.map((s) => (
-              <option key={s.value} value={s.value}>
-                {s.label}
-              </option>
-            ))}
-          </select>
-        </div>
+        {tab === "build" && buildMode === "map" ? (
+          <p className="pb-2 text-xs text-muted-foreground">
+            Pelo mapa a onda sai única, com todos os pedidos das colunas/linhas marcadas.
+          </p>
+        ) : (
+          <div>
+            <label className="mb-1 block text-xs font-medium text-muted-foreground">
+              Modo de onda
+            </label>
+            <select
+              value={partitionStrategy}
+              onChange={(e) =>
+                setPartitionStrategy(e.target.value as WavePartitionStrategy)
+              }
+              className="rounded-lg border bg-white px-3 py-2 text-sm"
+            >
+              {PARTITION_STRATEGIES.map((s) => (
+                <option key={s.value} value={s.value}>
+                  {s.label}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
       </section>
 
       {tab === "active" ? (
@@ -420,30 +467,65 @@ export default function OndasPage() {
           onCloseWave={handleClose}
         />
       ) : (
-        <BuildTab
-          pendingOrders={filteredPending}
-          totalOrders={pendingOrders.length}
-          loading={pendingLoading}
-          error={pendingError}
-          search={search}
-          onSearch={setSearch}
-          partitionStrategy={partitionStrategy}
-          proximityGroups={proximityGroups}
-          neighborCountByOrder={neighborCountByOrder}
-          onSelectProximityGroup={selectProximityGroup}
-          selected={selected}
-          allFilteredSelected={allFilteredSelected}
-          onToggle={toggle}
-          onToggleAll={toggleAllFiltered}
-          onClearSelection={clearSelection}
-          manualPreview={manualPreview}
-          manualPreviewLoading={manualPreviewLoading}
-          manualReleasing={manualReleasing}
-          manualMessage={manualMessage}
-          onPreview={handleManualPreview}
-          onRelease={handleManualRelease}
-          onReload={loadPending}
-        />
+        <div className="space-y-4">
+          <div className="flex flex-wrap items-center gap-1 rounded-lg bg-slate-100 p-1 text-sm sm:w-fit">
+            {BUILD_MODES.map((m) => (
+              <button
+                key={m.key}
+                type="button"
+                onClick={() => setBuildMode(m.key)}
+                className={`rounded-md px-3 py-1.5 font-medium ${
+                  buildMode === m.key ? "bg-white text-[#0d9488] shadow-sm" : "text-slate-600"
+                }`}
+              >
+                {m.label}
+              </button>
+            ))}
+          </div>
+          {buildMode === "map" ? (
+            <WaveMapBuilder
+              marketplace={marketplaceFilter}
+              onCreated={(text) => {
+                setMessage(text);
+                void load();
+              }}
+              onUseInList={(ids) => {
+                setSelected(new Set(ids));
+                setPinned(new Set(ids));
+                setActiveGroupId(null);
+                setManualPreview(null);
+                setManualMessage(`${ids.length} pedido(s) vindos do mapa selecionados — estão no topo da lista.`);
+                setBuildMode("list");
+              }}
+            />
+          ) : (
+            <BuildTab
+              pendingOrders={filteredPending}
+              totalOrders={pendingOrders.length}
+              loading={pendingLoading}
+              error={pendingError}
+              search={search}
+              onSearch={setSearch}
+              partitionStrategy={partitionStrategy}
+              proximityGroups={proximityGroups}
+              activeGroupId={activeGroupId}
+              neighborCountByOrder={neighborCountByOrder}
+              onSelectProximityGroup={selectProximityGroup}
+              selected={selected}
+              allFilteredSelected={allFilteredSelected}
+              onToggle={toggleOrder}
+              onToggleAll={toggleAllFiltered}
+              onClearSelection={clearSelection}
+              manualPreview={manualPreview}
+              manualPreviewLoading={manualPreviewLoading}
+              manualReleasing={manualReleasing}
+              manualMessage={manualMessage}
+              onPreview={handleManualPreview}
+              onRelease={handleManualRelease}
+              onReload={loadPending}
+            />
+          )}
+        </div>
       )}
 
       {appendModal ? (
@@ -627,7 +709,18 @@ function ActiveTab({
             <TableBody>
               {waves.map((w) => (
                 <TableRow key={w.id}>
-                  <TableCell className="font-medium">{w.name}</TableCell>
+                  <TableCell className="font-medium">
+                    {w.name}
+                    {w.template ? (
+                      <span
+                        title={`Gerada da onda fixa "${w.template.name}"`}
+                        className="ml-2 whitespace-nowrap rounded px-1.5 py-0.5 text-xs font-normal text-white"
+                        style={{ background: w.template.color }}
+                      >
+                        Onda fixa
+                      </span>
+                    ) : null}
+                  </TableCell>
                   <TableCell>{STATUS_LABEL[w.status] ?? w.status}</TableCell>
                   <TableCell>{w.orderCount}</TableCell>
                   <TableCell>{w.lineCount}</TableCell>
@@ -679,6 +772,7 @@ interface BuildTabProps {
   onSearch: (v: string) => void;
   partitionStrategy: WavePartitionStrategy;
   proximityGroups: PickProximityGroup[];
+  activeGroupId: string | null;
   neighborCountByOrder: Map<string, number>;
   onSelectProximityGroup: (g: PickProximityGroup) => void;
   selected: Set<string>;
@@ -704,6 +798,7 @@ function BuildTab({
   onSearch,
   partitionStrategy,
   proximityGroups,
+  activeGroupId,
   neighborCountByOrder,
   onSelectProximityGroup,
   selected,
@@ -755,23 +850,33 @@ function BuildTab({
             Sugestões de proximidade
           </h2>
           <ul className="space-y-2">
-            {proximityGroups.map((g) => (
-              <li
-                key={g.id}
-                className="flex flex-wrap items-center justify-between gap-2 rounded-lg border bg-white px-3 py-2 text-sm"
-              >
-                <span>
-                  {g.orders.length} pedido(s) · {g.routeHint}
-                </span>
-                <button
-                  type="button"
-                  onClick={() => onSelectProximityGroup(g)}
-                  className="rounded-md border px-2 py-1 text-xs font-medium hover:bg-slate-50"
+            {proximityGroups.map((g) => {
+              const active = g.id === activeGroupId;
+              return (
+                <li
+                  key={g.id}
+                  className={`flex flex-wrap items-center justify-between gap-2 rounded-lg border px-3 py-2 text-sm ${
+                    active ? "border-teal-400 bg-teal-50" : "bg-white"
+                  }`}
                 >
-                  Selecionar grupo
-                </button>
-              </li>
-            ))}
+                  <span>
+                    {g.orders.length} pedido(s) · {g.routeHint}
+                    <span className="ml-2 font-mono text-xs text-slate-500">
+                      {g.orders.map((o) => o.erpOrderId).join(", ")}
+                    </span>
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => onSelectProximityGroup(g)}
+                    className={`rounded-md border px-2 py-1 text-xs font-medium ${
+                      active ? "border-teal-500 bg-teal-600 text-white" : "hover:bg-slate-50"
+                    }`}
+                  >
+                    {active ? "✓ Selecionado (clique para desfazer)" : "Selecionar grupo"}
+                  </button>
+                </li>
+              );
+            })}
           </ul>
         </section>
       ) : null}

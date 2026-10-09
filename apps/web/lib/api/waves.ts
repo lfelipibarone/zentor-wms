@@ -11,6 +11,8 @@ export interface WaveRow {
   orderCount: number;
   lineCount: number;
   createdAt: string;
+  /** Onda fixa de origem; nulo = onda temporária */
+  template: { id: string; name: string; color: string } | null;
 }
 
 export type WavePartitionStrategy = "SINGLE_ITEM" | "PROXIMITY" | "BY_PRODUCT" | "BY_APPROACH" | "SINGLE_WAVE";
@@ -184,6 +186,7 @@ export function releaseWave(body?: {
   appendToWaveId?: string;
   marketplace?: string;
   partitionStrategy?: WavePartitionStrategy;
+  templateId?: string;
 }) {
   return apiFetch<{
     waveId: string;
