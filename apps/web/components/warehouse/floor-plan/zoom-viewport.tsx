@@ -13,6 +13,8 @@ import {
 import { Maximize2, ZoomIn, ZoomOut } from "lucide-react";
 
 const MAX_ZOOM = 6;
+/** Menor zoom, em fração do zoom em que o barracão inteiro preenche a moldura. */
+const MIN_FIT_RATIO = 0.25;
 /** Movimento mínimo (px) para um clique virar arrasto do mapa. */
 const PAN_THRESHOLD = 5;
 const MINIMAP_MAX_W = 168;
@@ -40,8 +42,8 @@ type Pan = { pointerId: number; x: number; y: number; startX: number; startY: nu
 type GestureLike = Event & { scale: number; clientX: number; clientY: number };
 
 /**
- * Moldura fixa no formato do barracão, com o mapa preso dentro: o menor zoom é o mapa inteiro
- * preenchendo a moldura, e ao aproximar só dá para andar até as bordas. Roda do mouse ou pinça: zoom
+ * Moldura fixa no formato do barracão, com o mapa preso dentro: abaixo de "inteiro" o mapa encolhe
+ * centralizado, e ao aproximar só dá para andar até as bordas. Roda do mouse ou pinça: zoom
  * no ponto do cursor; rolagem de dois dedos ou arrastar o fundo (ou espaço + arrastar, botão do meio):
  * mover. Cliques que o filho não tratar (sem `stopPropagation`) podem virar arrasto.
  */
@@ -72,7 +74,7 @@ export function ZoomViewport({
   const sizeRef = useRef({ w: contentWidth, h: contentHeight });
   sizeRef.current = { w: contentWidth, h: contentHeight };
 
-  /** Zoom em que o mapa inteiro preenche a moldura; é também o menor zoom permitido. */
+  /** Zoom em que o mapa inteiro preenche a moldura (= 100%). */
   const fitZoom = useCallback(() => {
     const el = ref.current;
     const { w, h } = sizeRef.current;
@@ -84,7 +86,7 @@ export function ZoomViewport({
     (next: View) => {
       const el = ref.current;
       if (el) {
-        const zoom = Math.min(MAX_ZOOM, Math.max(fitZoom(), next.zoom));
+        const zoom = Math.min(MAX_ZOOM, Math.max(fitZoom() * MIN_FIT_RATIO, next.zoom));
         next = {
           zoom,
           x: clampAxis(next.x, sizeRef.current.w * zoom, el.clientWidth),
@@ -103,7 +105,7 @@ export function ZoomViewport({
       const el = ref.current;
       if (!el) return;
       const v = viewRef.current;
-      const z = Math.min(MAX_ZOOM, Math.max(fitZoom(), next));
+      const z = Math.min(MAX_ZOOM, Math.max(fitZoom() * MIN_FIT_RATIO, next));
       const x = px ?? el.clientWidth / 2;
       const y = py ?? el.clientHeight / 2;
       apply({ zoom: z, x: x - ((x - v.x) / v.zoom) * z, y: y - ((y - v.y) / v.zoom) * z });
@@ -124,7 +126,7 @@ export function ZoomViewport({
     const ro = new ResizeObserver(() => {
       setFrame({ w: el.clientWidth, h: el.clientHeight });
       const v = viewRef.current;
-      if (v.zoom <= fitZoom() * 1.001) fit();
+      if (Math.abs(v.zoom / fitZoom() - 1) < 0.001) fit();
       else apply(v);
     });
     ro.observe(el);
@@ -266,7 +268,7 @@ export function ZoomViewport({
       <div className="bg-slate-100">
         <div
           ref={ref}
-          className="relative mx-auto overflow-hidden bg-white"
+          className="relative mx-auto overflow-hidden bg-slate-100"
           style={{
             aspectRatio: contentWidth > 0 && contentHeight > 0 ? `${contentWidth} / ${contentHeight}` : undefined,
             maxHeight: height,
