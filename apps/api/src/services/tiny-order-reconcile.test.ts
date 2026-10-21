@@ -10,14 +10,14 @@ describe("decideTinyOrderReconcileAction", () => {
     alreadyFlagged: false,
   };
 
-  it("mantém pedidos ainda abertos no Tiny", () => {
-    for (const situacao of [0, 1, 3, 4, 7, 8, null]) {
+  it("mantém pedidos ainda no estágio importável do Tiny", () => {
+    for (const situacao of [0, 1, 3, 4, 7, null]) {
       assert.equal(decideTinyOrderReconcileAction({ ...base, situacao }), "keep");
     }
   });
 
-  it("remove pendentes já cancelados, enviados, entregues ou não entregues", () => {
-    for (const situacao of [2, 5, 6, 9]) {
+  it("remove pendentes que já saíram do estágio importável no Tiny", () => {
+    for (const situacao of [2, 5, 6, 8, 9]) {
       assert.equal(
         decideTinyOrderReconcileAction({ ...base, situacao }),
         "remove",
