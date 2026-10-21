@@ -6,6 +6,7 @@ import {
 } from "./sync-sales-orders-from-tiny.js";
 import {
   shouldRunTinyDailySync,
+  shouldRunTinyOrderReconcile,
   TINY_ORDER_SYNC_TARGET_MINUTES,
 } from "./tiny-order-sync-scheduler.js";
 
@@ -35,6 +36,26 @@ describe("tiny order sync automation", () => {
         nowMinutes: TINY_ORDER_SYNC_TARGET_MINUTES + 5,
       }),
       false,
+    );
+  });
+
+  it("dispara conciliação com o Tiny no intervalo, não a cada tick", () => {
+    assert.equal(shouldRunTinyOrderReconcile({ lastReconcileAt: null }), true);
+    assert.equal(
+      shouldRunTinyOrderReconcile({
+        lastReconcileAt: "2026-10-21T10:00:00.000Z",
+        nowMs: Date.parse("2026-10-21T10:10:00.000Z"),
+        intervalMs: 30 * 60 * 1000,
+      }),
+      false,
+    );
+    assert.equal(
+      shouldRunTinyOrderReconcile({
+        lastReconcileAt: "2026-10-21T10:00:00.000Z",
+        nowMs: Date.parse("2026-10-21T10:30:00.000Z"),
+        intervalMs: 30 * 60 * 1000,
+      }),
+      true,
     );
   });
 

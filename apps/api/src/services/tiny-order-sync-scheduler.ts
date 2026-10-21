@@ -2,6 +2,7 @@ import { TinyConnectionStatus } from "@prisma/client";
 import { prisma } from "../lib/prisma.js";
 import { syncProductsFromTiny } from "./sync-products-from-tiny.js";
 import { syncSalesOrdersFromTiny } from "./sync-sales-orders-from-tiny.js";
+import { reconcileOpenTinyOrders } from "./tiny-order-reconcile.js";
 import {
   getConnectionRateLimitUntil,
   readRateLimitUntilFromMetadata,
@@ -15,7 +16,10 @@ import {
 import { isTinySyncLocked } from "./tiny-sync-lock.js";
 
 const AUTO_SYNC_LAST_RUN_KEY = "tiny.orders.lastAutoSyncDate";
+const AUTO_RECONCILE_LAST_RUN_KEY = "tiny.orders.lastAutoReconcileAt";
 export const TINY_ORDER_SYNC_TARGET_MINUTES = 7 * 60;
+/** Conciliação de status com o Tiny ao longo do dia (não espera o sync das 07:00). */
+export const TINY_ORDER_RECONCILE_INTERVAL_MS = 30 * 60 * 1000;
 /** Intervalo quando há checkpoint pendente (retomada automática). */
 const TINY_RESUME_TICK_MS = 30_000;
 /** Intervalo normal sem checkpoint pendente. */
@@ -57,6 +61,18 @@ export function shouldRunTinyDailySync(params: {
     params.nowMinutes >= (params.targetMinutes ?? TINY_ORDER_SYNC_TARGET_MINUTES) &&
     params.lastRunDate !== params.todayKey
   );
+}
+
+export function shouldRunTinyOrderReconcile(params: {
+  lastReconcileAt: string | null;
+  nowMs?: number;
+  intervalMs?: number;
+}): boolean {
+  const interval = params.intervalMs ?? TINY_ORDER_RECONCILE_INTERVAL_MS;
+  if (!params.lastReconcileAt) return true;
+  const last = Date.parse(params.lastReconcileAt);
+  if (!Number.isFinite(last)) return true;
+  return (params.nowMs ?? Date.now()) - last >= interval;
 }
 
 async function getLastAutoSyncDate(tenantId: string): Promise<string | null> {
@@ -144,6 +160,49 @@ async function tryResumeProductsSync(connection: {
   return true;
 }
 
+async function getLastAutoReconcileAt(tenantId: string): Promise<string | null> {
+  const row = await prisma.systemSetting.findUnique({
+    where: { tenantId_key: { tenantId, key: AUTO_RECONCILE_LAST_RUN_KEY } },
+  });
+  return row?.value?.trim() || null;
+}
+
+async function setLastAutoReconcileAt(
+  tenantId: string,
+  value: string,
+): Promise<void> {
+  await prisma.systemSetting.upsert({
+    where: { tenantId_key: { tenantId, key: AUTO_RECONCILE_LAST_RUN_KEY } },
+    create: { tenantId, key: AUTO_RECONCILE_LAST_RUN_KEY, value },
+    update: { value },
+  });
+}
+
+async function tryReconcileOrdersForConnection(connection: {
+  id: string;
+  tenantId: string;
+  userId: string;
+}): Promise<boolean> {
+  if (isTinySyncLocked(connection.tenantId, "orders")) return false;
+  const lastReconcileAt = await getLastAutoReconcileAt(connection.tenantId);
+  if (!shouldRunTinyOrderReconcile({ lastReconcileAt })) return false;
+  if (await isConnectionInRateLimitCooldown(connection.id)) return false;
+
+  const result = await reconcileOpenTinyOrders({
+    tenantId: connection.tenantId,
+    userId: connection.userId,
+    connectionId: connection.id,
+  });
+  if (!result.tinyConnected) return false;
+  if (result.rateLimited) return true;
+
+  await setLastAutoReconcileAt(connection.tenantId, new Date().toISOString());
+  console.log(
+    `[tiny-sync] ${connection.tenantId}/${connection.id}: conciliação — ${result.checked} conferidos, ${result.cancelledRemoved + result.closedRemoved} saíram da fila, ${result.cancelledFlagged} pausados por cancelamento`,
+  );
+  return false;
+}
+
 async function tryAutoSyncOrdersForConnection(connection: {
   id: string;
   tenantId: string;
@@ -204,6 +263,7 @@ async function tryAutoSyncOrdersForConnection(connection: {
   }
 
   await setLastAutoSyncDate(connection.tenantId, todayKey);
+  await setLastAutoReconcileAt(connection.tenantId, new Date().toISOString());
   console.log(
     `[tiny-sync] ${connection.tenantId}/${connection.id}: pedidos — ${result.created} criados, ${result.updated} atualizados, ${result.skipped} ignorados, ${result.cancelledRemoved + result.closedRemoved} removidos da fila, ${result.cancelledFlagged} pausados por cancelamento${result.resumed ? " (retomado)" : ""}`,
   );
@@ -217,7 +277,10 @@ async function tryAutoSyncForConnection(connection: {
 }): Promise<boolean> {
   const productsPending = await tryResumeProductsSync(connection);
   const ordersPending = await tryAutoSyncOrdersForConnection(connection);
-  return productsPending || ordersPending;
+  const reconcilePending = ordersPending
+    ? false
+    : await tryReconcileOrdersForConnection(connection);
+  return productsPending || ordersPending || reconcilePending;
 }
 
 export async function tryAutoSyncTinyOrders(): Promise<boolean> {
