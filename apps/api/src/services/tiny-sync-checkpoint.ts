@@ -8,8 +8,8 @@ export const TINY_PRODUCTS_LAST_SYNC_KEY = "tiny.products.lastSyncAt";
 export const TINY_ORDERS_CHECKPOINT_KEY = "tiny.orders.syncCheckpoint";
 export const TINY_ORDERS_LAST_SYNC_KEY = "tiny.orders.lastSyncAt";
 
-/** Fases do sync de pedidos: 5 situações syncáveis + cancelados + conciliação. */
-export const TINY_ORDER_SYNC_PHASE_COUNT = 7;
+/** Fases do sync de pedidos: Faturada + cancelados + conciliação. */
+export const TINY_ORDER_SYNC_PHASE_COUNT = 3;
 
 export type TinyOrderSyncPhase = "syncable" | "cancelled" | "reconcile";
 

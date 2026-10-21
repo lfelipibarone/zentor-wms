@@ -28,8 +28,11 @@ export interface TinyOrderPayload {
   items: TinyLineItem[];
 }
 
+/** Situação Tiny Faturada — única elegível para fila de picking e ondas. */
+export const TINY_ORDER_SITUACAO_FATURADA = 1;
+
 /** Situações Tiny elegíveis para ingestão no WMS (API v3). */
-export const TINY_ORDER_SITUACOES_SYNC = new Set([0, 1, 3, 4, 7]);
+export const TINY_ORDER_SITUACOES_SYNC = new Set([TINY_ORDER_SITUACAO_FATURADA]);
 
 /** Situação cancelada no Tiny. */
 export const TINY_ORDER_SITUACAO_CANCELADA = 2;
@@ -213,6 +216,11 @@ export function parseTinyWebhookPayload(body: unknown): TinyOrderPayload | null 
   }
 
   const tinyPriorityRaw = extractTinyPriorityFromRecord(dados);
+  const situacao =
+    parseTinyPedidoSituacao(pedido) ?? parseTinyPedidoSituacao(dados);
+  if (!isTinyOrderSituacaoSyncable(situacao)) {
+    return null;
+  }
 
   return {
     erpOrderId: `TINY-${erpOrderId}`,

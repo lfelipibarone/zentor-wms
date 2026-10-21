@@ -5,6 +5,7 @@ import {
   isTinyOrderSituacaoSyncable,
   parseTinyApiPedido,
   parseTinyPedidoSituacao,
+  parseTinyWebhookPayload,
   TINY_ORDER_SITUACAO_CANCELADA,
 } from "./tiny-integration.js";
 
@@ -19,11 +20,11 @@ describe("tiny-integration pedidos", () => {
   });
 
   it("filtra situações elegíveis para sync", () => {
-    assert.equal(isTinyOrderSituacaoSyncable(3), true);
-    assert.equal(isTinyOrderSituacaoSyncable(4), true);
-    assert.equal(isTinyOrderSituacaoSyncable(7), true);
     assert.equal(isTinyOrderSituacaoSyncable(1), true);
-    assert.equal(isTinyOrderSituacaoSyncable(0), true);
+    assert.equal(isTinyOrderSituacaoSyncable(0), false);
+    assert.equal(isTinyOrderSituacaoSyncable(3), false);
+    assert.equal(isTinyOrderSituacaoSyncable(4), false);
+    assert.equal(isTinyOrderSituacaoSyncable(7), false);
     assert.equal(isTinyOrderSituacaoSyncable(TINY_ORDER_SITUACAO_CANCELADA), false);
     assert.equal(isTinyOrderSituacaoSyncable(5), false);
     assert.equal(isTinyOrderSituacaoSyncable(null), false);
@@ -32,7 +33,7 @@ describe("tiny-integration pedidos", () => {
   it("parseia pedido API v3 com itens e cliente", () => {
     const payload = parseTinyApiPedido({
       id: 12345,
-      situacao: 3,
+      situacao: 1,
       dataPrevista: "2026-06-10",
       cliente: { nome: "Cliente Teste" },
       ecommerce: { nome: "Mercado Livre", canalVenda: "ML" },
@@ -62,8 +63,24 @@ describe("tiny-integration pedidos", () => {
     assert.equal(
       parseTinyApiPedido({
         id: 2,
-        situacao: 3,
+        situacao: 1,
         itens: [{ quantidade: 1, produto: {} }],
+      }),
+      null,
+    );
+    assert.equal(
+      parseTinyApiPedido({
+        id: 3,
+        situacao: 0,
+        itens: [{ quantidade: 1, produto: { sku: "SKU-001" } }],
+      }),
+      null,
+    );
+    assert.equal(
+      parseTinyApiPedido({
+        id: 4,
+        situacao: 7,
+        itens: [{ quantidade: 1, produto: { sku: "SKU-001" } }],
       }),
       null,
     );
@@ -73,5 +90,32 @@ describe("tiny-integration pedidos", () => {
     assert.equal(parseTinyPedidoSituacao({ situacao: 4 }), 4);
     assert.equal(parseTinyPedidoSituacao({ situacao: "7" }), 7);
     assert.equal(parseTinyPedidoSituacao({}), null);
+  });
+
+  it("webhook só aceita pedido Faturada", () => {
+    const itens = [{ codigo: "SKU-001", quantidade: 1 }];
+    assert.ok(
+      parseTinyWebhookPayload({
+        dados: { pedido: { id: 99, situacao: 1, itens } },
+      }),
+    );
+    assert.equal(
+      parseTinyWebhookPayload({
+        dados: { pedido: { id: 99, situacao: 0, itens } },
+      }),
+      null,
+    );
+    assert.equal(
+      parseTinyWebhookPayload({
+        dados: { pedido: { id: 99, situacao: 7, itens } },
+      }),
+      null,
+    );
+    assert.equal(
+      parseTinyWebhookPayload({
+        dados: { pedido: { id: 99, itens } },
+      }),
+      null,
+    );
   });
 });

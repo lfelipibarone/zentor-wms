@@ -182,7 +182,7 @@ flowchart TB
 | `apps/api/src/routes/integrations.ts` | Rota pública do webhook |
 | `apps/api/src/services/tiny-integration.ts` | Parse webhook/API, upsert, situações sync, `parseTinyApiPedido` |
 | `apps/api/src/services/sync-sales-orders-from-tiny.ts` | Sync pull `GET /pedidos` + upsert |
-| `apps/api/src/services/tiny-order-sync-scheduler.ts` | Job diário (~07:00 SP) por tenant conectado |
+| `apps/api/src/services/tiny-order-sync-scheduler.ts` | A cada 30 min atualiza Faturada e pedidos em aberto; backfill diário ~07:00 SP |
 | `apps/api/src/services/tiny-order-priority.ts` | Prioridade Tiny + `GET /pedidos/{id}` |
 | `apps/api/src/services/marketplace-priority.ts` | Marketplace + score WMS |
 | `apps/api/src/services/tiny-api-v3-client.ts` | `listPedidos`, `getPedido` (sem default `origemPedido=0`) |
@@ -350,17 +350,17 @@ Função: `parseTinyApiPedido` em `tiny-integration.ts` (sync pull e detalhe ap�
 
 ### Situações importadas no sync pull
 
-Constante: `TINY_ORDER_SITUACOES_SYNC` = `{ 0, 1, 3, 4, 7 }`.
+Constante: `TINY_ORDER_SITUACOES_SYNC` = `{ 1 }` (Faturada). Picking, ondas e a tela de pedidos só enxergam o que passou da NF.
 
 | Código | Significado | Sync pull |
 |--------|-------------|-----------|
-| 0 | Aberta | **Importa** |
-| 3 | Aprovada | Importa |
-| 4 | Preparando envio | Importa |
-| 1 | Faturada | Importa |
-| 7 | Pronto envio | Importa |
+| 1 | Faturada | **Importa** — entra na fila de picking e nas ondas |
+| 0 | Aberta | Não importa; remove `PENDING` se já estiver no WMS |
+| 3 | Aprovada | Não importa; remove `PENDING` |
+| 4 | Preparando envio | Não importa; remove `PENDING` |
+| 7 | Pronto envio | Não importa; remove `PENDING` |
 | 2 | Cancelada | Remove `Order` **PENDING** existente (`TINY-{id}`) |
-| 5, 6, 8, 9 | Enviada, entregue, etc. | Ignorado (`skipped`) |
+| 5, 6, 8, 9 | Enviada, entregue, etc. | Ignorado (`skipped`); remove `PENDING` |
 
 Também usado em `fetchTinyOrderPriority` quando o webhook não traz prioridade.
 
@@ -376,7 +376,7 @@ Serviço: `syncSalesOrdersFromTiny` (`sync-sales-orders-from-tiny.ts`).
 |-------|------|
 | UI | `/integracoes/tiny` → botão **Reexecutar sync manual** |
 | API | `POST /api/integrations/tiny/sync-orders` — body opcional `{ "days": 30 }` (1–90) |
-| Agendado | `tiny-order-sync-scheduler.ts` — ~**07:00** America/Sao_Paulo, tenants `CONNECTED` |
+| Agendado | `tiny-order-sync-scheduler.ts` — a cada **30 min** importa Faturada e tira da fila o que deixou de estar faturado; ~**07:00** America/Sao_Paulo faz o backfill com cancelados |
 
 Permissão: `olist.configure` (mesma da tela Tiny).
 
@@ -461,7 +461,7 @@ Endpoint manual: **Sincronizar prioridades** (`syncPendingOrderPrioritiesFromTin
 - [x] Sync manual de prioridades (`POST sync-order-priorities`)
 - [x] **Sync pull** `GET /pedidos` — botão UI, `POST sync-orders`, job diário
 - [x] `parseTinyApiPedido` + mesmas regras de upsert do webhook
-- [x] Situações 0, 1, 3, 4, 7; cancelado (2) remove PENDING
+- [x] Situação **1 (Faturada)**; demais situações não entram na fila; cancelado (2) remove PENDING
 - [x] UI: webhook, eventos, sync manual com `listedFromTiny` e `warning`
 - [x] Cliente API `listPedidos` / `getPedido`
 
@@ -473,7 +473,7 @@ Endpoint manual: **Sincronizar prioridades** (`syncPendingOrderPrioritiesFromTin
 | **URL webhook com `?tenant=`** na UI | Multi-tenant explícito |
 | **Idempotência por hash de payload** | Evitar reprocessar webhook duplicado |
 | **Atualizar status no Tiny** (opcional) | `PUT` situação quando WMS expedir — validar endpoints v3 |
-| **Filtro configurável de situação** | Se negócio não quiser importar Aberta (0) em produção |
+| **Filtro configurável de situação** | Hoje fixo em Faturada (1); tornar configurável se o negócio mudar |
 
 ### Fora de escopo imediato
 

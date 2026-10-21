@@ -859,9 +859,10 @@ export default function TinyIntegracaoPage() {
       <section className="rounded-xl border bg-white p-4 shadow-sm">
         <h2 className="text-sm font-semibold">Pedidos de venda</h2>
         <p className="mt-2 text-sm text-muted-foreground">
-          A sincronização é automática: roda todos os dias às 7h e o webhook
-          atualiza novos pedidos em tempo real. Os SKUs precisam existir no
-          cadastro de produtos.
+          A sincronização é automática: a cada 30 minutos o WMS puxa os
+          pedidos Faturados e atualiza os que ainda estão em aberto. O webhook
+          só entra na fila quando o Tiny já enviou a situação Faturada. Os SKUs
+          precisam existir no cadastro de produtos.
         </p>
         <p className="mt-2 text-xs text-muted-foreground">
           O botão abaixo fica apenas como fallback administrativo.

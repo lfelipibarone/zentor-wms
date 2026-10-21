@@ -65,6 +65,8 @@ export type SyncSalesOrdersResult = {
   skipped: number;
   /** Pedidos retornados pelo GET /pedidos no período (antes dos filtros WMS). */
   listedFromTiny: number;
+  /** Outra sync de pedidos já segura o lock deste tenant. */
+  busy?: boolean;
   ordersRemoved: number;
   wavesRemoved: number;
   demoRemoved: number;
@@ -196,6 +198,11 @@ export async function syncSalesOrdersFromTiny(params: {
   days?: number;
   /** Ignora checkpoint e recomeça do início */
   forceRestart?: boolean;
+  /**
+   * `open`: a cada 30 min — importa Faturada e concilia pedidos em aberto.
+   * `full`: backfill diário, inclui a varredura de cancelados.
+   */
+  mode?: "full" | "open";
 }): Promise<SyncSalesOrdersResult> {
   const days = Math.min(Math.max(params.days ?? 30, 1), TINY_MAX_SYNC_DAYS);
   const result: SyncSalesOrdersResult = {
@@ -203,6 +210,7 @@ export async function syncSalesOrdersFromTiny(params: {
     updated: 0,
     skipped: 0,
     listedFromTiny: 0,
+    busy: false,
     ordersRemoved: 0,
     wavesRemoved: 0,
     demoRemoved: 0,
@@ -219,6 +227,7 @@ export async function syncSalesOrdersFromTiny(params: {
     return {
       ...result,
       tinyConnected: true,
+      busy: true,
       warning: "Sync de pedidos já em andamento.",
     };
   }
@@ -270,6 +279,18 @@ export async function syncSalesOrdersFromTiny(params: {
   });
 
   if (resume && savedCheckpoint!.days !== undefined && savedCheckpoint!.days !== days) {
+    await clearTinySyncCheckpoint(params.tenantId, TINY_ORDERS_CHECKPOINT_KEY);
+    resume = false;
+  }
+
+  const savedSituacao = savedCheckpoint?.situacao;
+  if (
+    resume &&
+    (savedCheckpoint!.phase ?? "syncable") === "syncable" &&
+    ((savedCheckpoint!.situacaoIndex ?? 0) >= TINY_SYNCABLE_SITUACOES.length ||
+      (savedSituacao !== undefined &&
+        !TINY_ORDER_SITUACOES_SYNC.has(savedSituacao)))
+  ) {
     await clearTinySyncCheckpoint(params.tenantId, TINY_ORDERS_CHECKPOINT_KEY);
     resume = false;
   }
@@ -394,7 +415,7 @@ export async function syncSalesOrdersFromTiny(params: {
       }
 
       if (!isTinyOrderSituacaoSyncable(fullSituacao)) {
-        result.skipped += 1;
+        await applySituacao(erpOrderId, fullSituacao);
         return;
       }
 
@@ -617,7 +638,11 @@ export async function syncSalesOrdersFromTiny(params: {
         await syncSyncableSituacao(situacao, startOffset);
         offset = 0;
       }
-      phase = "cancelled";
+      phase = params.mode === "open" ? "reconcile" : "cancelled";
+      if (phase === "reconcile") {
+        offset = 0;
+        reconcileCursor = null;
+      }
     }
 
     if (phase === "cancelled") {
@@ -694,7 +719,7 @@ export async function syncSalesOrdersFromTiny(params: {
       "Use «Recomeçar do zero» para forçar reimportação completa.";
   } else if (result.listedFromTiny === 0) {
     result.warning =
-      `Nenhum pedido importável nos últimos ${effectiveDays} dias. O WMS importa apenas Aberta (0), Faturada (1), Aprovada (3), Preparando envio (4) e Pronto envio (7). Pedidos já enviados (5) ou entregues (6) não são importados e saem da fila do WMS se ainda estiverem pendentes. Confira se há pedidos pendentes no ERP e se o OAuth tem permissão de Pedidos de Venda.`;
+      `Nenhum pedido importável nos últimos ${effectiveDays} dias. O WMS importa apenas Faturada (1) — picking e ondas só entram depois da NF no Tiny. Pedidos em aberto, prontos para envio, enviados ou entregues não entram na fila e saem do WMS se ainda estiverem pendentes. Confira se há pedidos faturados no ERP e se o OAuth tem permissão de Pedidos de Venda.`;
   } else if (result.errors.length > 0) {
     result.warning = `${result.errors.length} pedido(s) com erro ao importar. Veja errors[] no resultado.`;
   } else if (result.created === 0 && result.updated === 0) {

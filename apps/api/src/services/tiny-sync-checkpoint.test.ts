@@ -107,7 +107,7 @@ describe("tiny-sync-checkpoint", () => {
       days: 30,
     };
     const pct = computeTinySyncProgressPercent(reconcileCp);
-    assert.ok(pct !== null && pct > 85 && pct < 100);
-    assert.match(buildTinySyncProgressLabel(reconcileCp), /Conciliação de status \(7\/7\)/);
+    assert.ok(pct !== null && pct > 70 && pct < 100);
+    assert.match(buildTinySyncProgressLabel(reconcileCp), /Conciliação de status \(3\/3\)/);
   });
 });

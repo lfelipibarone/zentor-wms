@@ -373,7 +373,7 @@ export default function OndasPage() {
     <div className="space-y-6">
       <PageHeader
         title="Ondas de separação"
-        description="Agrupa pedidos com o mesmo SKU na mesma gôndola. O operador aceita a onda no app antes de separar."
+        description="Agrupa pedidos faturados no Tiny com o mesmo SKU na mesma gôndola. O operador aceita a onda no app antes de separar."
       >
         {can(Permission.SETTINGS_MANAGE) ? (
           <Link

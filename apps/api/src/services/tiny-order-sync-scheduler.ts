@@ -2,7 +2,6 @@ import { TinyConnectionStatus } from "@prisma/client";
 import { prisma } from "../lib/prisma.js";
 import { syncProductsFromTiny } from "./sync-products-from-tiny.js";
 import { syncSalesOrdersFromTiny } from "./sync-sales-orders-from-tiny.js";
-import { reconcileOpenTinyOrders } from "./tiny-order-reconcile.js";
 import {
   getConnectionRateLimitUntil,
   readRateLimitUntilFromMetadata,
@@ -18,7 +17,7 @@ import { isTinySyncLocked } from "./tiny-sync-lock.js";
 const AUTO_SYNC_LAST_RUN_KEY = "tiny.orders.lastAutoSyncDate";
 const AUTO_RECONCILE_LAST_RUN_KEY = "tiny.orders.lastAutoReconcileAt";
 export const TINY_ORDER_SYNC_TARGET_MINUTES = 7 * 60;
-/** Conciliação de status com o Tiny ao longo do dia (não espera o sync das 07:00). */
+/** Atualiza a fila Faturada e os pedidos em aberto a cada 30 minutos. */
 export const TINY_ORDER_RECONCILE_INTERVAL_MS = 30 * 60 * 1000;
 /** Intervalo quando há checkpoint pendente (retomada automática). */
 const TINY_RESUME_TICK_MS = 30_000;
@@ -188,17 +187,18 @@ async function tryReconcileOrdersForConnection(connection: {
   if (!shouldRunTinyOrderReconcile({ lastReconcileAt })) return false;
   if (await isConnectionInRateLimitCooldown(connection.id)) return false;
 
-  const result = await reconcileOpenTinyOrders({
+  const result = await syncSalesOrdersFromTiny({
     tenantId: connection.tenantId,
     userId: connection.userId,
     connectionId: connection.id,
+    mode: "open",
   });
   if (!result.tinyConnected) return false;
-  if (result.rateLimited) return true;
+  if (result.busy || result.rateLimited) return true;
 
   await setLastAutoReconcileAt(connection.tenantId, new Date().toISOString());
   console.log(
-    `[tiny-sync] ${connection.tenantId}/${connection.id}: conciliação — ${result.checked} conferidos, ${result.cancelledRemoved + result.closedRemoved} saíram da fila, ${result.cancelledFlagged} pausados por cancelamento`,
+    `[tiny-sync] ${connection.tenantId}/${connection.id}: atualização de 30 min — ${result.created} criados, ${result.updated} atualizados, ${result.cancelledRemoved + result.closedRemoved} saíram da fila, ${result.cancelledFlagged} pausados por cancelamento`,
   );
   return false;
 }

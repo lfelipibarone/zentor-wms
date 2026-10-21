@@ -133,7 +133,7 @@ export default function PedidosPage() {
     <div className="space-y-6">
       <PageHeader
         title="Pedidos"
-        description="Pedidos ERP e ondas de separação — acompanhe o fluxo até packing e expedição. Packing operacional na tela Packing."
+        description="Pedidos ERP e ondas de separação — só entram na fila depois de Faturados no Tiny. Packing operacional na tela Packing."
       />
 
       <div className="flex flex-wrap gap-2">

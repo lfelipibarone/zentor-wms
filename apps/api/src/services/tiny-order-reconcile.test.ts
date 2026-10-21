@@ -11,13 +11,13 @@ describe("decideTinyOrderReconcileAction", () => {
   };
 
   it("mantém pedidos ainda no estágio importável do Tiny", () => {
-    for (const situacao of [0, 1, 3, 4, 7, null]) {
+    for (const situacao of [1, null]) {
       assert.equal(decideTinyOrderReconcileAction({ ...base, situacao }), "keep");
     }
   });
 
   it("remove pendentes que já saíram do estágio importável no Tiny", () => {
-    for (const situacao of [2, 5, 6, 8, 9]) {
+    for (const situacao of [0, 2, 3, 4, 5, 6, 7, 8, 9]) {
       assert.equal(
         decideTinyOrderReconcileAction({ ...base, situacao }),
         "remove",
