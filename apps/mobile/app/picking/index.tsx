@@ -6,7 +6,6 @@ import { useQuery } from "@tanstack/react-query";
 import { OrderStatus } from "@wms/shared";
 import { useOrderQueue } from "@/hooks/usePicking";
 import { AppHeader } from "@/components/AppHeader";
-import { FactoryButton } from "@/components/FactoryButton";
 import { CollectionDeadlineRow } from "@/components/CollectionDeadlineRow";
 import { WavePickingPanel } from "@/components/WavePickingPanel";
 import { Badge, Card, EmptyState, Loading, SectionTitle, SegmentedTabs } from "@/components/ui";
@@ -20,7 +19,6 @@ import {
   type ProblemOrder,
   type ProblemWave,
   type ProblemWaveOrder,
-  type ProximityGroupDto,
   type QueueOrder,
 } from "@/lib/api";
 
@@ -33,7 +31,6 @@ export default function PickingHubScreen() {
   const { data: queueData, isLoading, error, refetch, isRefetching } =
     useOrderQueue();
   const data = queueData?.orders;
-  const proximityGroups = queueData?.proximityGroups ?? [];
 
   const problemOrders = useQuery({
     queryKey: ["problem-orders"],
@@ -154,7 +151,6 @@ export default function PickingHubScreen() {
         ) : (
           <OrdersQueuePanel
             orders={data ?? []}
-            proximityGroups={proximityGroups}
             refreshing={isRefetching}
             onRefresh={refetch}
             onPressOrder={handleOrderPress}
@@ -167,77 +163,15 @@ export default function PickingHubScreen() {
 
 function OrdersQueuePanel({
   orders,
-  proximityGroups,
   refreshing,
   onRefresh,
   onPressOrder,
 }: {
   orders: QueueOrder[];
-  proximityGroups: ProximityGroupDto[];
   refreshing: boolean;
   onRefresh: () => void;
   onPressOrder: (o: QueueOrder) => void;
 }) {
-  const handleAcceptBatch = async (group: ProximityGroupDto) => {
-    const firstId = group.orderIds[0];
-    if (!firstId) return;
-    const order = orders.find((o) => o.id === firstId);
-    if (order) {
-      await onPressOrder(order);
-      return;
-    }
-    try {
-      await api.acceptOrder(firstId);
-      const session = await api.getPickingSession(firstId).catch(() => null);
-      if (session?.order.basket) {
-        router.push({
-          pathname: "/picking/[orderId]/pick",
-          params: {
-            orderId: firstId,
-            basketCode: session.order.basket.code,
-          },
-        });
-        return;
-      }
-      router.push(`/picking/${firstId}/basket`);
-    } catch (e) {
-      showErrorAlert(
-        e instanceof ApiError ? e.message : "Erro ao abrir pedido",
-      );
-    }
-  };
-
-  const header =
-    proximityGroups.length > 0 ? (
-      <View style={styles.listHeader}>
-        <SectionTitle>Pedidos próximos</SectionTitle>
-        {proximityGroups.slice(0, 5).map((g) => (
-          <Card key={g.id} accent={color}>
-            <View style={styles.recTop}>
-              <Badge label={`${g.orders.length} pedidos`} tone="primary" icon="git-merge" />
-              <Text style={styles.recRoute} numberOfLines={1}>
-                {g.routeHint}
-              </Text>
-            </View>
-            <Text style={styles.recOrders} numberOfLines={2}>
-              {g.orders.map((o) => o.erpOrderId).join(" · ")}
-            </Text>
-            <View style={styles.recActions}>
-              <FactoryButton
-                label="Abrir 1º"
-                icon="open-outline"
-                size="md"
-                variant="secondary"
-                style={styles.flex}
-                onPress={() => void handleAcceptBatch(g)}
-              />
-            </View>
-          </Card>
-        ))}
-        <SectionTitle>Fila</SectionTitle>
-      </View>
-    ) : null;
-
   return (
     <FlatList
       style={styles.flex}
@@ -246,7 +180,6 @@ function OrdersQueuePanel({
       contentContainerStyle={styles.list}
       refreshing={refreshing}
       onRefresh={onRefresh}
-      ListHeaderComponent={header}
       ListEmptyComponent={<EmptyState icon="cart-outline" title="Nenhum pedido na fila" />}
       renderItem={({ item }) => (
         <OrderCard item={item} onPress={() => onPressOrder(item)} />
@@ -383,8 +316,6 @@ function OrderCard({
   const qtyPicked =
     "qtyPicked" in item ? (item as ProblemOrder).qtyPicked : 0;
   const routeHint = "routeHint" in item ? item.routeHint : null;
-  const neighbors =
-    "proximityNeighborCount" in item ? item.proximityNeighborCount ?? 0 : 0;
 
   const accent = paused
     ? theme.danger
@@ -440,9 +371,6 @@ function OrderCard({
             {routeHint}
           </Text>
         ) : null}
-        {neighbors > 0 ? (
-          <Badge label={`+${neighbors} perto`} tone="primary" icon="git-merge" />
-        ) : null}
       </View>
     </Card>
   );
@@ -468,15 +396,6 @@ const styles = StyleSheet.create({
   },
   listHeader: { gap: spacing.sm, marginBottom: spacing.xs },
   waveSection: { gap: spacing.sm },
-  recTop: { flexDirection: "row", alignItems: "center", gap: spacing.sm },
-  recRoute: { flex: 1, color: color, fontWeight: "700", fontSize: typography.caption },
-  recOrders: {
-    marginTop: spacing.sm,
-    fontSize: typography.caption,
-    fontWeight: "700",
-    color: theme.text,
-  },
-  recActions: { flexDirection: "row", gap: spacing.sm, marginTop: spacing.sm },
   card: { gap: spacing.sm },
   cardTop: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
   erp: { flex: 1, fontSize: 28, fontWeight: "900", color: theme.text, letterSpacing: 0.3 },
