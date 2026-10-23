@@ -1,5 +1,5 @@
 # Context: monorepo root (Dokploy Docker Context = /)
-FROM node:20-bookworm-slim AS base
+FROM node:22.23.4-bookworm-slim AS base
 RUN corepack enable && corepack prepare pnpm@9.15.0 --activate
 WORKDIR /app
 

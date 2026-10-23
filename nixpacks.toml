@@ -2,7 +2,7 @@
 # Preferência do time: build Docker (apps/api/Dockerfile, apps/web/Dockerfile).
 
 [phases.setup]
-nixPkgs = ["nodejs_20", "openssl"]
+nixPkgs = ["nodejs_22", "openssl"]
 
 [phases.install]
 cmds = [
