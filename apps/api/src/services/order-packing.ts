@@ -928,7 +928,15 @@ export async function returnWaveLineToPicker(
 }
 
 /** Onda só vai para o packing quando o separador terminou de coletar tudo (cestas na mesa). */
-const WAVE_PICK_FINISHED = { lines: { every: { pickCompletedAt: { not: null } } } } satisfies Prisma.PickWaveWhereInput;
+const WAVE_PICK_FINISHED = {
+  lines: {
+    every: {
+      sortStatus: {
+        in: [PickWaveLineSortStatus.PICKED, PickWaveLineSortStatus.SORTED],
+      },
+    },
+  },
+} satisfies Prisma.PickWaveWhereInput;
 
 async function listWavePackingLinesInternal(tenantId: string) {
   const lines = await prisma.pickWaveLine.findMany({
@@ -1134,7 +1142,13 @@ export async function getWavePackingOverview(tenantId: string, waveId: string) {
       releasedAt: wave.releasedAt?.toISOString() ?? null,
       acceptedByName: wave.acceptedBy?.name ?? null,
       collectionDeadline: collectionDeadline?.toISOString() ?? null,
-      pickFinished: wave.lines.length > 0 && wave.lines.every((l) => l.pickCompletedAt != null),
+      pickFinished:
+        wave.lines.length > 0 &&
+        wave.lines.every(
+          (l) =>
+            l.sortStatus === PickWaveLineSortStatus.PICKED ||
+            l.sortStatus === PickWaveLineSortStatus.SORTED,
+        ),
     },
     lines,
     orders,

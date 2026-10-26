@@ -1,4 +1,8 @@
-import { resolvePickFaceForProduct } from "./pick-face-resolve.js";
+import type { Location } from "@prisma/client";
+import {
+  PickFaceError,
+  resolvePickFaceForProduct,
+} from "./pick-face-resolve.js";
 
 export type PickSegment = {
   locationId: string;
@@ -44,4 +48,47 @@ export function buildMultiGondolaHint(segments: PickSegment[]): string | null {
   return segments
     .map((s) => `${s.quantity} un. em ${s.barcode}`)
     .join(" · ");
+}
+
+/** Gôndola atual do produto, sem gravar no pedido. */
+export async function resolveCurrentPickFace(
+  tenantId: string,
+  productId: string | null | undefined,
+): Promise<Location | null> {
+  if (!productId) return null;
+  try {
+    return await resolvePickFaceForProduct(productId, tenantId, "pick");
+  } catch (e) {
+    if (e instanceof PickFaceError) return null;
+    throw e;
+  }
+}
+
+/**
+ * Endereço para exibir/validar no picking avulso: usa a gôndola já ligada ao
+ * item (onda) ou, se não houver, a pick face atual do produto — sem persistir.
+ */
+export async function displayPickLocationForItems<
+  T extends { id: string; productId: string | null; pickLocation: Location | null },
+>(tenantId: string, items: T[]): Promise<Map<string, Location>> {
+  const byItem = new Map<string, Location>();
+  const byProduct = new Map<string, Location | null>();
+
+  for (const item of items) {
+    if (item.pickLocation) {
+      byItem.set(item.id, item.pickLocation);
+      continue;
+    }
+    if (!item.productId) continue;
+    if (!byProduct.has(item.productId)) {
+      byProduct.set(
+        item.productId,
+        await resolveCurrentPickFace(tenantId, item.productId),
+      );
+    }
+    const loc = byProduct.get(item.productId);
+    if (loc) byItem.set(item.id, loc);
+  }
+
+  return byItem;
 }

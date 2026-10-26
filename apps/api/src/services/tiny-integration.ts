@@ -96,7 +96,6 @@ export function parseTinyApiPedido(
 
   const cliente = asRecord(pedido.cliente);
   const ecommerce = asRecord(pedido.ecommerce);
-  const natureza = asRecord(pedido.naturezaOperacao);
 
   const collectionDeadline =
     parseDateField(str(pedido.dataPrevista)) ??
@@ -105,10 +104,11 @@ export function parseTinyApiPedido(
   return {
     erpOrderId: `TINY-${id}`,
     customerName: str(cliente?.nome) ?? str(cliente?.fantasia),
+    // Só ecommerce/canal — naturezaOperacao ("…Mercadorias…") contaminava ML.
     marketplace: detectMarketplaceFromTiny(
       str(ecommerce?.nome),
       str(ecommerce?.canalVenda),
-      str(natureza?.nome) ?? null,
+      null,
     ),
     collectionDeadline,
     tinyPriorityRaw: extractTinyPriorityFromRecord(pedido),
@@ -197,8 +197,6 @@ export function parseTinyWebhookPayload(body: unknown): TinyOrderPayload | null 
     str(dados.ecommerce);
   const canalExtra = [
     str(pedido.tipo),
-    str(pedido.naturezaOperacao),
-    str(pedido.natureza_operacao),
     str(pedido.canalVenda),
     str(pedido.canal_venda),
   ]

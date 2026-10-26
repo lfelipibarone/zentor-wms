@@ -109,5 +109,6 @@ async function tryAcceptOneOrder(
   if (!accepted) {
     return { ok: false, message: "Pedido já aceito ou indisponível na fila" };
   }
+
   return { ok: true };
 }

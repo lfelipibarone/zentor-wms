@@ -18,7 +18,7 @@ export interface SortAllocationInput {
   webPacking?: boolean;
 }
 
-async function checkOrderComplete(
+export async function checkOrderComplete(
   orderId: string,
   tenantId: string,
   userId: string,
@@ -92,7 +92,10 @@ export async function confirmSortAllocation(input: SortAllocationInput) {
     await assertWaveOperatorForMutation(line.waveId, input.userId, line.partId);
   } else {
     const stillPicking = await prisma.pickWaveLine.count({
-      where: { waveId: line.waveId, pickCompletedAt: null },
+      where: {
+        waveId: line.waveId,
+        sortStatus: PickWaveLineSortStatus.PENDING,
+      },
     });
     if (stillPicking > 0) {
       throw new PickWaveError("A onda ainda está em separação. Confira quando o separador finalizar.");

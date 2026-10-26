@@ -66,7 +66,13 @@ export function normalizeMarketplace(
   }
   if (upper === "OUTROS") return "OUTROS";
 
-  if (upper.includes("MERCADO") || upper.includes("MELI")) {
+  // "Mercadorias" (natureza fiscal) não é Mercado Livre.
+  if (
+    upper.includes("MELI") ||
+    upper.includes("MERCADO LIVRE") ||
+    upper.includes("MERCADO_LIVRE") ||
+    (upper.includes("MERCADO") && !upper.includes("MERCADORIA"))
+  ) {
     return "MERCADO_LIVRE";
   }
   if (upper.includes("SHOPEE")) return "SHOPEE";

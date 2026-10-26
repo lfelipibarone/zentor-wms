@@ -1,5 +1,5 @@
 import type { FastifyInstance } from "fastify";
-import { formatMarketplace, productMatchesCode } from "@wms/shared";
+import { formatMarketplace, gondolaScanMatches, productMatchesCode } from "@wms/shared";
 import { OrderStatus, OrderTimeLogEvent, InventoryMovementType, LocationType } from "@prisma/client";
 import { requireMobileAccess } from "../lib/auth-guard.js";
 import { prisma } from "../lib/prisma.js";
@@ -374,8 +374,9 @@ export async function mobileRoutes(app: FastifyInstance) {
     "/mobile/orders/:orderId/picking",
     async (request, reply) => {
       const { orderId } = request.params;
-      const order = await prisma.order.findUnique({
-        where: { id: orderId },
+      const tenantId = request.authUser!.tenantId!;
+      const order = await prisma.order.findFirst({
+        where: { id: orderId, tenantId },
         include: {
           basket: true,
           items: {
@@ -389,6 +390,13 @@ export async function mobileRoutes(app: FastifyInstance) {
       });
       if (!order) return reply.status(404).send({ error: "Pedido não encontrado" });
 
+      const { displayPickLocationForItems } = await import(
+        "../services/pick-allocation.js"
+      );
+      const displayLocs = await displayPickLocationForItems(tenantId, order.items);
+      const locOf = (item: (typeof order.items)[0]) =>
+        displayLocs.get(item.id) ?? item.pickLocation;
+
       const { mapLocationForRoute } = await import("../services/location-route.js");
       const { getRouteEngine, pickNextItemByEngine, sortPendingItemsByEngine } =
         await import("../services/route-engine/index.js");
@@ -397,7 +405,7 @@ export async function mobileRoutes(app: FastifyInstance) {
       const isPending = (i: (typeof order.items)[0]) =>
         i.quantityPicked < i.quantityOrdered;
 
-      const mapPickLoc = (loc: (typeof order.items)[0]["pickLocation"]) =>
+      const mapPickLoc = (loc: ReturnType<typeof locOf>) =>
         loc
           ? {
               id: loc.id,
@@ -412,20 +420,22 @@ export async function mobileRoutes(app: FastifyInstance) {
           : null;
 
       const mapForRoute = (
-        loc: NonNullable<(typeof order.items)[0]["pickLocation"]>,
+        loc: NonNullable<ReturnType<typeof locOf>>,
       ) => mapLocationForRoute(loc);
 
       const lastPickedItem = [...order.items]
-        .filter((i) => i.quantityPicked > 0 && i.pickLocation)
+        .filter((i) => i.quantityPicked > 0 && locOf(i))
         .sort((a, b) => b.lineNumber - a.lineNumber)[0];
-      const lastLocation = lastPickedItem?.pickLocation
-        ? mapForRoute(lastPickedItem.pickLocation)
-        : null;
+      const lastPickedLoc = lastPickedItem ? locOf(lastPickedItem) : null;
+      const lastLocation = lastPickedLoc ? mapForRoute(lastPickedLoc) : null;
 
-      const routeItems = order.items.map((item) => ({
-        ...item,
-        pickLocation: item.pickLocation ? mapForRoute(item.pickLocation) : null,
-      }));
+      const routeItems = order.items.map((item) => {
+        const loc = locOf(item);
+        return {
+          ...item,
+          pickLocation: loc ? mapForRoute(loc) : null,
+        };
+      });
 
       const isPendingQty = (i: {
         quantityPicked: number;
@@ -466,16 +476,17 @@ export async function mobileRoutes(app: FastifyInstance) {
           quantityOrdered: item.quantityOrdered,
           quantityPicked: item.quantityPicked,
           product: item.product,
-          pickLocation: mapPickLoc(item.pickLocation),
+          pickLocation: mapPickLoc(locOf(item)),
           completed: item.quantityPicked >= item.quantityOrdered,
         })),
         routeQueue: routeQueue.slice(0, 5).map((item) => {
           const original = order.items.find((i) => i.id === item.id);
+          const loc = original ? locOf(original) : null;
           return {
             id: item.id,
             lineNumber: item.lineNumber,
-            pickLocation: original
-              ? mapPickLoc(original.pickLocation)
+            pickLocation: loc
+              ? mapPickLoc(loc)
               : item.pickLocation
                 ? {
                     id: item.pickLocation.id ?? "",
@@ -497,8 +508,8 @@ export async function mobileRoutes(app: FastifyInstance) {
               quantityPicked: nextOrderItem.quantityPicked,
               remaining,
               product: nextOrderItem.product,
-              pickLocation: mapPickLoc(nextOrderItem.pickLocation),
-              stockMismatchHint: emptyFaceHint(nextOrderItem.pickLocation),
+              pickLocation: mapPickLoc(locOf(nextOrderItem)),
+              stockMismatchHint: emptyFaceHint(locOf(nextOrderItem)),
             }
           : null,
         allPicked: !nextOrderItem,
@@ -515,21 +526,44 @@ export async function mobileRoutes(app: FastifyInstance) {
       const { orderId, itemId } = request.params;
       const { locationBarcode } = request.body ?? {};
 
+      const tenantId = request.authUser!.tenantId!;
       const item = await prisma.orderItem.findFirst({
-        where: { id: itemId, orderId },
-        include: { pickLocation: true },
+        where: { id: itemId, orderId, order: { tenantId } },
+        include: { pickLocation: true, product: true },
       });
       if (!item) return reply.status(404).send({ error: "Item não encontrado" });
-      if (!item.pickLocation) {
+      const { resolveCurrentPickFace } = await import(
+        "../services/pick-allocation.js"
+      );
+      const loc =
+        item.pickLocation ??
+        (await resolveCurrentPickFace(tenantId, item.productId));
+      if (!loc) {
         return reply.status(400).send({ error: "Item sem localização de pick" });
       }
-      if (item.pickLocation.barcode !== locationBarcode?.trim()) {
+      const scanned = locationBarcode ?? "";
+      let matches = gondolaScanMatches({
+        locationBarcode: loc.barcode,
+        scanned,
+        product: item.product,
+      });
+      if (!matches && scanned.trim()) {
+        const found = await prisma.location.findFirst({
+          where: {
+            tenantId,
+            active: true,
+            barcode: { equals: scanned.trim(), mode: "insensitive" },
+          },
+        });
+        matches = found?.id === loc.id;
+      }
+      if (!matches) {
         return reply.status(400).send({
           error: "Gôndola incorreta",
-          expected: item.pickLocation.barcode,
+          expected: loc.barcode,
         });
       }
-      return { valid: true, location: formatLocation(item.pickLocation) };
+      return { valid: true, location: formatLocation(loc) };
     }
   );
 
@@ -557,6 +591,13 @@ export async function mobileRoutes(app: FastifyInstance) {
       });
       if (!item) return reply.status(404).send({ error: "Item não encontrado" });
 
+      const { resolveCurrentPickFace } = await import(
+        "../services/pick-allocation.js"
+      );
+      const pickLoc =
+        item.pickLocation ??
+        (await resolveCurrentPickFace(item.order.tenantId, item.productId));
+
       const newPicked = Math.min(
         item.quantityPicked + quantity,
         item.quantityOrdered
@@ -570,8 +611,8 @@ export async function mobileRoutes(app: FastifyInstance) {
         });
 
         // gôndola por %: a coleta não desconta (o app pede a %); por quantidade: baixa automática
-        if (pickedDelta > 0 && item.pickLocation) {
-          const change = await decrementFaceOnPick(tx, item.pickLocation, pickedDelta);
+        if (pickedDelta > 0 && pickLoc) {
+          const change = await decrementFaceOnPick(tx, pickLoc, pickedDelta);
           if (item.productId) {
             await tx.inventoryMovement.create({
               data: {
@@ -580,7 +621,7 @@ export async function mobileRoutes(app: FastifyInstance) {
                 quantity: pickedDelta,
                 userId,
                 productId: item.productId,
-                fromLocationId: item.pickLocation.id,
+                fromLocationId: pickLoc.id,
                 orderId,
                 ...(change ? { percentBefore: change.before, percentAfter: change.after } : {}),
               },
@@ -591,16 +632,16 @@ export async function mobileRoutes(app: FastifyInstance) {
         return null;
       });
 
-      if (level && level.unitsAfter <= 0 && level.unitsBefore > 0 && item.productId) {
+      if (level && level.unitsAfter <= 0 && level.unitsBefore > 0 && item.productId && pickLoc) {
         await reconcilePickTargetsAfterStockChange(item.order.tenantId, item.productId, {
-          adjustedLocationId: item.pickLocation!.id,
+          adjustedLocationId: pickLoc.id,
           orderId,
           itemId,
         });
       }
 
-      const location = item.pickLocation
-        ? await prisma.location.findUniqueOrThrow({ where: { id: item.pickLocation.id } })
+      const location = pickLoc
+        ? await prisma.location.findUniqueOrThrow({ where: { id: pickLoc.id } })
         : null;
 
       return {

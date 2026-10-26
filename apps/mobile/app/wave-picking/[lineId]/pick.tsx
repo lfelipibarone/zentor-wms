@@ -20,6 +20,7 @@ import { ApiError } from "@/lib/api";
 import { modules } from "@/lib/modules";
 import { formatLevel, formatMinLevel, isQuantityMode } from "@/lib/percent";
 import type { GondolaLevel } from "@/components/PercentInput";
+import { gondolaScanMatches } from "@/lib/gondola-scan";
 import { theme, spacing, typography, radius } from "@/lib/theme";
 
 export default function WavePickScreen() {
@@ -104,12 +105,21 @@ export default function WavePickScreen() {
         `Pick registrado: ${result.quantityPicked}/${result.quantityTotal}`,
       );
       if (result.readyForSort) {
+        const finished = Boolean(result.wavePickFinished || result.partPickFinished);
         if (isQuantityMode(result.location)) {
-          showToast(`Pick concluído · gôndola com ${formatLevel(result.location)}`);
+          showToast(
+            finished
+              ? "Separação concluída — packing pode iniciar"
+              : `Pick concluído · gôndola com ${formatLevel(result.location)}`,
+          );
           router.replace("/picking");
           return;
         }
-        say("Pick concluído — informe a % que ficou na gôndola.");
+        say(
+          finished
+            ? "Separação concluída — informe a % da gôndola."
+            : "Pick concluído — informe a % que ficou na gôndola.",
+        );
         setAfterPickOpen(true);
       }
     } catch (e) {
@@ -127,6 +137,7 @@ export default function WavePickScreen() {
         waveLineId: lineId,
       });
       setAfterPickOpen(false);
+      showToast("Separação enviada para o packing");
       router.replace("/picking");
     } catch (e) {
       showErrorAlert(e instanceof ApiError ? e.message : "Erro ao salvar a % da gôndola");
@@ -180,11 +191,20 @@ export default function WavePickScreen() {
       ) : null}
 
       {picked ? (
-        <FactoryButton
-          label="Informar % da gôndola"
-          icon="speedometer"
-          onPress={() => setAfterPickOpen(true)}
-        />
+        <>
+          <FactoryButton
+            label="Informar % da gôndola"
+            icon="speedometer"
+            onPress={() => setAfterPickOpen(true)}
+          />
+          <FactoryButton
+            label="Voltar à fila"
+            icon="arrow-back"
+            size="md"
+            variant="secondary"
+            onPress={() => router.replace("/picking")}
+          />
+        </>
       ) : !locationOk ? (
         <FactoryButton
           label="Bipar gôndola"
@@ -248,7 +268,13 @@ export default function WavePickScreen() {
         onScan={(code) => {
           setScannerOpen(false);
           if (scannerMode === "location") {
-            if (code.trim().toUpperCase() === line.pickLocation.barcode.toUpperCase()) {
+            if (
+              gondolaScanMatches({
+                locationBarcode: line.pickLocation.barcode,
+                scanned: code,
+                product: line.product,
+              })
+            ) {
               setLocationOk(true);
               say("Gôndola confirmada ✓");
             } else {

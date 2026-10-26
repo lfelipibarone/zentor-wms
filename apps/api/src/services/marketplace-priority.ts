@@ -16,8 +16,6 @@ export function computeOrderPriority(params: {
   const code = normalizeMarketplace(marketplace);
   if (code && MARKETPLACE_PRIORITY_BONUS[code]) {
     score += MARKETPLACE_PRIORITY_BONUS[code]!;
-  } else if (marketplace?.toUpperCase().includes("MERCADO")) {
-    score += 5;
   }
 
   if (!collectionDeadline) {

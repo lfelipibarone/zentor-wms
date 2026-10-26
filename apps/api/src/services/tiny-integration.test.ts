@@ -118,4 +118,36 @@ describe("tiny-integration pedidos", () => {
       null,
     );
   });
+
+  it("marketplace vem do ecommerce, não da natureza fiscal Mercadorias", () => {
+    const itens = [
+      { quantidade: 1, produto: { sku: "SKU-001", descricao: "Produto" } },
+    ];
+    const shopee = parseTinyApiPedido({
+      id: 10,
+      situacao: 1,
+      ecommerce: { nome: "Shopee Loja Carbi", canalVenda: "" },
+      naturezaOperacao: { nome: "Venda de Mercadorias - Regime normal" },
+      itens,
+    });
+    assert.equal(shopee?.marketplace, "SHOPEE");
+
+    const amazon = parseTinyApiPedido({
+      id: 11,
+      situacao: 1,
+      ecommerce: { nome: "Amazon", canalVenda: "" },
+      naturezaOperacao: { nome: "Venda de Mercadorias - Regime normal" },
+      itens,
+    });
+    assert.equal(amazon?.marketplace, "AMAZON");
+
+    const ml = parseTinyApiPedido({
+      id: 12,
+      situacao: 1,
+      ecommerce: { nome: "Mercado Livre Mamute", canalVenda: "" },
+      naturezaOperacao: { nome: "Venda de Mercadorias - Regime normal" },
+      itens,
+    });
+    assert.equal(ml?.marketplace, "MERCADO_LIVRE");
+  });
 });

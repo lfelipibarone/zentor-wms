@@ -322,7 +322,7 @@ export default function RessuprimentoScreen() {
           ))}
           <SectionTitle>Fila</SectionTitle>
         </View>
-      ) : null;
+      ) : undefined;
 
     return (
       <ScreenShell

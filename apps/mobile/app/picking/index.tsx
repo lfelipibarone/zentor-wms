@@ -247,7 +247,7 @@ function ProblemsPanel({
         ))}
         {orders.length > 0 ? <SectionTitle>Pedidos avulsos</SectionTitle> : null}
       </View>
-    ) : null;
+    ) : undefined;
 
   return (
     <FlatList
@@ -261,7 +261,7 @@ function ProblemsPanel({
       ListEmptyComponent={
         waves.length === 0 ? (
           <EmptyState icon="checkmark-circle-outline" title="Nenhum problema" />
-        ) : null
+        ) : undefined
       }
       renderItem={({ item }) => (
         <OrderCard item={item} problem onPress={() => onPressOrder(item)} />

@@ -7,7 +7,7 @@ import { CollectionDeadlineRow } from "@/components/CollectionDeadlineRow";
 import { ProductThumbnail } from "@/components/ProductThumbnail";
 import { SplitWorkModal } from "@/components/SplitWorkModal";
 import { WorkShareCard, workBlockedMessage } from "@/components/WorkTimer";
-import { Badge, Card, EmptyState, Loading, ProgressBar } from "@/components/ui";
+import { Badge, Card, EmptyState, Loading, Notice, ProgressBar } from "@/components/ui";
 import { useCurrentWave, useReleaseWaveAccept } from "@/hooks/useWavePicking";
 import { useSplitWork } from "@/hooks/useWorkShares";
 import { showErrorAlert, showToast } from "@/lib/app-alert";
@@ -58,6 +58,10 @@ export function WavePickingPanel() {
   const { wave, lines, work } = data;
   const blocked = workBlockedMessage(work);
   const pending = lines.filter((l) => l.sortStatus !== "SORTED");
+  const pickPending = lines.filter(
+    (l) => l.sortStatus !== "PICKED" && l.sortStatus !== "SORTED" && l.remaining > 0,
+  );
+  const pickFinished = lines.length > 0 && pickPending.length === 0;
   const unitsTotal = lines.reduce((n, l) => n + l.quantityTotal, 0);
   const unitsPicked = lines.reduce((n, l) => n + l.quantityPicked, 0);
   const canReleaseWave =
@@ -177,6 +181,11 @@ export function WavePickingPanel() {
       </View>
       <ProgressBar value={unitsPicked} total={unitsTotal} color={color} />
       <WorkShareCard work={work} />
+      {pickFinished ? (
+        <Notice tone="success">
+          Separação da onda concluída. Os pedidos completos já podem ir ao packing.
+        </Notice>
+      ) : null}
       {canReleaseWave ? (
         <FactoryButton
           label="Cancelar aceite"
@@ -193,12 +202,20 @@ export function WavePickingPanel() {
   return (
     <FlatList
       style={styles.flex}
-      data={lines}
+      data={pickFinished ? [] : lines}
       keyExtractor={(item) => item.id}
       contentContainerStyle={styles.list}
       refreshing={isRefetching}
       onRefresh={refetch}
       ListHeaderComponent={listHeader}
+      ListEmptyComponent={
+        pickFinished ? (
+          <EmptyState
+            icon="checkmark-circle"
+            title="Onda pronta para o packing"
+          />
+        ) : undefined
+      }
       renderItem={({ item }) => {
         const done =
           item.sortStatus === "PICKED" || item.sortStatus === "SORTED";

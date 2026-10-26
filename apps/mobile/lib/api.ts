@@ -751,6 +751,8 @@ export const api = {
       quantityTotal: number;
       sortStatus: string;
       readyForSort: boolean;
+      wavePickFinished?: boolean;
+      partPickFinished?: boolean;
       location:
         | (StockModeFields & { id: string; fillPercent: number; minPercent: number })
         | null;

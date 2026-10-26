@@ -3,3 +3,4 @@ export * from "./types/marketplaces.js";
 export * from "./permissions.js";
 export * from "./collection-urgency.js";
 export * from "./product-code.js";
+export * from "./location-code.js";

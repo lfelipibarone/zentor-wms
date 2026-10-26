@@ -3,13 +3,11 @@ import {
   PickWaveLineSortStatus,
   PickWaveStatus,
 } from "@prisma/client";
-import { productMatchesCode } from "@wms/shared";
+import { gondolaScanMatches, productMatchesCode } from "@wms/shared";
 import { prisma } from "../lib/prisma.js";
 import { PickWaveError, assertWaveOperatorForMutation } from "./pick-wave.js";
-import {
-  ensurePickingEndLog,
-  ensurePickingStartLog,
-} from "./order-time-log-helpers.js";
+import { checkOrderComplete } from "./pick-wave-sort.js";
+import { ensurePickingStartLog } from "./order-time-log-helpers.js";
 import { assertWaveShareStarted, finishShareIfDone } from "./work-share.js";
 import { decrementFaceOnPick, stockModeFields } from "./location-level.js";
 import { reconcilePickTargetsAfterStockChange } from "./pick-location-reconcile.js";
@@ -50,8 +48,24 @@ export async function confirmConsolidatedPick(input: ConsolidatedPickInput) {
     throw new PickWaveError("Linha já finalizada no packing");
   }
 
-  const locBarcode = input.locationBarcode.trim().toUpperCase();
-  if (line.pickLocation.barcode !== locBarcode) {
+  const scanned = input.locationBarcode ?? "";
+  let locationOk = gondolaScanMatches({
+    locationBarcode: line.pickLocation.barcode,
+    scanned,
+    product: line.product,
+  });
+  if (!locationOk && scanned.trim()) {
+    const found = await prisma.location.findFirst({
+      where: {
+        tenantId: line.wave.tenantId,
+        active: true,
+        barcode: { equals: scanned.trim(), mode: "insensitive" },
+      },
+      select: { id: true },
+    });
+    locationOk = found?.id === line.pickLocationId;
+  }
+  if (!locationOk) {
     throw new PickWaveError("Gôndola incorreta para esta linha");
   }
 
@@ -163,14 +177,7 @@ export async function confirmConsolidatedPick(input: ConsolidatedPickInput) {
 
     for (const orderId of affectedOrderIds) {
       await ensurePickingStartLog(tx, orderId, input.userId);
-
-      const items = await tx.orderItem.findMany({ where: { orderId } });
-      const pickComplete = items.every(
-        (i) => i.quantityPicked >= i.quantityOrdered,
-      );
-      if (pickComplete) {
-        await ensurePickingEndLog(tx, orderId, input.userId);
-      }
+      await checkOrderComplete(orderId, line.wave.tenantId, input.userId, tx);
     }
     return change;
   });
@@ -189,11 +196,39 @@ export async function confirmConsolidatedPick(input: ConsolidatedPickInput) {
     include: { product: true, pickLocation: true },
   });
 
+  const pendingWhere = {
+    sortStatus: PickWaveLineSortStatus.PENDING,
+  } as const;
+  const [pendingInWave, pendingInPart] = await Promise.all([
+    prisma.pickWaveLine.count({
+      where: { waveId: line.waveId, ...pendingWhere },
+    }),
+    line.partId
+      ? prisma.pickWaveLine.count({
+          where: { waveId: line.waveId, partId: line.partId, ...pendingWhere },
+        })
+      : Promise.resolve(0),
+  ]);
+
+  if (pendingInWave === 0) {
+    const waveOrders = await prisma.pickWaveOrder.findMany({
+      where: { waveId: line.waveId },
+      select: { orderId: true },
+    });
+    await prisma.$transaction(async (tx) => {
+      for (const { orderId } of waveOrders) {
+        await checkOrderComplete(orderId, line.wave.tenantId, input.userId, tx);
+      }
+    });
+  }
+
   return {
     quantityPicked: updated!.quantityPicked,
     quantityTotal: updated!.quantityTotal,
     sortStatus: updated!.sortStatus,
     readyForSort: updated!.sortStatus === PickWaveLineSortStatus.PICKED,
+    wavePickFinished: pendingInWave === 0,
+    partPickFinished: line.partId ? pendingInPart === 0 : pendingInWave === 0,
     location: {
       id: updated!.pickLocation.id,
       fillPercent: updated!.pickLocation.fillPercent,
