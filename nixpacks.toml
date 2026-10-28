@@ -1,5 +1,7 @@
 # Fallback se alguma app no Dokploy ainda usar Nixpacks.
-# Preferência do time: build Docker (apps/api/Dockerfile, apps/web/Dockerfile).
+# Preferência: build Docker (apps/api/Dockerfile, apps/web/Dockerfile).
+# Nixpacks no frontend engorda a imagem (copia o monorepo) e o deploy fica
+# amarelo em "exporting/unpacking layers". Use Dockerfile no Dokploy.
 
 [phases.setup]
 nixPkgs = ["nodejs_22", "openssl"]
@@ -8,7 +10,7 @@ nixPkgs = ["nodejs_22", "openssl"]
 cmds = [
   "corepack enable",
   "corepack prepare pnpm@9.15.0 --activate",
-  "pnpm install --frozen-lockfile"
+  "pnpm install --frozen-lockfile --filter @wms/api... --filter @wms/web... --filter @wms/shared..."
 ]
 
 [phases.build]

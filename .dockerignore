@@ -11,6 +11,9 @@ dist
 !**/.env.example
 apps/mobile/*
 !apps/mobile/package.json
+apps/mobile/.expo
+apps/mobile/android
+apps/mobile/ios
 docs
 **/*.md
 **/coverage
@@ -19,3 +22,9 @@ docs
 terminals
 assets
 *.log
+**/*.tsbuildinfo
+app.json
+.cursor
+agent-transcripts
+*.png
+!apps/web/public/**

@@ -23,11 +23,8 @@
     "cruzar-etiquetas": "pnpm --filter @wms/api cruzar-etiquetas"
   },
   "engines": {
-    "node": ">=22.23.4",
+    "node": ">=22.19.0",
     "pnpm": ">=9.0.0"
   },
-  "packageManager": "pnpm@9.15.0",
-  "devDependencies": {
-    "eas-cli": "16"
-  }
+  "packageManager": "pnpm@9.15.0"
 }
