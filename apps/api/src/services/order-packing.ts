@@ -1067,7 +1067,29 @@ export async function getWavePackingOverview(tenantId: string, waveId: string) {
           },
           pickedBy: { select: { name: true } },
           allocations: {
-            select: { quantity: true, quantitySorted: true, orderItem: { select: { orderId: true } } },
+            select: {
+              id: true,
+              quantity: true,
+              quantitySorted: true,
+              orderItem: {
+                select: {
+                  orderId: true,
+                  order: {
+                    select: {
+                      id: true,
+                      erpOrderId: true,
+                      customerName: true,
+                      marketplace: true,
+                      status: true,
+                      priority: true,
+                      collectionDeadline: true,
+                      shippingLabel: true,
+                      basket: { select: { code: true } },
+                    },
+                  },
+                },
+              },
+            },
           },
         },
       },
@@ -1092,7 +1114,6 @@ export async function getWavePackingOverview(tenantId: string, waveId: string) {
   });
   if (!wave) throw new PackingSessionError("Onda não encontrada", 404);
 
-  const { collectionDeadline } = aggregateWaveUrgency(wave.orders.map((wo) => wo.order));
   const engine = await getRouteEngine(tenantId);
   const lines = sortPendingItemsByEngine(engine, wave.lines, () => true).map((l) => ({
     id: l.id,
@@ -1106,19 +1127,86 @@ export async function getWavePackingOverview(tenantId: string, waveId: string) {
     quantitySorted: l.allocations.reduce((sum, a) => sum + a.quantitySorted, 0),
     sortStatus: l.sortStatus,
     pickedByName: l.pickedBy?.name ?? null,
+    allocations: l.allocations.map((a) => {
+      const o = a.orderItem.order;
+      return {
+        id: a.id,
+        quantity: a.quantity,
+        quantitySorted: a.quantitySorted,
+        orderId: o.id,
+        erpOrderId: o.erpOrderId,
+        customerName: o.customerName,
+        marketplace: o.marketplace,
+        orderStatus: o.status,
+        basketCode: o.basket?.code ?? null,
+        hasLabel: Boolean(o.shippingLabel),
+        labelFormat: o.shippingLabel ? detectLabelFormat(o.shippingLabel) : null,
+      };
+    }),
   }));
 
   const unitsByOrder = new Map<string, { total: number; sorted: number }>();
+  const orderMeta = new Map<
+    string,
+    {
+      id: string;
+      erpOrderId: string;
+      customerName: string | null;
+      marketplace: string | null;
+      status: string;
+      priority: number;
+      collectionDeadline: Date | null;
+      shippingLabel: string | null;
+      basketCode: string | null;
+    }
+  >();
+  for (const wo of wave.orders) {
+    const o = wo.order;
+    orderMeta.set(o.id, {
+      id: o.id,
+      erpOrderId: o.erpOrderId,
+      customerName: o.customerName,
+      marketplace: o.marketplace,
+      status: o.status,
+      priority: o.priority,
+      collectionDeadline: o.collectionDeadline,
+      shippingLabel: o.shippingLabel,
+      basketCode: o.basket?.code ?? null,
+    });
+  }
   for (const l of wave.lines) {
     for (const a of l.allocations) {
-      const acc = unitsByOrder.get(a.orderItem.orderId) ?? { total: 0, sorted: 0 };
+      const o = a.orderItem.order;
+      const acc = unitsByOrder.get(o.id) ?? { total: 0, sorted: 0 };
       acc.total += a.quantity;
       acc.sorted += a.quantitySorted;
-      unitsByOrder.set(a.orderItem.orderId, acc);
+      unitsByOrder.set(o.id, acc);
+      if (!orderMeta.has(o.id)) {
+        orderMeta.set(o.id, {
+          id: o.id,
+          erpOrderId: o.erpOrderId,
+          customerName: o.customerName,
+          marketplace: o.marketplace,
+          status: o.status,
+          priority: o.priority,
+          collectionDeadline: o.collectionDeadline,
+          shippingLabel: o.shippingLabel,
+          basketCode: o.basket?.code ?? null,
+        });
+      }
     }
   }
-  const orders = wave.orders
-    .map(({ order: o }) => ({
+
+  const { collectionDeadline } = aggregateWaveUrgency(
+    [...orderMeta.values()].map((o) => ({
+      priority: o.priority,
+      collectionDeadline: o.collectionDeadline,
+      marketplace: o.marketplace,
+    })),
+  );
+
+  const orders = [...orderMeta.values()]
+    .map((o) => ({
       id: o.id,
       erpOrderId: o.erpOrderId,
       customerName: o.customerName,
@@ -1126,7 +1214,7 @@ export async function getWavePackingOverview(tenantId: string, waveId: string) {
       status: o.status,
       priority: o.priority,
       collectionDeadline: o.collectionDeadline?.toISOString() ?? null,
-      basketCode: o.basket?.code ?? null,
+      basketCode: o.basketCode,
       hasLabel: Boolean(o.shippingLabel),
       labelFormat: o.shippingLabel ? detectLabelFormat(o.shippingLabel) : null,
       unitsTotal: unitsByOrder.get(o.id)?.total ?? 0,

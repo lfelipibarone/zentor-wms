@@ -122,14 +122,10 @@ export default function PackingWaveOverviewPage() {
   const pdfLabels = orders.filter((o) => o.hasLabel && o.labelFormat === "pdf");
   const labelBusy = generating !== null || printing;
 
-  const openOrderConference = async (orderId: string) => {
-    try {
-      await apiFetch(`/api/packing/orders/${orderId}/start`, { method: "POST", body: "{}" });
-      router.push(`/packing/${orderId}`);
-    } catch (e) {
-      setLabelMessage(e instanceof Error ? e.message : "Não foi possível abrir o pedido");
-    }
-  };
+  /** Uma linha por pedido × SKU (unifica as duas tabelas). */
+  const unifiedRows = lines.flatMap((line) =>
+    (line.allocations?.length ? line.allocations : []).map((alloc) => ({ line, alloc })),
+  );
 
   const generateAll = async () => {
     if (missingLabels.length === 0) return;
@@ -260,72 +256,12 @@ export default function PackingWaveOverviewPage() {
             </div>
 
             <section className="space-y-2">
-              <h2 className="text-sm font-semibold text-slate-800">Itens da onda ({lines.length})</h2>
-              <div className="overflow-x-auto rounded-xl border bg-white shadow-sm">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>SKU</TableHead>
-                      <TableHead>Gôndola</TableHead>
-                      <TableHead className="text-right">Coletado</TableHead>
-                      <TableHead className="whitespace-nowrap text-right">Conferido</TableHead>
-                      <TableHead>Situação</TableHead>
-                      <TableHead />
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {lines.map((line) => {
-                      const state = lineState(line, data.wave.pickFinished);
-                      return (
-                        <TableRow key={line.id}>
-                          <TableCell>
-                            <span className="font-mono text-sm font-medium">{line.sku}</span>
-                            <span className="block max-w-[200px] truncate text-xs text-muted-foreground">
-                              {line.productName}
-                            </span>
-                          </TableCell>
-                          <TableCell className="whitespace-nowrap text-sm">{line.routeLabel}</TableCell>
-                          <TableCell className="text-right tabular-nums">
-                            {line.quantityPicked}/{line.quantityTotal}
-                          </TableCell>
-                          <TableCell className="text-right tabular-nums">
-                            {line.quantitySorted}/{line.quantityTotal}
-                          </TableCell>
-                          <TableCell>
-                            <span
-                              className={cn(
-                                "whitespace-nowrap rounded-md px-2 py-0.5 text-xs font-medium",
-                                state.className,
-                              )}
-                            >
-                              {state.label}
-                            </span>
-                          </TableCell>
-                          <TableCell className="text-right">
-                            {state.ready && data.wave.status === "RELEASED" ? (
-                              <button
-                                type="button"
-                                onClick={() => router.push(`/packing/waves/${line.id}`)}
-                                className="rounded-lg bg-[#0d9488] px-3 py-1.5 text-xs font-semibold text-white"
-                              >
-                                Conferir
-                              </button>
-                            ) : null}
-                          </TableCell>
-                        </TableRow>
-                      );
-                    })}
-                  </TableBody>
-                </Table>
-              </div>
-            </section>
-
-            <section className="space-y-2">
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <h2 className="text-sm font-semibold text-slate-800">
-                  Pedidos da onda ({orders.length})
+                  Pedidos × itens ({unifiedRows.length})
                   <span className="ml-2 font-normal text-muted-foreground">
-                    {orders.length - missingLabels.length}/{orders.length} etiqueta(s) gerada(s)
+                    {orders.length} pedido(s) · {lines.length} SKU(s) ·{" "}
+                    {orders.length - missingLabels.length}/{orders.length} etiqueta(s)
                   </span>
                 </h2>
                 <div className="flex flex-wrap gap-2">
@@ -369,8 +305,10 @@ export default function PackingWaveOverviewPage() {
                   <TableHeader>
                     <TableRow>
                       <TableHead>Pedido</TableHead>
-                      <TableHead>Marketplace</TableHead>
                       <TableHead>Cesta</TableHead>
+                      <TableHead>SKU</TableHead>
+                      <TableHead>Gôndola</TableHead>
+                      <TableHead className="text-right">Qtd</TableHead>
                       <TableHead className="whitespace-nowrap text-right">Conferido</TableHead>
                       <TableHead>Situação</TableHead>
                       <TableHead>Etiqueta</TableHead>
@@ -378,51 +316,95 @@ export default function PackingWaveOverviewPage() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {orders.map((o) => (
-                      <TableRow key={o.id}>
-                        <TableCell>
-                          <span className="whitespace-nowrap font-mono text-sm font-medium">{o.erpOrderId}</span>
-                          {o.customerName ? (
-                            <span className="block whitespace-nowrap text-xs text-muted-foreground">
-                              {o.customerName}
-                            </span>
-                          ) : null}
-                        </TableCell>
-                        <TableCell className="whitespace-nowrap">
-                          <MarketplaceBadge value={o.marketplace} />
-                        </TableCell>
-                        <TableCell className="whitespace-nowrap font-mono text-sm">{o.basketCode ?? "—"}</TableCell>
-                        <TableCell
-                          className={cn(
-                            "text-right tabular-nums",
-                            o.unitsTotal > 0 && o.unitsSorted >= o.unitsTotal && "font-semibold text-emerald-700",
-                          )}
-                        >
-                          {o.unitsSorted}/{o.unitsTotal}
-                        </TableCell>
-                        <TableCell className="whitespace-nowrap text-sm">
-                          {ORDER_STATUS_LABEL[o.status as keyof typeof ORDER_STATUS_LABEL] ?? o.status}
-                        </TableCell>
-                        <TableCell>
-                          <LabelStatus
-                            hasLabel={o.hasLabel}
-                            format={o.labelFormat}
-                            error={labelErrors[o.id]}
-                          />
-                        </TableCell>
-                        <TableCell className="text-right">
-                          {o.status === "PICKED_AWAITING_CONFERENCE" ? (
-                            <button
-                              type="button"
-                              onClick={() => openOrderConference(o.id)}
-                              className="rounded-lg bg-[#0d9488] px-3 py-1.5 text-xs font-semibold text-white"
-                            >
-                              Conferir
-                            </button>
-                          ) : null}
+                    {unifiedRows.length === 0 ? (
+                      <TableRow>
+                        <TableCell colSpan={9} className="py-8 text-center text-sm text-muted-foreground">
+                          Nenhum pedido/item nesta onda
                         </TableCell>
                       </TableRow>
-                    ))}
+                    ) : (
+                      unifiedRows.map((row) => {
+                        const state = lineState(row.line, data.wave.pickFinished);
+                        const allocDone = row.alloc.quantitySorted >= row.alloc.quantity;
+                        return (
+                          <TableRow key={`${row.line.id}-${row.alloc.id}`}>
+                            <TableCell>
+                              <span className="whitespace-nowrap font-mono text-sm font-medium">
+                                {row.alloc.erpOrderId}
+                              </span>
+                              {row.alloc.customerName ? (
+                                <span className="block max-w-[160px] truncate text-xs text-muted-foreground">
+                                  {row.alloc.customerName}
+                                </span>
+                              ) : null}
+                              <div className="mt-0.5">
+                                <MarketplaceBadge value={row.alloc.marketplace} />
+                              </div>
+                            </TableCell>
+                            <TableCell className="whitespace-nowrap font-mono text-sm">
+                              {row.alloc.basketCode ?? "—"}
+                            </TableCell>
+                            <TableCell>
+                              <span className="font-mono text-sm font-medium">{row.line.sku}</span>
+                              <span className="block max-w-[180px] truncate text-xs text-muted-foreground">
+                                {row.line.productName}
+                              </span>
+                            </TableCell>
+                            <TableCell className="whitespace-nowrap text-sm">
+                              {row.line.routeLabel}
+                            </TableCell>
+                            <TableCell className="text-right tabular-nums">
+                              {row.alloc.quantity}
+                            </TableCell>
+                            <TableCell
+                              className={cn(
+                                "text-right tabular-nums",
+                                allocDone && "font-semibold text-emerald-700",
+                              )}
+                            >
+                              {row.alloc.quantitySorted}/{row.alloc.quantity}
+                            </TableCell>
+                            <TableCell>
+                              <span
+                                className={cn(
+                                  "whitespace-nowrap rounded-md px-2 py-0.5 text-xs font-medium",
+                                  allocDone
+                                    ? "bg-emerald-100 text-emerald-800"
+                                    : state.className,
+                                )}
+                              >
+                                {allocDone ? "Conferido" : state.label}
+                              </span>
+                              <span className="mt-1 block text-[11px] text-muted-foreground">
+                                {ORDER_STATUS_LABEL[
+                                  row.alloc.orderStatus as keyof typeof ORDER_STATUS_LABEL
+                                ] ?? row.alloc.orderStatus}
+                              </span>
+                            </TableCell>
+                            <TableCell>
+                              <LabelStatus
+                                hasLabel={row.alloc.hasLabel}
+                                format={row.alloc.labelFormat}
+                                error={labelErrors[row.alloc.orderId]}
+                              />
+                            </TableCell>
+                            <TableCell className="text-right">
+                              {!allocDone &&
+                              state.ready &&
+                              data.wave.status === "RELEASED" ? (
+                                <button
+                                  type="button"
+                                  onClick={() => router.push(`/packing/waves/${row.line.id}`)}
+                                  className="rounded-lg bg-[#0d9488] px-3 py-1.5 text-xs font-semibold text-white"
+                                >
+                                  Conferir
+                                </button>
+                              ) : null}
+                            </TableCell>
+                          </TableRow>
+                        );
+                      })
+                    )}
                   </TableBody>
                 </Table>
               </div>

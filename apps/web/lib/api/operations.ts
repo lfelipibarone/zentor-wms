@@ -805,6 +805,19 @@ export type PackingWaveOverview = {
     quantitySorted: number;
     sortStatus: string;
     pickedByName: string | null;
+    allocations: Array<{
+      id: string;
+      quantity: number;
+      quantitySorted: number;
+      orderId: string;
+      erpOrderId: string;
+      customerName: string | null;
+      marketplace: string | null;
+      orderStatus: string;
+      basketCode: string | null;
+      hasLabel: boolean;
+      labelFormat: "zpl" | "pdf" | "unknown" | null;
+    }>;
   }>;
   orders: Array<{
     id: string;
