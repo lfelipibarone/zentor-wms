@@ -17,6 +17,7 @@ import { ScreenShell } from "@/components/ScreenShell";
 import { Card, EmptyState, Loading, Notice, ProgressBar } from "@/components/ui";
 import { useAdjustLocationStock } from "@/hooks/useAdjustLocationStock";
 import {
+  useAttachBasket,
   useCompletePicking,
   usePickItem,
   usePickingSession,
@@ -43,6 +44,7 @@ export default function PickScreen() {
   const pickItem = usePickItem(orderId);
   const reportIssue = useReportIssue(orderId);
   const completePicking = useCompletePicking(orderId);
+  const attachBasket = useAttachBasket(orderId);
   const releaseAccept = useReleaseOrderAccept(orderId);
   const adjustStock = useAdjustLocationStock();
   const [itemsExpanded, setItemsExpanded] = useState(false);
@@ -51,7 +53,8 @@ export default function PickScreen() {
   const [locationValidated, setLocationValidated] = useState(false);
   const [scanCount, setScanCount] = useState(0);
   const [scannerOpen, setScannerOpen] = useState(false);
-  const [scannerMode, setScannerMode] = useState<"location" | "product">(
+  const [scannerSession, setScannerSession] = useState(0);
+  const [scannerMode, setScannerMode] = useState<"location" | "product" | "basket">(
     "location"
   );
   const [problemOpen, setProblemOpen] = useState(false);
@@ -76,9 +79,31 @@ export default function PickScreen() {
     setFeedback(null);
   }, []);
 
+  const openScanner = useCallback((mode: "location" | "product" | "basket") => {
+    setScannerMode(mode);
+    setScannerSession((n) => n + 1);
+    setScannerOpen(true);
+  }, []);
+
   useEffect(() => {
     resetItemFlow();
   }, [itemId, resetItemFlow]);
+
+  // Abre o leitor da gôndola assim que o item estiver pronto (sem segundo toque)
+  useEffect(() => {
+    if (!itemId || !next || locationValidated || afterPick) return;
+    if (scannerOpen || problemOpen || adjustOpen) return;
+    openScanner("location");
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- só ao trocar de item
+  }, [itemId]);
+
+  // Itens prontos sem cesta: bipar cesta para o packing encontrar o pedido
+  useEffect(() => {
+    if (!session?.allPicked || session.order.basket || basketCode) return;
+    if (afterPick || scannerOpen || problemOpen) return;
+    openScanner("basket");
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [session?.allPicked, session?.order.basket?.id]);
 
   const adjustContext: AdjustStockContext | null =
     next?.pickLocation
@@ -135,24 +160,34 @@ export default function PickScreen() {
   };
 
   const handleLocationScan = async (barcode: string) => {
-    setScannerOpen(false);
     if (!itemId) return;
     try {
       await api.validateLocation(orderId, itemId, barcode);
       setLocationValidated(true);
       setStep("product");
       setFeedback("Gôndola confirmada ✓");
+      // Segue direto para bipar o produto — sem segundo toque
+      openScanner("product");
     } catch (e) {
       setFeedback(e instanceof ApiError ? e.message : "Gôndola incorreta");
+      openScanner("location");
     }
   };
 
   const handleProductScan = async (barcode: string) => {
-    setScannerOpen(false);
     if (!next) return;
 
     if (next.product && !productMatchesCode(next.product, barcode)) {
       setFeedback(`Produto incorreto. Esperado: ${next.product.sku}`);
+      openScanner("product");
+      return;
+    }
+
+    const requiresScan = next.product?.requiresItemScan ?? false;
+    if (!requiresScan) {
+      setScannerOpen(false);
+      // Um bipo do produto confirma a quantidade restante
+      await confirmPick(next.remaining);
       return;
     }
 
@@ -160,9 +195,11 @@ export default function PickScreen() {
     setScanCount(newCount);
 
     if (newCount >= next.remaining) {
+      setScannerOpen(false);
       await confirmPick(next.remaining);
     } else {
       setFeedback(`Bipado ${newCount} de ${next.remaining}`);
+      openScanner("product");
     }
   };
 
@@ -231,20 +268,46 @@ export default function PickScreen() {
     />
   );
 
-  const handleCompleteOrder = async () => {
+  const finishPicking = useCallback(async () => {
     try {
       await completePicking.mutateAsync();
       Alert.alert(
         "Separação finalizada",
-        "Cesta enviada para Aguardando Conferência.",
-        [{ text: "OK", onPress: () => router.replace("/picking") }]
+        "Pedido enviado para Aguardando Conferência — packing bipa a cesta.",
+        [{ text: "OK", onPress: () => router.replace("/picking") }],
       );
     } catch (e) {
       Alert.alert(
         "Erro",
-        e instanceof ApiError ? e.message : "Não foi possível finalizar"
+        e instanceof ApiError ? e.message : "Não foi possível finalizar",
       );
     }
+  }, [completePicking]);
+
+  const handleBasketScan = async (barcode: string) => {
+    setScannerOpen(false);
+    try {
+      const result = await attachBasket.mutateAsync(barcode);
+      setFeedback(`Cesta ${result.basketCode} vinculada ✓`);
+      await refetch();
+      // Itens já separados: vinculou a cesta → envia ao packing
+      if (session?.allPicked) {
+        await finishPicking();
+      }
+    } catch (e) {
+      setFeedback(e instanceof ApiError ? e.message : "Cesta inválida");
+      openScanner("basket");
+    }
+  };
+
+  const handleCompleteOrder = async () => {
+    const hasBasket = Boolean(session?.order.basket || basketCode);
+    if (!hasBasket) {
+      setFeedback("Bipe a cesta onde colocou os itens");
+      openScanner("basket");
+      return;
+    }
+    await finishPicking();
   };
 
   const handleReport = async (reason: string) => {
@@ -288,29 +351,56 @@ export default function PickScreen() {
   }
 
   if (session.allPicked || !next) {
+    const hasBasket = Boolean(session.order.basket || basketCode);
     return (
       <ScreenShell
         scroll
         module="picking"
         title={session.order.erpOrderId}
-        subtitle={`Cesta ${basket}`}
+        subtitle={hasBasket ? `Cesta ${basket}` : "Coloque na cesta"}
       >
-        <EmptyState icon="checkmark-circle" title="Todos os itens separados" />
-        {feedback ? <Notice tone="success">{feedback}</Notice> : null}
-        <FactoryButton
-          label="Enviar para conferência"
-          icon="send"
-          variant="success"
-          loading={completePicking.isPending}
-          disabled={afterPick !== null}
-          onPress={handleCompleteOrder}
+        <EmptyState
+          icon="checkmark-circle"
+          title="Todos os itens separados"
         />
+        {feedback ? (
+          <Notice tone={feedback.includes("✓") ? "success" : "info"}>
+            {feedback}
+          </Notice>
+        ) : null}
+        {!hasBasket ? (
+          <FactoryButton
+            label="Bipar cesta"
+            icon="basket"
+            color={color}
+            loading={attachBasket.isPending}
+            disabled={afterPick !== null}
+            onPress={() => openScanner("basket")}
+          />
+        ) : (
+          <FactoryButton
+            label="Enviar para conferência"
+            icon="send"
+            variant="success"
+            loading={completePicking.isPending}
+            disabled={afterPick !== null}
+            onPress={handleCompleteOrder}
+          />
+        )}
         <FactoryButton
           label="Relatar problema"
           icon="warning"
           size="md"
           variant="secondary"
           onPress={() => setProblemOpen(true)}
+        />
+        <BarcodeScanner
+          visible={scannerOpen}
+          session={scannerSession}
+          title="Bipar cesta"
+          hint="Cesta onde colocou os itens do pedido"
+          onScan={handleBasketScan}
+          onClose={() => setScannerOpen(false)}
         />
         <ProblemReportModal
           visible={problemOpen}
@@ -414,33 +504,27 @@ export default function PickScreen() {
           label="Bipar gôndola"
           icon="scan"
           color={color}
-          onPress={() => {
-            setScannerMode("location");
-            setScannerOpen(true);
-          }}
+          onPress={() => openScanner("location")}
         />
       ) : (
         <>
-          <QuantityInput
-            label="Quantidade coletada"
-            max={next.remaining}
-            loading={pickItem.isPending}
-            onConfirm={(qty) => confirmPick(qty)}
-          />
           <FactoryButton
             label={
               requiresScan
                 ? `Bipar produto · ${scanCount}/${next.remaining}`
-                : "Bipar produto"
+                : `Bipar produto · confirmar ${next.remaining} un.`
             }
             icon="barcode"
-            size="md"
-            variant="secondary"
-            onPress={() => {
-              setScannerMode("product");
-              setScannerOpen(true);
-            }}
+            color={color}
+            onPress={() => openScanner("product")}
             loading={pickItem.isPending}
+          />
+          <QuantityInput
+            label="Ou digitar quantidade"
+            max={next.remaining}
+            defaultValue={next.remaining}
+            loading={pickItem.isPending}
+            onConfirm={(qty) => confirmPick(qty)}
           />
         </>
       )}
@@ -524,11 +608,29 @@ export default function PickScreen() {
 
       <BarcodeScanner
         visible={scannerOpen}
+        session={scannerSession}
         title={
-          scannerMode === "location" ? `Gôndola ${locLabel}` : next.product?.sku ?? "Produto"
+          scannerMode === "basket"
+            ? "Bipar cesta"
+            : scannerMode === "location"
+              ? `Gôndola ${locLabel}`
+              : next.product?.sku ?? "Produto"
+        }
+        hint={
+          scannerMode === "basket"
+            ? "Cesta onde colocou os itens"
+            : scannerMode === "location"
+              ? "Aponte para o QR da gôndola"
+              : requiresScan
+                ? `Bipe cada unidade · ${scanCount}/${next.remaining}`
+                : `Confirma ${next.remaining} un. no bipo`
         }
         onScan={
-          scannerMode === "location" ? handleLocationScan : handleProductScan
+          scannerMode === "basket"
+            ? handleBasketScan
+            : scannerMode === "location"
+              ? handleLocationScan
+              : handleProductScan
         }
         onClose={() => setScannerOpen(false)}
       />

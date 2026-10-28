@@ -1,4 +1,4 @@
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Modal, Pressable, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
@@ -10,6 +10,8 @@ interface BarcodeScannerProps {
   visible: boolean;
   title: string;
   hint?: string;
+  /** Incrementar a cada nova leitura (mesmo com o modal já aberto) */
+  session?: number;
   onScan: (barcode: string) => void;
   onClose: () => void;
 }
@@ -18,28 +20,31 @@ export function BarcodeScanner({
   visible,
   title,
   hint,
+  session = 0,
   onScan,
   onClose,
 }: BarcodeScannerProps) {
   const insets = useSafeAreaInsets();
   const [permission, requestPermission] = useCameraPermissions();
-  const scannedRef = useRef(false);
+  /** Só lê um código por sessão */
+  const [armed, setArmed] = useState(true);
   const [lastCode, setLastCode] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!visible) return;
+    setArmed(true);
+    setLastCode(null);
+  }, [visible, session]);
 
   const handleBarcode = useCallback(
     ({ data }: { data: string }) => {
-      if (scannedRef.current) return;
-      scannedRef.current = true;
+      if (!armed) return;
+      setArmed(false);
       setLastCode(data);
       onScan(data);
     },
-    [onScan]
+    [armed, onScan],
   );
-
-  const resetScan = () => {
-    scannedRef.current = false;
-    setLastCode(null);
-  };
 
   if (!visible) return null;
 
@@ -74,7 +79,7 @@ export function BarcodeScanner({
                   "upc_e",
                 ],
               }}
-              onBarcodeScanned={scannedRef.current ? undefined : handleBarcode}
+              onBarcodeScanned={armed ? handleBarcode : undefined}
             />
             <View style={styles.reticleWrap} pointerEvents="none">
               <View style={styles.reticle} />
@@ -109,13 +114,6 @@ export function BarcodeScanner({
                     {lastCode}
                   </Text>
                 </View>
-                <FactoryButton
-                  label="Bipar novamente"
-                  icon="scan"
-                  size="md"
-                  variant="secondary"
-                  onPress={resetScan}
-                />
               </View>
             ) : null}
           </>

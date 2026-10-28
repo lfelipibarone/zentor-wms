@@ -15,6 +15,8 @@ export function WaveLineIssueModal({
   sku,
   location,
   order,
+  initialType = "WRONG_ITEM",
+  initialDescription = "",
   onClose,
   onSubmitted,
 }: {
@@ -22,11 +24,14 @@ export function WaveLineIssueModal({
   sku: string;
   location: string;
   order: { allocationId: string; erpOrderId: string; units: number };
+  /** Pré-seleciona o tipo (ex.: quantidade divergente ao confirmar qty menor). */
+  initialType?: PackingIssueType;
+  initialDescription?: string;
   onClose: () => void;
   onSubmitted: () => void;
 }) {
-  const [type, setType] = useState<PackingIssueType>("WRONG_ITEM");
-  const [description, setDescription] = useState("");
+  const [type, setType] = useState<PackingIssueType>(initialType);
+  const [description, setDescription] = useState(initialDescription);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   /** undefined = ainda não enviado; null = voltou sem separador identificado */

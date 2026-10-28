@@ -77,18 +77,18 @@ export default function PickingHubScreen() {
       }
       void refetch();
 
+      // Pedido avulso: vai direto para gôndola/produto.
+      // A cesta é vinculada ao final (packing bipa a cesta).
       const session = await api.getPickingSession(order.id).catch(() => null);
-      if (session?.order.basket) {
-        router.push({
-          pathname: "/picking/[orderId]/pick",
-          params: {
-            orderId: order.id,
-            basketCode: session.order.basket.code,
-          },
-        });
-        return;
-      }
-      router.push(`/picking/${order.id}/basket`);
+      router.push({
+        pathname: "/picking/[orderId]/pick",
+        params: {
+          orderId: order.id,
+          ...(session?.order.basket?.code
+            ? { basketCode: session.order.basket.code }
+            : {}),
+        },
+      });
     } catch (e) {
       const msg = e instanceof ApiError ? e.message : "Erro ao abrir pedido";
       showErrorAlert(msg);

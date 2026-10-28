@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Pressable, StyleSheet, Text, TextInput, View } from "react-native";
 import { FactoryButton } from "./FactoryButton";
 import { theme, spacing, typography, radius } from "@/lib/theme";
@@ -12,6 +12,8 @@ interface QuantityInputProps {
   /** Permite confirmar 0 (ex.: gôndola vazia na solicitação de reabastecimento). */
   allowZero?: boolean;
   confirmLabel?: string;
+  /** Valor inicial (ex.: quantidade restante do pick). */
+  defaultValue?: number;
 }
 
 export function QuantityInput({
@@ -21,8 +23,25 @@ export function QuantityInput({
   loading,
   allowZero = false,
   confirmLabel = "Confirmar",
+  defaultValue,
 }: QuantityInputProps) {
-  const [value, setValue] = useState("");
+  const initial =
+    defaultValue != null
+      ? String(defaultValue)
+      : max != null
+        ? String(max)
+        : "";
+  const [value, setValue] = useState(initial);
+
+  useEffect(() => {
+    setValue(
+      defaultValue != null
+        ? String(defaultValue)
+        : max != null
+          ? String(max)
+          : "",
+    );
+  }, [defaultValue, max]);
 
   const parsed = parseInt(value, 10);
   const valid =

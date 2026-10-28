@@ -1,5 +1,6 @@
-import { useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { router, useLocalSearchParams } from "expo-router";
+import { productMatchesCode } from "@wms/shared";
 import { Alert, StyleSheet, Text, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import {
@@ -29,6 +30,7 @@ export default function WavePickScreen() {
   const pick = useWaveLinePick(lineId);
   const adjustStock = useAdjustLocationStock();
   const [scannerOpen, setScannerOpen] = useState(false);
+  const [scannerSession, setScannerSession] = useState(0);
   const [scannerMode, setScannerMode] = useState<"location" | "product">(
     "location",
   );
@@ -39,7 +41,25 @@ export default function WavePickScreen() {
   const [message, setMessage] = useState<{ text: string; error: boolean } | null>(null);
   const say = (text: string, error = false) => setMessage({ text, error });
 
+  const openScanner = useCallback((mode: "location" | "product") => {
+    setScannerMode(mode);
+    setScannerSession((n) => n + 1);
+    setScannerOpen(true);
+  }, []);
+
   const line = data?.line;
+
+  useEffect(() => {
+    setLocationOk(false);
+    setMessage(null);
+  }, [lineId]);
+
+  useEffect(() => {
+    if (!line || line.sortStatus === "PICKED" || locationOk || afterPickOpen) return;
+    if (scannerOpen || adjustOpen) return;
+    openScanner("location");
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- só ao trocar de linha
+  }, [lineId, line?.id]);
 
   if (isLoading || !line) {
     return (
@@ -210,29 +230,24 @@ export default function WavePickScreen() {
           label="Bipar gôndola"
           icon="scan"
           color={modules.picking.color}
-          onPress={() => {
-            setScannerMode("location");
-            setScannerOpen(true);
-          }}
+          onPress={() => openScanner("location")}
         />
       ) : (
         <>
+          <FactoryButton
+            label={`Bipar produto · confirmar ${maxPick} un.`}
+            icon="barcode"
+            color={modules.picking.color}
+            disabled={maxPick <= 0}
+            loading={pick.isPending}
+            onPress={() => openScanner("product")}
+          />
           <QuantityInput
-            label="Quantidade coletada"
+            label="Ou digitar quantidade"
             max={maxPick}
+            defaultValue={maxPick}
             loading={pick.isPending}
             onConfirm={(q) => confirmPick(q, line.product.barcode ?? undefined)}
-          />
-          <FactoryButton
-            label="Bipar produto (+1)"
-            icon="barcode"
-            size="md"
-            variant="secondary"
-            disabled={maxPick <= 0}
-            onPress={() => {
-              setScannerMode("product");
-              setScannerOpen(true);
-            }}
           />
         </>
       )}
@@ -260,13 +275,18 @@ export default function WavePickScreen() {
 
       <BarcodeScanner
         visible={scannerOpen}
+        session={scannerSession}
         title={
           scannerMode === "location"
             ? `Gôndola ${line.pickLocation.label}`
             : line.product.sku
         }
+        hint={
+          scannerMode === "location"
+            ? "Aponte para o QR da gôndola"
+            : `Confirma ${maxPick} un. no bipo`
+        }
         onScan={(code) => {
-          setScannerOpen(false);
           if (scannerMode === "location") {
             if (
               gondolaScanMatches({
@@ -277,11 +297,20 @@ export default function WavePickScreen() {
             ) {
               setLocationOk(true);
               say("Gôndola confirmada ✓");
+              openScanner("product");
             } else {
               say("Gôndola incorreta", true);
+              openScanner("location");
             }
+          } else if (
+            line.product &&
+            !productMatchesCode(line.product, code)
+          ) {
+            say(`Produto incorreto. Esperado: ${line.product.sku}`, true);
+            openScanner("product");
           } else {
-            void confirmPick(1, code);
+            setScannerOpen(false);
+            void confirmPick(maxPick, code);
           }
         }}
         onClose={() => setScannerOpen(false)}

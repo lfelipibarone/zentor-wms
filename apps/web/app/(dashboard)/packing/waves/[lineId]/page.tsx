@@ -8,10 +8,20 @@ import { CollectionDeadlineIndicator } from "@/components/ops/collection-deadlin
 import { DataState } from "@/components/ops/data-state";
 import { WaveLineIssueModal } from "@/components/ops/wave-line-issue-modal";
 import { apiFetch } from "@/lib/api/client";
-import { fetchWavePackingLine } from "@/lib/api/operations";
+import {
+  fetchWavePackingLine,
+  type PackingIssueType,
+} from "@/lib/api/operations";
 import { cn } from "@/lib/utils";
 
 type WaveLine = Awaited<ReturnType<typeof fetchWavePackingLine>>["line"];
+type Allocation = WaveLine["allocations"][number];
+
+type ReportState = {
+  alloc: Allocation;
+  initialType: PackingIssueType;
+  initialDescription: string;
+};
 
 export default function PackingWaveLinePage() {
   const params = useParams<{ lineId: string }>();
@@ -23,12 +33,25 @@ export default function PackingWaveLinePage() {
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
-  const [reporting, setReporting] = useState<WaveLine["allocations"][number] | null>(null);
+  /** qty digitada por allocationId */
+  const [qtyByAlloc, setQtyByAlloc] = useState<Record<string, string>>({});
+  const [reporting, setReporting] = useState<ReportState | null>(null);
 
   const refresh = useCallback(async () => {
     const data = await fetchWavePackingLine(lineId);
     setLine(data.line);
     setCollectionDeadline(data.collectionDeadline ?? null);
+    setQtyByAlloc((prev) => {
+      const next: Record<string, string> = {};
+      for (const alloc of data.line.allocations) {
+        if (alloc.remaining <= 0 || alloc.awaitingRepick) continue;
+        next[alloc.id] =
+          prev[alloc.id] !== undefined && prev[alloc.id] !== ""
+            ? prev[alloc.id]
+            : String(alloc.remaining);
+      }
+      return next;
+    });
     return data.line;
   }, [lineId]);
 
@@ -69,12 +92,38 @@ export default function PackingWaveLinePage() {
     }
   };
 
+  const handleConfirm = (alloc: Allocation) => {
+    const remaining = alloc.remaining;
+    const parsed = parseInt(qtyByAlloc[alloc.id] ?? String(remaining), 10);
+    if (Number.isNaN(parsed) || parsed <= 0 || parsed > remaining) {
+      setMessage(`Informe uma quantidade entre 1 e ${remaining}`);
+      return;
+    }
+    if (parsed < remaining) {
+      setReporting({
+        alloc,
+        initialType: "WRONG_QUANTITY",
+        initialDescription: `Conferiu ${parsed} de ${remaining} un. esperadas.`,
+      });
+      return;
+    }
+    void confirmAlloc(alloc.id, parsed);
+  };
+
+  const openManualReport = (alloc: Allocation) => {
+    setReporting({
+      alloc,
+      initialType: "WRONG_ITEM",
+      initialDescription: "",
+    });
+  };
+
   return (
     <div className="mx-auto max-w-xl space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <PageHeader
           title={line ? `Conferir ${line.product.sku}` : "Conferir item"}
-          description={`${line?.waveName ?? "Onda"} · confira a quantidade de cada pedido. Se estiver errado, toque em Reportar.`}
+          description={`${line?.waveName ?? "Onda"} · digite a quantidade. Se for menor, abre reporte. Item errado: use Reportar.`}
         />
         <div className="flex gap-2">
           {line ? (
@@ -98,6 +147,7 @@ export default function PackingWaveLinePage() {
           <>
             <div className="flex gap-4 rounded-xl border border-amber-200 bg-amber-50/60 p-4 shadow-sm">
               {line.product.imageUrl ? (
+                // eslint-disable-next-line @next/next/no-img-element
                 <img
                   src={line.product.imageUrl}
                   alt={line.product.name}
@@ -120,6 +170,11 @@ export default function PackingWaveLinePage() {
             <div className="space-y-3">
               {line.allocations.map((alloc) => {
                 const done = alloc.remaining <= 0;
+                const qtyStr = qtyByAlloc[alloc.id] ?? String(alloc.remaining);
+                const parsed = parseInt(qtyStr, 10);
+                const qtyValid =
+                  !Number.isNaN(parsed) && parsed > 0 && parsed <= alloc.remaining;
+
                 return (
                   <div
                     key={alloc.id}
@@ -151,23 +206,49 @@ export default function PackingWaveLinePage() {
                         Aguardando o separador coletar de novo
                       </p>
                     ) : (
-                      <div className="mt-3 flex gap-2">
-                        <button
-                          type="button"
-                          disabled={saving}
-                          className="flex-1 rounded-lg bg-[#0d9488] py-2.5 text-sm font-semibold text-white disabled:opacity-50"
-                          onClick={() => confirmAlloc(alloc.id, alloc.remaining)}
-                        >
-                          Confirmar {alloc.remaining} un.
-                        </button>
-                        <button
-                          type="button"
-                          disabled={saving}
-                          className="rounded-lg border border-red-300 px-4 py-2.5 text-sm font-semibold text-red-700 hover:bg-red-50 disabled:opacity-50"
-                          onClick={() => setReporting(alloc)}
-                        >
-                          Reportar
-                        </button>
+                      <div className="mt-3 space-y-3">
+                        <label className="block text-sm">
+                          <span className="mb-1 block font-medium text-slate-700">
+                            Quantidade conferida
+                          </span>
+                          <input
+                            type="number"
+                            inputMode="numeric"
+                            min={1}
+                            max={alloc.remaining}
+                            value={qtyStr}
+                            disabled={saving}
+                            onChange={(e) =>
+                              setQtyByAlloc((prev) => ({
+                                ...prev,
+                                [alloc.id]: e.target.value,
+                              }))
+                            }
+                            className="w-full rounded-lg border px-3 py-2.5 text-lg font-semibold tabular-nums"
+                          />
+                          <span className="mt-1 block text-xs text-muted-foreground">
+                            Esperado: {alloc.remaining} un. · se for menor, abre reporte de
+                            quantidade
+                          </span>
+                        </label>
+                        <div className="flex gap-2">
+                          <button
+                            type="button"
+                            disabled={saving || !qtyValid}
+                            className="flex-1 rounded-lg bg-[#0d9488] py-2.5 text-sm font-semibold text-white disabled:opacity-50"
+                            onClick={() => handleConfirm(alloc)}
+                          >
+                            Confirmar
+                          </button>
+                          <button
+                            type="button"
+                            disabled={saving}
+                            className="rounded-lg border border-red-300 px-4 py-2.5 text-sm font-semibold text-red-700 hover:bg-red-50 disabled:opacity-50"
+                            onClick={() => openManualReport(alloc)}
+                          >
+                            Reportar
+                          </button>
+                        </div>
                       </div>
                     )}
                   </div>
@@ -184,10 +265,12 @@ export default function PackingWaveLinePage() {
           sku={line.product.sku}
           location={line.pickLocation.barcode}
           order={{
-            allocationId: reporting.id,
-            erpOrderId: reporting.order.erpOrderId,
-            units: reporting.remaining,
+            allocationId: reporting.alloc.id,
+            erpOrderId: reporting.alloc.order.erpOrderId,
+            units: reporting.alloc.remaining,
           }}
+          initialType={reporting.initialType}
+          initialDescription={reporting.initialDescription}
           onClose={() => setReporting(null)}
           onSubmitted={() => {
             setReporting(null);
