@@ -1,7 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Loader2, Printer, RefreshCw, ScanBarcode } from "lucide-react";
 import { PageHeader } from "@/components/ops/page-header";
 import { CollectionDeadlineIndicator } from "@/components/ops/collection-deadline-indicator";
@@ -10,6 +9,7 @@ import { MarketplaceFilter } from "@/components/ops/marketplace-filter";
 import { matchesMarketplaceFilter } from "@/lib/marketplace-filter-client";
 import { DataState } from "@/components/ops/data-state";
 import { WaveLineIssueModal } from "@/components/ops/wave-line-issue-modal";
+import { PackingOrderInline } from "@/components/ops/packing-order-inline";
 import { apiFetch } from "@/lib/api/client";
 import { cn } from "@/lib/utils";
 import {
@@ -29,10 +29,8 @@ import { printZplWithQz } from "@/lib/shipping-label-qz";
 type QueueFilter = "all" | "wave" | "order";
 
 const ZONE_STORAGE_KEY = "packing.approachWaveId";
-const WAVE_ROW_LIMIT = 12;
-/** Pedido | SKU | Cesta | Local | Qtd | Ações — mesmas colunas no header e nas linhas */
-const WAVE_GRID_COLS =
-  "minmax(120px,1.1fr) minmax(120px,1.2fr) minmax(72px,0.7fr) minmax(88px,0.8fr) 88px 188px";
+/** SKU | Local | Qtd | Ações — pedido fica no cabeçalho do grupo */
+const WAVE_ITEM_COLS = "minmax(140px,1.3fr) minmax(100px,0.9fr) 88px 188px";
 
 function normalizeBasketCode(code: string) {
   return code.trim().toLowerCase();
@@ -63,9 +61,16 @@ function filterItems(items: PackingQueueItem[], filter: QueueFilter) {
   return items.filter((i) => i.kind === "order");
 }
 
-export default function PackingPage() {
-  const router = useRouter();
+function syncOrderInUrl(orderId: string | null) {
+  if (typeof window === "undefined") return;
+  const url = new URL(window.location.href);
+  url.searchParams.delete("line");
+  if (orderId) url.searchParams.set("order", orderId);
+  else url.searchParams.delete("order");
+  window.history.replaceState(null, "", `${url.pathname}${url.search}${url.hash}`);
+}
 
+export default function PackingPage() {
   const [items, setItems] = useState<PackingQueueItem[]>([]);
   const [filter, setFilter] = useState<QueueFilter>("all");
   const [marketplace, setMarketplace] = useState("");
@@ -75,6 +80,7 @@ export default function PackingPage() {
   const [message, setMessage] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [labelBusyWaveId, setLabelBusyWaveId] = useState<string | null>(null);
+  const [activeOrderId, setActiveOrderId] = useState<string | null>(null);
   const openingRef = useRef(false);
   const basketInputRef = useRef<HTMLInputElement>(null);
   const lastScanRef = useRef("");
@@ -85,9 +91,10 @@ export default function PackingPage() {
   );
 
   useEffect(() => {
-    // limpa ?line= antigo (conferência agora é na tabela)
     if (typeof window === "undefined") return;
     const url = new URL(window.location.href);
+    const fromUrl = url.searchParams.get("order");
+    if (fromUrl) setActiveOrderId(fromUrl);
     if (url.searchParams.has("line")) {
       url.searchParams.delete("line");
       window.history.replaceState(null, "", `${url.pathname}${url.search}${url.hash}`);
@@ -147,23 +154,17 @@ export default function PackingPage() {
     return () => clearInterval(t);
   }, [items, loadQueue]);
 
-  const goToOrder = useCallback(
-    async (orderId: string) => {
-      try {
-        await apiFetch(`/api/packing/orders/${orderId}/start`, {
-          method: "POST",
-          body: "{}",
-        });
-        router.push(`/packing/${orderId}`);
-      } catch (e) {
-        setMessage(
-          e instanceof Error ? e.message : "Não foi possível abrir o pedido",
-        );
-        lastScanRef.current = "";
-      }
-    },
-    [router],
-  );
+  const openOrderInline = useCallback((orderId: string) => {
+    setActiveOrderId(orderId);
+    syncOrderInUrl(orderId);
+    setMessage(null);
+  }, []);
+
+  const closeOrderInline = useCallback(() => {
+    setActiveOrderId(null);
+    syncOrderInUrl(null);
+    void loadQueue({ silent: true });
+  }, [loadQueue]);
 
   const openOrderByBasketCode = useCallback(
     async (rawCode: string) => {
@@ -180,12 +181,13 @@ export default function PackingPage() {
       try {
         const local = findOrderByBasketInput(ordersFromItems(items), trimmed);
         if (local) {
-          await goToOrder(local.id);
+          openOrderInline(local.id);
+          setBasketScan("");
           return;
         }
-
         const { order } = await scanPackingBasket(trimmed);
-        await goToOrder(order.id);
+        openOrderInline(order.id);
+        setBasketScan("");
       } catch (e) {
         setMessage(e instanceof Error ? e.message : "Cesta não encontrada");
         lastScanRef.current = "";
@@ -194,7 +196,7 @@ export default function PackingPage() {
         openingRef.current = false;
       }
     },
-    [items, goToOrder],
+    [items, openOrderInline],
   );
 
   const handleBasketScan = async (e: React.FormEvent) => {
@@ -281,7 +283,12 @@ export default function PackingPage() {
     if (entry.kind !== "order") return true;
     return matchesMarketplaceFilter(entry.order.marketplace, marketplace);
   });
-  const isEmpty = !loading && visible.length === 0;
+
+  /** Pedidos avulsos: esconde o que está sendo conferido inline */
+  const queueVisible = visible.filter(
+    (e) => !(e.kind === "order" && e.order.id === activeOrderId),
+  );
+  const isEmpty = !loading && queueVisible.length === 0 && !activeOrderId;
 
   const filters: { id: QueueFilter; label: string }[] = [
     { id: "all", label: "Todos" },
@@ -293,7 +300,7 @@ export default function PackingPage() {
     <div className="mx-auto max-w-[1400px] space-y-5">
       <PageHeader
         title="Packing"
-        description="Conferir na tabela: digite a qtd e confirme ou reporte."
+        description="Uma tela: onda por pedido e conferência avulsa inline."
       />
 
       {message ? (
@@ -347,7 +354,16 @@ export default function PackingPage() {
         </button>
       </div>
 
-      <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(280px,320px)] lg:items-start">
+      {activeOrderId ? (
+        <PackingOrderInline
+          orderId={activeOrderId}
+          onClose={closeOrderInline}
+          onFinished={closeOrderInline}
+          onMessage={setMessage}
+        />
+      ) : null}
+
+      <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(260px,300px)] lg:items-start">
         <div className="min-w-0 space-y-4">
           <DataState
             loading={loading}
@@ -356,7 +372,7 @@ export default function PackingPage() {
             emptyMessage="Nada na fila deste filtro."
           >
             <div className="space-y-4">
-              {visible.map((entry) =>
+              {queueVisible.map((entry) =>
                 entry.kind === "wave" ? (
                   <WaveStationBlock
                     key={`wave-${entry.wave.id}`}
@@ -373,7 +389,7 @@ export default function PackingPage() {
                   <OrderRow
                     key={entry.order.id}
                     order={entry.order}
-                    onOpen={() => goToOrder(entry.order.id)}
+                    onOpen={() => openOrderInline(entry.order.id)}
                   />
                 ),
               )}
@@ -381,40 +397,46 @@ export default function PackingPage() {
           </DataState>
         </div>
 
-        <form
-          onSubmit={handleBasketScan}
-          className="rounded-2xl border border-dashed border-slate-300 bg-gradient-to-b from-slate-50 to-white px-5 py-6 lg:sticky lg:top-3"
-        >
-          <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-[#0d9488]/10 text-[#0d9488]">
-            <ScanBarcode className="h-6 w-6" />
-          </div>
-          <label className="mt-4 block text-center text-base font-semibold text-slate-900">
-            Bipar cesta
-          </label>
-          <p className="mt-1 text-center text-xs text-slate-500">
-            Pedidos avulsos (fora de onda).
-          </p>
-          <input
-            ref={basketInputRef}
-            autoFocus
-            className="mt-4 w-full rounded-xl border border-slate-300 bg-white px-3 py-3 font-mono text-base outline-none ring-[#0d9488] focus:border-[#0d9488] focus:ring-2"
-            placeholder="Código da cesta"
-            value={basketScan}
-            onChange={(e) => {
-              setBasketScan(e.target.value);
-              if (message) setMessage(null);
-              lastScanRef.current = "";
-            }}
-            onKeyDown={handleBasketKeyDown}
-          />
-          <button
-            type="submit"
-            disabled={saving || !basketScan.trim()}
-            className="mt-3 w-full rounded-xl bg-[#0d9488] py-3 text-sm font-semibold text-white transition hover:bg-teal-700 disabled:opacity-40"
+        {!activeOrderId ? (
+          <form
+            onSubmit={handleBasketScan}
+            className="rounded-2xl border border-dashed border-slate-300 bg-gradient-to-b from-slate-50 to-white px-5 py-6 lg:sticky lg:top-3"
           >
-            {saving ? "Abrindo…" : "Abrir pedido"}
-          </button>
-        </form>
+            <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-[#0d9488]/10 text-[#0d9488]">
+              <ScanBarcode className="h-6 w-6" />
+            </div>
+            <label className="mt-4 block text-center text-base font-semibold text-slate-900">
+              Bipar cesta
+            </label>
+            <p className="mt-1 text-center text-xs text-slate-500">
+              Abre o pedido nesta mesma tela.
+            </p>
+            <input
+              ref={basketInputRef}
+              autoFocus
+              className="mt-4 w-full rounded-xl border border-slate-300 bg-white px-3 py-3 font-mono text-base outline-none ring-[#0d9488] focus:border-[#0d9488] focus:ring-2"
+              placeholder="Código da cesta"
+              value={basketScan}
+              onChange={(e) => {
+                setBasketScan(e.target.value);
+                if (message) setMessage(null);
+                lastScanRef.current = "";
+              }}
+              onKeyDown={handleBasketKeyDown}
+            />
+            <button
+              type="submit"
+              disabled={saving || !basketScan.trim()}
+              className="mt-3 w-full rounded-xl bg-[#0d9488] py-3 text-sm font-semibold text-white transition hover:bg-teal-700 disabled:opacity-40"
+            >
+              {saving ? "Abrindo…" : "Conferir pedido"}
+            </button>
+          </form>
+        ) : (
+          <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-5 text-center text-sm text-slate-500 lg:sticky lg:top-3">
+            Conferência do pedido aberta acima. Feche-a para bipar outra cesta.
+          </div>
+        )}
       </div>
     </div>
   );
@@ -432,6 +454,12 @@ type UnifiedReadyRow = {
   remaining: number;
   qtyDone: number;
   qtyTotal: number;
+};
+
+type OrderGroup = {
+  erpOrderId: string;
+  basketCode: string | null;
+  rows: UnifiedReadyRow[];
 };
 
 type ReportState = {
@@ -486,8 +514,25 @@ function WaveStationBlock({
     }));
   });
 
-  const shown = unifiedRows.slice(0, WAVE_ROW_LIMIT);
-  const hidden = unifiedRows.length - shown.length;
+  const orderGroups: OrderGroup[] = useMemo(() => {
+    const map = new Map<string, OrderGroup>();
+    for (const row of unifiedRows) {
+      const existing = map.get(row.erpOrderId);
+      if (existing) {
+        existing.rows.push(row);
+        if (!existing.basketCode && row.basketCode) existing.basketCode = row.basketCode;
+      } else {
+        map.set(row.erpOrderId, {
+          erpOrderId: row.erpOrderId,
+          basketCode: row.basketCode,
+          rows: [row],
+        });
+      }
+    }
+    return [...map.values()].sort((a, b) =>
+      a.erpOrderId.localeCompare(b.erpOrderId, "pt-BR"),
+    );
+  }, [unifiedRows]);
 
   const [qtyByKey, setQtyByKey] = useState<Record<string, string>>({});
   const [rowBusy, setRowBusy] = useState<string | null>(null);
@@ -504,7 +549,6 @@ function WaveStationBlock({
       }
       return next;
     });
-    // Só quando a lista de keys muda (fila atualizou)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [unifiedRows.map((r) => `${r.key}:${r.remaining}`).join("|")]);
 
@@ -636,112 +680,119 @@ function WaveStationBlock({
         </p>
       ))}
 
-      {shown.length === 0 ? (
+      {orderGroups.length === 0 ? (
         <p className="px-4 py-6 text-sm text-slate-500">Nenhum item pendente nesta onda.</p>
       ) : (
-        <div className="overflow-x-auto">
-          {/* grid em vez de <table>: evita th/td desalinhados com input+botões */}
-          <div className="min-w-[900px]">
-            <div
-              className="grid items-center gap-x-3 border-b border-slate-100 bg-slate-50/80 px-3 py-2.5 text-[11px] font-semibold uppercase tracking-wide text-slate-500"
-              style={{ gridTemplateColumns: WAVE_GRID_COLS }}
-            >
-              <span>Pedido</span>
-              <span>SKU</span>
-              <span>Cesta</span>
-              <span>Local</span>
-              <span>Qtd</span>
-              <span>Ações</span>
-            </div>
-            {shown.map((row) => {
-              const qtyStr = qtyByKey[row.key] ?? String(row.remaining);
-              const parsed = parseInt(qtyStr, 10);
-              const qtyValid =
-                !Number.isNaN(parsed) && parsed > 0 && parsed <= row.remaining;
-              const busyRow = rowBusy === row.key;
+        <div className="divide-y divide-slate-200">
+          {orderGroups.map((group) => (
+            <div key={group.erpOrderId} className="bg-white">
+              <div className="flex flex-wrap items-center gap-2 border-b border-slate-100 bg-slate-50 px-4 py-2.5">
+                <span className="rounded-md bg-white px-2 py-0.5 text-[11px] font-bold uppercase tracking-wide text-slate-600 ring-1 ring-slate-200">
+                  Pedido
+                </span>
+                <span className="font-mono text-sm font-bold text-slate-900">
+                  {group.erpOrderId}
+                </span>
+                <span className="text-sm text-slate-500">
+                  {group.basketCode ? `cesta ${group.basketCode}` : "sem cesta"}
+                  {" · "}
+                  {group.rows.length} item(ns)
+                </span>
+              </div>
 
-              return (
-                <div
-                  key={row.key}
-                  className="grid items-center gap-x-3 border-b border-slate-100 px-3 py-2 last:border-0 hover:bg-slate-50/80"
-                  style={{ gridTemplateColumns: WAVE_GRID_COLS }}
-                >
-                  <span className="truncate font-mono text-sm font-semibold text-slate-900">
-                    {row.erpOrderId}
-                  </span>
-                  <span
-                    className="truncate font-mono text-sm text-slate-700"
-                    title={row.sku}
+              <div className="overflow-x-auto">
+                <div className="min-w-[640px]">
+                  <div
+                    className="grid items-center gap-x-3 border-b border-slate-100 bg-white px-3 py-2 text-[11px] font-semibold uppercase tracking-wide text-slate-400"
+                    style={{ gridTemplateColumns: WAVE_ITEM_COLS }}
                   >
-                    {row.sku}
-                  </span>
-                  <span className="truncate font-mono text-sm tabular-nums text-slate-600">
-                    {row.basketCode ?? "—"}
-                  </span>
-                  <span
-                    className="truncate text-sm text-slate-500"
-                    title={row.routeLabel}
-                  >
-                    {row.routeLabel}
-                  </span>
-                  <div className="flex h-8 items-center gap-1">
-                    <input
-                      type="number"
-                      inputMode="numeric"
-                      min={1}
-                      max={row.remaining}
-                      value={qtyStr}
-                      disabled={busyRow}
-                      onChange={(e) =>
-                        setQtyByKey((prev) => ({
-                          ...prev,
-                          [row.key]: e.target.value,
-                        }))
-                      }
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter") {
-                          e.preventDefault();
-                          handleConfirm(row);
-                        }
-                      }}
-                      aria-label={`Quantidade ${row.erpOrderId} ${row.sku}`}
-                      className="h-8 w-12 rounded-md border border-slate-300 bg-white px-1 text-center text-sm font-semibold tabular-nums outline-none focus:border-[#0d9488] focus:ring-1 focus:ring-[#0d9488]"
-                    />
-                    <span className="text-xs tabular-nums text-slate-400">
-                      /{row.remaining}
-                    </span>
+                    <span>SKU</span>
+                    <span>Local</span>
+                    <span>Qtd</span>
+                    <span>Ações</span>
                   </div>
-                  <div className="flex h-8 items-center gap-1.5">
-                    <button
-                      type="button"
-                      disabled={busyRow || !qtyValid}
-                      onClick={() => handleConfirm(row)}
-                      className="inline-flex h-8 w-[88px] items-center justify-center gap-1 rounded-md bg-[#0d9488] text-xs font-semibold text-white hover:bg-teal-700 disabled:opacity-40"
-                    >
-                      {busyRow ? <Loader2 className="h-3 w-3 animate-spin" /> : null}
-                      Conferir
-                    </button>
-                    <button
-                      type="button"
-                      disabled={busyRow}
-                      onClick={() => openReport(row)}
-                      className="inline-flex h-8 w-[88px] items-center justify-center rounded-md border border-red-300 text-xs font-semibold text-red-700 hover:bg-red-50 disabled:opacity-40"
-                    >
-                      Reportar
-                    </button>
-                  </div>
+                  {group.rows.map((row) => {
+                    const qtyStr = qtyByKey[row.key] ?? String(row.remaining);
+                    const parsed = parseInt(qtyStr, 10);
+                    const qtyValid =
+                      !Number.isNaN(parsed) && parsed > 0 && parsed <= row.remaining;
+                    const busyRow = rowBusy === row.key;
+
+                    return (
+                      <div
+                        key={row.key}
+                        className="grid items-center gap-x-3 border-b border-slate-50 px-3 py-2 last:border-0 hover:bg-slate-50/80"
+                        style={{ gridTemplateColumns: WAVE_ITEM_COLS }}
+                      >
+                        <span
+                          className="truncate font-mono text-sm font-semibold text-slate-800"
+                          title={row.sku}
+                        >
+                          {row.sku}
+                        </span>
+                        <span
+                          className="truncate text-sm text-slate-500"
+                          title={row.routeLabel}
+                        >
+                          {row.routeLabel}
+                        </span>
+                        <div className="flex h-8 items-center gap-1">
+                          <input
+                            type="number"
+                            inputMode="numeric"
+                            min={1}
+                            max={row.remaining}
+                            value={qtyStr}
+                            disabled={busyRow}
+                            onChange={(e) =>
+                              setQtyByKey((prev) => ({
+                                ...prev,
+                                [row.key]: e.target.value,
+                              }))
+                            }
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter") {
+                                e.preventDefault();
+                                handleConfirm(row);
+                              }
+                            }}
+                            aria-label={`Quantidade ${group.erpOrderId} ${row.sku}`}
+                            className="h-8 w-12 rounded-md border border-slate-300 bg-white px-1 text-center text-sm font-semibold tabular-nums outline-none focus:border-[#0d9488] focus:ring-1 focus:ring-[#0d9488]"
+                          />
+                          <span className="text-xs tabular-nums text-slate-400">
+                            /{row.remaining}
+                          </span>
+                        </div>
+                        <div className="flex h-8 items-center gap-1.5">
+                          <button
+                            type="button"
+                            disabled={busyRow || !qtyValid}
+                            onClick={() => handleConfirm(row)}
+                            className="inline-flex h-8 w-[88px] items-center justify-center gap-1 rounded-md bg-[#0d9488] text-xs font-semibold text-white hover:bg-teal-700 disabled:opacity-40"
+                          >
+                            {busyRow ? (
+                              <Loader2 className="h-3 w-3 animate-spin" />
+                            ) : null}
+                            Conferir
+                          </button>
+                          <button
+                            type="button"
+                            disabled={busyRow}
+                            onClick={() => openReport(row)}
+                            className="inline-flex h-8 w-[88px] items-center justify-center rounded-md border border-red-300 text-xs font-semibold text-red-700 hover:bg-red-50 disabled:opacity-40"
+                          >
+                            Reportar
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })}
                 </div>
-              );
-            })}
-          </div>
+              </div>
+            </div>
+          ))}
         </div>
       )}
-
-      {hidden > 0 ? (
-        <p className="border-t border-slate-100 px-4 py-2 text-xs text-slate-500">
-          +{hidden} itens nesta onda
-        </p>
-      ) : null}
 
       {reporting ? (
         <WaveLineIssueModal
@@ -779,7 +830,7 @@ function OrderRow({ order, onOpen }: { order: PackingOrder; onOpen: () => void }
       <div className="min-w-0 flex-1">
         <div className="flex flex-wrap items-center gap-2">
           <span className="rounded-md bg-slate-100 px-2 py-0.5 text-[11px] font-bold uppercase tracking-wide text-slate-600">
-            Pedido
+            Pedido avulso
           </span>
           <MarketplaceBadge value={order.marketplace} />
           <CollectionDeadlineIndicator
@@ -791,22 +842,11 @@ function OrderRow({ order, onOpen }: { order: PackingOrder; onOpen: () => void }
           {order.erpOrderId}
         </p>
         <p className="text-sm text-slate-500">
-          {order.routeLabel ? `${order.routeLabel} · ` : ""}
           Cesta {order.basket?.code ?? "—"} · {order.items.length} itens
-          {order.packingInProgress
-            ? ` · em conferência${order.packingOperatorName ? ` (${order.packingOperatorName})` : ""}`
-            : ""}
         </p>
-        {order.shippingLabelError ? (
-          <p className="mt-1 text-xs font-medium text-red-700">
-            Etiqueta: {order.shippingLabelError}
-          </p>
-        ) : order.shippingLabel ? (
-          <p className="mt-1 text-xs font-medium text-emerald-700">Etiqueta pronta</p>
-        ) : null}
       </div>
-      <span className="shrink-0 rounded-lg bg-slate-900 px-3 py-1.5 text-xs font-semibold text-white">
-        Abrir
+      <span className="shrink-0 rounded-lg bg-[#0d9488] px-3 py-1.5 text-xs font-semibold text-white">
+        Conferir
       </span>
     </button>
   );
