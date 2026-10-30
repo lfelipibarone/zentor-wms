@@ -336,7 +336,18 @@ export default function PackingPage() {
   );
 }
 
-const WAVE_CARD_LINE_LIMIT = 4;
+const WAVE_CARD_ROW_LIMIT = 8;
+
+type UnifiedReadyRow = {
+  key: string;
+  lineId: string;
+  erpOrderId: string;
+  basketCode: string | null;
+  sku: string;
+  routeLabel: string;
+  qtyDone: number;
+  qtyTotal: number;
+};
 
 function WaveQueueCard({
   wave,
@@ -350,8 +361,38 @@ function WaveQueueCard({
   const pickedPct = wave.unitsTotal > 0 ? Math.round((wave.unitsPicked / wave.unitsTotal) * 100) : 0;
   const ready = wave.readyLines.filter((l) => l.quantityPicked >= l.quantityTotal);
   const collecting = wave.readyLines.length - ready.length;
-  const shown = ready.slice(0, WAVE_CARD_LINE_LIMIT);
-  const hidden = ready.length - shown.length;
+
+  // Pedido × SKU na própria fila (sem ir para “onda completa”)
+  const unifiedRows: UnifiedReadyRow[] = ready.flatMap((line) => {
+    const allocs = (line.allocations ?? []).filter((a) => a.remaining > 0);
+    if (allocs.length === 0) {
+      return [
+        {
+          key: line.id,
+          lineId: line.id,
+          erpOrderId: "—",
+          basketCode: null,
+          sku: line.sku,
+          routeLabel: line.routeLabel ?? line.locationBarcode,
+          qtyDone: 0,
+          qtyTotal: line.quantityTotal,
+        },
+      ];
+    }
+    return allocs.map((a) => ({
+      key: `${line.id}-${a.id}`,
+      lineId: line.id,
+      erpOrderId: a.erpOrderId,
+      basketCode: a.basketCode,
+      sku: line.sku,
+      routeLabel: line.routeLabel ?? line.locationBarcode,
+      qtyDone: a.quantitySorted,
+      qtyTotal: a.quantity,
+    }));
+  });
+
+  const shown = unifiedRows.slice(0, WAVE_CARD_ROW_LIMIT);
+  const hidden = unifiedRows.length - shown.length;
 
   return (
     <div className="rounded-xl border border-amber-200 bg-amber-50/80 p-4 shadow-sm">
@@ -375,32 +416,41 @@ function WaveQueueCard({
       </div>
 
       <p className="mt-3 text-xs font-semibold uppercase text-amber-900">
-        Prontos para conferir ({ready.length})
+        Pedidos × itens ({unifiedRows.length})
         {collecting > 0 ? (
-          <span className="ml-1 font-normal normal-case text-amber-800">· {collecting} aguardando recoleta</span>
+          <span className="ml-1 font-normal normal-case text-amber-800">
+            · {collecting} SKU aguardando recoleta
+          </span>
         ) : null}
       </p>
       <div className="mt-1 space-y-1">
-        {shown.map((line) => (
+        {shown.map((row) => (
           <button
-            key={line.id}
+            key={row.key}
             type="button"
-            onClick={() => onOpenLine(line.id)}
+            onClick={() => onOpenLine(row.lineId)}
             className="flex w-full items-center justify-between gap-2 rounded-lg border border-amber-200 bg-white px-3 py-2 text-left text-sm transition hover:border-amber-400"
           >
             <span className="min-w-0">
-              <span className="font-mono font-semibold">{line.sku}</span>
-              <span className="ml-2 text-muted-foreground">
-                {line.routeLabel ?? line.locationBarcode}
+              <span className="font-mono font-semibold">{row.erpOrderId}</span>
+              {row.basketCode ? (
+                <span className="ml-2 text-muted-foreground">cesta {row.basketCode}</span>
+              ) : null}
+              <span className="mt-0.5 block truncate">
+                <span className="font-mono font-medium">{row.sku}</span>
+                <span className="ml-2 text-muted-foreground">{row.routeLabel}</span>
               </span>
             </span>
-            <span className="shrink-0 tabular-nums text-muted-foreground">
-              {line.quantityPicked}/{line.quantityTotal} un.
+            <span className="shrink-0 text-right">
+              <span className="block tabular-nums text-muted-foreground">
+                {row.qtyDone}/{row.qtyTotal} un.
+              </span>
+              <span className="text-xs font-semibold text-[#0d9488]">Conferir</span>
             </span>
           </button>
         ))}
         {hidden > 0 ? (
-          <p className="px-1 text-xs text-muted-foreground">+{hidden} item(ns) na onda completa</p>
+          <p className="px-1 text-xs text-muted-foreground">+{hidden} na onda completa</p>
         ) : null}
       </div>
 
@@ -409,7 +459,7 @@ function WaveQueueCard({
         onClick={onOpenWave}
         className="mt-3 w-full rounded-lg border border-amber-300 bg-white py-2 text-sm font-semibold text-amber-900 transition hover:bg-amber-100"
       >
-        Ver onda completa
+        Ver onda completa · etiquetas
       </button>
     </div>
   );

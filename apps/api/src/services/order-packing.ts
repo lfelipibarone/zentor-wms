@@ -353,7 +353,14 @@ export async function listUnifiedPackingQueue(tenantId: string, opts?: { approac
           id: true,
           acceptedBy: { select: { name: true } },
           _count: { select: { orders: true } },
-          lines: { select: { quantityTotal: true, quantityPicked: true, sortStatus: true } },
+          lines: {
+            select: {
+              quantityTotal: true,
+              quantityPicked: true,
+              sortStatus: true,
+              allocations: { select: { orderItem: { select: { orderId: true } } } },
+            },
+          },
         },
       })
     : [];
@@ -370,13 +377,17 @@ export async function listUnifiedPackingQueue(tenantId: string, opts?: { approac
     }
     const totals = totalsById.get(line.waveId);
     const allLines = totals?.lines ?? [];
+    const orderIds = new Set<string>();
+    for (const l of allLines) {
+      for (const a of l.allocations) orderIds.add(a.orderItem.orderId);
+    }
     waves.set(line.waveId, {
       sortKey: line.waveUrgency,
       wave: {
         id: line.waveId,
         name: line.waveName,
         collectionDeadline: queueLine.collectionDeadline,
-        orderCount: totals?._count.orders ?? 0,
+        orderCount: orderIds.size || totals?._count.orders || 0,
         pickerName: totals?.acceptedBy?.name ?? null,
         linesTotal: allLines.length,
         linesPicked: allLines.filter((l) => l.quantityPicked >= l.quantityTotal).length,
@@ -967,6 +978,25 @@ async function listWavePackingLinesInternal(tenantId: string) {
         },
       },
       pickLocation: { select: { corridor: true, row: true, barcode: true, estanteId: true, face: true } },
+      allocations: {
+        select: {
+          id: true,
+          quantity: true,
+          quantitySorted: true,
+          orderItem: {
+            select: {
+              order: {
+                select: {
+                  id: true,
+                  erpOrderId: true,
+                  marketplace: true,
+                  basket: { select: { code: true } },
+                },
+              },
+            },
+          },
+        },
+      },
     },
   });
 
@@ -988,6 +1018,16 @@ async function listWavePackingLinesInternal(tenantId: string) {
       quantityTotal: l.quantityTotal,
       sortStatus: l.sortStatus,
       pickLocation: l.pickLocation,
+      allocations: l.allocations.map((a) => ({
+        id: a.id,
+        quantity: a.quantity,
+        quantitySorted: a.quantitySorted,
+        remaining: Math.max(0, a.quantity - a.quantitySorted),
+        orderId: a.orderItem.order.id,
+        erpOrderId: a.orderItem.order.erpOrderId,
+        marketplace: a.orderItem.order.marketplace,
+        basketCode: a.orderItem.order.basket?.code ?? null,
+      })),
     };
   });
 

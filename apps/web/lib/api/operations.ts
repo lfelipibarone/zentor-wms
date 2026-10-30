@@ -716,6 +716,17 @@ export interface PackingOrder {
   }>;
 }
 
+export type PackingWaveLineAllocation = {
+  id: string;
+  quantity: number;
+  quantitySorted: number;
+  remaining: number;
+  orderId: string;
+  erpOrderId: string;
+  marketplace: string | null;
+  basketCode: string | null;
+};
+
 export type PackingWaveLineSummary = {
   id: string;
   waveId: string;
@@ -730,6 +741,7 @@ export type PackingWaveLineSummary = {
   quantityPicked: number;
   quantityTotal: number;
   sortStatus: string;
+  allocations?: PackingWaveLineAllocation[];
 };
 
 export type ReplenishmentNeedSummary = {
