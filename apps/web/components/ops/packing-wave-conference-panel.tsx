@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { X } from "lucide-react";
+import { Check, X } from "lucide-react";
 import { CollectionDeadlineIndicator } from "@/components/ops/collection-deadline-indicator";
 import { DataState } from "@/components/ops/data-state";
 import { WaveLineIssueModal } from "@/components/ops/wave-line-issue-modal";
@@ -105,72 +105,83 @@ export function PackingWaveConferencePanel({ lineId, onClose, onChanged }: Props
     void confirmAlloc(alloc.id, parsed);
   };
 
-  const pendingAllocs = line?.allocations.filter((a) => a.remaining > 0 && !a.awaitingRepick) ?? [];
+  const pendingAllocs =
+    line?.allocations.filter((a) => a.remaining > 0 && !a.awaitingRepick) ?? [];
 
   return (
-    <div className="flex max-h-[calc(100vh-8rem)] flex-col overflow-hidden rounded-xl border border-amber-200 bg-white shadow-sm lg:sticky lg:top-4">
-      <div className="flex shrink-0 items-start justify-between gap-2 border-b border-amber-100 bg-amber-50/80 px-4 py-3">
+    <div className="flex h-[min(720px,calc(100vh-7rem))] flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm lg:sticky lg:top-3">
+      <div className="flex shrink-0 items-start justify-between gap-3 border-b border-slate-100 px-5 py-4">
         <div className="min-w-0">
-          <p className="text-xs font-bold uppercase text-amber-900">Conferir</p>
-          <p className="truncate font-mono text-sm font-bold">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[#0d9488]">
+            Estação · conferir
+          </p>
+          <p className="mt-1 truncate font-mono text-lg font-bold tracking-tight text-slate-900">
             {line?.product.sku ?? "…"}
           </p>
-          <p className="truncate text-xs text-muted-foreground">
-            {line?.waveName ?? "Onda"}
-          </p>
+          <p className="truncate text-sm text-slate-500">{line?.waveName ?? "Onda"}</p>
         </div>
         <button
           type="button"
           onClick={onClose}
-          className="rounded-lg p-1.5 text-slate-500 hover:bg-amber-100 hover:text-slate-800"
+          className="rounded-full p-2 text-slate-400 transition hover:bg-slate-100 hover:text-slate-800"
           aria-label="Fechar painel"
         >
-          <X className="h-4 w-4" />
+          <X className="h-5 w-5" />
         </button>
       </div>
 
-      {/* min-h-0: sem isso o flex corta qty/report sem scroll */}
-      <div className="min-h-0 flex-1 space-y-3 overflow-y-auto overscroll-contain p-4">
+      <div className="min-h-0 flex-1 space-y-4 overflow-y-auto overscroll-contain px-5 py-4">
         {message ? (
-          <p className="rounded-lg bg-slate-100 px-3 py-2 text-sm">{message}</p>
+          <p className="rounded-xl bg-slate-100 px-3 py-2 text-sm text-slate-700">{message}</p>
         ) : null}
 
         <DataState loading={loading} error={error} empty={false}>
           {line ? (
             <>
-              <div className="flex gap-3">
-                {line.product.imageUrl ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img
-                    src={line.product.imageUrl}
-                    alt={line.product.name}
-                    className="h-16 w-16 shrink-0 rounded-lg border bg-white object-contain"
-                  />
-                ) : null}
-                <div className="min-w-0 flex-1">
-                  <p className="text-sm">{line.product.name}</p>
-                  <p className="text-xs text-muted-foreground">
-                    Local {line.pickLocation.barcode} · {line.quantityPicked}/
-                    {line.quantityTotal} un.
+              <div className="flex gap-4">
+                <div className="flex h-28 w-28 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-slate-200 bg-slate-50">
+                  {line.product.imageUrl ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={line.product.imageUrl}
+                      alt={line.product.name}
+                      className="h-full w-full object-contain p-2"
+                    />
+                  ) : (
+                    <span className="px-2 text-center font-mono text-xs text-slate-400">
+                      sem foto
+                    </span>
+                  )}
+                </div>
+                <div className="min-w-0 flex-1 space-y-2">
+                  <p className="text-base font-medium leading-snug text-slate-900">
+                    {line.product.name}
                   </p>
-                  <div className="mt-2">
-                    <CollectionDeadlineIndicator deadline={collectionDeadline} />
-                  </div>
+                  <p className="text-sm text-slate-500">
+                    Local{" "}
+                    <span className="font-mono font-semibold text-slate-800">
+                      {line.pickLocation.barcode}
+                    </span>
+                    <span className="mx-1.5 text-slate-300">·</span>
+                    <span className="tabular-nums">
+                      {line.quantityPicked}/{line.quantityTotal} un.
+                    </span>
+                  </p>
+                  <CollectionDeadlineIndicator deadline={collectionDeadline} />
                 </div>
               </div>
 
               {line.allocations.length === 0 ? (
-                <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-3 text-sm text-amber-950">
-                  Esta linha não tem pedidos alocados para conferir. Feche e atualize a
-                  fila, ou use Reportar se o item estiver errado na mesa.
+                <p className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950">
+                  Sem pedidos alocados nesta linha. Atualize a fila.
                 </p>
               ) : pendingAllocs.length === 0 ? (
-                <p className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-3 text-sm text-emerald-900">
+                <p className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-900">
                   Todos os pedidos desta linha já foram conferidos.
                 </p>
               ) : null}
 
-              <div className="space-y-2">
+              <div className="space-y-3">
                 {line.allocations.map((alloc) => {
                   const done = alloc.remaining <= 0;
                   const qtyStr = qtyByAlloc[alloc.id] ?? String(alloc.remaining);
@@ -182,43 +193,39 @@ export function PackingWaveConferencePanel({ lineId, onClose, onChanged }: Props
                     <div
                       key={alloc.id}
                       className={cn(
-                        "rounded-lg border p-3",
-                        done && "border-emerald-300 bg-emerald-50",
-                        alloc.awaitingRepick && "border-red-200 bg-red-50/50",
+                        "rounded-2xl border px-4 py-4",
+                        done && "border-emerald-200 bg-emerald-50/70",
+                        alloc.awaitingRepick && "border-red-200 bg-red-50/60",
+                        !done && !alloc.awaitingRepick && "border-slate-200 bg-slate-50/50",
                       )}
                     >
                       <div className="flex items-baseline justify-between gap-2">
-                        <p className="font-mono text-sm font-bold">
+                        <p className="font-mono text-base font-bold text-slate-900">
                           {alloc.order?.erpOrderId ?? "Pedido"}
                         </p>
-                        <p className="text-xs text-muted-foreground">
+                        <p className="text-xs font-medium uppercase tracking-wide text-slate-500">
                           {alloc.order?.basketCode
-                            ? `cesta ${alloc.order.basketCode}`
-                            : "sem cesta"}
+                            ? `Cesta ${alloc.order.basketCode}`
+                            : "Sem cesta"}
                         </p>
                       </div>
-                      <p className="mt-1 text-lg font-bold tabular-nums">
-                        {alloc.quantity} un.
-                        {alloc.quantitySorted > 0 && !done ? (
-                          <span className="ml-2 text-xs font-normal text-muted-foreground">
-                            ({alloc.quantitySorted} já)
-                          </span>
-                        ) : null}
-                      </p>
 
                       {done ? (
-                        <p className="mt-1 text-sm font-medium text-emerald-700">
-                          Conferido
+                        <p className="mt-3 inline-flex items-center gap-1.5 text-sm font-semibold text-emerald-700">
+                          <Check className="h-4 w-4" /> Conferido
                         </p>
                       ) : alloc.awaitingRepick ? (
-                        <p className="mt-1 text-sm font-medium text-red-700">
+                        <p className="mt-3 text-sm font-semibold text-red-700">
                           Aguardando recoleta
                         </p>
                       ) : (
-                        <div className="mt-2 space-y-2">
-                          <label className="block text-sm">
-                            <span className="mb-1 block text-xs font-medium text-slate-700">
-                              Qtd conferida
+                        <div className="mt-4 space-y-3">
+                          <label className="block">
+                            <span className="mb-2 block text-xs font-semibold uppercase tracking-wide text-slate-500">
+                              Quantidade · esperado {alloc.remaining}
+                              {alloc.quantitySorted > 0
+                                ? ` · ${alloc.quantitySorted} já ok`
+                                : ""}
                             </span>
                             <input
                               type="number"
@@ -233,14 +240,14 @@ export function PackingWaveConferencePanel({ lineId, onClose, onChanged }: Props
                                   [alloc.id]: e.target.value,
                                 }))
                               }
-                              className="w-full rounded-lg border px-3 py-2 text-base font-semibold tabular-nums"
+                              className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-3xl font-bold tabular-nums tracking-tight text-slate-900 outline-none ring-[#0d9488] focus:border-[#0d9488] focus:ring-2"
                             />
                           </label>
-                          <div className="flex gap-2">
+                          <div className="grid grid-cols-[1fr_auto] gap-2">
                             <button
                               type="button"
                               disabled={saving || !qtyValid}
-                              className="flex-1 rounded-lg bg-[#0d9488] py-2 text-sm font-semibold text-white disabled:opacity-50"
+                              className="rounded-xl bg-[#0d9488] py-3.5 text-base font-semibold text-white transition hover:bg-teal-700 disabled:opacity-40"
                               onClick={() => handleConfirm(alloc)}
                             >
                               Confirmar
@@ -248,7 +255,7 @@ export function PackingWaveConferencePanel({ lineId, onClose, onChanged }: Props
                             <button
                               type="button"
                               disabled={saving}
-                              className="rounded-lg border border-red-300 px-3 py-2 text-sm font-semibold text-red-700 hover:bg-red-50 disabled:opacity-50"
+                              className="rounded-xl border border-red-300 px-4 py-3.5 text-sm font-semibold text-red-700 transition hover:bg-red-50 disabled:opacity-40"
                               onClick={() =>
                                 setReporting({
                                   alloc,
