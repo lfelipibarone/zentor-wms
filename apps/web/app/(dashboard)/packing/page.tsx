@@ -1,7 +1,7 @@
 "use client";
 
-import { Suspense, useCallback, useEffect, useRef, useState } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import { Loader2, Printer, RefreshCw } from "lucide-react";
 import { PageHeader } from "@/components/ops/page-header";
 import { CollectionDeadlineIndicator } from "@/components/ops/collection-deadline-indicator";
@@ -58,18 +58,22 @@ function filterItems(items: PackingQueueItem[], filter: QueueFilter) {
   return items.filter((i) => i.kind === "order");
 }
 
-export default function PackingPage() {
-  return (
-    <Suspense fallback={null}>
-      <PackingHub />
-    </Suspense>
-  );
+function readLineFromUrl(): string | null {
+  if (typeof window === "undefined") return null;
+  return new URLSearchParams(window.location.search).get("line");
 }
 
-function PackingHub() {
+function syncLineInUrl(lineId: string | null) {
+  if (typeof window === "undefined") return;
+  const url = new URL(window.location.href);
+  if (lineId) url.searchParams.set("line", lineId);
+  else url.searchParams.delete("line");
+  // replaceState evita remount do Next (useSearchParams + Suspense sumia a fila)
+  window.history.replaceState(null, "", `${url.pathname}${url.search}${url.hash}`);
+}
+
+export default function PackingPage() {
   const router = useRouter();
-  const searchParams = useSearchParams();
-  const lineFromUrl = searchParams.get("line");
 
   const [items, setItems] = useState<PackingQueueItem[]>([]);
   const [filter, setFilter] = useState<QueueFilter>("all");
@@ -79,19 +83,20 @@ function PackingHub() {
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
-  const [activeLineId, setActiveLineId] = useState<string | null>(lineFromUrl);
+  const [activeLineId, setActiveLineId] = useState<string | null>(null);
   const [labelBusyWaveId, setLabelBusyWaveId] = useState<string | null>(null);
   const openingRef = useRef(false);
   const basketInputRef = useRef<HTMLInputElement>(null);
   const lastScanRef = useRef("");
+  const hasItemsRef = useRef(false);
   const [zones, setZones] = useState<ApproachWaveSummary[]>([]);
   const [zone, setZone] = useState(() =>
     typeof window === "undefined" ? "" : (window.localStorage.getItem(ZONE_STORAGE_KEY) ?? ""),
   );
 
   useEffect(() => {
-    if (lineFromUrl) setActiveLineId(lineFromUrl);
-  }, [lineFromUrl]);
+    setActiveLineId(readLineFromUrl());
+  }, []);
 
   useEffect(() => {
     fetchTenantApproachWaves("PACKING")
@@ -105,28 +110,34 @@ function PackingHub() {
     else window.localStorage.removeItem(ZONE_STORAGE_KEY);
   };
 
-  const loadQueue = useCallback(async () => {
-    setLoading(true);
-    setError(null);
+  const loadQueue = useCallback(async (opts?: { silent?: boolean }) => {
+    const silent = opts?.silent && hasItemsRef.current;
+    if (!silent) {
+      setLoading(true);
+      setError(null);
+    }
     try {
       const data = await fetchUnifiedPackingQueue(zone || undefined);
       setItems(data.items);
+      hasItemsRef.current = data.items.length > 0;
     } catch (e) {
       if (zone && e instanceof Error && e.message.includes("não encontrada")) {
         changeZone("");
         return;
       }
-      setError(e instanceof Error ? e.message : "Erro ao carregar fila");
+      if (!silent) {
+        setError(e instanceof Error ? e.message : "Erro ao carregar fila");
+      }
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
   }, [zone]);
 
   useEffect(() => {
-    loadQueue();
+    void loadQueue();
   }, [loadQueue]);
 
-  // Poll leve enquanto painel aberto ou etiquetas incompletas
+  // Poll silencioso (não zera a fila com spinner)
   useEffect(() => {
     const needsPoll = items.some(
       (i) =>
@@ -136,7 +147,7 @@ function PackingHub() {
     );
     if (!needsPoll && !activeLineId) return;
     const t = setInterval(() => {
-      void loadQueue();
+      void loadQueue({ silent: true });
     }, 8_000);
     return () => clearInterval(t);
   }, [items, activeLineId, loadQueue]);
@@ -206,12 +217,12 @@ function PackingHub() {
 
   const openLine = (lineId: string) => {
     setActiveLineId(lineId);
-    router.replace(`/packing?line=${encodeURIComponent(lineId)}`, { scroll: false });
+    syncLineInUrl(lineId);
   };
 
   const closePanel = () => {
     setActiveLineId(null);
-    router.replace("/packing", { scroll: false });
+    syncLineInUrl(null);
   };
 
   const retryWaveLabels = async (waveId: string) => {
@@ -224,7 +235,7 @@ function PackingHub() {
           ? `Etiquetas OK: ${result.ok}/${result.total}`
           : `Etiquetas ${result.ok}/${result.total} · ${result.failed.length} com erro`,
       );
-      await loadQueue();
+      await loadQueue({ silent: true });
     } catch (e) {
       setMessage(e instanceof Error ? e.message : "Falha ao gerar etiquetas");
     } finally {
@@ -463,7 +474,7 @@ function PackingHub() {
             <PackingWaveConferencePanel
               lineId={activeLineId}
               onClose={closePanel}
-              onChanged={() => void loadQueue()}
+              onChanged={() => void loadQueue({ silent: true })}
             />
           ) : (
             basketForm
@@ -511,22 +522,9 @@ function WaveQueueCard({
   const labelsFailed = wave.labelsFailed ?? 0;
   const pendingLabels = Math.max(0, labelsTotal - labelsOk);
 
+  // Só linhas com qty pendente — evita abrir painel vazio sem campo de qtd
   const unifiedRows: UnifiedReadyRow[] = ready.flatMap((line) => {
     const allocs = (line.allocations ?? []).filter((a) => a.remaining > 0);
-    if (allocs.length === 0) {
-      return [
-        {
-          key: line.id,
-          lineId: line.id,
-          erpOrderId: "—",
-          basketCode: null,
-          sku: line.sku,
-          routeLabel: line.routeLabel ?? line.locationBarcode,
-          qtyDone: 0,
-          qtyTotal: line.quantityTotal,
-        },
-      ];
-    }
     return allocs.map((a) => ({
       key: `${line.id}-${a.id}`,
       lineId: line.id,

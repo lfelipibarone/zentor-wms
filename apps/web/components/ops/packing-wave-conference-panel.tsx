@@ -105,9 +105,11 @@ export function PackingWaveConferencePanel({ lineId, onClose, onChanged }: Props
     void confirmAlloc(alloc.id, parsed);
   };
 
+  const pendingAllocs = line?.allocations.filter((a) => a.remaining > 0 && !a.awaitingRepick) ?? [];
+
   return (
     <div className="flex max-h-[calc(100vh-8rem)] flex-col overflow-hidden rounded-xl border border-amber-200 bg-white shadow-sm lg:sticky lg:top-4">
-      <div className="flex items-start justify-between gap-2 border-b border-amber-100 bg-amber-50/80 px-4 py-3">
+      <div className="flex shrink-0 items-start justify-between gap-2 border-b border-amber-100 bg-amber-50/80 px-4 py-3">
         <div className="min-w-0">
           <p className="text-xs font-bold uppercase text-amber-900">Conferir</p>
           <p className="truncate font-mono text-sm font-bold">
@@ -127,7 +129,8 @@ export function PackingWaveConferencePanel({ lineId, onClose, onChanged }: Props
         </button>
       </div>
 
-      <div className="flex-1 space-y-3 overflow-y-auto p-4">
+      {/* min-h-0: sem isso o flex corta qty/report sem scroll */}
+      <div className="min-h-0 flex-1 space-y-3 overflow-y-auto overscroll-contain p-4">
         {message ? (
           <p className="rounded-lg bg-slate-100 px-3 py-2 text-sm">{message}</p>
         ) : null}
@@ -151,13 +154,21 @@ export function PackingWaveConferencePanel({ lineId, onClose, onChanged }: Props
                     {line.quantityTotal} un.
                   </p>
                   <div className="mt-2">
-                    <CollectionDeadlineIndicator
-                      deadline={collectionDeadline}
-                      variant="detail"
-                    />
+                    <CollectionDeadlineIndicator deadline={collectionDeadline} />
                   </div>
                 </div>
               </div>
+
+              {line.allocations.length === 0 ? (
+                <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-3 text-sm text-amber-950">
+                  Esta linha não tem pedidos alocados para conferir. Feche e atualize a
+                  fila, ou use Reportar se o item estiver errado na mesa.
+                </p>
+              ) : pendingAllocs.length === 0 ? (
+                <p className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-3 text-sm text-emerald-900">
+                  Todos os pedidos desta linha já foram conferidos.
+                </p>
+              ) : null}
 
               <div className="space-y-2">
                 {line.allocations.map((alloc) => {
@@ -178,10 +189,10 @@ export function PackingWaveConferencePanel({ lineId, onClose, onChanged }: Props
                     >
                       <div className="flex items-baseline justify-between gap-2">
                         <p className="font-mono text-sm font-bold">
-                          {alloc.order.erpOrderId}
+                          {alloc.order?.erpOrderId ?? "Pedido"}
                         </p>
                         <p className="text-xs text-muted-foreground">
-                          {alloc.order.basketCode
+                          {alloc.order?.basketCode
                             ? `cesta ${alloc.order.basketCode}`
                             : "sem cesta"}
                         </p>
