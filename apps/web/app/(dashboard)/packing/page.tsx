@@ -637,15 +637,23 @@ function WaveStationBlock({
         <p className="px-4 py-6 text-sm text-slate-500">Nenhum item pendente nesta onda.</p>
       ) : (
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[780px] text-left text-sm">
+          <table className="w-full min-w-[860px] table-fixed border-collapse text-sm">
+            <colgroup>
+              <col className="w-[18%]" />
+              <col className="w-[20%]" />
+              <col className="w-[12%]" />
+              <col className="w-[14%]" />
+              <col className="w-[12%]" />
+              <col className="w-[24%]" />
+            </colgroup>
             <thead>
               <tr className="border-b border-slate-100 bg-slate-50/80 text-[11px] uppercase tracking-wide text-slate-500">
-                <th className="px-4 py-2.5 font-semibold">Pedido</th>
-                <th className="px-3 py-2.5 font-semibold">SKU</th>
-                <th className="px-3 py-2.5 font-semibold">Cesta</th>
-                <th className="px-3 py-2.5 font-semibold">Local</th>
-                <th className="px-3 py-2.5 text-right font-semibold">Qtd</th>
-                <th className="px-3 py-2.5 font-semibold">Ações</th>
+                <th className="px-3 py-2.5 text-left font-semibold">Pedido</th>
+                <th className="px-3 py-2.5 text-left font-semibold">SKU</th>
+                <th className="px-3 py-2.5 text-left font-semibold">Cesta</th>
+                <th className="px-3 py-2.5 text-left font-semibold">Local</th>
+                <th className="px-3 py-2.5 text-left font-semibold">Qtd</th>
+                <th className="px-3 py-2.5 text-left font-semibold">Ações</th>
               </tr>
             </thead>
             <tbody>
@@ -661,54 +669,60 @@ function WaveStationBlock({
                     key={row.key}
                     className="border-b border-slate-100 last:border-0 hover:bg-slate-50/80"
                   >
-                    <td className="px-4 py-2">
-                      <span className="font-mono font-semibold text-slate-900">
-                        {row.erpOrderId}
-                      </span>
+                    <td className="truncate px-3 py-2.5 align-middle font-mono font-semibold text-slate-900">
+                      {row.erpOrderId}
                     </td>
-                    <td className="max-w-[160px] px-3 py-2">
-                      <span className="block truncate font-mono text-slate-700">
-                        {row.sku}
-                      </span>
+                    <td
+                      className="truncate px-3 py-2.5 align-middle font-mono text-slate-700"
+                      title={row.sku}
+                    >
+                      {row.sku}
                     </td>
-                    <td className="px-3 py-2 tabular-nums text-slate-600">
+                    <td className="truncate px-3 py-2.5 align-middle font-mono tabular-nums text-slate-600">
                       {row.basketCode ?? "—"}
                     </td>
-                    <td className="max-w-[110px] truncate px-3 py-2 text-slate-500">
+                    <td
+                      className="truncate px-3 py-2.5 align-middle text-slate-500"
+                      title={row.routeLabel}
+                    >
                       {row.routeLabel}
                     </td>
-                    <td className="px-3 py-2 text-right">
-                      <input
-                        type="number"
-                        inputMode="numeric"
-                        min={1}
-                        max={row.remaining}
-                        value={qtyStr}
-                        disabled={busyRow}
-                        onChange={(e) =>
-                          setQtyByKey((prev) => ({
-                            ...prev,
-                            [row.key]: e.target.value,
-                          }))
-                        }
-                        onKeyDown={(e) => {
-                          if (e.key === "Enter") {
-                            e.preventDefault();
-                            handleConfirm(row);
-                          }
-                        }}
-                        aria-label={`Quantidade ${row.erpOrderId} ${row.sku}`}
-                        className="ml-auto w-16 rounded-lg border border-slate-300 bg-white px-2 py-1.5 text-right text-sm font-semibold tabular-nums outline-none focus:border-[#0d9488] focus:ring-1 focus:ring-[#0d9488]"
-                      />
-                      <span className="ml-1 text-xs text-slate-400">/{row.remaining}</span>
-                    </td>
-                    <td className="px-3 py-2">
+                    <td className="px-3 py-2.5 align-middle">
                       <div className="flex items-center gap-1.5">
+                        <input
+                          type="number"
+                          inputMode="numeric"
+                          min={1}
+                          max={row.remaining}
+                          value={qtyStr}
+                          disabled={busyRow}
+                          onChange={(e) =>
+                            setQtyByKey((prev) => ({
+                              ...prev,
+                              [row.key]: e.target.value,
+                            }))
+                          }
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter") {
+                              e.preventDefault();
+                              handleConfirm(row);
+                            }
+                          }}
+                          aria-label={`Quantidade ${row.erpOrderId} ${row.sku}`}
+                          className="h-8 w-14 shrink-0 rounded-md border border-slate-300 bg-white px-1.5 text-center text-sm font-semibold tabular-nums outline-none focus:border-[#0d9488] focus:ring-1 focus:ring-[#0d9488]"
+                        />
+                        <span className="shrink-0 text-xs tabular-nums text-slate-400">
+                          / {row.remaining}
+                        </span>
+                      </div>
+                    </td>
+                    <td className="px-3 py-2.5 align-middle">
+                      <div className="flex items-center gap-1.5 whitespace-nowrap">
                         <button
                           type="button"
                           disabled={busyRow || !qtyValid}
                           onClick={() => handleConfirm(row)}
-                          className="inline-flex items-center gap-1 rounded-lg bg-[#0d9488] px-2.5 py-1.5 text-xs font-semibold text-white hover:bg-teal-700 disabled:opacity-40"
+                          className="inline-flex h-8 min-w-[5.5rem] items-center justify-center gap-1 rounded-md bg-[#0d9488] px-2.5 text-xs font-semibold text-white hover:bg-teal-700 disabled:opacity-40"
                         >
                           {busyRow ? (
                             <Loader2 className="h-3 w-3 animate-spin" />
@@ -719,7 +733,7 @@ function WaveStationBlock({
                           type="button"
                           disabled={busyRow}
                           onClick={() => openReport(row)}
-                          className="rounded-lg border border-red-300 px-2.5 py-1.5 text-xs font-semibold text-red-700 hover:bg-red-50 disabled:opacity-40"
+                          className="inline-flex h-8 min-w-[5.5rem] items-center justify-center rounded-md border border-red-300 px-2.5 text-xs font-semibold text-red-700 hover:bg-red-50 disabled:opacity-40"
                         >
                           Reportar
                         </button>
