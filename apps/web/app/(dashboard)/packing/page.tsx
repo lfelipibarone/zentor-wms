@@ -9,7 +9,7 @@ import { MarketplaceBadge } from "@/components/ops/marketplace-badge";
 import { MarketplaceFilter } from "@/components/ops/marketplace-filter";
 import { matchesMarketplaceFilter } from "@/lib/marketplace-filter-client";
 import { DataState } from "@/components/ops/data-state";
-import { PackingWaveConferencePanel } from "@/components/ops/packing-wave-conference-panel";
+import { WaveLineIssueModal } from "@/components/ops/wave-line-issue-modal";
 import { apiFetch } from "@/lib/api/client";
 import { cn } from "@/lib/utils";
 import {
@@ -17,6 +17,7 @@ import {
   fetchLabelBatchOrders,
   fetchUnifiedPackingQueue,
   scanPackingBasket,
+  type PackingIssueType,
   type PackingOrder,
   type PackingQueueItem,
   type PackingWaveQueueSummary,
@@ -59,19 +60,6 @@ function filterItems(items: PackingQueueItem[], filter: QueueFilter) {
   return items.filter((i) => i.kind === "order");
 }
 
-function readLineFromUrl(): string | null {
-  if (typeof window === "undefined") return null;
-  return new URLSearchParams(window.location.search).get("line");
-}
-
-function syncLineInUrl(lineId: string | null) {
-  if (typeof window === "undefined") return;
-  const url = new URL(window.location.href);
-  if (lineId) url.searchParams.set("line", lineId);
-  else url.searchParams.delete("line");
-  window.history.replaceState(null, "", `${url.pathname}${url.search}${url.hash}`);
-}
-
 export default function PackingPage() {
   const router = useRouter();
 
@@ -83,7 +71,6 @@ export default function PackingPage() {
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
-  const [activeLineId, setActiveLineId] = useState<string | null>(null);
   const [labelBusyWaveId, setLabelBusyWaveId] = useState<string | null>(null);
   const openingRef = useRef(false);
   const basketInputRef = useRef<HTMLInputElement>(null);
@@ -95,7 +82,13 @@ export default function PackingPage() {
   );
 
   useEffect(() => {
-    setActiveLineId(readLineFromUrl());
+    // limpa ?line= antigo (conferência agora é na tabela)
+    if (typeof window === "undefined") return;
+    const url = new URL(window.location.href);
+    if (url.searchParams.has("line")) {
+      url.searchParams.delete("line");
+      window.history.replaceState(null, "", `${url.pathname}${url.search}${url.hash}`);
+    }
   }, []);
 
   useEffect(() => {
@@ -144,12 +137,12 @@ export default function PackingPage() {
         i.wave.labelsTotal > 0 &&
         i.wave.labelsOk < i.wave.labelsTotal,
     );
-    if (!needsPoll && !activeLineId) return;
+    if (!needsPoll) return;
     const t = setInterval(() => {
       void loadQueue({ silent: true });
     }, 8_000);
     return () => clearInterval(t);
-  }, [items, activeLineId, loadQueue]);
+  }, [items, loadQueue]);
 
   const goToOrder = useCallback(
     async (orderId: string) => {
@@ -212,16 +205,6 @@ export default function PackingPage() {
     e.preventDefault();
     const code = (e.currentTarget.value || basketScan).trim();
     if (code) void openOrderByBasketCode(code);
-  };
-
-  const openLine = (lineId: string) => {
-    setActiveLineId(lineId);
-    syncLineInUrl(lineId);
-  };
-
-  const closePanel = () => {
-    setActiveLineId(null);
-    syncLineInUrl(null);
   };
 
   const retryWaveLabels = async (waveId: string) => {
@@ -303,46 +286,12 @@ export default function PackingPage() {
     { id: "order", label: "Pedidos" },
   ];
 
-  const stationIdle = (
-    <form
-      onSubmit={handleBasketScan}
-      className="flex h-[min(720px,calc(100vh-7rem))] flex-col justify-center rounded-2xl border border-dashed border-slate-300 bg-gradient-to-b from-slate-50 to-white px-6 py-10 lg:sticky lg:top-3"
-    >
-      <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-[#0d9488]/10 text-[#0d9488]">
-        <ScanBarcode className="h-7 w-7" />
-      </div>
-      <label className="mt-5 text-center text-lg font-semibold tracking-tight text-slate-900">
-        Bipar cesta
-      </label>
-      <p className="mt-1 text-center text-sm text-slate-500">
-        Ou escolha um item na fila à esquerda.
-      </p>
-      <input
-        ref={basketInputRef}
-        autoFocus={!activeLineId}
-        className="mt-6 w-full rounded-xl border border-slate-300 bg-white px-4 py-4 font-mono text-xl outline-none ring-[#0d9488] focus:border-[#0d9488] focus:ring-2"
-        placeholder="Código da cesta"
-        value={basketScan}
-        onChange={(e) => {
-          setBasketScan(e.target.value);
-          if (message) setMessage(null);
-          lastScanRef.current = "";
-        }}
-        onKeyDown={handleBasketKeyDown}
-      />
-      <button
-        type="submit"
-        disabled={saving || !basketScan.trim()}
-        className="mt-3 w-full rounded-xl bg-[#0d9488] py-3.5 text-sm font-semibold text-white transition hover:bg-teal-700 disabled:opacity-40"
-      >
-        {saving ? "Abrindo…" : "Abrir pedido"}
-      </button>
-    </form>
-  );
-
   return (
     <div className="mx-auto max-w-[1400px] space-y-5">
-      <PageHeader title="Packing" description="Mesa de conferência — fila + estação." />
+      <PageHeader
+        title="Packing"
+        description="Conferir na tabela: digite a qtd e confirme ou reporte."
+      />
 
       {message ? (
         <p className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm text-slate-700">
@@ -395,8 +344,8 @@ export default function PackingPage() {
         </button>
       </div>
 
-      <div className="grid gap-5 lg:grid-cols-[minmax(0,1.35fr)_minmax(340px,0.9fr)] lg:items-start">
-        <div className="order-2 min-w-0 space-y-4 lg:order-1">
+      <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(280px,320px)] lg:items-start">
+        <div className="min-w-0 space-y-4">
           <DataState
             loading={loading}
             error={error}
@@ -410,12 +359,12 @@ export default function PackingPage() {
                     key={`wave-${entry.wave.id}`}
                     wave={entry.wave}
                     busy={labelBusyWaveId === entry.wave.id}
-                    activeLineId={activeLineId}
-                    onOpenLine={openLine}
                     onRetryLabels={() => void retryWaveLabels(entry.wave.id)}
                     onPrintLabels={() =>
                       void printWaveLabels(entry.wave.id, entry.wave.name)
                     }
+                    onChanged={() => void loadQueue({ silent: true })}
+                    onMessage={setMessage}
                   />
                 ) : (
                   <OrderRow
@@ -429,17 +378,40 @@ export default function PackingPage() {
           </DataState>
         </div>
 
-        <div className="order-1 lg:order-2">
-          {activeLineId ? (
-            <PackingWaveConferencePanel
-              lineId={activeLineId}
-              onClose={closePanel}
-              onChanged={() => void loadQueue({ silent: true })}
-            />
-          ) : (
-            stationIdle
-          )}
-        </div>
+        <form
+          onSubmit={handleBasketScan}
+          className="rounded-2xl border border-dashed border-slate-300 bg-gradient-to-b from-slate-50 to-white px-5 py-6 lg:sticky lg:top-3"
+        >
+          <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-[#0d9488]/10 text-[#0d9488]">
+            <ScanBarcode className="h-6 w-6" />
+          </div>
+          <label className="mt-4 block text-center text-base font-semibold text-slate-900">
+            Bipar cesta
+          </label>
+          <p className="mt-1 text-center text-xs text-slate-500">
+            Pedidos avulsos (fora de onda).
+          </p>
+          <input
+            ref={basketInputRef}
+            autoFocus
+            className="mt-4 w-full rounded-xl border border-slate-300 bg-white px-3 py-3 font-mono text-base outline-none ring-[#0d9488] focus:border-[#0d9488] focus:ring-2"
+            placeholder="Código da cesta"
+            value={basketScan}
+            onChange={(e) => {
+              setBasketScan(e.target.value);
+              if (message) setMessage(null);
+              lastScanRef.current = "";
+            }}
+            onKeyDown={handleBasketKeyDown}
+          />
+          <button
+            type="submit"
+            disabled={saving || !basketScan.trim()}
+            className="mt-3 w-full rounded-xl bg-[#0d9488] py-3 text-sm font-semibold text-white transition hover:bg-teal-700 disabled:opacity-40"
+          >
+            {saving ? "Abrindo…" : "Abrir pedido"}
+          </button>
+        </form>
       </div>
     </div>
   );
@@ -448,28 +420,42 @@ export default function PackingPage() {
 type UnifiedReadyRow = {
   key: string;
   lineId: string;
+  allocationId: string;
   erpOrderId: string;
   basketCode: string | null;
   sku: string;
+  productName: string;
   routeLabel: string;
+  remaining: number;
   qtyDone: number;
   qtyTotal: number;
+};
+
+type ReportState = {
+  lineId: string;
+  sku: string;
+  location: string;
+  allocationId: string;
+  erpOrderId: string;
+  units: number;
+  initialType: PackingIssueType;
+  initialDescription: string;
 };
 
 function WaveStationBlock({
   wave,
   busy,
-  activeLineId,
-  onOpenLine,
   onRetryLabels,
   onPrintLabels,
+  onChanged,
+  onMessage,
 }: {
   wave: PackingWaveQueueSummary;
   busy: boolean;
-  activeLineId: string | null;
-  onOpenLine: (lineId: string) => void;
   onRetryLabels: () => void;
   onPrintLabels: () => void;
+  onChanged: () => void;
+  onMessage: (msg: string | null) => void;
 }) {
   const pickedPct =
     wave.unitsTotal > 0 ? Math.round((wave.unitsPicked / wave.unitsTotal) * 100) : 0;
@@ -485,10 +471,13 @@ function WaveStationBlock({
     return allocs.map((a) => ({
       key: `${line.id}-${a.id}`,
       lineId: line.id,
+      allocationId: a.id,
       erpOrderId: a.erpOrderId,
       basketCode: a.basketCode,
       sku: line.sku,
+      productName: line.productName,
       routeLabel: line.routeLabel ?? line.locationBarcode,
+      remaining: a.remaining,
       qtyDone: a.quantitySorted,
       qtyTotal: a.quantity,
     }));
@@ -496,6 +485,80 @@ function WaveStationBlock({
 
   const shown = unifiedRows.slice(0, WAVE_ROW_LIMIT);
   const hidden = unifiedRows.length - shown.length;
+
+  const [qtyByKey, setQtyByKey] = useState<Record<string, string>>({});
+  const [rowBusy, setRowBusy] = useState<string | null>(null);
+  const [reporting, setReporting] = useState<ReportState | null>(null);
+
+  useEffect(() => {
+    setQtyByKey((prev) => {
+      const next: Record<string, string> = {};
+      for (const row of unifiedRows) {
+        next[row.key] =
+          prev[row.key] !== undefined && prev[row.key] !== ""
+            ? prev[row.key]
+            : String(row.remaining);
+      }
+      return next;
+    });
+    // Só quando a lista de keys muda (fila atualizou)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [unifiedRows.map((r) => `${r.key}:${r.remaining}`).join("|")]);
+
+  const confirmRow = async (row: UnifiedReadyRow, quantity: number) => {
+    setRowBusy(row.key);
+    onMessage(null);
+    try {
+      await apiFetch(`/api/packing/waves/lines/${row.lineId}/sort`, {
+        method: "POST",
+        body: JSON.stringify({
+          allocationId: row.allocationId,
+          quantity,
+        }),
+      });
+      onMessage(`Conferido ${row.erpOrderId} · ${row.sku} · ${quantity} un.`);
+      onChanged();
+    } catch (e) {
+      onMessage(e instanceof Error ? e.message : "Erro na conferência");
+    } finally {
+      setRowBusy(null);
+    }
+  };
+
+  const handleConfirm = (row: UnifiedReadyRow) => {
+    const parsed = parseInt(qtyByKey[row.key] ?? String(row.remaining), 10);
+    if (Number.isNaN(parsed) || parsed <= 0 || parsed > row.remaining) {
+      onMessage(`Informe uma quantidade entre 1 e ${row.remaining}`);
+      return;
+    }
+    if (parsed < row.remaining) {
+      setReporting({
+        lineId: row.lineId,
+        sku: row.sku,
+        location: row.routeLabel,
+        allocationId: row.allocationId,
+        erpOrderId: row.erpOrderId,
+        units: row.remaining,
+        initialType: "WRONG_QUANTITY",
+        initialDescription: `Conferiu ${parsed} de ${row.remaining} un. esperadas.`,
+      });
+      return;
+    }
+    void confirmRow(row, parsed);
+  };
+
+  const openReport = (row: UnifiedReadyRow) => {
+    setReporting({
+      lineId: row.lineId,
+      sku: row.sku,
+      location: row.routeLabel,
+      allocationId: row.allocationId,
+      erpOrderId: row.erpOrderId,
+      units: row.remaining,
+      initialType: "WRONG_ITEM",
+      initialDescription: "",
+    });
+  };
 
   return (
     <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
@@ -562,7 +625,10 @@ function WaveStationBlock({
       </header>
 
       {(wave.labelErrors ?? []).slice(0, 2).map((err) => (
-        <p key={err.orderId} className="border-b border-red-100 bg-red-50 px-4 py-1.5 text-xs text-red-700">
+        <p
+          key={err.orderId}
+          className="border-b border-red-100 bg-red-50 px-4 py-1.5 text-xs text-red-700"
+        >
           {err.erpOrderId}: {err.message}
         </p>
       ))}
@@ -571,7 +637,7 @@ function WaveStationBlock({
         <p className="px-4 py-6 text-sm text-slate-500">Nenhum item pendente nesta onda.</p>
       ) : (
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[640px] text-left text-sm">
+          <table className="w-full min-w-[780px] text-left text-sm">
             <thead>
               <tr className="border-b border-slate-100 bg-slate-50/80 text-[11px] uppercase tracking-wide text-slate-500">
                 <th className="px-4 py-2.5 font-semibold">Pedido</th>
@@ -579,50 +645,85 @@ function WaveStationBlock({
                 <th className="px-3 py-2.5 font-semibold">Cesta</th>
                 <th className="px-3 py-2.5 font-semibold">Local</th>
                 <th className="px-3 py-2.5 text-right font-semibold">Qtd</th>
-                <th className="px-4 py-2.5 text-right font-semibold"> </th>
+                <th className="px-3 py-2.5 font-semibold">Ações</th>
               </tr>
             </thead>
             <tbody>
               {shown.map((row) => {
-                const active = activeLineId === row.lineId;
+                const qtyStr = qtyByKey[row.key] ?? String(row.remaining);
+                const parsed = parseInt(qtyStr, 10);
+                const qtyValid =
+                  !Number.isNaN(parsed) && parsed > 0 && parsed <= row.remaining;
+                const busyRow = rowBusy === row.key;
+
                 return (
                   <tr
                     key={row.key}
-                    className={cn(
-                      "border-b border-slate-100 last:border-0 transition",
-                      active ? "bg-teal-50/80" : "hover:bg-slate-50/80",
-                    )}
+                    className="border-b border-slate-100 last:border-0 hover:bg-slate-50/80"
                   >
-                    <td className="px-4 py-2.5">
+                    <td className="px-4 py-2">
                       <span className="font-mono font-semibold text-slate-900">
                         {row.erpOrderId}
                       </span>
                     </td>
-                    <td className="max-w-[140px] truncate px-3 py-2.5 font-mono text-slate-700">
-                      {row.sku}
+                    <td className="max-w-[160px] px-3 py-2">
+                      <span className="block truncate font-mono text-slate-700">
+                        {row.sku}
+                      </span>
                     </td>
-                    <td className="px-3 py-2.5 tabular-nums text-slate-600">
+                    <td className="px-3 py-2 tabular-nums text-slate-600">
                       {row.basketCode ?? "—"}
                     </td>
-                    <td className="max-w-[120px] truncate px-3 py-2.5 text-slate-500">
+                    <td className="max-w-[110px] truncate px-3 py-2 text-slate-500">
                       {row.routeLabel}
                     </td>
-                    <td className="px-3 py-2.5 text-right tabular-nums text-slate-600">
-                      {row.qtyDone}/{row.qtyTotal}
+                    <td className="px-3 py-2 text-right">
+                      <input
+                        type="number"
+                        inputMode="numeric"
+                        min={1}
+                        max={row.remaining}
+                        value={qtyStr}
+                        disabled={busyRow}
+                        onChange={(e) =>
+                          setQtyByKey((prev) => ({
+                            ...prev,
+                            [row.key]: e.target.value,
+                          }))
+                        }
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") {
+                            e.preventDefault();
+                            handleConfirm(row);
+                          }
+                        }}
+                        aria-label={`Quantidade ${row.erpOrderId} ${row.sku}`}
+                        className="ml-auto w-16 rounded-lg border border-slate-300 bg-white px-2 py-1.5 text-right text-sm font-semibold tabular-nums outline-none focus:border-[#0d9488] focus:ring-1 focus:ring-[#0d9488]"
+                      />
+                      <span className="ml-1 text-xs text-slate-400">/{row.remaining}</span>
                     </td>
-                    <td className="px-4 py-2.5 text-right">
-                      <button
-                        type="button"
-                        onClick={() => onOpenLine(row.lineId)}
-                        className={cn(
-                          "rounded-lg px-3 py-1.5 text-xs font-semibold transition",
-                          active
-                            ? "bg-[#0d9488] text-white"
-                            : "bg-slate-900 text-white hover:bg-slate-800",
-                        )}
-                      >
-                        Conferir
-                      </button>
+                    <td className="px-3 py-2">
+                      <div className="flex items-center gap-1.5">
+                        <button
+                          type="button"
+                          disabled={busyRow || !qtyValid}
+                          onClick={() => handleConfirm(row)}
+                          className="inline-flex items-center gap-1 rounded-lg bg-[#0d9488] px-2.5 py-1.5 text-xs font-semibold text-white hover:bg-teal-700 disabled:opacity-40"
+                        >
+                          {busyRow ? (
+                            <Loader2 className="h-3 w-3 animate-spin" />
+                          ) : null}
+                          Conferir
+                        </button>
+                        <button
+                          type="button"
+                          disabled={busyRow}
+                          onClick={() => openReport(row)}
+                          className="rounded-lg border border-red-300 px-2.5 py-1.5 text-xs font-semibold text-red-700 hover:bg-red-50 disabled:opacity-40"
+                        >
+                          Reportar
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 );
@@ -636,6 +737,26 @@ function WaveStationBlock({
         <p className="border-t border-slate-100 px-4 py-2 text-xs text-slate-500">
           +{hidden} itens nesta onda
         </p>
+      ) : null}
+
+      {reporting ? (
+        <WaveLineIssueModal
+          lineId={reporting.lineId}
+          sku={reporting.sku}
+          location={reporting.location}
+          order={{
+            allocationId: reporting.allocationId,
+            erpOrderId: reporting.erpOrderId,
+            units: reporting.units,
+          }}
+          initialType={reporting.initialType}
+          initialDescription={reporting.initialDescription}
+          onClose={() => setReporting(null)}
+          onSubmitted={() => {
+            setReporting(null);
+            onChanged();
+          }}
+        />
       ) : null}
     </section>
   );

@@ -10,15 +10,15 @@ Cards amarelos empilhados, Pedido×item confuso, painel apertado. Operador não 
 
 ## Direção (aprovada)
 
-**Mesa dual:** esquerda = fila densa; direita = estação fixa (cesta ou conferência).
+**Mesa dual:** esquerda = fila densa com conferência **inline**; direita = só bipar cesta (avulso).
 
 ## Layout
 
 | Zona | Conteúdo |
 | --- | --- |
 | Topo | Título curto + filtros (marketplace, zona, Todos/Ondas/Pedidos) numa barra |
-| Esquerda (~58%) | Ondas como bloco com **cabeçalho** (nome, progresso, etiquetas k/n, Gerar, Imprimir) + **tabela** Pedido \| SKU \| Cesta \| Local \| Qty \| ação Conferir. Pedidos avulsos em lista simples. Sem cards amarelos por linha. |
-| Direita (~42%, sticky) | Idle: bipar cesta grande. Conferência: foto + SKU + local; por pedido qty grande + Confirmar / Reportar. |
+| Esquerda | Ondas com cabeçalho + **tabela** Pedido \| SKU \| Cesta \| Local \| **input Qtd** \| **Conferir** + **Reportar** lado a lado. Qty menor que o esperado abre modal WRONG_QUANTITY. |
+| Direita | Compacto: bipar cesta para pedido avulso. |
 
 ## Visual
 
