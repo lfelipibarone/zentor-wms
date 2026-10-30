@@ -742,6 +742,11 @@ export async function mobileRoutes(app: FastifyInstance) {
         });
       });
 
+      const { scheduleOrderShippingLabel } = await import(
+        "../services/ensure-shipping-labels.js"
+      );
+      scheduleOrderShippingLabel(order.tenantId, orderId);
+
       return { status: OrderStatus.PICKED_AWAITING_CONFERENCE };
     }
   );

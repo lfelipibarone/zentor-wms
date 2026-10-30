@@ -684,6 +684,7 @@ export interface PackingOrder {
   erpOrderId: string;
   customerName: string | null;
   shippingLabel?: string | null;
+  shippingLabelError?: string | null;
   marketplace?: string | null;
   status: string;
   priority?: number;
@@ -787,6 +788,10 @@ export type PackingWaveQueueSummary = {
   linesSorted: number;
   unitsTotal: number;
   unitsPicked: number;
+  labelsOk: number;
+  labelsTotal: number;
+  labelsFailed: number;
+  labelErrors: Array<{ orderId: string; erpOrderId: string; message: string }>;
   /** Linhas já coletadas aguardando distribuição nas cestas */
   readyLines: PackingWaveLineSummary[];
 };
@@ -883,6 +888,17 @@ export function fetchPackingQueue() {
 export function fetchUnifiedPackingQueue(approachWaveId?: string) {
   const qs = approachWaveId ? `?approachWaveId=${encodeURIComponent(approachWaveId)}` : "";
   return apiFetch<{ items: PackingQueueItem[] }>(`/api/packing/queue/unified${qs}`);
+}
+
+export function ensureWaveShippingLabels(waveId: string) {
+  return apiFetch<{
+    total: number;
+    ok: number;
+    failed: Array<{ orderId: string; message: string }>;
+  }>(`/api/packing/waves/${waveId}/shipping-labels/ensure`, {
+    method: "POST",
+    body: "{}",
+  });
 }
 
 export function searchPackingOrder(q: string) {

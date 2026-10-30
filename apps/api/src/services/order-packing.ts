@@ -120,6 +120,7 @@ type OrderRow = {
   erpOrderId: string;
   customerName: string | null;
   shippingLabel: string | null;
+  shippingLabelError?: string | null;
   status: OrderStatus;
   priority: number;
   collectionDeadline: Date | null;
@@ -227,6 +228,7 @@ async function mapPackingOrder(
     erpOrderId: order.erpOrderId,
     customerName: order.customerName,
     shippingLabel: order.shippingLabel,
+    shippingLabelError: order.shippingLabelError ?? null,
     status: order.status,
     priority: order.priority,
     collectionDeadline: order.collectionDeadline?.toISOString() ?? null,
@@ -337,6 +339,10 @@ export async function listUnifiedPackingQueue(tenantId: string, opts?: { approac
     linesSorted: number;
     unitsTotal: number;
     unitsPicked: number;
+    labelsOk: number;
+    labelsTotal: number;
+    labelsFailed: number;
+    labelErrors: Array<{ orderId: string; erpOrderId: string; message: string }>;
     readyLines: WaveLineQueue[];
   };
 
@@ -394,10 +400,66 @@ export async function listUnifiedPackingQueue(tenantId: string, opts?: { approac
         linesSorted: allLines.filter((l) => l.sortStatus === PickWaveLineSortStatus.SORTED).length,
         unitsTotal: allLines.reduce((sum, l) => sum + l.quantityTotal, 0),
         unitsPicked: allLines.reduce((sum, l) => sum + l.quantityPicked, 0),
+        labelsOk: 0,
+        labelsTotal: orderIds.size || totals?._count.orders || 0,
+        labelsFailed: 0,
+        labelErrors: [],
         readyLines: [queueLine],
       },
     });
   }
+
+  const allWaveOrderIds = [
+    ...new Set(
+      [...totalsById.values()].flatMap((w) => {
+        const ids = new Set<string>();
+        for (const l of w.lines) {
+          for (const a of l.allocations) ids.add(a.orderItem.orderId);
+        }
+        return [...ids];
+      }),
+    ),
+  ];
+  const labelRows =
+    allWaveOrderIds.length > 0
+      ? await prisma.order.findMany({
+          where: { id: { in: allWaveOrderIds }, tenantId },
+          select: {
+            id: true,
+            erpOrderId: true,
+            shippingLabel: true,
+            shippingLabelError: true,
+          },
+        })
+      : [];
+  const labelByOrderId = new Map(labelRows.map((o) => [o.id, o]));
+  for (const { wave } of waves.values()) {
+    const totals = totalsById.get(wave.id);
+    const ids = new Set<string>();
+    for (const l of totals?.lines ?? []) {
+      for (const a of l.allocations) ids.add(a.orderItem.orderId);
+    }
+    let ok = 0;
+    let failed = 0;
+    const errors: WaveQueue["labelErrors"] = [];
+    for (const orderId of ids) {
+      const row = labelByOrderId.get(orderId);
+      if (row?.shippingLabel) ok++;
+      else if (row?.shippingLabelError) {
+        failed++;
+        errors.push({
+          orderId,
+          erpOrderId: row.erpOrderId,
+          message: row.shippingLabelError,
+        });
+      }
+    }
+    wave.labelsOk = ok;
+    wave.labelsTotal = ids.size || wave.orderCount;
+    wave.labelsFailed = failed;
+    wave.labelErrors = errors;
+  }
+
   for (const { sortKey, wave } of waves.values()) {
     items.push({ kind: "wave", sortKey, wave });
   }

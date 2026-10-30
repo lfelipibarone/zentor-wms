@@ -815,6 +815,8 @@ model Order {
   /// Metadados de integração ERP
   customerName       String?
   shippingLabel      String?
+  /// Último erro ao gerar etiqueta Tiny (limpo quando OK)
+  shippingLabelError String?
   notes              String?
   /// Horário limite de coleta (ex.: Mercado Livre)
   collectionDeadline DateTime?

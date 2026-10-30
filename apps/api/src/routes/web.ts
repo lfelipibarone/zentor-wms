@@ -2162,6 +2162,25 @@ export async function webRoutes(app: FastifyInstance) {
     },
   );
 
+  app.post<{ Params: { waveId: string } }>(
+    "/api/packing/waves/:waveId/shipping-labels/ensure",
+    { preHandler: guard(Permission.SHIPPING_VIEW) },
+    async (request, reply) => {
+      try {
+        const { ensureWaveShippingLabelsNow } = await import(
+          "../services/ensure-shipping-labels.js"
+        );
+        return await ensureWaveShippingLabelsNow(
+          tenantWhere(request).tenantId,
+          request.params.waveId,
+        );
+      } catch (e) {
+        const message = e instanceof Error ? e.message : "Erro";
+        return reply.status(422).send({ error: message });
+      }
+    },
+  );
+
   app.get<{ Params: { lineId: string } }>(
     "/api/packing/waves/lines/:lineId",
     { preHandler: guard(Permission.SHIPPING_VIEW) },

@@ -1,18 +1,20 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
-import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { Tags } from "lucide-react";
+import { Suspense, useCallback, useEffect, useRef, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { Loader2, Printer, RefreshCw } from "lucide-react";
 import { PageHeader } from "@/components/ops/page-header";
 import { CollectionDeadlineIndicator } from "@/components/ops/collection-deadline-indicator";
 import { MarketplaceBadge } from "@/components/ops/marketplace-badge";
 import { MarketplaceFilter } from "@/components/ops/marketplace-filter";
 import { matchesMarketplaceFilter } from "@/lib/marketplace-filter-client";
 import { DataState } from "@/components/ops/data-state";
+import { PackingWaveConferencePanel } from "@/components/ops/packing-wave-conference-panel";
 import { apiFetch } from "@/lib/api/client";
 import { cn } from "@/lib/utils";
 import {
+  ensureWaveShippingLabels,
+  fetchLabelBatchOrders,
   fetchUnifiedPackingQueue,
   scanPackingBasket,
   type PackingOrder,
@@ -20,6 +22,8 @@ import {
   type PackingWaveQueueSummary,
 } from "@/lib/api/operations";
 import { fetchTenantApproachWaves, type ApproachWaveSummary } from "@/lib/api/approach-waves";
+import { fetchShippingLabelText } from "@/lib/shipping-label-file";
+import { printZplWithQz } from "@/lib/shipping-label-qz";
 
 type QueueFilter = "all" | "wave" | "order";
 
@@ -55,7 +59,18 @@ function filterItems(items: PackingQueueItem[], filter: QueueFilter) {
 }
 
 export default function PackingPage() {
+  return (
+    <Suspense fallback={null}>
+      <PackingHub />
+    </Suspense>
+  );
+}
+
+function PackingHub() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const lineFromUrl = searchParams.get("line");
+
   const [items, setItems] = useState<PackingQueueItem[]>([]);
   const [filter, setFilter] = useState<QueueFilter>("all");
   const [marketplace, setMarketplace] = useState("");
@@ -64,6 +79,8 @@ export default function PackingPage() {
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const [activeLineId, setActiveLineId] = useState<string | null>(lineFromUrl);
+  const [labelBusyWaveId, setLabelBusyWaveId] = useState<string | null>(null);
   const openingRef = useRef(false);
   const basketInputRef = useRef<HTMLInputElement>(null);
   const lastScanRef = useRef("");
@@ -71,6 +88,10 @@ export default function PackingPage() {
   const [zone, setZone] = useState(() =>
     typeof window === "undefined" ? "" : (window.localStorage.getItem(ZONE_STORAGE_KEY) ?? ""),
   );
+
+  useEffect(() => {
+    if (lineFromUrl) setActiveLineId(lineFromUrl);
+  }, [lineFromUrl]);
 
   useEffect(() => {
     fetchTenantApproachWaves("PACKING")
@@ -104,6 +125,21 @@ export default function PackingPage() {
   useEffect(() => {
     loadQueue();
   }, [loadQueue]);
+
+  // Poll leve enquanto painel aberto ou etiquetas incompletas
+  useEffect(() => {
+    const needsPoll = items.some(
+      (i) =>
+        i.kind === "wave" &&
+        i.wave.labelsTotal > 0 &&
+        i.wave.labelsOk < i.wave.labelsTotal,
+    );
+    if (!needsPoll && !activeLineId) return;
+    const t = setInterval(() => {
+      void loadQueue();
+    }, 8_000);
+    return () => clearInterval(t);
+  }, [items, activeLineId, loadQueue]);
 
   const goToOrder = useCallback(
     async (orderId: string) => {
@@ -168,6 +204,82 @@ export default function PackingPage() {
     if (code) void openOrderByBasketCode(code);
   };
 
+  const openLine = (lineId: string) => {
+    setActiveLineId(lineId);
+    router.replace(`/packing?line=${encodeURIComponent(lineId)}`, { scroll: false });
+  };
+
+  const closePanel = () => {
+    setActiveLineId(null);
+    router.replace("/packing", { scroll: false });
+  };
+
+  const retryWaveLabels = async (waveId: string) => {
+    setLabelBusyWaveId(waveId);
+    setMessage(null);
+    try {
+      const result = await ensureWaveShippingLabels(waveId);
+      setMessage(
+        result.failed.length === 0
+          ? `Etiquetas OK: ${result.ok}/${result.total}`
+          : `Etiquetas ${result.ok}/${result.total} · ${result.failed.length} com erro`,
+      );
+      await loadQueue();
+    } catch (e) {
+      setMessage(e instanceof Error ? e.message : "Falha ao gerar etiquetas");
+    } finally {
+      setLabelBusyWaveId(null);
+    }
+  };
+
+  const printWaveLabels = async (waveId: string, waveName: string) => {
+    setLabelBusyWaveId(waveId);
+    setMessage(null);
+    try {
+      const batch = await fetchLabelBatchOrders(waveId);
+      const withLabel = batch.orders.filter((o) => o.hasLabel);
+      if (withLabel.length === 0) {
+        setMessage("Nenhuma etiqueta pronta para imprimir nesta onda");
+        return;
+      }
+      const zpls: string[] = [];
+      let fail = 0;
+      for (const o of withLabel) {
+        try {
+          zpls.push((await fetchShippingLabelText(o.id)).trim());
+        } catch {
+          fail++;
+        }
+      }
+      if (zpls.length === 0) {
+        setMessage("Não foi possível baixar as etiquetas ZPL");
+        return;
+      }
+      try {
+        const { printer } = await printZplWithQz(zpls.join("\n"));
+        setMessage(
+          `${zpls.length} etiqueta(s) → ${printer}${fail ? ` · ${fail} falharam` : ""}`,
+        );
+      } catch (e) {
+        const blob = new Blob([zpls.join("\n")], { type: "text/plain" });
+        const a = document.createElement("a");
+        a.href = URL.createObjectURL(blob);
+        a.download = `etiquetas-${waveName.replace(/[^\w.-]+/g, "_")}.zpl`;
+        a.click();
+        const raw = e instanceof Error ? e.message : "";
+        setMessage(
+          /connection|websocket/i.test(raw) || !raw
+            ? `QZ Tray indisponível — baixei ${zpls.length} etiqueta(s)`
+            : raw,
+        );
+      }
+    } catch (e) {
+      setMessage(e instanceof Error ? e.message : "Erro ao imprimir");
+    } finally {
+      setLabelBusyWaveId(null);
+    }
+  };
+
   const visible = filterItems(items, filter).filter((entry) => {
     if (!marketplace) return true;
     if (entry.kind !== "order") return true;
@@ -194,7 +306,7 @@ export default function PackingPage() {
       </p>
       <input
         ref={basketInputRef}
-        autoFocus
+        autoFocus={!activeLineId}
         className="mt-3 w-full rounded-lg border px-3 py-3 text-lg font-mono"
         placeholder="Código de barras da cesta"
         value={basketScan}
@@ -217,22 +329,16 @@ export default function PackingPage() {
 
   return (
     <div className="mx-auto max-w-6xl space-y-6">
-      <div className="flex flex-wrap items-start justify-between gap-2">
-        <PageHeader title="Packing" description="Ondas primeiro, depois pedidos." />
-        <Link
-          href="/packing/etiquetas"
-          className="inline-flex items-center gap-1.5 rounded-lg border bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
-        >
-          <Tags className="h-4 w-4" />
-          Etiquetas em lote
-        </Link>
-      </div>
+      <PageHeader
+        title="Packing"
+        description="Fila, conferência e etiquetas na mesma tela."
+      />
 
       {message ? (
         <p className="rounded-lg bg-slate-100 px-3 py-2 text-sm">{message}</p>
       ) : null}
 
-      <div className="grid gap-6 lg:grid-cols-[1fr_min(320px,100%)] lg:items-start">
+      <div className="grid gap-6 lg:grid-cols-[1fr_min(380px,100%)] lg:items-start">
         <div className="order-2 space-y-4 lg:order-1">
           <div className="flex flex-wrap items-center gap-2">
             <MarketplaceFilter value={marketplace} onChange={setMarketplace} />
@@ -252,6 +358,14 @@ export default function PackingPage() {
                 <option value="none">Sem área</option>
               </select>
             ) : null}
+            <button
+              type="button"
+              onClick={() => void loadQueue()}
+              className="inline-flex items-center gap-1 rounded-lg border bg-white px-3 py-2 text-sm"
+            >
+              <RefreshCw className="h-3.5 w-3.5" />
+              Atualizar
+            </button>
           </div>
 
           <div className="flex flex-wrap gap-2">
@@ -284,8 +398,13 @@ export default function PackingPage() {
                   <WaveQueueCard
                     key={`wave-${entry.wave.id}`}
                     wave={entry.wave}
-                    onOpenWave={() => router.push(`/packing/ondas/${entry.wave.id}`)}
-                    onOpenLine={(lineId) => router.push(`/packing/waves/${lineId}`)}
+                    busy={labelBusyWaveId === entry.wave.id}
+                    activeLineId={activeLineId}
+                    onOpenLine={openLine}
+                    onRetryLabels={() => void retryWaveLabels(entry.wave.id)}
+                    onPrintLabels={() =>
+                      void printWaveLabels(entry.wave.id, entry.wave.name)
+                    }
                   />
                 ) : (
                   <button
@@ -314,6 +433,15 @@ export default function PackingPage() {
                           : ""}
                       </p>
                     ) : null}
+                    {entry.order.shippingLabelError ? (
+                      <p className="mt-1 text-xs font-medium text-red-700">
+                        Etiqueta: {entry.order.shippingLabelError}
+                      </p>
+                    ) : entry.order.shippingLabel ? (
+                      <p className="mt-1 text-xs font-medium text-emerald-700">
+                        Etiqueta pronta
+                      </p>
+                    ) : null}
                     <p className="mt-2 font-mono font-bold">{entry.order.erpOrderId}</p>
                     <div className="mt-1">
                       <MarketplaceBadge value={entry.order.marketplace} />
@@ -330,7 +458,17 @@ export default function PackingPage() {
           </DataState>
         </div>
 
-        <div className="order-1 lg:order-2">{basketForm}</div>
+        <div className="order-1 lg:order-2">
+          {activeLineId ? (
+            <PackingWaveConferencePanel
+              lineId={activeLineId}
+              onClose={closePanel}
+              onChanged={() => void loadQueue()}
+            />
+          ) : (
+            basketForm
+          )}
+        </div>
       </div>
     </div>
   );
@@ -351,18 +489,28 @@ type UnifiedReadyRow = {
 
 function WaveQueueCard({
   wave,
-  onOpenWave,
+  busy,
+  activeLineId,
   onOpenLine,
+  onRetryLabels,
+  onPrintLabels,
 }: {
   wave: PackingWaveQueueSummary;
-  onOpenWave: () => void;
+  busy: boolean;
+  activeLineId: string | null;
   onOpenLine: (lineId: string) => void;
+  onRetryLabels: () => void;
+  onPrintLabels: () => void;
 }) {
-  const pickedPct = wave.unitsTotal > 0 ? Math.round((wave.unitsPicked / wave.unitsTotal) * 100) : 0;
+  const pickedPct =
+    wave.unitsTotal > 0 ? Math.round((wave.unitsPicked / wave.unitsTotal) * 100) : 0;
   const ready = wave.readyLines.filter((l) => l.quantityPicked >= l.quantityTotal);
   const collecting = wave.readyLines.length - ready.length;
+  const labelsTotal = wave.labelsTotal ?? wave.orderCount;
+  const labelsOk = wave.labelsOk ?? 0;
+  const labelsFailed = wave.labelsFailed ?? 0;
+  const pendingLabels = Math.max(0, labelsTotal - labelsOk);
 
-  // Pedido × SKU na própria fila (sem ir para “onda completa”)
   const unifiedRows: UnifiedReadyRow[] = ready.flatMap((line) => {
     const allocs = (line.allocations ?? []).filter((a) => a.remaining > 0);
     if (allocs.length === 0) {
@@ -407,13 +555,52 @@ function WaveQueueCard({
       </div>
       <p className="mt-2 font-semibold">{wave.name}</p>
       <p className="text-sm text-muted-foreground">
-        {wave.orderCount} pedido(s) · coleta {wave.linesPicked}/{wave.linesTotal} itens · packing{" "}
+        {wave.orderCount} pedido(s) · coleta {wave.linesPicked}/{wave.linesTotal} · packing{" "}
         {wave.linesSorted}/{wave.linesTotal}
         {wave.pickerName ? ` · ${wave.pickerName}` : ""}
       </p>
       <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-amber-100">
         <div className="h-full rounded-full bg-amber-500" style={{ width: `${pickedPct}%` }} />
       </div>
+
+      <div className="mt-3 flex flex-wrap items-center gap-2">
+        <span
+          className={cn(
+            "rounded-md px-2 py-1 text-xs font-semibold",
+            labelsOk >= labelsTotal && labelsTotal > 0
+              ? "bg-emerald-100 text-emerald-800"
+              : labelsFailed > 0
+                ? "bg-red-100 text-red-800"
+                : "bg-white text-amber-900",
+          )}
+        >
+          Etiquetas {labelsOk}/{labelsTotal}
+          {labelsFailed > 0 ? ` · ${labelsFailed} erro` : pendingLabels > 0 ? " · gerando…" : ""}
+        </span>
+        <button
+          type="button"
+          disabled={busy}
+          onClick={onRetryLabels}
+          className="inline-flex items-center gap-1 rounded-lg border border-amber-300 bg-white px-2.5 py-1 text-xs font-semibold text-amber-900 disabled:opacity-50"
+        >
+          {busy ? <Loader2 className="h-3 w-3 animate-spin" /> : <RefreshCw className="h-3 w-3" />}
+          Gerar / retry
+        </button>
+        <button
+          type="button"
+          disabled={busy || labelsOk === 0}
+          onClick={onPrintLabels}
+          className="inline-flex items-center gap-1 rounded-lg border border-amber-300 bg-white px-2.5 py-1 text-xs font-semibold text-amber-900 disabled:opacity-50"
+        >
+          <Printer className="h-3 w-3" />
+          Imprimir
+        </button>
+      </div>
+      {(wave.labelErrors ?? []).slice(0, 2).map((err) => (
+        <p key={err.orderId} className="mt-1 text-xs text-red-700">
+          {err.erpOrderId}: {err.message}
+        </p>
+      ))}
 
       <p className="mt-3 text-xs font-semibold uppercase text-amber-900">
         Pedidos × itens ({unifiedRows.length})
@@ -429,7 +616,10 @@ function WaveQueueCard({
             key={row.key}
             type="button"
             onClick={() => onOpenLine(row.lineId)}
-            className="flex w-full items-center justify-between gap-2 rounded-lg border border-amber-200 bg-white px-3 py-2 text-left text-sm transition hover:border-amber-400"
+            className={cn(
+              "flex w-full items-center justify-between gap-2 rounded-lg border border-amber-200 bg-white px-3 py-2 text-left text-sm transition hover:border-amber-400",
+              activeLineId === row.lineId && "border-[#0d9488] ring-1 ring-[#0d9488]",
+            )}
           >
             <span className="min-w-0">
               <span className="font-mono font-semibold">{row.erpOrderId}</span>
@@ -450,17 +640,9 @@ function WaveQueueCard({
           </button>
         ))}
         {hidden > 0 ? (
-          <p className="px-1 text-xs text-muted-foreground">+{hidden} na onda completa</p>
+          <p className="px-1 text-xs text-muted-foreground">+{hidden} itens nesta onda</p>
         ) : null}
       </div>
-
-      <button
-        type="button"
-        onClick={onOpenWave}
-        className="mt-3 w-full rounded-lg border border-amber-300 bg-white py-2 text-sm font-semibold text-amber-900 transition hover:bg-amber-100"
-      >
-        Ver onda completa · etiquetas
-      </button>
     </div>
   );
 }

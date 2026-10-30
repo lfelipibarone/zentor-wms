@@ -354,7 +354,7 @@ export async function fetchShippingLabelsForOrder(params: {
 
   await prisma.order.update({
     where: { id: order.id },
-    data: { shippingLabel: urls[0] },
+    data: { shippingLabel: urls[0], shippingLabelError: null },
   });
 
   return {

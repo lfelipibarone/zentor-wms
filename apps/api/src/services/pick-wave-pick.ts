@@ -220,6 +220,11 @@ export async function confirmConsolidatedPick(input: ConsolidatedPickInput) {
         await checkOrderComplete(orderId, line.wave.tenantId, input.userId, tx);
       }
     });
+    // Gera etiqueta de TODOS os pedidos da onda (ex.: 10/10) em background
+    const { scheduleWaveShippingLabels } = await import(
+      "./ensure-shipping-labels.js"
+    );
+    scheduleWaveShippingLabels(line.wave.tenantId, line.waveId);
   }
 
   return {
