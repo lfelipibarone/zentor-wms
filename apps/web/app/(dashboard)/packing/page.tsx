@@ -30,6 +30,9 @@ type QueueFilter = "all" | "wave" | "order";
 
 const ZONE_STORAGE_KEY = "packing.approachWaveId";
 const WAVE_ROW_LIMIT = 12;
+/** Pedido | SKU | Cesta | Local | Qtd | Ações — mesmas colunas no header e nas linhas */
+const WAVE_GRID_COLS =
+  "minmax(120px,1.1fr) minmax(120px,1.2fr) minmax(72px,0.7fr) minmax(88px,0.8fr) 88px 188px";
 
 function normalizeBasketCode(code: string) {
   return code.trim().toLowerCase();
@@ -637,113 +640,100 @@ function WaveStationBlock({
         <p className="px-4 py-6 text-sm text-slate-500">Nenhum item pendente nesta onda.</p>
       ) : (
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[860px] table-fixed border-collapse text-sm">
-            <colgroup>
-              <col className="w-[18%]" />
-              <col className="w-[20%]" />
-              <col className="w-[12%]" />
-              <col className="w-[14%]" />
-              <col className="w-[12%]" />
-              <col className="w-[24%]" />
-            </colgroup>
-            <thead>
-              <tr className="border-b border-slate-100 bg-slate-50/80 text-[11px] uppercase tracking-wide text-slate-500">
-                <th className="px-3 py-2.5 text-left font-semibold">Pedido</th>
-                <th className="px-3 py-2.5 text-left font-semibold">SKU</th>
-                <th className="px-3 py-2.5 text-left font-semibold">Cesta</th>
-                <th className="px-3 py-2.5 text-left font-semibold">Local</th>
-                <th className="px-3 py-2.5 text-left font-semibold">Qtd</th>
-                <th className="px-3 py-2.5 text-left font-semibold">Ações</th>
-              </tr>
-            </thead>
-            <tbody>
-              {shown.map((row) => {
-                const qtyStr = qtyByKey[row.key] ?? String(row.remaining);
-                const parsed = parseInt(qtyStr, 10);
-                const qtyValid =
-                  !Number.isNaN(parsed) && parsed > 0 && parsed <= row.remaining;
-                const busyRow = rowBusy === row.key;
+          {/* grid em vez de <table>: evita th/td desalinhados com input+botões */}
+          <div className="min-w-[900px]">
+            <div
+              className="grid items-center gap-x-3 border-b border-slate-100 bg-slate-50/80 px-3 py-2.5 text-[11px] font-semibold uppercase tracking-wide text-slate-500"
+              style={{ gridTemplateColumns: WAVE_GRID_COLS }}
+            >
+              <span>Pedido</span>
+              <span>SKU</span>
+              <span>Cesta</span>
+              <span>Local</span>
+              <span>Qtd</span>
+              <span>Ações</span>
+            </div>
+            {shown.map((row) => {
+              const qtyStr = qtyByKey[row.key] ?? String(row.remaining);
+              const parsed = parseInt(qtyStr, 10);
+              const qtyValid =
+                !Number.isNaN(parsed) && parsed > 0 && parsed <= row.remaining;
+              const busyRow = rowBusy === row.key;
 
-                return (
-                  <tr
-                    key={row.key}
-                    className="border-b border-slate-100 last:border-0 hover:bg-slate-50/80"
+              return (
+                <div
+                  key={row.key}
+                  className="grid items-center gap-x-3 border-b border-slate-100 px-3 py-2 last:border-0 hover:bg-slate-50/80"
+                  style={{ gridTemplateColumns: WAVE_GRID_COLS }}
+                >
+                  <span className="truncate font-mono text-sm font-semibold text-slate-900">
+                    {row.erpOrderId}
+                  </span>
+                  <span
+                    className="truncate font-mono text-sm text-slate-700"
+                    title={row.sku}
                   >
-                    <td className="truncate px-3 py-2.5 align-middle font-mono font-semibold text-slate-900">
-                      {row.erpOrderId}
-                    </td>
-                    <td
-                      className="truncate px-3 py-2.5 align-middle font-mono text-slate-700"
-                      title={row.sku}
+                    {row.sku}
+                  </span>
+                  <span className="truncate font-mono text-sm tabular-nums text-slate-600">
+                    {row.basketCode ?? "—"}
+                  </span>
+                  <span
+                    className="truncate text-sm text-slate-500"
+                    title={row.routeLabel}
+                  >
+                    {row.routeLabel}
+                  </span>
+                  <div className="flex h-8 items-center gap-1">
+                    <input
+                      type="number"
+                      inputMode="numeric"
+                      min={1}
+                      max={row.remaining}
+                      value={qtyStr}
+                      disabled={busyRow}
+                      onChange={(e) =>
+                        setQtyByKey((prev) => ({
+                          ...prev,
+                          [row.key]: e.target.value,
+                        }))
+                      }
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") {
+                          e.preventDefault();
+                          handleConfirm(row);
+                        }
+                      }}
+                      aria-label={`Quantidade ${row.erpOrderId} ${row.sku}`}
+                      className="h-8 w-12 rounded-md border border-slate-300 bg-white px-1 text-center text-sm font-semibold tabular-nums outline-none focus:border-[#0d9488] focus:ring-1 focus:ring-[#0d9488]"
+                    />
+                    <span className="text-xs tabular-nums text-slate-400">
+                      /{row.remaining}
+                    </span>
+                  </div>
+                  <div className="flex h-8 items-center gap-1.5">
+                    <button
+                      type="button"
+                      disabled={busyRow || !qtyValid}
+                      onClick={() => handleConfirm(row)}
+                      className="inline-flex h-8 w-[88px] items-center justify-center gap-1 rounded-md bg-[#0d9488] text-xs font-semibold text-white hover:bg-teal-700 disabled:opacity-40"
                     >
-                      {row.sku}
-                    </td>
-                    <td className="truncate px-3 py-2.5 align-middle font-mono tabular-nums text-slate-600">
-                      {row.basketCode ?? "—"}
-                    </td>
-                    <td
-                      className="truncate px-3 py-2.5 align-middle text-slate-500"
-                      title={row.routeLabel}
+                      {busyRow ? <Loader2 className="h-3 w-3 animate-spin" /> : null}
+                      Conferir
+                    </button>
+                    <button
+                      type="button"
+                      disabled={busyRow}
+                      onClick={() => openReport(row)}
+                      className="inline-flex h-8 w-[88px] items-center justify-center rounded-md border border-red-300 text-xs font-semibold text-red-700 hover:bg-red-50 disabled:opacity-40"
                     >
-                      {row.routeLabel}
-                    </td>
-                    <td className="px-3 py-2.5 align-middle">
-                      <div className="flex items-center gap-1.5">
-                        <input
-                          type="number"
-                          inputMode="numeric"
-                          min={1}
-                          max={row.remaining}
-                          value={qtyStr}
-                          disabled={busyRow}
-                          onChange={(e) =>
-                            setQtyByKey((prev) => ({
-                              ...prev,
-                              [row.key]: e.target.value,
-                            }))
-                          }
-                          onKeyDown={(e) => {
-                            if (e.key === "Enter") {
-                              e.preventDefault();
-                              handleConfirm(row);
-                            }
-                          }}
-                          aria-label={`Quantidade ${row.erpOrderId} ${row.sku}`}
-                          className="h-8 w-14 shrink-0 rounded-md border border-slate-300 bg-white px-1.5 text-center text-sm font-semibold tabular-nums outline-none focus:border-[#0d9488] focus:ring-1 focus:ring-[#0d9488]"
-                        />
-                        <span className="shrink-0 text-xs tabular-nums text-slate-400">
-                          / {row.remaining}
-                        </span>
-                      </div>
-                    </td>
-                    <td className="px-3 py-2.5 align-middle">
-                      <div className="flex items-center gap-1.5 whitespace-nowrap">
-                        <button
-                          type="button"
-                          disabled={busyRow || !qtyValid}
-                          onClick={() => handleConfirm(row)}
-                          className="inline-flex h-8 min-w-[5.5rem] items-center justify-center gap-1 rounded-md bg-[#0d9488] px-2.5 text-xs font-semibold text-white hover:bg-teal-700 disabled:opacity-40"
-                        >
-                          {busyRow ? (
-                            <Loader2 className="h-3 w-3 animate-spin" />
-                          ) : null}
-                          Conferir
-                        </button>
-                        <button
-                          type="button"
-                          disabled={busyRow}
-                          onClick={() => openReport(row)}
-                          className="inline-flex h-8 min-w-[5.5rem] items-center justify-center rounded-md border border-red-300 px-2.5 text-xs font-semibold text-red-700 hover:bg-red-50 disabled:opacity-40"
-                        >
-                          Reportar
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
+                      Reportar
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
         </div>
       )}
 
