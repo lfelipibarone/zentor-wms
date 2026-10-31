@@ -151,6 +151,29 @@ export function PackingOrderInline({
       setOrder(updated);
       syncQty(updated);
       packedProgressRef.current = updated.items.some((i) => i.quantityPacked > 0);
+      if (updated.allPacked) {
+        setRowBusy(null);
+        setSaving(true);
+        try {
+          await labelPanelRef.current?.ensureAndPrint();
+          await apiFetch(`/api/packing/orders/${order.id}/complete`, {
+            method: "POST",
+            body: "{}",
+          });
+          packedProgressRef.current = true;
+          onMessage(`Pedido ${updated.erpOrderId} finalizado · etiqueta impressa`);
+          onFinished();
+        } catch (err) {
+          onMessage(
+            err instanceof Error
+              ? `Itens OK · finalize/etiqueta: ${err.message}`
+              : "Itens OK · falha ao finalizar/imprimir",
+          );
+        } finally {
+          setSaving(false);
+        }
+        return;
+      }
       onMessage(`${quantity} un. conferida(s)`);
     } catch (err) {
       onMessage(err instanceof Error ? err.message : "Erro ao confirmar");

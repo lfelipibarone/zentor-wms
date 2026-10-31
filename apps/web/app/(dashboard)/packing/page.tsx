@@ -25,6 +25,7 @@ import {
 import { fetchTenantApproachWaves, type ApproachWaveSummary } from "@/lib/api/approach-waves";
 import { fetchShippingLabelText } from "@/lib/shipping-label-file";
 import { printZplWithQz } from "@/lib/shipping-label-qz";
+import { ensureAndPrintOrderShippingLabel } from "@/lib/print-order-shipping-label";
 
 type QueueFilter = "all" | "wave" | "order";
 
@@ -446,6 +447,7 @@ type UnifiedReadyRow = {
   key: string;
   lineId: string;
   allocationId: string;
+  orderId: string;
   erpOrderId: string;
   basketCode: string | null;
   sku: string;
@@ -457,6 +459,7 @@ type UnifiedReadyRow = {
 };
 
 type OrderGroup = {
+  orderId: string;
   erpOrderId: string;
   basketCode: string | null;
   rows: UnifiedReadyRow[];
@@ -503,6 +506,7 @@ function WaveStationBlock({
       key: `${line.id}-${a.id}`,
       lineId: line.id,
       allocationId: a.id,
+      orderId: a.orderId,
       erpOrderId: a.erpOrderId,
       basketCode: a.basketCode,
       sku: line.sku,
@@ -517,12 +521,13 @@ function WaveStationBlock({
   const orderGroups: OrderGroup[] = useMemo(() => {
     const map = new Map<string, OrderGroup>();
     for (const row of unifiedRows) {
-      const existing = map.get(row.erpOrderId);
+      const existing = map.get(row.orderId);
       if (existing) {
         existing.rows.push(row);
         if (!existing.basketCode && row.basketCode) existing.basketCode = row.basketCode;
       } else {
-        map.set(row.erpOrderId, {
+        map.set(row.orderId, {
+          orderId: row.orderId,
           erpOrderId: row.erpOrderId,
           basketCode: row.basketCode,
           rows: [row],
@@ -536,6 +541,7 @@ function WaveStationBlock({
 
   const [qtyByKey, setQtyByKey] = useState<Record<string, string>>({});
   const [rowBusy, setRowBusy] = useState<string | null>(null);
+  const [printBusyOrderId, setPrintBusyOrderId] = useState<string | null>(null);
   const [reporting, setReporting] = useState<ReportState | null>(null);
 
   useEffect(() => {
@@ -552,19 +558,55 @@ function WaveStationBlock({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [unifiedRows.map((r) => `${r.key}:${r.remaining}`).join("|")]);
 
+  const printOrderLabel = async (orderId: string, erpOrderId: string) => {
+    setPrintBusyOrderId(orderId);
+    onMessage(null);
+    try {
+      const { printer } = await ensureAndPrintOrderShippingLabel(orderId);
+      onMessage(`Pedido ${erpOrderId} · etiqueta → ${printer}`);
+      onChanged();
+    } catch (e) {
+      onMessage(
+        e instanceof Error
+          ? `Pedido ${erpOrderId}: ${e.message}`
+          : `Pedido ${erpOrderId}: falha ao imprimir etiqueta`,
+      );
+    } finally {
+      setPrintBusyOrderId(null);
+    }
+  };
+
   const confirmRow = async (row: UnifiedReadyRow, quantity: number) => {
     setRowBusy(row.key);
     onMessage(null);
     try {
-      await apiFetch(`/api/packing/waves/lines/${row.lineId}/sort`, {
+      const result = await apiFetch<{
+        orderCompleted?: boolean;
+        orderId?: string;
+        erpOrderId?: string;
+      }>(`/api/packing/waves/lines/${row.lineId}/sort`, {
         method: "POST",
         body: JSON.stringify({
           allocationId: row.allocationId,
           quantity,
         }),
       });
-      onMessage(`Conferido ${row.erpOrderId} · ${row.sku} · ${quantity} un.`);
       onChanged();
+      if (result.orderCompleted && result.orderId) {
+        const erp = result.erpOrderId ?? row.erpOrderId;
+        try {
+          const { printer } = await ensureAndPrintOrderShippingLabel(result.orderId);
+          onMessage(`Pedido ${erp} conferido · etiqueta → ${printer}`);
+        } catch (e) {
+          onMessage(
+            e instanceof Error
+              ? `Pedido ${erp} conferido · etiqueta: ${e.message}`
+              : `Pedido ${erp} conferido · falha ao imprimir etiqueta`,
+          );
+        }
+      } else {
+        onMessage(`Conferido ${row.erpOrderId} · ${row.sku} · ${quantity} un.`);
+      }
     } catch (e) {
       onMessage(e instanceof Error ? e.message : "Erro na conferência");
     } finally {
@@ -685,7 +727,7 @@ function WaveStationBlock({
       ) : (
         <div className="divide-y divide-slate-200">
           {orderGroups.map((group) => (
-            <div key={group.erpOrderId} className="bg-white">
+            <div key={group.orderId} className="bg-white">
               <div className="flex flex-wrap items-center gap-2 border-b border-slate-100 bg-slate-50 px-4 py-2.5">
                 <span className="rounded-md bg-white px-2 py-0.5 text-[11px] font-bold uppercase tracking-wide text-slate-600 ring-1 ring-slate-200">
                   Pedido
@@ -693,11 +735,25 @@ function WaveStationBlock({
                 <span className="font-mono text-sm font-bold text-slate-900">
                   {group.erpOrderId}
                 </span>
-                <span className="text-sm text-slate-500">
+                <span className="min-w-0 flex-1 text-sm text-slate-500">
                   {group.basketCode ? `cesta ${group.basketCode}` : "sem cesta"}
                   {" · "}
                   {group.rows.length} item(ns)
                 </span>
+                <button
+                  type="button"
+                  disabled={busy || printBusyOrderId === group.orderId || rowBusy !== null}
+                  onClick={() => void printOrderLabel(group.orderId, group.erpOrderId)}
+                  className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+                  title="Gera a etiqueta se faltar e imprime"
+                >
+                  {printBusyOrderId === group.orderId ? (
+                    <Loader2 className="h-3 w-3 animate-spin" />
+                  ) : (
+                    <Printer className="h-3 w-3" />
+                  )}
+                  Imprimir
+                </button>
               </div>
 
               <div className="overflow-x-auto">

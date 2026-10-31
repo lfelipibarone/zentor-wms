@@ -1,12 +1,15 @@
 import { OrderStatus, PickWaveLineSortStatus, PickWaveStatus } from "@prisma/client";
+import { Permission } from "@wms/shared";
 import { prisma } from "../lib/prisma.js";
 import { PickWaveError, assertWaveOperatorForMutation } from "./pick-wave.js";
 import { recordOrderStageChange } from "./order-stage-log.js";
 import {
+  ensureDispatchStartLog,
   ensurePackEndLog,
   ensurePackStartLog,
   ensurePickingEndLog,
 } from "./order-time-log-helpers.js";
+import { notifyUsersWithPermission } from "./notifications.js";
 
 export interface SortAllocationInput {
   lineId: string;
@@ -48,22 +51,45 @@ export async function checkOrderComplete(
   await ensurePickingEndLog(tx, orderId, userId);
 }
 
-async function checkOrderSortComplete(
+/** Quando todas as alocações do pedido estão sorted → PACK_END + DISPATCHING. */
+async function finalizeOrderIfFullySorted(
   orderId: string,
+  tenantId: string,
   userId: string,
   tx: Parameters<Parameters<typeof prisma.$transaction>[0]>[0],
-) {
+): Promise<boolean> {
   const allocations = await tx.pickWaveAllocation.findMany({
     where: { orderItem: { orderId } },
   });
-  if (allocations.length === 0) return;
+  if (allocations.length === 0) return false;
 
-  const allSorted = allocations.every(
-    (a) => a.quantitySorted >= a.quantity,
-  );
-  if (!allSorted) return;
+  const allSorted = allocations.every((a) => a.quantitySorted >= a.quantity);
+  if (!allSorted) return false;
 
   await ensurePackEndLog(tx, orderId, userId);
+
+  const order = await tx.order.findUnique({ where: { id: orderId } });
+  if (!order) return false;
+  if (
+    order.status === OrderStatus.DISPATCHING ||
+    order.status === OrderStatus.DISPATCHED
+  ) {
+    return true;
+  }
+
+  await tx.order.update({
+    where: { id: orderId },
+    data: { status: OrderStatus.DISPATCHING },
+  });
+  await recordOrderStageChange(tx, {
+    tenantId,
+    orderId,
+    fromStatus: order.status,
+    toStatus: OrderStatus.DISPATCHING,
+    userId,
+  });
+  await ensureDispatchStartLog(tx, orderId, userId);
+  return true;
 }
 
 export async function confirmSortAllocation(input: SortAllocationInput) {
@@ -137,7 +163,9 @@ export async function confirmSortAllocation(input: SortAllocationInput) {
   const allocComplete = newSorted >= alloc.quantity;
   const now = new Date();
   const orderId = alloc.orderItem.orderId;
+  const erpOrderId = alloc.orderItem.order.erpOrderId;
   const tenantId = line.wave.tenantId;
+  let orderCompleted = false;
 
   await prisma.$transaction(async (tx) => {
     await ensurePackStartLog(tx, orderId, input.userId);
@@ -151,6 +179,22 @@ export async function confirmSortAllocation(input: SortAllocationInput) {
         ...(allocComplete ? { sortCompletedAt: now } : {}),
       },
     });
+
+    const orderItem = await tx.orderItem.findUnique({
+      where: { id: alloc.orderItemId },
+    });
+    if (orderItem) {
+      const nextPacked = Math.min(
+        orderItem.quantityPicked,
+        orderItem.quantityPacked + quantity,
+      );
+      if (nextPacked !== orderItem.quantityPacked) {
+        await tx.orderItem.update({
+          where: { id: orderItem.id },
+          data: { quantityPacked: nextPacked },
+        });
+      }
+    }
 
     if (basketId && alloc.orderItem.order.basketId !== basketId) {
       await tx.order.update({
@@ -173,8 +217,22 @@ export async function confirmSortAllocation(input: SortAllocationInput) {
     }
 
     await checkOrderComplete(orderId, tenantId, input.userId, tx);
-    await checkOrderSortComplete(orderId, input.userId, tx);
+    orderCompleted = await finalizeOrderIfFullySorted(
+      orderId,
+      tenantId,
+      input.userId,
+      tx,
+    );
   });
+
+  if (orderCompleted) {
+    await notifyUsersWithPermission(Permission.SHIPPING_VIEW, {
+      title: "Pedido pronto para expedir",
+      body: `${erpOrderId} aguarda despacho.`,
+      category: "SHIPPING",
+      data: { orderId, erpOrderId },
+    });
+  }
 
   const updatedAlloc = await prisma.pickWaveAllocation.findUnique({
     where: { id: alloc.id },
@@ -193,6 +251,9 @@ export async function confirmSortAllocation(input: SortAllocationInput) {
       updatedAlloc!.quantity - updatedAlloc!.quantitySorted,
     lineSortStatus: updatedLine!.sortStatus,
     basketCode: updatedAlloc!.orderItem.order.basket?.code ?? null,
+    orderId,
+    erpOrderId,
     orderStatus: updatedAlloc!.orderItem.order.status,
+    orderCompleted,
   };
 }

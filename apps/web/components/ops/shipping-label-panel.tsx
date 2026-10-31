@@ -3,11 +3,8 @@
 import { useCallback, useEffect, useImperativeHandle, useRef, useState, forwardRef } from "react";
 import { Loader2, Printer, RefreshCw } from "lucide-react";
 import { apiFetch } from "@/lib/api/client";
-import {
-  fetchShippingLabelPreviewBlob,
-  fetchShippingLabelText,
-} from "@/lib/shipping-label-file";
-import { printZplWithQz } from "@/lib/shipping-label-qz";
+import { fetchShippingLabelPreviewBlob } from "@/lib/shipping-label-file";
+import { ensureAndPrintOrderShippingLabel } from "@/lib/print-order-shipping-label";
 
 export type ShippingLabelApiResult = {
   status: string;
@@ -149,36 +146,16 @@ export const ShippingLabelPanel = forwardRef<ShippingLabelPanelHandle, Props>(
       }
     }, [initialUrl, loadPreview]);
 
-    const handlePrintThermal = useCallback(async () => {
-      setPrintLoading(true);
-      setLabelMessage(null);
-      try {
-        const zpl = await fetchShippingLabelText(orderId);
-        const { printer } = await printZplWithQz(zpl);
-        setLabelMessage(`Enviado para impressora ${printer}`);
-      } catch (e) {
-        const msg =
-          e instanceof Error ? e.message : "Erro ao imprimir na térmica";
-        setLabelMessage(msg);
-        throw e instanceof Error ? e : new Error(msg);
-      } finally {
-        setPrintLoading(false);
-      }
-    }, [orderId]);
-
     useImperativeHandle(
       ref,
       () => ({
         ensureAndPrint: async () => {
-          const has =
-            labelUrls.length > 0 || Boolean(initialUrl);
-          if (!has) {
-            await handleFetch(false);
-          }
-          await handlePrintThermal();
+          const { printer } = await ensureAndPrintOrderShippingLabel(orderId);
+          setLabelMessage(`Enviado para impressora ${printer}`);
+          await loadPreview(false);
         },
       }),
-      [labelUrls.length, initialUrl, handleFetch, handlePrintThermal],
+      [orderId, loadPreview],
     );
 
     const hasLabel = labelUrls.length > 0 || Boolean(initialUrl);
@@ -255,33 +232,48 @@ export const ShippingLabelPanel = forwardRef<ShippingLabelPanelHandle, Props>(
             {labelLoading ? "Criando…" : "Criar Etiqueta"}
           </button>
 
-          {hasLabel ? (
-            <>
-              <button
-                type="button"
-                disabled={busy}
-                onClick={() => void handlePrintThermal().catch(() => {})}
-                title="Opcional: requer QZ Tray instalado na estação"
-                className="inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-sm font-medium text-muted-foreground disabled:opacity-50"
-              >
-                {printLoading ? (
-                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                ) : (
-                  <Printer className="h-3.5 w-3.5" />
-                )}
-                Imprimir térmica
-              </button>
+          <button
+            type="button"
+            disabled={busy}
+            onClick={() => {
+              void (async () => {
+                setPrintLoading(true);
+                setLabelMessage(null);
+                try {
+                  const { printer } =
+                    await ensureAndPrintOrderShippingLabel(orderId);
+                  setLabelMessage(`Enviado para impressora ${printer}`);
+                  await loadPreview(false);
+                } catch (e) {
+                  setLabelMessage(
+                    e instanceof Error ? e.message : "Erro ao imprimir",
+                  );
+                } finally {
+                  setPrintLoading(false);
+                }
+              })();
+            }}
+            title="Gera a etiqueta se faltar e imprime na térmica (QZ Tray)"
+            className="inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-sm font-medium disabled:opacity-50"
+          >
+            {printLoading ? (
+              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+            ) : (
+              <Printer className="h-3.5 w-3.5" />
+            )}
+            Imprimir
+          </button>
 
-              <button
-                type="button"
-                disabled={busy}
-                onClick={() => void handleFetch(true).catch(() => {})}
-                className="inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-sm font-medium disabled:opacity-50"
-              >
-                <RefreshCw className="h-3.5 w-3.5" />
-                Atualizar
-              </button>
-            </>
+          {hasLabel ? (
+            <button
+              type="button"
+              disabled={busy}
+              onClick={() => void handleFetch(true).catch(() => {})}
+              className="inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-sm font-medium disabled:opacity-50"
+            >
+              <RefreshCw className="h-3.5 w-3.5" />
+              Atualizar
+            </button>
           ) : null}
         </div>
       </div>
