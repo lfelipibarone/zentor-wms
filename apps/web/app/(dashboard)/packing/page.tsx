@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Loader2, Printer, RefreshCw, ScanBarcode } from "lucide-react";
+import { Check, Loader2, Printer, RefreshCw, ScanBarcode, X } from "lucide-react";
 import { PageHeader } from "@/components/ops/page-header";
 import { CollectionDeadlineIndicator } from "@/components/ops/collection-deadline-indicator";
 import { MarketplaceBadge } from "@/components/ops/marketplace-badge";
@@ -305,7 +305,14 @@ export default function PackingPage() {
       />
 
       {message ? (
-        <p className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm text-slate-700">
+        <p
+          className={cn(
+            "rounded-xl border px-4 py-2.5 text-sm font-medium",
+            /falha|erro|indispon/i.test(message)
+              ? "border-amber-200 bg-amber-50 text-amber-950"
+              : "border-emerald-200 bg-emerald-50 text-emerald-900",
+          )}
+        >
           {message}
         </p>
       ) : null}
@@ -463,6 +470,15 @@ type OrderGroup = {
   erpOrderId: string;
   basketCode: string | null;
   rows: UnifiedReadyRow[];
+  pendingCount: number;
+};
+
+type JustDoneOrder = {
+  orderId: string;
+  erpOrderId: string;
+  basketCode: string | null;
+  labelOk: boolean;
+  labelDetail: string;
 };
 
 type ReportState = {
@@ -500,8 +516,21 @@ function WaveStationBlock({
   const labelsFailed = wave.labelsFailed ?? 0;
   const pendingLabels = Math.max(0, labelsTotal - labelsOk);
 
+  const pendingOrderIds = useMemo(() => {
+    const ids = new Set<string>();
+    for (const line of ready) {
+      for (const a of line.allocations ?? []) {
+        if (a.remaining > 0) ids.add(a.orderId);
+      }
+    }
+    return ids;
+  }, [ready]);
+
+  /** Pendentes + já conferidos do mesmo pedido (não some da tela). */
   const unifiedRows: UnifiedReadyRow[] = ready.flatMap((line) => {
-    const allocs = (line.allocations ?? []).filter((a) => a.remaining > 0);
+    const allocs = (line.allocations ?? []).filter(
+      (a) => a.remaining > 0 || pendingOrderIds.has(a.orderId),
+    );
     return allocs.map((a) => ({
       key: `${line.id}-${a.id}`,
       lineId: line.id,
@@ -524,6 +553,7 @@ function WaveStationBlock({
       const existing = map.get(row.orderId);
       if (existing) {
         existing.rows.push(row);
+        if (row.remaining > 0) existing.pendingCount += 1;
         if (!existing.basketCode && row.basketCode) existing.basketCode = row.basketCode;
       } else {
         map.set(row.orderId, {
@@ -531,6 +561,7 @@ function WaveStationBlock({
           erpOrderId: row.erpOrderId,
           basketCode: row.basketCode,
           rows: [row],
+          pendingCount: row.remaining > 0 ? 1 : 0,
         });
       }
     }
@@ -543,11 +574,13 @@ function WaveStationBlock({
   const [rowBusy, setRowBusy] = useState<string | null>(null);
   const [printBusyOrderId, setPrintBusyOrderId] = useState<string | null>(null);
   const [reporting, setReporting] = useState<ReportState | null>(null);
+  const [justDone, setJustDone] = useState<JustDoneOrder[]>([]);
 
   useEffect(() => {
     setQtyByKey((prev) => {
       const next: Record<string, string> = {};
       for (const row of unifiedRows) {
+        if (row.remaining <= 0) continue;
         next[row.key] =
           prev[row.key] !== undefined && prev[row.key] !== ""
             ? prev[row.key]
@@ -564,12 +597,24 @@ function WaveStationBlock({
     try {
       const { printer } = await ensureAndPrintOrderShippingLabel(orderId);
       onMessage(`Pedido ${erpOrderId} · etiqueta → ${printer}`);
+      setJustDone((prev) =>
+        prev.map((o) =>
+          o.orderId === orderId
+            ? { ...o, labelOk: true, labelDetail: `impressa · ${printer}` }
+            : o,
+        ),
+      );
       onChanged();
     } catch (e) {
-      onMessage(
-        e instanceof Error
-          ? `Pedido ${erpOrderId}: ${e.message}`
-          : `Pedido ${erpOrderId}: falha ao imprimir etiqueta`,
+      const detail =
+        e instanceof Error ? e.message : "falha ao imprimir etiqueta";
+      onMessage(`Pedido ${erpOrderId}: ${detail}`);
+      setJustDone((prev) =>
+        prev.map((o) =>
+          o.orderId === orderId
+            ? { ...o, labelOk: false, labelDetail: detail }
+            : o,
+        ),
       );
     } finally {
       setPrintBusyOrderId(null);
@@ -594,18 +639,30 @@ function WaveStationBlock({
       onChanged();
       if (result.orderCompleted && result.orderId) {
         const erp = result.erpOrderId ?? row.erpOrderId;
+        let labelOk = false;
+        let labelDetail = "aguardando impressão";
         try {
           const { printer } = await ensureAndPrintOrderShippingLabel(result.orderId);
-          onMessage(`Pedido ${erp} conferido · etiqueta → ${printer}`);
+          labelOk = true;
+          labelDetail = `etiqueta → ${printer}`;
+          onMessage(`Pedido ${erp} conferido · ${labelDetail}`);
         } catch (e) {
-          onMessage(
-            e instanceof Error
-              ? `Pedido ${erp} conferido · etiqueta: ${e.message}`
-              : `Pedido ${erp} conferido · falha ao imprimir etiqueta`,
-          );
+          labelDetail =
+            e instanceof Error ? e.message : "falha ao imprimir etiqueta";
+          onMessage(`Pedido ${erp} conferido · etiqueta: ${labelDetail}`);
         }
+        setJustDone((prev) => [
+          {
+            orderId: result.orderId!,
+            erpOrderId: erp,
+            basketCode: row.basketCode,
+            labelOk,
+            labelDetail,
+          },
+          ...prev.filter((o) => o.orderId !== result.orderId),
+        ]);
       } else {
-        onMessage(`Conferido ${row.erpOrderId} · ${row.sku} · ${quantity} un.`);
+        onMessage(`✓ Conferido ${row.erpOrderId} · ${row.sku} · ${quantity} un.`);
       }
     } catch (e) {
       onMessage(e instanceof Error ? e.message : "Erro na conferência");
@@ -722,9 +779,64 @@ function WaveStationBlock({
         </p>
       ))}
 
-      {orderGroups.length === 0 ? (
+      {justDone.length > 0 ? (
+        <div className="space-y-2 border-b border-emerald-100 bg-emerald-50/80 px-4 py-3">
+          {justDone.map((done) => (
+            <div
+              key={done.orderId}
+              className="flex flex-wrap items-center gap-2 rounded-xl border border-emerald-200 bg-white px-3 py-2.5"
+            >
+              <Check className="h-4 w-4 shrink-0 text-emerald-600" />
+              <div className="min-w-0 flex-1">
+                <p className="font-mono text-sm font-bold text-slate-900">
+                  {done.erpOrderId}
+                  <span className="ml-2 font-sans text-xs font-semibold uppercase tracking-wide text-emerald-700">
+                    Conferido
+                  </span>
+                </p>
+                <p
+                  className={cn(
+                    "text-xs",
+                    done.labelOk ? "text-emerald-700" : "text-amber-800",
+                  )}
+                >
+                  {done.basketCode ? `cesta ${done.basketCode} · ` : ""}
+                  {done.labelOk
+                    ? done.labelDetail
+                    : `Etiqueta: ${done.labelDetail}`}
+                </p>
+              </div>
+              <button
+                type="button"
+                disabled={busy || printBusyOrderId === done.orderId}
+                onClick={() => void printOrderLabel(done.orderId, done.erpOrderId)}
+                className="inline-flex items-center gap-1 rounded-lg bg-[#0d9488] px-2.5 py-1.5 text-xs font-semibold text-white hover:bg-teal-700 disabled:opacity-50"
+              >
+                {printBusyOrderId === done.orderId ? (
+                  <Loader2 className="h-3 w-3 animate-spin" />
+                ) : (
+                  <Printer className="h-3 w-3" />
+                )}
+                Imprimir
+              </button>
+              <button
+                type="button"
+                aria-label="Dispensar"
+                onClick={() =>
+                  setJustDone((prev) => prev.filter((o) => o.orderId !== done.orderId))
+                }
+                className="rounded-full p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-700"
+              >
+                <X className="h-3.5 w-3.5" />
+              </button>
+            </div>
+          ))}
+        </div>
+      ) : null}
+
+      {orderGroups.length === 0 && justDone.length === 0 ? (
         <p className="px-4 py-6 text-sm text-slate-500">Nenhum item pendente nesta onda.</p>
-      ) : (
+      ) : orderGroups.length === 0 ? null : (
         <div className="divide-y divide-slate-200">
           {orderGroups.map((group) => (
             <div key={group.orderId} className="bg-white">
@@ -738,7 +850,7 @@ function WaveStationBlock({
                 <span className="min-w-0 flex-1 text-sm text-slate-500">
                   {group.basketCode ? `cesta ${group.basketCode}` : "sem cesta"}
                   {" · "}
-                  {group.rows.length} item(ns)
+                  {group.pendingCount}/{group.rows.length} pendente(s)
                 </span>
                 <button
                   type="button"
@@ -768,6 +880,7 @@ function WaveStationBlock({
                     <span>Ações</span>
                   </div>
                   {group.rows.map((row) => {
+                    const done = row.remaining <= 0;
                     const qtyStr = qtyByKey[row.key] ?? String(row.remaining);
                     const parsed = parseInt(qtyStr, 10);
                     const qtyValid =
@@ -777,7 +890,10 @@ function WaveStationBlock({
                     return (
                       <div
                         key={row.key}
-                        className="grid items-center gap-x-3 border-b border-slate-50 px-3 py-2 last:border-0 hover:bg-slate-50/80"
+                        className={cn(
+                          "grid items-center gap-x-3 border-b border-slate-50 px-3 py-2 last:border-0",
+                          done ? "bg-emerald-50/70" : "hover:bg-slate-50/80",
+                        )}
                         style={{ gridTemplateColumns: WAVE_ITEM_COLS }}
                       >
                         <span
@@ -792,53 +908,68 @@ function WaveStationBlock({
                         >
                           {row.routeLabel}
                         </span>
-                        <div className="flex h-8 items-center gap-1">
-                          <input
-                            type="number"
-                            inputMode="numeric"
-                            min={1}
-                            max={row.remaining}
-                            value={qtyStr}
-                            disabled={busyRow}
-                            onChange={(e) =>
-                              setQtyByKey((prev) => ({
-                                ...prev,
-                                [row.key]: e.target.value,
-                              }))
-                            }
-                            onKeyDown={(e) => {
-                              if (e.key === "Enter") {
-                                e.preventDefault();
-                                handleConfirm(row);
-                              }
-                            }}
-                            aria-label={`Quantidade ${group.erpOrderId} ${row.sku}`}
-                            className="h-8 w-12 rounded-md border border-slate-300 bg-white px-1 text-center text-sm font-semibold tabular-nums outline-none focus:border-[#0d9488] focus:ring-1 focus:ring-[#0d9488]"
-                          />
-                          <span className="text-xs tabular-nums text-slate-400">
-                            /{row.remaining}
+                        {done ? (
+                          <span className="text-xs font-semibold tabular-nums text-emerald-700">
+                            {row.qtyDone}/{row.qtyTotal}
                           </span>
-                        </div>
+                        ) : (
+                          <div className="flex h-8 items-center gap-1">
+                            <input
+                              type="number"
+                              inputMode="numeric"
+                              min={1}
+                              max={row.remaining}
+                              value={qtyStr}
+                              disabled={busyRow}
+                              onChange={(e) =>
+                                setQtyByKey((prev) => ({
+                                  ...prev,
+                                  [row.key]: e.target.value,
+                                }))
+                              }
+                              onKeyDown={(e) => {
+                                if (e.key === "Enter") {
+                                  e.preventDefault();
+                                  handleConfirm(row);
+                                }
+                              }}
+                              aria-label={`Quantidade ${group.erpOrderId} ${row.sku}`}
+                              className="h-8 w-12 rounded-md border border-slate-300 bg-white px-1 text-center text-sm font-semibold tabular-nums outline-none focus:border-[#0d9488] focus:ring-1 focus:ring-[#0d9488]"
+                            />
+                            <span className="text-xs tabular-nums text-slate-400">
+                              /{row.remaining}
+                            </span>
+                          </div>
+                        )}
                         <div className="flex h-8 items-center gap-1.5">
-                          <button
-                            type="button"
-                            disabled={busyRow || !qtyValid}
-                            onClick={() => handleConfirm(row)}
-                            className="inline-flex h-8 w-[88px] items-center justify-center gap-1 rounded-md bg-[#0d9488] text-xs font-semibold text-white hover:bg-teal-700 disabled:opacity-40"
-                          >
-                            {busyRow ? (
-                              <Loader2 className="h-3 w-3 animate-spin" />
-                            ) : null}
-                            Conferir
-                          </button>
-                          <button
-                            type="button"
-                            disabled={busyRow}
-                            onClick={() => openReport(row)}
-                            className="inline-flex h-8 w-[88px] items-center justify-center rounded-md border border-red-300 text-xs font-semibold text-red-700 hover:bg-red-50 disabled:opacity-40"
-                          >
-                            Reportar
-                          </button>
+                          {done ? (
+                            <span className="inline-flex h-8 items-center gap-1 text-xs font-semibold text-emerald-700">
+                              <Check className="h-3.5 w-3.5" />
+                              Conferido
+                            </span>
+                          ) : (
+                            <>
+                              <button
+                                type="button"
+                                disabled={busyRow || !qtyValid}
+                                onClick={() => handleConfirm(row)}
+                                className="inline-flex h-8 w-[88px] items-center justify-center gap-1 rounded-md bg-[#0d9488] text-xs font-semibold text-white hover:bg-teal-700 disabled:opacity-40"
+                              >
+                                {busyRow ? (
+                                  <Loader2 className="h-3 w-3 animate-spin" />
+                                ) : null}
+                                Conferir
+                              </button>
+                              <button
+                                type="button"
+                                disabled={busyRow}
+                                onClick={() => openReport(row)}
+                                className="inline-flex h-8 w-[88px] items-center justify-center rounded-md border border-red-300 text-xs font-semibold text-red-700 hover:bg-red-50 disabled:opacity-40"
+                              >
+                                Reportar
+                              </button>
+                            </>
+                          )}
                         </div>
                       </div>
                     );
