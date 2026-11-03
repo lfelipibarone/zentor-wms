@@ -516,6 +516,14 @@ function WaveStationBlock({
   const labelsFailed = wave.labelsFailed ?? 0;
   const pendingLabels = Math.max(0, labelsTotal - labelsOk);
 
+  const [qtyByKey, setQtyByKey] = useState<Record<string, string>>({});
+  const [rowBusy, setRowBusy] = useState<string | null>(null);
+  const [printBusyOrderId, setPrintBusyOrderId] = useState<string | null>(null);
+  const [reporting, setReporting] = useState<ReportState | null>(null);
+  const [justDone, setJustDone] = useState<JustDoneOrder[]>([]);
+  /** Itens conferidos nesta sessão — a API tira a linha da fila após o sort. */
+  const [sessionDone, setSessionDone] = useState<UnifiedReadyRow[]>([]);
+
   const pendingOrderIds = useMemo(() => {
     const ids = new Set<string>();
     for (const line of ready) {
@@ -526,26 +534,36 @@ function WaveStationBlock({
     return ids;
   }, [ready]);
 
-  /** Pendentes + já conferidos do mesmo pedido (não some da tela). */
-  const unifiedRows: UnifiedReadyRow[] = ready.flatMap((line) => {
-    const allocs = (line.allocations ?? []).filter(
-      (a) => a.remaining > 0 || pendingOrderIds.has(a.orderId),
+  const unifiedRows: UnifiedReadyRow[] = useMemo(() => {
+    const fromApi = ready.flatMap((line) => {
+      const allocs = (line.allocations ?? []).filter(
+        (a) => a.remaining > 0 || pendingOrderIds.has(a.orderId),
+      );
+      return allocs.map((a) => ({
+        key: `${line.id}-${a.id}`,
+        lineId: line.id,
+        allocationId: a.id,
+        orderId: a.orderId,
+        erpOrderId: a.erpOrderId,
+        basketCode: a.basketCode,
+        sku: line.sku,
+        productName: line.productName,
+        routeLabel: line.routeLabel ?? line.locationBarcode,
+        remaining: a.remaining,
+        qtyDone: a.quantitySorted,
+        qtyTotal: a.quantity,
+      }));
+    });
+    const keys = new Set(fromApi.map((r) => r.key));
+    const allocIds = new Set(fromApi.map((r) => r.allocationId));
+    const extras = sessionDone.filter(
+      (r) =>
+        pendingOrderIds.has(r.orderId) &&
+        !keys.has(r.key) &&
+        !allocIds.has(r.allocationId),
     );
-    return allocs.map((a) => ({
-      key: `${line.id}-${a.id}`,
-      lineId: line.id,
-      allocationId: a.id,
-      orderId: a.orderId,
-      erpOrderId: a.erpOrderId,
-      basketCode: a.basketCode,
-      sku: line.sku,
-      productName: line.productName,
-      routeLabel: line.routeLabel ?? line.locationBarcode,
-      remaining: a.remaining,
-      qtyDone: a.quantitySorted,
-      qtyTotal: a.quantity,
-    }));
-  });
+    return [...fromApi, ...extras];
+  }, [ready, pendingOrderIds, sessionDone]);
 
   const orderGroups: OrderGroup[] = useMemo(() => {
     const map = new Map<string, OrderGroup>();
@@ -565,16 +583,17 @@ function WaveStationBlock({
         });
       }
     }
+    for (const g of map.values()) {
+      g.rows.sort((a, b) => {
+        if (a.remaining === 0 && b.remaining > 0) return 1;
+        if (a.remaining > 0 && b.remaining === 0) return -1;
+        return a.sku.localeCompare(b.sku, "pt-BR");
+      });
+    }
     return [...map.values()].sort((a, b) =>
       a.erpOrderId.localeCompare(b.erpOrderId, "pt-BR"),
     );
   }, [unifiedRows]);
-
-  const [qtyByKey, setQtyByKey] = useState<Record<string, string>>({});
-  const [rowBusy, setRowBusy] = useState<string | null>(null);
-  const [printBusyOrderId, setPrintBusyOrderId] = useState<string | null>(null);
-  const [reporting, setReporting] = useState<ReportState | null>(null);
-  const [justDone, setJustDone] = useState<JustDoneOrder[]>([]);
 
   useEffect(() => {
     setQtyByKey((prev) => {
@@ -639,6 +658,7 @@ function WaveStationBlock({
       onChanged();
       if (result.orderCompleted && result.orderId) {
         const erp = result.erpOrderId ?? row.erpOrderId;
+        setSessionDone((prev) => prev.filter((r) => r.orderId !== result.orderId));
         let labelOk = false;
         let labelDetail = "aguardando impressão";
         try {
@@ -662,6 +682,14 @@ function WaveStationBlock({
           ...prev.filter((o) => o.orderId !== result.orderId),
         ]);
       } else {
+        setSessionDone((prev) => [
+          ...prev.filter((r) => r.key !== row.key && r.allocationId !== row.allocationId),
+          {
+            ...row,
+            remaining: 0,
+            qtyDone: row.qtyTotal,
+          },
+        ]);
         onMessage(`✓ Conferido ${row.erpOrderId} · ${row.sku} · ${quantity} un.`);
       }
     } catch (e) {
