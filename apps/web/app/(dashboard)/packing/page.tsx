@@ -1,7 +1,16 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Check, Loader2, Printer, RefreshCw, ScanBarcode, X } from "lucide-react";
+import {
+  Check,
+  ChevronDown,
+  ChevronRight,
+  Loader2,
+  Printer,
+  RefreshCw,
+  ScanBarcode,
+  X,
+} from "lucide-react";
 import { PageHeader } from "@/components/ops/page-header";
 import { CollectionDeadlineIndicator } from "@/components/ops/collection-deadline-indicator";
 import { MarketplaceBadge } from "@/components/ops/marketplace-badge";
@@ -56,6 +65,45 @@ function ordersFromItems(items: PackingQueueItem[]): PackingOrder[] {
     .map((i) => i.order);
 }
 
+/** Pedido de onda localizado pela cesta (código da allocation). */
+function findWaveOrderByBasket(
+  items: PackingQueueItem[],
+  code: string,
+): { waveId: string; orderId: string; erpOrderId: string } | null {
+  const normalized = normalizeBasketCode(code);
+  if (!normalized) return null;
+  for (const entry of items) {
+    if (entry.kind !== "wave") continue;
+    for (const line of entry.wave.readyLines) {
+      for (const a of line.allocations ?? []) {
+        if (a.basketCode?.toLowerCase() === normalized) {
+          return {
+            waveId: entry.wave.id,
+            orderId: a.orderId,
+            erpOrderId: a.erpOrderId,
+          };
+        }
+      }
+    }
+  }
+  return null;
+}
+
+function findWaveContainingOrder(
+  items: PackingQueueItem[],
+  orderId: string,
+): string | null {
+  for (const entry of items) {
+    if (entry.kind !== "wave") continue;
+    for (const line of entry.wave.readyLines) {
+      if ((line.allocations ?? []).some((a) => a.orderId === orderId)) {
+        return entry.wave.id;
+      }
+    }
+  }
+  return null;
+}
+
 function filterItems(items: PackingQueueItem[], filter: QueueFilter) {
   if (filter === "all") return items;
   if (filter === "wave") return items.filter((i) => i.kind === "wave");
@@ -82,6 +130,10 @@ export default function PackingPage() {
   const [saving, setSaving] = useState(false);
   const [labelBusyWaveId, setLabelBusyWaveId] = useState<string | null>(null);
   const [activeOrderId, setActiveOrderId] = useState<string | null>(null);
+  /** Onda expandida na fila (fechada por padrão). */
+  const [expandedWaveId, setExpandedWaveId] = useState<string | null>(null);
+  /** Pedido a destacar dentro da onda (ex.: após bipar cesta). */
+  const [focusWaveOrderId, setFocusWaveOrderId] = useState<string | null>(null);
   const openingRef = useRef(false);
   const basketInputRef = useRef<HTMLInputElement>(null);
   const lastScanRef = useRef("");
@@ -167,6 +219,14 @@ export default function PackingPage() {
     void loadQueue({ silent: true });
   }, [loadQueue]);
 
+  const openWaveOrder = useCallback((waveId: string, orderId: string, erpOrderId: string) => {
+    setActiveOrderId(null);
+    syncOrderInUrl(null);
+    setExpandedWaveId(waveId);
+    setFocusWaveOrderId(orderId);
+    setMessage(`Onda aberta · pedido ${erpOrderId}`);
+  }, []);
+
   const openOrderByBasketCode = useCallback(
     async (rawCode: string) => {
       if (openingRef.current) return;
@@ -180,13 +240,27 @@ export default function PackingPage() {
       setMessage(null);
 
       try {
+        const inWave = findWaveOrderByBasket(items, trimmed);
+        if (inWave) {
+          openWaveOrder(inWave.waveId, inWave.orderId, inWave.erpOrderId);
+          setBasketScan("");
+          return;
+        }
+
         const local = findOrderByBasketInput(ordersFromItems(items), trimmed);
         if (local) {
           openOrderInline(local.id);
           setBasketScan("");
           return;
         }
+
         const { order } = await scanPackingBasket(trimmed);
+        const waveId = findWaveContainingOrder(items, order.id);
+        if (waveId) {
+          openWaveOrder(waveId, order.id, order.erpOrderId);
+          setBasketScan("");
+          return;
+        }
         openOrderInline(order.id);
         setBasketScan("");
       } catch (e) {
@@ -197,7 +271,7 @@ export default function PackingPage() {
         openingRef.current = false;
       }
     },
-    [items, openOrderInline],
+    [items, openOrderInline, openWaveOrder],
   );
 
   const handleBasketScan = async (e: React.FormEvent) => {
@@ -301,7 +375,7 @@ export default function PackingPage() {
     <div className="mx-auto max-w-[1400px] space-y-5">
       <PageHeader
         title="Packing"
-        description="Uma tela: onda por pedido e conferência avulsa inline."
+        description="Onda fechada como o pedido; clique para abrir. Bipar a cesta abre direto no pedido."
       />
 
       {message ? (
@@ -386,6 +460,15 @@ export default function PackingPage() {
                     key={`wave-${entry.wave.id}`}
                     wave={entry.wave}
                     busy={labelBusyWaveId === entry.wave.id}
+                    expanded={expandedWaveId === entry.wave.id}
+                    focusOrderId={
+                      expandedWaveId === entry.wave.id ? focusWaveOrderId : null
+                    }
+                    onToggle={() =>
+                      setExpandedWaveId((prev) =>
+                        prev === entry.wave.id ? null : entry.wave.id,
+                      )
+                    }
                     onRetryLabels={() => void retryWaveLabels(entry.wave.id)}
                     onPrintLabels={() =>
                       void printWaveLabels(entry.wave.id, entry.wave.name)
@@ -417,7 +500,7 @@ export default function PackingPage() {
               Bipar cesta
             </label>
             <p className="mt-1 text-center text-xs text-slate-500">
-              Abre o pedido nesta mesma tela.
+              Abre a onda no pedido da cesta (ou o avulso).
             </p>
             <input
               ref={basketInputRef}
@@ -495,6 +578,9 @@ type ReportState = {
 function WaveStationBlock({
   wave,
   busy,
+  expanded,
+  focusOrderId,
+  onToggle,
   onRetryLabels,
   onPrintLabels,
   onChanged,
@@ -502,6 +588,9 @@ function WaveStationBlock({
 }: {
   wave: PackingWaveQueueSummary;
   busy: boolean;
+  expanded: boolean;
+  focusOrderId: string | null;
+  onToggle: () => void;
   onRetryLabels: () => void;
   onPrintLabels: () => void;
   onChanged: () => void;
@@ -515,6 +604,21 @@ function WaveStationBlock({
   const labelsOk = wave.labelsOk ?? 0;
   const labelsFailed = wave.labelsFailed ?? 0;
   const pendingLabels = Math.max(0, labelsTotal - labelsOk);
+  const pendingItems = ready.reduce(
+    (n, l) => n + (l.allocations ?? []).filter((a) => a.remaining > 0).length,
+    0,
+  );
+
+  useEffect(() => {
+    if (!expanded || !focusOrderId) return;
+    const t = window.setTimeout(() => {
+      document
+        .getElementById(`wave-order-${focusOrderId}`)
+        ?.scrollIntoView({ behavior: "smooth", block: "center" });
+    }, 80);
+    return () => window.clearTimeout(t);
+  }, [expanded, focusOrderId]);
+
 
   const [qtyByKey, setQtyByKey] = useState<Record<string, string>>({});
   const [rowBusy, setRowBusy] = useState<string | null>(null);
@@ -735,9 +839,21 @@ function WaveStationBlock({
   };
 
   return (
-    <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
-      <header className="flex flex-wrap items-start justify-between gap-3 border-b border-slate-100 px-4 py-3.5">
-        <div className="min-w-0 space-y-1">
+    <section
+      className={cn(
+        "overflow-hidden rounded-2xl border bg-white shadow-sm transition",
+        expanded
+          ? "border-[#0d9488] ring-1 ring-[#0d9488]/25"
+          : "border-slate-200 hover:border-[#0d9488]",
+      )}
+    >
+      <button
+        type="button"
+        onClick={onToggle}
+        className="flex w-full items-center gap-4 px-4 py-3.5 text-left"
+        aria-expanded={expanded}
+      >
+        <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2">
             <span className="rounded-md bg-amber-100 px-2 py-0.5 text-[11px] font-bold uppercase tracking-wide text-amber-900">
               Onda
@@ -746,12 +862,23 @@ function WaveStationBlock({
               deadline={wave.collectionDeadline}
               className="text-xs"
             />
+            <span
+              className={cn(
+                "rounded-full px-2 py-0.5 text-[11px] font-semibold tabular-nums",
+                labelsOk >= labelsTotal && labelsTotal > 0
+                  ? "bg-emerald-100 text-emerald-800"
+                  : labelsFailed > 0
+                    ? "bg-red-100 text-red-800"
+                    : "bg-slate-100 text-slate-600",
+              )}
+            >
+              Etiquetas {labelsOk}/{labelsTotal}
+            </span>
           </div>
-          <h2 className="truncate text-base font-semibold tracking-tight text-slate-900">
-            {wave.name}
-          </h2>
+          <p className="mt-1.5 truncate text-base font-bold text-slate-900">{wave.name}</p>
           <p className="text-sm text-slate-500">
             {wave.orderCount} pedidos · packing {wave.linesSorted}/{wave.linesTotal}
+            {pendingItems > 0 ? ` · ${pendingItems} item(ns) pendente(s)` : ""}
             {wave.pickerName ? ` · ${wave.pickerName}` : ""}
             {collecting > 0 ? ` · ${collecting} SKU em recoleta` : ""}
           </p>
@@ -762,41 +889,46 @@ function WaveStationBlock({
             />
           </div>
         </div>
+        <span className="inline-flex shrink-0 items-center gap-1.5 rounded-lg bg-[#0d9488] px-3 py-1.5 text-xs font-semibold text-white">
+          {expanded ? (
+            <>
+              Fechar
+              <ChevronDown className="h-3.5 w-3.5" />
+            </>
+          ) : (
+            <>
+              Abrir
+              <ChevronRight className="h-3.5 w-3.5" />
+            </>
+          )}
+        </span>
+      </button>
 
-        <div className="flex flex-wrap items-center gap-2">
-          <span
-            className={cn(
-              "rounded-full px-2.5 py-1 text-xs font-semibold tabular-nums",
-              labelsOk >= labelsTotal && labelsTotal > 0
-                ? "bg-emerald-100 text-emerald-800"
-                : labelsFailed > 0
-                  ? "bg-red-100 text-red-800"
-                  : "bg-slate-100 text-slate-700",
-            )}
-          >
-            Etiquetas {labelsOk}/{labelsTotal}
-            {labelsFailed > 0 ? ` · ${labelsFailed} erro` : pendingLabels > 0 ? " · …" : ""}
-          </span>
-          <button
-            type="button"
-            disabled={busy}
-            onClick={onRetryLabels}
-            className="inline-flex items-center gap-1 rounded-lg border border-slate-200 px-2.5 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-50"
-          >
-            {busy ? <Loader2 className="h-3 w-3 animate-spin" /> : <RefreshCw className="h-3 w-3" />}
-            Gerar
-          </button>
-          <button
-            type="button"
-            disabled={busy || labelsOk === 0}
-            onClick={onPrintLabels}
-            className="inline-flex items-center gap-1 rounded-lg border border-slate-200 px-2.5 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-50"
-          >
-            <Printer className="h-3 w-3" />
-            Imprimir
-          </button>
-        </div>
-      </header>
+      {!expanded ? null : (
+        <>
+      <div className="flex flex-wrap items-center gap-2 border-t border-slate-100 bg-slate-50/80 px-4 py-2.5">
+        <button
+          type="button"
+          disabled={busy}
+          onClick={onRetryLabels}
+          className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+        >
+          {busy ? <Loader2 className="h-3 w-3 animate-spin" /> : <RefreshCw className="h-3 w-3" />}
+          Gerar etiquetas
+        </button>
+        <button
+          type="button"
+          disabled={busy || labelsOk === 0}
+          onClick={onPrintLabels}
+          className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+        >
+          <Printer className="h-3 w-3" />
+          Imprimir lote
+        </button>
+        {pendingLabels > 0 ? (
+          <span className="text-xs text-slate-500">{pendingLabels} etiqueta(s) pendente(s)</span>
+        ) : null}
+      </div>
 
       {(wave.labelErrors ?? []).slice(0, 2).map((err) => (
         <p
@@ -867,7 +999,15 @@ function WaveStationBlock({
       ) : orderGroups.length === 0 ? null : (
         <div className="divide-y divide-slate-200">
           {orderGroups.map((group) => (
-            <div key={group.orderId} className="bg-white">
+            <div
+              key={group.orderId}
+              id={`wave-order-${group.orderId}`}
+              className={cn(
+                "bg-white scroll-mt-4",
+                focusOrderId === group.orderId &&
+                  "ring-2 ring-inset ring-[#0d9488] bg-[#0d9488]/5",
+              )}
+            >
               <div className="flex flex-wrap items-center gap-2 border-b border-slate-100 bg-slate-50 px-4 py-2.5">
                 <span className="rounded-md bg-white px-2 py-0.5 text-[11px] font-bold uppercase tracking-wide text-slate-600 ring-1 ring-slate-200">
                   Pedido
@@ -1028,6 +1168,8 @@ function WaveStationBlock({
           }}
         />
       ) : null}
+        </>
+      )}
     </section>
   );
 }
