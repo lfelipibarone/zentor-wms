@@ -41,11 +41,49 @@ export function parseTinyPedidoId(erpOrderId: string): number | null {
   return Number.isFinite(id) && id > 0 ? id : null;
 }
 
+/** Marcador interno: etiqueta ZPL simulada (pedidos DEMO-PACK-*). */
+export const DEMO_LABEL_SCHEME = "wms-demo-zpl:";
+
+export function isDemoPackErpOrderId(erpOrderId: string): boolean {
+  return erpOrderId.trim().toUpperCase().startsWith("DEMO-PACK-");
+}
+
 export function detectLabelFormat(url: string): "zpl" | "pdf" | "unknown" {
   const lower = url.toLowerCase();
-  if (lower.includes(".zpl") || lower.endsWith("zpl")) return "zpl";
+  if (lower.startsWith(DEMO_LABEL_SCHEME) || lower.includes(".zpl") || lower.endsWith("zpl")) {
+    return "zpl";
+  }
   if (lower.includes(".pdf") || lower.endsWith("pdf")) return "pdf";
   return "unknown";
+}
+
+export function buildDemoShippingLabelZpl(input: {
+  erpOrderId: string;
+  customerName?: string | null;
+  marketplace?: string | null;
+  basketCode?: string | null;
+}): string {
+  const erp = (input.erpOrderId || "DEMO").slice(0, 40);
+  const cliente = (input.customerName || "Cliente demo").slice(0, 40);
+  const market = (input.marketplace || "DEMO").slice(0, 24);
+  const cesta = (input.basketCode || "—").slice(0, 20);
+  // Escapa ^ em campos ZPL
+  const esc = (s: string) => s.replace(/\^/g, " ");
+  return [
+    "^XA",
+    "^CF0,36",
+    "^FO40,40^FDWMS · ETIQUETA SIMULADA^FS",
+    "^CF0,28",
+    `^FO40,100^FDPedido: ${esc(erp)}^FS`,
+    `^FO40,150^FDCliente: ${esc(cliente)}^FS`,
+    `^FO40,200^FDCanal: ${esc(market)}^FS`,
+    `^FO40,250^FDCesta: ${esc(cesta)}^FS`,
+    "^CF0,24",
+    "^FO40,310^FDNAO ENVIA — so para teste de impressao^FS",
+    `^FO40,380^BY2^BCN,80,Y,N,N^FD${esc(erp)}^FS`,
+    "^XZ",
+    "",
+  ].join("\n");
 }
 
 function labelFilename(erpOrderId: string, url: string): string {
@@ -97,6 +135,32 @@ export async function fetchShippingLabelFile(params: {
   if (!resolved.ok) return resolved;
 
   const { url, erpOrderId } = resolved;
+
+  if (url.startsWith(DEMO_LABEL_SCHEME)) {
+    const demoOrder = await prisma.order.findFirst({
+      where: { id: params.orderId, tenantId: params.tenantId },
+      select: {
+        erpOrderId: true,
+        customerName: true,
+        marketplace: true,
+        basket: { select: { code: true } },
+      },
+    });
+    const zpl = buildDemoShippingLabelZpl({
+      erpOrderId: demoOrder?.erpOrderId ?? erpOrderId,
+      customerName: demoOrder?.customerName,
+      marketplace: demoOrder?.marketplace,
+      basketCode: demoOrder?.basket?.code,
+    });
+    return {
+      ok: true,
+      content: Buffer.from(zpl, "utf-8"),
+      contentType: "text/plain; charset=utf-8",
+      filename: labelFilename(erpOrderId, `${erpOrderId}.zpl`),
+      sourceUrl: url,
+    };
+  }
+
   const res = await fetch(url, { signal: AbortSignal.timeout(30_000) });
   if (!res.ok) {
     return {
@@ -228,6 +292,9 @@ export async function fetchShippingLabelsForOrder(params: {
       id: true,
       erpOrderId: true,
       shippingLabel: true,
+      customerName: true,
+      marketplace: true,
+      basket: { select: { code: true } },
     },
   });
 
@@ -246,6 +313,26 @@ export async function fetchShippingLabelsForOrder(params: {
       urls: [order.shippingLabel],
       cached: true,
       labelFormat: detectLabelFormat(order.shippingLabel),
+      message: order.shippingLabel.startsWith(DEMO_LABEL_SCHEME)
+        ? "Etiqueta simulada (demo)"
+        : undefined,
+    };
+  }
+
+  // Pedidos de teste local: ZPL fictício para exercitar gerar/imprimir sem Tiny.
+  if (isDemoPackErpOrderId(order.erpOrderId)) {
+    const demoUrl = `${DEMO_LABEL_SCHEME}${order.id}`;
+    await prisma.order.update({
+      where: { id: order.id },
+      data: { shippingLabel: demoUrl, shippingLabelError: null },
+    });
+    return {
+      status: "OK",
+      urls: [demoUrl],
+      cached: false,
+      labelFormat: "zpl",
+      message: "Etiqueta simulada (demo) — pronta para imprimir",
+      formaEnvioNome: "Demo / simulação",
     };
   }
 

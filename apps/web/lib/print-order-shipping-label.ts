@@ -1,5 +1,8 @@
 import { apiFetch } from "@/lib/api/client";
-import { fetchShippingLabelText } from "@/lib/shipping-label-file";
+import {
+  fetchShippingLabelText,
+  triggerBlobDownload,
+} from "@/lib/shipping-label-file";
 import { printZplWithQz } from "@/lib/shipping-label-qz";
 
 type ShippingLabelApiResult = {
@@ -8,7 +11,7 @@ type ShippingLabelApiResult = {
   message?: string;
 };
 
-/** Garante etiqueta (Tiny) e envia ZPL à térmica. */
+/** Garante etiqueta e envia à térmica (QZ). Sem QZ, baixa o ZPL. */
 export async function ensureAndPrintOrderShippingLabel(
   orderId: string,
 ): Promise<{ printer: string }> {
@@ -21,5 +24,17 @@ export async function ensureAndPrintOrderShippingLabel(
   }
   const zpl = (await fetchShippingLabelText(orderId)).trim();
   if (!zpl) throw new Error("Etiqueta ZPL vazia");
-  return printZplWithQz(zpl);
+  try {
+    return await printZplWithQz(zpl);
+  } catch (e) {
+    triggerBlobDownload(
+      new Blob([zpl], { type: "text/plain;charset=utf-8" }),
+      `etiqueta-${orderId}.zpl`,
+    );
+    const raw = e instanceof Error ? e.message : "";
+    if (/connection|websocket|QZ|impressora|timeout/i.test(raw) || !raw) {
+      return { printer: "download (QZ Tray indisponível)" };
+    }
+    throw e;
+  }
 }
