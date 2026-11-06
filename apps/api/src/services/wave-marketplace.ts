@@ -18,6 +18,21 @@ export function assertUniformMarketplace(
   return first;
 }
 
+/** Agrupa pedidos por marketplace (null → chave vazia) para liberar uma onda por loja. */
+export function groupOrdersByMarketplace<T extends OrderMarketplace>(
+  orders: T[],
+): Array<{ marketplace: string | null; orders: T[] }> {
+  const map = new Map<string, { marketplace: string | null; orders: T[] }>();
+  for (const order of orders) {
+    const marketplace = order.marketplace ?? null;
+    const key = marketplace ?? "";
+    const bucket = map.get(key);
+    if (bucket) bucket.orders.push(order);
+    else map.set(key, { marketplace, orders: [order] });
+  }
+  return [...map.values()];
+}
+
 export function assertOrdersMatchWaveMarketplace(
   waveMarketplace: string | null | undefined,
   orders: OrderMarketplace[],

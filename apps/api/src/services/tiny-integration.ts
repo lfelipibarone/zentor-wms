@@ -40,6 +40,16 @@ export const TINY_ORDER_SITUACAO_CANCELADA = 2;
 /** Situações em que o pedido já saiu do fluxo do WMS: Cancelada (2), Enviada (5), Entregue (6), Não entregue (9). */
 export const TINY_ORDER_SITUACOES_ENCERRADAS = new Set([2, 5, 6, 9]);
 
+/**
+ * Situação do módulo Separação do Tiny que bloqueia a fila de picking do WMS.
+ * 4 = Em Separação (já sendo separado no Tiny).
+ * 1 Aguardando Separação continua elegível — é a fila de entrada do WMS.
+ */
+export const TINY_SEPARACAO_SITUACAO_EM_SEPARACAO = 4;
+export const TINY_SEPARACAO_SITUACOES_BLOCK_PICKING = new Set([
+  TINY_SEPARACAO_SITUACAO_EM_SEPARACAO,
+]);
+
 const DEMO_ERP_PREFIXES = ["ERP-DEMO-", "ERP-MOB-"] as const;
 
 export function isDemoErpOrderId(erpOrderId: string): boolean {

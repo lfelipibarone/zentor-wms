@@ -14,6 +14,8 @@ import {
 } from "./tiny-integration.js";
 import {
   applyTinySituacaoToOrder,
+  listTinySeparacaoBlockedErpOrderIds,
+  removeOrdersBlockedByTinySeparacao,
   TINY_RECONCILE_ORDER_STATUSES,
   type TinyReconcileOutcome,
 } from "./tiny-order-reconcile.js";
@@ -265,6 +267,22 @@ export async function syncSalesOrdersFromTiny(params: {
 
   result.tinyConnected = true;
 
+  /** Pedidos Em Separação / Separada / Embalada no Tiny — fora da fila WMS. */
+  let separacaoBlockedErpIds = new Map<string, number>();
+  try {
+    separacaoBlockedErpIds = await listTinySeparacaoBlockedErpOrderIds(client);
+  } catch (e) {
+    if (isTinyRateLimitError(e)) throw e;
+    // Separação é complementar; falha não impede o sync de Faturada.
+    result.errors.push({
+      erpOrderId: "SEPARACAO",
+      message:
+        e instanceof Error
+          ? `Falha ao listar separações Tiny: ${e.message}`
+          : "Falha ao listar separações Tiny",
+    });
+  }
+
   if (params.forceRestart) {
     await clearTinySyncCheckpoint(params.tenantId, TINY_ORDERS_CHECKPOINT_KEY);
   }
@@ -399,6 +417,23 @@ export async function syncSalesOrdersFromTiny(params: {
     const erpOrderId = tinyErpOrderId(pedidoId);
     if (nonUpdatableOrders.has(erpOrderId)) {
       result.skipped += 1;
+      return;
+    }
+
+    // Já em Separação no Tiny: não entra (nem permanece) na fila de picking.
+    if (separacaoBlockedErpIds.has(erpOrderId)) {
+      const outcome = await applyTinySituacaoToOrder({
+        tenantId: params.tenantId,
+        erpOrderId,
+        // Força remoção de PENDING via situação não-syncable (Preparando envio).
+        situacao: 4,
+        userId: params.userId,
+      });
+      if (outcome === "missing") {
+        result.skipped += 1;
+      } else {
+        countReconcileOutcome(outcome, 4);
+      }
       return;
     }
 
@@ -660,6 +695,23 @@ export async function syncSalesOrdersFromTiny(params: {
     }
 
     await reconcileOpenOrders();
+
+    try {
+      const sep = await removeOrdersBlockedByTinySeparacao({
+        tenantId: params.tenantId,
+        client,
+      });
+      result.closedRemoved += sep.removed;
+    } catch (e) {
+      if (isTinyRateLimitError(e)) throw e;
+      result.errors.push({
+        erpOrderId: "SEPARACAO",
+        message:
+          e instanceof Error
+            ? `Falha ao conciliar separações Tiny: ${e.message}`
+            : "Falha ao conciliar separações Tiny",
+      });
+    }
 
     await clearTinySyncCheckpoint(params.tenantId, TINY_ORDERS_CHECKPOINT_KEY);
     await setLastSyncAt(params.tenantId);

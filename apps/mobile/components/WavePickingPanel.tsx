@@ -1,18 +1,25 @@
 import { router } from "expo-router";
 import { useState } from "react";
-import { FlatList, ScrollView, StyleSheet, Text, View } from "react-native";
+import {
+  FlatList,
+  RefreshControl,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+} from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { FactoryButton } from "@/components/FactoryButton";
 import { CollectionDeadlineRow } from "@/components/CollectionDeadlineRow";
 import { ProductThumbnail } from "@/components/ProductThumbnail";
 import { SplitWorkModal } from "@/components/SplitWorkModal";
-import { WorkShareCard, workBlockedMessage } from "@/components/WorkTimer";
-import { Badge, Card, EmptyState, Loading, Notice, ProgressBar } from "@/components/ui";
+import { workBlockedMessage } from "@/components/WorkTimer";
+import { Badge, Card, EmptyState, Loading, ProgressBar } from "@/components/ui";
 import { useCurrentWave, useReleaseWaveAccept } from "@/hooks/useWavePicking";
 import { useSplitWork } from "@/hooks/useWorkShares";
 import { showErrorAlert, showToast } from "@/lib/app-alert";
 import { ApiError } from "@/lib/api";
-import type { WaveLineSummary } from "@/lib/api";
+import type { WaveLineSummary, WaveOrderSummary } from "@/lib/api";
 import { modules } from "@/lib/modules";
 import { theme, spacing, typography, radius } from "@/lib/theme";
 import type { Tone } from "@/lib/theme";
@@ -26,6 +33,25 @@ function lineStatus(line: WaveLineSummary): { label: string; tone: Tone } {
   return { label: "Pendente", tone: "neutral" };
 }
 
+function WaveOrdersBlock({ orders }: { orders: WaveOrderSummary[] }) {
+  if (orders.length === 0) return null;
+  return (
+    <View style={styles.ordersBlock}>
+      <Text style={styles.ordersTitle}>Pedidos da onda</Text>
+      {orders.map((o) => (
+        <View key={o.id} style={styles.orderRow}>
+          <Text style={styles.orderErp} numberOfLines={1}>
+            {o.erpOrderId}
+          </Text>
+          <Text style={styles.orderCustomer} numberOfLines={1}>
+            {o.customerName?.trim() || o.marketplace || "—"}
+          </Text>
+        </View>
+      ))}
+    </View>
+  );
+}
+
 export function WavePickingPanel() {
   const { data, isLoading, error, refetch, isRefetching } = useCurrentWave();
   const splitWork = useSplitWork();
@@ -36,7 +62,12 @@ export function WavePickingPanel() {
 
   if (error || !data) {
     return (
-      <ScrollView contentContainerStyle={styles.centered}>
+      <ScrollView
+        contentContainerStyle={styles.centered}
+        refreshControl={
+          <RefreshControl refreshing={isRefetching} onRefresh={() => void refetch()} />
+        }
+      >
         <EmptyState
           icon="layers-outline"
           title={error instanceof Error ? error.message : "Nenhuma onda liberada"}
@@ -56,6 +87,7 @@ export function WavePickingPanel() {
   }
 
   const { wave, lines, work } = data;
+  const orders = wave.orders ?? [];
   const blocked = workBlockedMessage(work);
   const pending = lines.filter((l) => l.sortStatus !== "SORTED");
   const pickPending = lines.filter(
@@ -66,6 +98,33 @@ export function WavePickingPanel() {
   const unitsPicked = lines.reduce((n, l) => n + l.quantityPicked, 0);
   const canReleaseWave =
     wave.canWork && lines.every((l) => l.quantityPicked === 0);
+
+  // Coleta concluída: some da lista (API também filtra; evita card residual).
+  if (pickFinished) {
+    return (
+      <ScrollView
+        contentContainerStyle={styles.centered}
+        refreshControl={
+          <RefreshControl refreshing={isRefetching} onRefresh={() => void refetch()} />
+        }
+      >
+        <EmptyState
+          icon="checkmark-circle"
+          title="Coleta concluída — puxe para ver novas ondas"
+          action={
+            <FactoryButton
+              label="Atualizar"
+              icon="refresh"
+              size="md"
+              variant="secondary"
+              onPress={() => refetch()}
+              loading={isRefetching}
+            />
+          }
+        />
+      </ScrollView>
+    );
+  }
 
   const handleReleaseWave = async () => {
     try {
@@ -102,12 +161,18 @@ export function WavePickingPanel() {
           <Badge key={m} label={m} />
         ))}
       </View>
+      <WaveOrdersBlock orders={orders} />
     </View>
   );
 
   if (wave.canAccept) {
     return (
-      <ScrollView contentContainerStyle={styles.scroll}>
+      <ScrollView
+        contentContainerStyle={styles.scroll}
+        refreshControl={
+          <RefreshControl refreshing={isRefetching} onRefresh={() => void refetch()} />
+        }
+      >
         {waveCard}
         <FactoryButton
           label={wave.part ? "Aceitar parte" : "Aceitar onda"}
@@ -148,7 +213,12 @@ export function WavePickingPanel() {
 
   if (!wave.canWork) {
     return (
-      <ScrollView contentContainerStyle={styles.scroll}>
+      <ScrollView
+        contentContainerStyle={styles.scroll}
+        refreshControl={
+          <RefreshControl refreshing={isRefetching} onRefresh={() => void refetch()} />
+        }
+      >
         {waveCard}
         <Card>
           <View style={styles.lockedRow}>
@@ -180,12 +250,6 @@ export function WavePickingPanel() {
         <Text style={styles.progressMuted}>{pending.length} linhas pendentes</Text>
       </View>
       <ProgressBar value={unitsPicked} total={unitsTotal} color={color} />
-      <WorkShareCard work={work} />
-      {pickFinished ? (
-        <Notice tone="success">
-          Separação da onda concluída. Os pedidos completos já podem ir ao packing.
-        </Notice>
-      ) : null}
       {canReleaseWave ? (
         <FactoryButton
           label="Cancelar aceite"
@@ -202,20 +266,12 @@ export function WavePickingPanel() {
   return (
     <FlatList
       style={styles.flex}
-      data={pickFinished ? [] : lines}
+      data={lines}
       keyExtractor={(item) => item.id}
       contentContainerStyle={styles.list}
       refreshing={isRefetching}
       onRefresh={refetch}
       ListHeaderComponent={listHeader}
-      ListEmptyComponent={
-        pickFinished ? (
-          <EmptyState
-            icon="checkmark-circle"
-            title="Onda pronta para o packing"
-          />
-        ) : undefined
-      }
       renderItem={({ item }) => {
         const done =
           item.sortStatus === "PICKED" || item.sortStatus === "SORTED";
@@ -326,6 +382,21 @@ const styles = StyleSheet.create({
   statValue: { fontSize: 24, fontWeight: "900", color: "#0F766E" },
   statLabel: { fontSize: typography.small, fontWeight: "800", color: "#0F766E" },
   badges: { flexDirection: "row", flexWrap: "wrap", gap: 6 },
+  ordersBlock: {
+    gap: 6,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: theme.border,
+    paddingTop: spacing.sm,
+  },
+  ordersTitle: {
+    fontSize: typography.caption,
+    fontWeight: "800",
+    color: theme.textMuted,
+    textTransform: "uppercase",
+  },
+  orderRow: { gap: 2 },
+  orderErp: { fontFamily: undefined, fontWeight: "800", color: theme.text, fontSize: typography.body },
+  orderCustomer: { color: theme.textMuted, fontWeight: "600", fontSize: typography.caption },
   lockedRow: { flexDirection: "row", alignItems: "center", gap: spacing.sm },
   lockedText: { fontWeight: "800", color: theme.textMuted, fontSize: typography.body },
   progressRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "baseline" },

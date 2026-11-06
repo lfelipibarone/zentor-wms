@@ -29,6 +29,7 @@ import {
 import {
   assertOrdersMatchWaveMarketplace,
   assertUniformMarketplace,
+  groupOrdersByMarketplace,
 } from "./wave-marketplace.js";
 import { getWaveSettings } from "./wave-settings.js";
 import { getRouteEngine } from "./route-engine/index.js";
@@ -513,19 +514,14 @@ export async function releasePickWaves(
     throw new PickWaveError("Nenhum pedido pendente disponível para a onda");
   }
 
-  const waveMarketplace = assertUniformMarketplace(orders);
-  const profiles = await buildOrderPickProfiles(tenantId, orders);
-  const sorted = sortOrdersByPickProximity(orders, profiles);
-  const partitionSettings = waveSettingsToPartition(settings, strategy);
-  const groups = partitionOrders(sorted, strategy, partitionSettings, profiles);
+  // Sem filtro de loja: se houver marketplaces mistos, cria uma onda por loja
+  // em vez de falhar com 400.
+  const marketplaceBuckets = marketplace
+    ? [{ marketplace: assertUniformMarketplace(orders), orders }]
+    : groupOrdersByMarketplace(orders);
 
-  if (groups.length === 0) {
-    throw new PickWaveError(
-      strategy === "SINGLE_ITEM"
-        ? "Nenhum pedido mono-SKU elegível para onda neste modo"
-        : "Nenhum grupo de onda formado com os critérios atuais",
-    );
-  }
+  const profiles = await buildOrderPickProfiles(tenantId, orders);
+  const partitionSettings = waveSettingsToPartition(settings, strategy);
 
   const baseTime = new Date().toLocaleTimeString("pt-BR", {
     hour: "2-digit",
@@ -540,35 +536,60 @@ export async function releasePickWaves(
     name: string;
   }> = [];
 
-  for (let i = 0; i < groups.length; i++) {
-    const group = groups[i]!;
-    const suffix = groups.length > 1 ? ` (${i + 1}/${groups.length})` : "";
-    const waveLabel = template
-      ? `${template.name} · ${baseDate} ${baseTime}${suffix}`
-      : `Onda ${baseDate} ${baseTime}${suffix}`;
-    const { wave, lineCount } = await createReleasedWave(
-      tenantId,
-      releasedById,
-      group,
-      waveLabel,
-      {
-        marketplace: waveMarketplace,
-        partitionStrategy: strategy,
-        templateId: template?.id ?? null,
-      },
+  let waveIndex = 0;
+  const totalBuckets = marketplaceBuckets.length;
+
+  for (const bucket of marketplaceBuckets) {
+    const sorted = sortOrdersByPickProximity(bucket.orders, profiles);
+    const groups = partitionOrders(sorted, strategy, partitionSettings, profiles);
+    if (groups.length === 0) continue;
+
+    for (let i = 0; i < groups.length; i++) {
+      const group = groups[i]!;
+      waveIndex += 1;
+      const parts: string[] = [];
+      if (totalBuckets > 1 || groups.length > 1) {
+        parts.push(`${waveIndex}`);
+      }
+      const suffix = parts.length ? ` (${parts.join("/")})` : "";
+      const mpLabel = bucket.marketplace ? ` · ${bucket.marketplace}` : "";
+      const waveLabel = template
+        ? `${template.name}${mpLabel} · ${baseDate} ${baseTime}${suffix}`
+        : `Onda ${baseDate} ${baseTime}${mpLabel}${suffix}`;
+      const { wave, lineCount } = await createReleasedWave(
+        tenantId,
+        releasedById,
+        group,
+        waveLabel,
+        {
+          marketplace: bucket.marketplace,
+          partitionStrategy: strategy,
+          templateId: template?.id ?? null,
+        },
+      );
+      created.push({
+        waveId: wave.id,
+        orderCount: group.length,
+        lineCount,
+        name: wave.name,
+      });
+    }
+  }
+
+  if (created.length === 0) {
+    throw new PickWaveError(
+      strategy === "SINGLE_ITEM"
+        ? "Nenhum pedido mono-SKU elegível para onda neste modo"
+        : strategy === "BY_PRODUCT"
+          ? "Modo SKU compartilhado não formou onda — esses pedidos não compartilham produtos. Use “Onda única (personalizada)”."
+          : "Nenhum grupo de onda formado com os critérios atuais",
     );
-    created.push({
-      waveId: wave.id,
-      orderCount: group.length,
-      lineCount,
-      name: wave.name,
-    });
   }
 
   const lineCount = created.reduce((s, w) => s + w.lineCount, 0);
   return {
     waves: created,
-    orderCount: orders.length,
+    orderCount: created.reduce((s, w) => s + w.orderCount, 0),
     lineCount,
   };
 }
@@ -1096,9 +1117,31 @@ export async function getOrderIdsInActiveWave(tenantId: string): Promise<string[
   return [...ids];
 }
 
+/** Onda ainda tem coleta pendente (linhas não PICKED/SORTED). */
+export function waveHasPickPending(
+  lines: Array<{ sortStatus: PickWaveLineSortStatus }>,
+): boolean {
+  return lines.some(
+    (l) =>
+      l.sortStatus !== PickWaveLineSortStatus.PICKED &&
+      l.sortStatus !== PickWaveLineSortStatus.SORTED,
+  );
+}
+
 export async function listReleasedWaves(tenantId: string) {
+  // Mobile: esconde ondas cuja coleta já terminou (ainda RELEASED para packing web).
   return prisma.pickWave.findMany({
-    where: { tenantId, status: PickWaveStatus.RELEASED },
+    where: {
+      tenantId,
+      status: PickWaveStatus.RELEASED,
+      lines: {
+        some: {
+          sortStatus: {
+            notIn: [PickWaveLineSortStatus.PICKED, PickWaveLineSortStatus.SORTED],
+          },
+        },
+      },
+    },
     orderBy: { releasedAt: "asc" },
     include: {
       acceptedBy: { select: { id: true, name: true } },
@@ -1107,6 +1150,9 @@ export async function listReleasedWaves(tenantId: string) {
         include: {
           order: {
             select: {
+              id: true,
+              erpOrderId: true,
+              customerName: true,
               priority: true,
               collectionDeadline: true,
               marketplace: true,
@@ -1118,7 +1164,7 @@ export async function listReleasedWaves(tenantId: string) {
         orderBy: { sortOrder: "asc" },
         include: {
           acceptedBy: { select: { id: true, name: true } },
-          lines: { select: { quantityPicked: true, quantityTotal: true } },
+          lines: { select: { quantityPicked: true, quantityTotal: true, sortStatus: true } },
         },
       },
     },
@@ -1189,6 +1235,7 @@ function findReleasedWaveById(tenantId: string, waveId: string) {
             select: {
               id: true,
               erpOrderId: true,
+              customerName: true,
               priority: true,
               collectionDeadline: true,
               marketplace: true,

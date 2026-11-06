@@ -1,8 +1,8 @@
 import { prisma } from "../lib/prisma.js";
 import { fetchShippingLabelsForOrder } from "./tiny-shipping-labels.js";
 
-const MAX_ATTEMPTS = 3;
-const RETRY_MS = 1_500;
+const MAX_ATTEMPTS = 4;
+const RETRY_MS = 2_000;
 
 function sleep(ms: number) {
   return new Promise((r) => setTimeout(r, ms));

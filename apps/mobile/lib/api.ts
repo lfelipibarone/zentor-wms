@@ -662,6 +662,7 @@ export const api = {
         packingUrgency: number;
         collectionDeadline: string | null;
         marketplaces?: string[];
+        orders?: WaveOrderSummary[];
         parts: WavePartSummary[];
       }>;
     }>("/mobile/waves/released"),
@@ -683,6 +684,7 @@ export const api = {
         isMine: boolean;
         collectionDeadline: string | null;
         marketplaces?: string[];
+        orders?: WaveOrderSummary[];
         part: WavePartRef | null;
       };
       lines: WaveLineSummary[];
@@ -712,6 +714,7 @@ export const api = {
         isMine: boolean;
         collectionDeadline: string | null;
         marketplaces?: string[];
+        orders?: WaveOrderSummary[];
         part: WavePartRef | null;
       };
       lines: WaveLineSummary[];
@@ -1066,6 +1069,13 @@ export interface WorkShareSummary {
 export interface WorkRefDto {
   mine: WorkShareSummary | null;
   shares: WorkShareSummary[];
+}
+
+export interface WaveOrderSummary {
+  id: string;
+  erpOrderId: string;
+  customerName: string | null;
+  marketplace: string;
 }
 
 export interface WavePartSummary {

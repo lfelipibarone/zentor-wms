@@ -28,7 +28,7 @@ import {
 } from "./packing-queue-sort.js";
 import { getRouteEngine } from "./route-engine/index.js";
 import { sortPendingItemsByEngine } from "./route-engine/route-helpers.js";
-import { detectLabelFormat } from "./tiny-shipping-labels.js";
+import { apiLabelFormat } from "./tiny-shipping-labels.js";
 import { restoreFaceOnReturn } from "./location-level.js";
 import { recordOrderStageChange } from "./order-stage-log.js";
 import { loadApproachWaveDefs } from "./approach-waves/store.js";
@@ -646,6 +646,12 @@ export async function completePacking(orderId: string, userId: string) {
 
   const order = await prisma.order.findUnique({ where: { id: orderId } });
   if (order) {
+    const { scheduleOrderShippingLabel } = await import(
+      "./ensure-shipping-labels.js"
+    );
+    // Garante etiqueta no servidor mesmo se a UI falhar ao imprimir.
+    scheduleOrderShippingLabel(order.tenantId, orderId);
+
     await notifyUsersWithPermission(Permission.SHIPPING_VIEW, {
       title: "Pedido pronto para expedir",
       body: `${order.erpOrderId} aguarda despacho.`,
@@ -1020,7 +1026,7 @@ async function listWavePackingLinesInternal(tenantId: string) {
     },
     take: 100,
     include: {
-      product: { select: { sku: true, name: true } },
+      product: { select: { sku: true, name: true, imageUrl: true } },
       wave: {
         select: {
           id: true,
@@ -1051,6 +1057,7 @@ async function listWavePackingLinesInternal(tenantId: string) {
                 select: {
                   id: true,
                   erpOrderId: true,
+                  customerName: true,
                   marketplace: true,
                   basket: { select: { code: true } },
                 },
@@ -1074,6 +1081,7 @@ async function listWavePackingLinesInternal(tenantId: string) {
       collectionDeadline,
       sku: l.product.sku,
       productName: l.product.name,
+      imageUrl: l.product.imageUrl,
       locationBarcode: l.pickLocation.barcode,
       routeLabel: formatRouteLabel(l.pickLocation),
       quantityPicked: l.quantityPicked,
@@ -1087,6 +1095,7 @@ async function listWavePackingLinesInternal(tenantId: string) {
         remaining: Math.max(0, a.quantity - a.quantitySorted),
         orderId: a.orderItem.order.id,
         erpOrderId: a.orderItem.order.erpOrderId,
+        customerName: a.orderItem.order.customerName,
         marketplace: a.orderItem.order.marketplace,
         basketCode: a.orderItem.order.basket?.code ?? null,
       })),
@@ -1242,7 +1251,7 @@ export async function getWavePackingOverview(tenantId: string, waveId: string) {
         orderStatus: o.status,
         basketCode: o.basket?.code ?? null,
         hasLabel: Boolean(o.shippingLabel),
-        labelFormat: o.shippingLabel ? detectLabelFormat(o.shippingLabel) : null,
+        labelFormat: o.shippingLabel ? apiLabelFormat(o.shippingLabel) : null,
       };
     }),
   }));
@@ -1318,7 +1327,7 @@ export async function getWavePackingOverview(tenantId: string, waveId: string) {
       collectionDeadline: o.collectionDeadline?.toISOString() ?? null,
       basketCode: o.basketCode,
       hasLabel: Boolean(o.shippingLabel),
-      labelFormat: o.shippingLabel ? detectLabelFormat(o.shippingLabel) : null,
+      labelFormat: o.shippingLabel ? apiLabelFormat(o.shippingLabel) : null,
       unitsTotal: unitsByOrder.get(o.id)?.total ?? 0,
       unitsSorted: unitsByOrder.get(o.id)?.sorted ?? 0,
     }))

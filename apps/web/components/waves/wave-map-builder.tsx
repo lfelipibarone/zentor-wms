@@ -305,7 +305,11 @@ export function WaveMapBuilder({
         templateId: template?.id,
       });
       const kind = template ? `da onda fixa "${template.name}"` : "temporária";
-      const text = `Onda ${kind} criada com ${result.orderCount} pedido(s) → ${result.lineCount} linha(s). Ela já aparece em "Ondas ativas".`;
+      const waveCount = result.waveCount ?? 1;
+      const text =
+        waveCount > 1
+          ? `${waveCount} ondas ${kind} criadas com ${result.orderCount} pedido(s) → ${result.lineCount} linha(s) (separadas por marketplace). Já aparecem em "Ondas ativas".`
+          : `Onda ${kind} criada com ${result.orderCount} pedido(s) → ${result.lineCount} linha(s). Ela já aparece em "Ondas ativas".`;
       onCreated(text);
       if (!template) setSelected(new Set());
       await load();

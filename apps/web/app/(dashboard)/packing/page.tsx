@@ -17,6 +17,7 @@ import { MarketplaceBadge } from "@/components/ops/marketplace-badge";
 import { MarketplaceFilter } from "@/components/ops/marketplace-filter";
 import { matchesMarketplaceFilter } from "@/lib/marketplace-filter-client";
 import { DataState } from "@/components/ops/data-state";
+import { ProductImageZoom } from "@/components/ops/product-image-zoom";
 import { WaveLineIssueModal } from "@/components/ops/wave-line-issue-modal";
 import { PackingOrderInline } from "@/components/ops/packing-order-inline";
 import { apiFetch } from "@/lib/api/client";
@@ -39,8 +40,8 @@ import { ensureAndPrintOrderShippingLabel } from "@/lib/print-order-shipping-lab
 type QueueFilter = "all" | "wave" | "order";
 
 const ZONE_STORAGE_KEY = "packing.approachWaveId";
-/** SKU | Local | Qtd | Ações — pedido fica no cabeçalho do grupo */
-const WAVE_ITEM_COLS = "minmax(140px,1.3fr) minmax(100px,0.9fr) 88px 188px";
+/** Img | SKU | Local | Qtd | Ações — pedido fica no cabeçalho do grupo */
+const WAVE_ITEM_COLS = "48px minmax(120px,1.2fr) minmax(100px,0.9fr) 88px 188px";
 
 function normalizeBasketCode(code: string) {
   return code.trim().toLowerCase();
@@ -319,7 +320,12 @@ export default function PackingPage() {
       let fail = 0;
       for (const o of withLabel) {
         try {
-          zpls.push((await fetchShippingLabelText(o.id)).trim());
+          const text = (await fetchShippingLabelText(o.id)).trim();
+          if (!text || (!/\^XA/i.test(text) && !/~DG/i.test(text))) {
+            fail++;
+            continue;
+          }
+          zpls.push(text);
         } catch {
           fail++;
         }
@@ -539,9 +545,11 @@ type UnifiedReadyRow = {
   allocationId: string;
   orderId: string;
   erpOrderId: string;
+  customerName: string | null;
   basketCode: string | null;
   sku: string;
   productName: string;
+  imageUrl: string | null;
   routeLabel: string;
   remaining: number;
   qtyDone: number;
@@ -551,6 +559,7 @@ type UnifiedReadyRow = {
 type OrderGroup = {
   orderId: string;
   erpOrderId: string;
+  customerName: string | null;
   basketCode: string | null;
   rows: UnifiedReadyRow[];
   pendingCount: number;
@@ -649,9 +658,11 @@ function WaveStationBlock({
         allocationId: a.id,
         orderId: a.orderId,
         erpOrderId: a.erpOrderId,
+        customerName: a.customerName ?? null,
         basketCode: a.basketCode,
         sku: line.sku,
         productName: line.productName,
+        imageUrl: line.imageUrl ?? null,
         routeLabel: line.routeLabel ?? line.locationBarcode,
         remaining: a.remaining,
         qtyDone: a.quantitySorted,
@@ -677,10 +688,14 @@ function WaveStationBlock({
         existing.rows.push(row);
         if (row.remaining > 0) existing.pendingCount += 1;
         if (!existing.basketCode && row.basketCode) existing.basketCode = row.basketCode;
+        if (!existing.customerName && row.customerName) {
+          existing.customerName = row.customerName;
+        }
       } else {
         map.set(row.orderId, {
           orderId: row.orderId,
           erpOrderId: row.erpOrderId,
+          customerName: row.customerName,
           basketCode: row.basketCode,
           rows: [row],
           pendingCount: row.remaining > 0 ? 1 : 0,
@@ -1015,6 +1030,11 @@ function WaveStationBlock({
                 <span className="font-mono text-sm font-bold text-slate-900">
                   {group.erpOrderId}
                 </span>
+                {group.customerName ? (
+                  <span className="text-sm font-semibold text-slate-700">
+                    {group.customerName}
+                  </span>
+                ) : null}
                 <span className="min-w-0 flex-1 text-sm text-slate-500">
                   {group.basketCode ? `cesta ${group.basketCode}` : "sem cesta"}
                   {" · "}
@@ -1042,6 +1062,7 @@ function WaveStationBlock({
                     className="grid items-center gap-x-3 border-b border-slate-100 bg-white px-3 py-2 text-[11px] font-semibold uppercase tracking-wide text-slate-400"
                     style={{ gridTemplateColumns: WAVE_ITEM_COLS }}
                   >
+                    <span />
                     <span>SKU</span>
                     <span>Local</span>
                     <span>Qtd</span>
@@ -1064,6 +1085,13 @@ function WaveStationBlock({
                         )}
                         style={{ gridTemplateColumns: WAVE_ITEM_COLS }}
                       >
+                        <ProductImageZoom
+                          src={row.imageUrl}
+                          alt={row.productName}
+                          className="relative h-10 w-10 shrink-0 overflow-hidden rounded-md bg-slate-100"
+                          sizes="40px"
+                          placeholder="—"
+                        />
                         <span
                           className="truncate font-mono text-sm font-semibold text-slate-800"
                           title={row.sku}
@@ -1197,6 +1225,11 @@ function OrderRow({ order, onOpen }: { order: PackingOrder; onOpen: () => void }
         </div>
         <p className="mt-1.5 font-mono text-base font-bold text-slate-900">
           {order.erpOrderId}
+          {order.customerName ? (
+            <span className="ml-2 font-sans text-sm font-semibold text-slate-700">
+              · {order.customerName}
+            </span>
+          ) : null}
         </p>
         <p className="text-sm text-slate-500">
           Cesta {order.basket?.code ?? "—"} · {order.items.length} itens

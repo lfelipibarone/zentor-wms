@@ -40,6 +40,7 @@ import {
   getOrderIdsInActiveWave,
   getWaveLineDetail,
   mapWaveLineSummary,
+  waveHasPickPending,
 } from "../services/pick-wave.js";
 import { acceptOrdersBatch } from "../services/order-picking-batch.js";
 import { isWaveEnabled } from "../services/wave-settings.js";
@@ -322,7 +323,8 @@ export async function mobileRoutes(app: FastifyInstance) {
       const { orderId } = request.params;
       const { basketBarcode } = request.body ?? {};
 
-      if (!basketBarcode?.trim()) {
+      const basketCodeOrBarcode = basketBarcode?.trim();
+      if (!basketCodeOrBarcode) {
         return reply.status(400).send({ error: "Código da cesta obrigatório" });
       }
 
@@ -330,8 +332,11 @@ export async function mobileRoutes(app: FastifyInstance) {
       const basket = await prisma.basket.findFirst({
         where: {
           tenantId,
-          barcode: basketBarcode.trim(),
           active: true,
+          OR: [
+            { barcode: { equals: basketCodeOrBarcode, mode: "insensitive" } },
+            { code: { equals: basketCodeOrBarcode, mode: "insensitive" } },
+          ],
         },
       });
       if (!basket) return reply.status(404).send({ error: "Cesta não encontrada" });
@@ -1323,6 +1328,12 @@ export async function mobileRoutes(app: FastifyInstance) {
         waveOrders.map((o) => formatMarketplace(o.marketplace)).filter((m) => m !== "—"),
       ),
     ];
+    const orders = waveOrders.map((o) => ({
+      id: o.id,
+      erpOrderId: o.erpOrderId,
+      customerName: o.customerName ?? null,
+      marketplace: formatMarketplace(o.marketplace),
+    }));
     return {
       wave: {
         id: wave.id,
@@ -1332,6 +1343,7 @@ export async function mobileRoutes(app: FastifyInstance) {
         orderCount: wave.orders.length,
         gondolaPasses: lines.length,
         marketplaces,
+        orders,
         acceptedById: owner.id,
         acceptedByName: owner.name,
         acceptedAt: owner.at,
@@ -1393,6 +1405,12 @@ export async function mobileRoutes(app: FastifyInstance) {
         orderCount: w._count.orders,
         lineCount: w._count.lines,
         marketplaces,
+        orders: orders.map((o) => ({
+          id: o.id,
+          erpOrderId: o.erpOrderId,
+          customerName: o.customerName ?? null,
+          marketplace: formatMarketplace(o.marketplace),
+        })),
         acceptedById: w.acceptedById,
         acceptedByName: w.acceptedBy?.name ?? null,
         packingUrgency: urgency,
@@ -1423,7 +1441,8 @@ export async function mobileRoutes(app: FastifyInstance) {
     const myShare = await findMyOpenWaveShare(tenantId, userId);
     if (myShare?.waveId) {
       const mineWave = await getReleasedWaveById(tenantId, myShare.waveId);
-      if (mineWave) {
+      // Coleta já concluída: some da tela do picker (packing web ainda vê a onda).
+      if (mineWave && waveHasPickPending(mineWave.lines)) {
         return mapWaveMobilePayloadWithWork(
           mineWave,
           userId,

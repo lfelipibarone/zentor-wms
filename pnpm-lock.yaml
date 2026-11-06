@@ -22,6 +22,9 @@ importers:
       fastify:
         specifier: ^5.3.3
         version: 5.8.5
+      fflate:
+        specifier: ^0.8.2
+        version: 0.8.3
       prisma:
         specifier: ^6.8.2
         version: 6.19.3(typescript@5.9.3)

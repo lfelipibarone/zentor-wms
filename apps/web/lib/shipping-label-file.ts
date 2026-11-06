@@ -11,7 +11,7 @@ function parseFilename(contentDisposition: string | null, fallback: string): str
 export async function downloadShippingLabelFile(
   orderId: string,
   refresh = false,
-): Promise<{ filename: string; blob: Blob }> {
+): Promise<{ filename: string; blob: Blob; contentType: string }> {
   const qs = refresh ? "?refresh=1" : "";
   const res = await fetch(
     `${API_BASE}/api/packing/orders/${orderId}/shipping-label/file${qs}`,
@@ -33,11 +33,14 @@ export async function downloadShippingLabelFile(
   }
 
   const blob = await res.blob();
+  const contentType = res.headers.get("Content-Type") ?? "application/octet-stream";
   const filename = parseFilename(
     res.headers.get("Content-Disposition"),
-    `etiqueta-${orderId}.zpl`,
+    contentType.includes("pdf")
+      ? `etiqueta-${orderId}.pdf`
+      : `etiqueta-${orderId}.zpl`,
   );
-  return { filename, blob };
+  return { filename, blob, contentType };
 }
 
 export async function fetchShippingLabelText(

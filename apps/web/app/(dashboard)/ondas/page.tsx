@@ -98,7 +98,7 @@ export default function OndasPage() {
   const [search, setSearch] = useState("");
   const [marketplaceFilter, setMarketplaceFilter] = useState("");
   const [partitionStrategy, setPartitionStrategy] =
-    useState<WavePartitionStrategy>("BY_PRODUCT");
+    useState<WavePartitionStrategy>("SINGLE_WAVE");
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [manualPreview, setManualPreview] = useState<WavePreview | null>(null);
   const [manualPreviewLoading, setManualPreviewLoading] = useState(false);
@@ -212,8 +212,11 @@ export default function OndasPage() {
     setMessage(null);
     try {
       const result = await releaseWave({ auto: true, ...waveParams() });
+      const waveCount = result.waveCount ?? 1;
       setMessage(
-        `Onda liberada: ${result.orderCount} pedidos → ${result.lineCount} passagens na gôndola (mesmo SKU agrupado).`,
+        waveCount > 1
+          ? `${waveCount} ondas liberadas: ${result.orderCount} pedidos → ${result.lineCount} passagens (uma onda por marketplace).`
+          : `Onda liberada: ${result.orderCount} pedidos → ${result.lineCount} passagens na gôndola (mesmo SKU agrupado).`,
       );
       setPreview(null);
       await load();

@@ -6,7 +6,15 @@ import { BarcodeScanner } from "@/components/BarcodeScanner";
 import { FactoryButton } from "@/components/FactoryButton";
 import { ProductThumbnail } from "@/components/ProductThumbnail";
 import { ScreenShell } from "@/components/ScreenShell";
-import { Badge, Card, Loading, Notice, SectionTitle } from "@/components/ui";
+import {
+  Badge,
+  Card,
+  Field,
+  Loading,
+  Notice,
+  OrDivider,
+  SectionTitle,
+} from "@/components/ui";
 import { modules } from "@/lib/modules";
 import {
   useAttachBasket,
@@ -28,6 +36,7 @@ export default function BasketScanScreen() {
   const attach = useAttachBasket(orderId);
   const releaseAccept = useReleaseOrderAccept(orderId);
   const [scannerOpen, setScannerOpen] = useState(false);
+  const [basketDraft, setBasketDraft] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [allowLeave, setAllowLeave] = useState(false);
   const releasingRef = useRef(false);
@@ -81,11 +90,16 @@ export default function BasketScanScreen() {
     },
   );
 
-  const handleScan = async (barcode: string) => {
+  const submitBasket = async (codeOrBarcode: string) => {
+    const value = codeOrBarcode.trim();
+    if (!value) {
+      setError("Informe o nome ou código da cesta");
+      return;
+    }
     setScannerOpen(false);
     setError(null);
     try {
-      const result = await attach.mutateAsync(barcode);
+      const result = await attach.mutateAsync(value);
       router.replace({
         pathname: "/picking/[orderId]/pick",
         params: { orderId, basketCode: result.basketCode },
@@ -93,6 +107,10 @@ export default function BasketScanScreen() {
     } catch (e) {
       setError(e instanceof ApiError ? e.message : "Cesta inválida");
     }
+  };
+
+  const handleScan = async (barcode: string) => {
+    await submitBasket(barcode);
   };
 
   const handleReleaseAcceptPress = async () => {
@@ -148,6 +166,29 @@ export default function BasketScanScreen() {
         onPress={() => setScannerOpen(true)}
         loading={attach.isPending}
       />
+      <OrDivider label="ou digite o nome" />
+      <View style={styles.basketRow}>
+        <Field
+          style={styles.flex}
+          value={basketDraft}
+          onChangeText={setBasketDraft}
+          placeholder="Ex.: CESTA-042"
+          autoCapitalize="characters"
+          autoCorrect={false}
+          returnKeyType="done"
+          editable={!attach.isPending}
+          onSubmitEditing={() => void submitBasket(basketDraft)}
+        />
+        <FactoryButton
+          label="Vincular"
+          icon="checkmark"
+          size="md"
+          variant="secondary"
+          disabled={!basketDraft.trim()}
+          loading={attach.isPending}
+          onPress={() => void submitBasket(basketDraft)}
+        />
+      </View>
 
       {session ? (
         <>
@@ -207,6 +248,8 @@ export default function BasketScanScreen() {
 const color = modules.picking.color;
 
 const styles = StyleSheet.create({
+  flex: { flex: 1 },
+  basketRow: { flexDirection: "row", gap: spacing.sm, alignItems: "center" },
   locationCard: {
     backgroundColor: color,
     borderRadius: radius.xl,

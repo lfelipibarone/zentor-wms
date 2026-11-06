@@ -5,6 +5,7 @@ import { Loader2, X } from "lucide-react";
 import { CollectionDeadlineIndicator } from "@/components/ops/collection-deadline-indicator";
 import { MarketplaceBadge } from "@/components/ops/marketplace-badge";
 import { PackingIssueModal } from "@/components/ops/packing-issue-modal";
+import { ProductImageZoom } from "@/components/ops/product-image-zoom";
 import {
   ShippingLabelPanel,
   type ShippingLabelPanelHandle,
@@ -18,7 +19,7 @@ import {
 import { cn } from "@/lib/utils";
 
 const ITEM_GRID_COLS =
-  "minmax(110px,0.9fr) minmax(140px,1.4fr) minmax(88px,0.7fr) 88px 188px";
+  "48px minmax(110px,0.9fr) minmax(140px,1.4fr) minmax(88px,0.7fr) 88px 188px";
 
 type Props = {
   orderId: string;
@@ -245,6 +246,11 @@ export function PackingOrderInline({
           </div>
           <h2 className="font-mono text-lg font-bold text-slate-900">
             {order.erpOrderId}
+            {order.customerName ? (
+              <span className="ml-2 font-sans text-base font-semibold text-slate-700">
+                · {order.customerName}
+              </span>
+            ) : null}
           </h2>
           <p className="text-sm text-slate-500">
             Cesta {order.basket?.code ?? "—"}
@@ -296,6 +302,7 @@ export function PackingOrderInline({
                 className="grid items-center gap-x-3 border-b border-slate-100 bg-slate-50/80 px-3 py-2 text-[11px] font-semibold uppercase tracking-wide text-slate-500"
                 style={{ gridTemplateColumns: ITEM_GRID_COLS }}
               >
+                <span />
                 <span>SKU</span>
                 <span>Produto</span>
                 <span>Local</span>
@@ -323,6 +330,13 @@ export function PackingOrderInline({
                     )}
                     style={{ gridTemplateColumns: ITEM_GRID_COLS }}
                   >
+                    <ProductImageZoom
+                      src={item.product.imageUrl}
+                      alt={item.product.name}
+                      className="relative h-10 w-10 shrink-0 overflow-hidden rounded-md bg-slate-100"
+                      sizes="40px"
+                      placeholder="—"
+                    />
                     <span className="truncate font-mono text-sm font-semibold">
                       {item.product.sku}
                     </span>

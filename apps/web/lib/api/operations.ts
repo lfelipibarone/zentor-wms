@@ -724,6 +724,7 @@ export type PackingWaveLineAllocation = {
   remaining: number;
   orderId: string;
   erpOrderId: string;
+  customerName: string | null;
   marketplace: string | null;
   basketCode: string | null;
 };
@@ -737,6 +738,7 @@ export type PackingWaveLineSummary = {
   collectionDeadline?: string | null;
   sku: string;
   productName: string;
+  imageUrl?: string | null;
   locationBarcode: string;
   routeLabel?: string;
   quantityPicked: number;

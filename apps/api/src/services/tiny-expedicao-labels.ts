@@ -267,7 +267,8 @@ export function findPedidoNoIndice(
 
 export type CriarAgrupamentoBody =
   | { idsNotasFiscais: number[] }
-  | { idsPedidos: number[] };
+  | { idsPedidos: number[] }
+  | { idsExpedicoes: number[] };
 
 /** POST /expedicao — criar agrupamento */
 export async function criarAgrupamentoExpedicao(
@@ -283,6 +284,75 @@ export async function concluirAgrupamentoExpedicao(
   idAgrupamento: number,
 ) {
   return client.request("POST", `/expedicao/${idAgrupamento}/concluir`);
+}
+
+export type OneStepShippingItem = {
+  idPedido: number;
+  idExpedicao: number | null;
+  idAgrupamento: number | null;
+  urls: string[];
+  erro: { codigo: number | null; mensagem: string | null } | null;
+};
+
+export type OneStepShippingResult = {
+  item: OneStepShippingItem | null;
+  unsupported: boolean;
+  error?: string;
+};
+
+/**
+ * POST /expedicao/etiquetas — One Step Shipping (ecommerce / gateway / logística própria).
+ * Cria expedição, agrupa, conclui e devolve URLs numa chamada.
+ * Para TRANSPORTADORA/CUSTOMIZADO a Tiny pede o fluxo clássico.
+ */
+export async function oneStepShippingEtiquetas(
+  client: TinyApiV3Client,
+  pedidoId: number,
+): Promise<OneStepShippingResult> {
+  try {
+    const body = asRecord(
+      await client.request("POST", "/expedicao/etiquetas", {
+        body: { idsPedidos: [pedidoId] },
+      }),
+    );
+    const raw = asArray(body?.itens)[0];
+    const itemRec = asRecord(raw);
+    if (!itemRec) {
+      return { item: null, unsupported: false, error: "One Step Shipping sem itens na resposta" };
+    }
+    const erroRec = asRecord(itemRec.erro);
+    const urls = asArray(itemRec.urls)
+      .map((u) => str(u))
+      .filter((u): u is string => Boolean(u));
+    const item: OneStepShippingItem = {
+      idPedido: num(itemRec.idPedido) ?? pedidoId,
+      idExpedicao: num(itemRec.idExpedicao),
+      idAgrupamento: num(itemRec.idAgrupamento),
+      urls,
+      erro: erroRec
+        ? {
+            codigo: num(erroRec.codigo),
+            mensagem: str(erroRec.mensagem),
+          }
+        : null,
+    };
+    return { item, unsupported: false };
+  } catch (e) {
+    const message = e instanceof Error ? e.message : String(e);
+    const lower = message.toLowerCase();
+    const unsupported =
+      lower.includes("transportadora") ||
+      lower.includes("customizado") ||
+      lower.includes("fluxo padrão") ||
+      lower.includes("fluxo padrao") ||
+      (e instanceof TinyApiError && e.statusCode === 404);
+    return { item: null, unsupported, error: message };
+  }
+}
+
+export function isOneStepRetryable(item: OneStepShippingItem | null): boolean {
+  // Código 39 = item não processado no orçamento de tempo (docs Tiny).
+  return item?.erro?.codigo === 39;
 }
 
 export async function obterPedidoTiny(
@@ -361,6 +431,19 @@ export type EnsureExpedicaoResult = {
   error?: string;
 };
 
+function extractIdsExpedicaoFromCreate(created: unknown): number[] {
+  const rec = asRecord(created);
+  return asArray(rec?.idsExpedicao)
+    .map((id) => num(id))
+    .filter((id): id is number => Boolean(id));
+}
+
+function isAlreadyExpeditedError(message: string | null | undefined): boolean {
+  if (!message) return false;
+  const m = message.toLowerCase();
+  return m.includes("já foi expedida") || m.includes("ja foi expedida");
+}
+
 /** Localiza pedido no índice ou cria agrupamento na Tiny (NF preferencial). */
 export async function ensurePedidoInExpedicao(
   client: TinyApiV3Client,
@@ -382,7 +465,9 @@ export async function ensurePedidoInExpedicao(
   }
 
   let idAgrupamento: number | null = null;
+  let idsExpedicao: number[] = [];
   let createError: string | null = null;
+  let alreadyExpedited = false;
 
   if (idNotaFiscal) {
     try {
@@ -390,17 +475,22 @@ export async function ensurePedidoInExpedicao(
         idsNotasFiscais: [idNotaFiscal],
       });
       idAgrupamento = num(asRecord(created)?.id);
+      idsExpedicao = extractIdsExpedicaoFromCreate(created);
     } catch (e) {
       createError = e instanceof Error ? e.message : String(e);
+      alreadyExpedited = isAlreadyExpeditedError(createError);
     }
   }
 
-  if (!idAgrupamento) {
+  // idsPedidos com NF já expedida costuma criar lote vazio (expedicoes: []).
+  // Só usa esse caminho se ainda não temos agrupamento útil e a NF não está "já expedida".
+  if (!idAgrupamento && !alreadyExpedited) {
     try {
       const created = await criarAgrupamentoExpedicao(client, {
         idsPedidos: [pedidoId],
       });
       idAgrupamento = num(asRecord(created)?.id);
+      idsExpedicao = extractIdsExpedicaoFromCreate(created);
       createError = null;
     } catch (e) {
       createError = e instanceof Error ? e.message : String(e);
@@ -417,17 +507,27 @@ export async function ensurePedidoInExpedicao(
     if (match) {
       return { match, createdAgrupamento: true };
     }
+    // Lote vazio (comum em Mercado Envios via idsPedidos): não conta como sucesso.
+    if (idsExpedicao.length === 0) {
+      createError =
+        createError ??
+        "Agrupamento Tiny criado sem expedições. Use One Step Shipping ou agrupe pelo ERP.";
+    }
   }
 
+  // NF já expedida / race: reindexa — o pedido pode já estar em outro lote.
   index = await buildPedidoExpedicaoIndex(client);
   const afterCreate = findPedidoNoIndice(index, pedidoId, idNotaFiscal);
   if (afterCreate) {
-    return { match: afterCreate, createdAgrupamento: Boolean(idAgrupamento) };
+    return {
+      match: afterCreate,
+      createdAgrupamento: Boolean(idAgrupamento) && idsExpedicao.length > 0,
+    };
   }
 
   return {
     match: null,
-    createdAgrupamento: Boolean(idAgrupamento),
+    createdAgrupamento: false,
     error:
       createError ??
       "Pedido não está em agrupamento de expedição no Tiny. Verifique NF e forma de envio.",

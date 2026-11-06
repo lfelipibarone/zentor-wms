@@ -3,19 +3,33 @@ import * as Device from "expo-device";
 import { Platform } from "react-native";
 import { registerPushDevice } from "./notifications-api";
 
+type NotificationsModule = typeof import("expo-notifications");
+
 /** Remote push is unavailable in Expo Go since SDK 53. */
 function isRemotePushSupported(): boolean {
   if (!Device.isDevice) return false;
-  return (
-    Constants.appOwnership !== "expo" &&
-    Constants.executionEnvironment !== "storeClient"
-  );
+  if (Constants.appOwnership === "expo") return false;
+  if (Constants.executionEnvironment === "storeClient") return false;
+  return true;
+}
+
+/**
+ * APK/dev client antigo pode não ter ExpoApplication / expo-notifications nativo.
+ * Falha de módulo nativo vira null — o app segue sem push.
+ */
+async function loadNotifications(): Promise<NotificationsModule | null> {
+  try {
+    return await import("expo-notifications");
+  } catch {
+    return null;
+  }
 }
 
 export async function setupPushNotifications(): Promise<void> {
   if (!isRemotePushSupported()) return;
 
-  const Notifications = await import("expo-notifications");
+  const Notifications = await loadNotifications();
+  if (!Notifications) return;
 
   Notifications.setNotificationHandler({
     handleNotification: async () => ({
@@ -53,7 +67,8 @@ export async function listenForPushTaps(
   onRoute: (route: PushRoute) => void,
 ): Promise<() => void> {
   if (!isRemotePushSupported()) return () => {};
-  const Notifications = await import("expo-notifications");
+  const Notifications = await loadNotifications();
+  if (!Notifications) return () => {};
   const handle = (data: unknown) => {
     const route = (data as { route?: PushRoute } | null)?.route;
     if (route?.pathname) onRoute({ pathname: route.pathname, params: route.params ?? {} });

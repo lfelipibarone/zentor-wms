@@ -21,8 +21,37 @@ type QzApi = {
   configs: {
     create: (printer: string | null, opts?: { size?: { width: number; height: number } }) => unknown;
   };
-  print: (config: unknown, data: Array<{ type: string; format: string; data: string }>) => Promise<void>;
+  print: (
+    config: unknown,
+    data: Array<{
+      type: string;
+      format: string;
+      flavor?: string;
+      data: string;
+    }>,
+  ) => Promise<void>;
 };
+
+async function resolveQzPrinter(printerName?: string | null): Promise<string> {
+  const qz = await getQz();
+  if (!qz.websocket.isActive()) {
+    await qz.websocket.connect({ host: ["localhost"], usingSecure: false });
+  }
+
+  const saved = printerName ?? getSavedQzPrinter();
+  const printer =
+    saved ??
+    (await qz.printers.getDefault()) ??
+    (await qz.printers.find())[0] ??
+    null;
+
+  if (!printer) {
+    throw new Error(
+      "Nenhuma impressora térmica encontrada. Instale o QZ Tray e configure a impressora padrão.",
+    );
+  }
+  return printer;
+}
 
 declare global {
   interface Window {
@@ -105,25 +134,41 @@ export async function printZplWithQz(
   printerName?: string | null,
 ): Promise<{ printer: string }> {
   const qz = await getQz();
-  if (!qz.websocket.isActive()) {
-    await qz.websocket.connect({ host: ["localhost"], usingSecure: false });
-  }
-
-  const saved = printerName ?? getSavedQzPrinter();
-  const printer =
-    saved ??
-    (await qz.printers.getDefault()) ??
-    (await qz.printers.find())[0] ??
-    null;
-
-  if (!printer) {
-    throw new Error(
-      "Nenhuma impressora térmica encontrada. Instale o QZ Tray e configure a impressora padrão.",
-    );
-  }
-
+  const printer = await resolveQzPrinter(printerName);
   const config = qz.configs.create(printer);
   await qz.print(config, [{ type: "raw", format: "plain", data: zpl }]);
+  saveQzPrinter(printer);
+  return { printer };
+}
+
+/** PDF (ex.: Amazon / alguns carriers) via QZ pixel/pdf. */
+export async function printPdfWithQz(
+  pdfBytes: ArrayBuffer | Uint8Array | Blob,
+  printerName?: string | null,
+): Promise<{ printer: string }> {
+  const qz = await getQz();
+  const printer = await resolveQzPrinter(printerName);
+  const config = qz.configs.create(printer, {
+    size: { width: 4, height: 6 },
+  });
+
+  const buffer =
+    pdfBytes instanceof Blob
+      ? new Uint8Array(await pdfBytes.arrayBuffer())
+      : pdfBytes instanceof ArrayBuffer
+        ? new Uint8Array(pdfBytes)
+        : pdfBytes;
+
+  let binary = "";
+  const chunk = 0x8000;
+  for (let i = 0; i < buffer.length; i += chunk) {
+    binary += String.fromCharCode(...buffer.subarray(i, i + chunk));
+  }
+  const base64 = btoa(binary);
+
+  await qz.print(config, [
+    { type: "pixel", format: "pdf", flavor: "base64", data: base64 },
+  ]);
   saveQzPrinter(printer);
   return { printer };
 }

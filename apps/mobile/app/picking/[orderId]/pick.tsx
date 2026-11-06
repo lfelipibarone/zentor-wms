@@ -14,7 +14,15 @@ import { ProblemReportModal } from "@/components/ProblemReportModal";
 import { CollectionDeadlineRow } from "@/components/CollectionDeadlineRow";
 import { ProductThumbnail } from "@/components/ProductThumbnail";
 import { ScreenShell } from "@/components/ScreenShell";
-import { Card, EmptyState, Loading, Notice, ProgressBar } from "@/components/ui";
+import {
+  Card,
+  EmptyState,
+  Field,
+  Loading,
+  Notice,
+  OrDivider,
+  ProgressBar,
+} from "@/components/ui";
 import { useAdjustLocationStock } from "@/hooks/useAdjustLocationStock";
 import {
   useAttachBasket,
@@ -62,6 +70,7 @@ export default function PickScreen() {
   /** Gôndola do item recém-concluído: o separador precisa informar a % */
   const [afterPick, setAfterPick] = useState<AdjustStockContext | null>(null);
   const [feedback, setFeedback] = useState<string | null>(null);
+  const [basketDraft, setBasketDraft] = useState("");
 
   const next = session?.nextItem;
   const itemId = next?.id ?? "";
@@ -88,22 +97,6 @@ export default function PickScreen() {
   useEffect(() => {
     resetItemFlow();
   }, [itemId, resetItemFlow]);
-
-  // Abre o leitor da gôndola assim que o item estiver pronto (sem segundo toque)
-  useEffect(() => {
-    if (!itemId || !next || locationValidated || afterPick) return;
-    if (scannerOpen || problemOpen || adjustOpen) return;
-    openScanner("location");
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- só ao trocar de item
-  }, [itemId]);
-
-  // Itens prontos sem cesta: bipar cesta para o packing encontrar o pedido
-  useEffect(() => {
-    if (!session?.allPicked || session.order.basket || basketCode) return;
-    if (afterPick || scannerOpen || problemOpen) return;
-    openScanner("basket");
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [session?.allPicked, session?.order.basket?.id]);
 
   const adjustContext: AdjustStockContext | null =
     next?.pickLocation
@@ -284,10 +277,16 @@ export default function PickScreen() {
     }
   }, [completePicking]);
 
-  const handleBasketScan = async (barcode: string) => {
+  const submitBasket = async (codeOrBarcode: string) => {
+    const value = codeOrBarcode.trim();
+    if (!value) {
+      setFeedback("Informe o nome ou código da cesta");
+      return;
+    }
     setScannerOpen(false);
     try {
-      const result = await attachBasket.mutateAsync(barcode);
+      const result = await attachBasket.mutateAsync(value);
+      setBasketDraft("");
       setFeedback(`Cesta ${result.basketCode} vinculada ✓`);
       await refetch();
       // Itens já separados: vinculou a cesta → envia ao packing
@@ -296,15 +295,17 @@ export default function PickScreen() {
       }
     } catch (e) {
       setFeedback(e instanceof ApiError ? e.message : "Cesta inválida");
-      openScanner("basket");
     }
+  };
+
+  const handleBasketScan = async (barcode: string) => {
+    await submitBasket(barcode);
   };
 
   const handleCompleteOrder = async () => {
     const hasBasket = Boolean(session?.order.basket || basketCode);
     if (!hasBasket) {
-      setFeedback("Bipe a cesta onde colocou os itens");
-      openScanner("basket");
+      setFeedback("Informe ou bipe a cesta onde colocou os itens");
       return;
     }
     await finishPicking();
@@ -369,14 +370,39 @@ export default function PickScreen() {
           </Notice>
         ) : null}
         {!hasBasket ? (
-          <FactoryButton
-            label="Bipar cesta"
-            icon="basket"
-            color={color}
-            loading={attachBasket.isPending}
-            disabled={afterPick !== null}
-            onPress={() => openScanner("basket")}
-          />
+          <>
+            <FactoryButton
+              label="Bipar cesta"
+              icon="basket"
+              color={color}
+              loading={attachBasket.isPending}
+              disabled={afterPick !== null}
+              onPress={() => openScanner("basket")}
+            />
+            <OrDivider label="ou digite o nome" />
+            <View style={styles.basketRow}>
+              <Field
+                style={styles.flex}
+                value={basketDraft}
+                onChangeText={setBasketDraft}
+                placeholder="Ex.: CESTA-042"
+                autoCapitalize="characters"
+                autoCorrect={false}
+                returnKeyType="done"
+                editable={afterPick === null && !attachBasket.isPending}
+                onSubmitEditing={() => void submitBasket(basketDraft)}
+              />
+              <FactoryButton
+                label="Vincular"
+                icon="checkmark"
+                size="md"
+                variant="secondary"
+                disabled={!basketDraft.trim() || afterPick !== null}
+                loading={attachBasket.isPending}
+                onPress={() => void submitBasket(basketDraft)}
+              />
+            </View>
+          </>
         ) : (
           <FactoryButton
             label="Enviar para conferência"
@@ -658,6 +684,7 @@ const color = modules.picking.color;
 
 const styles = StyleSheet.create({
   flex: { flex: 1 },
+  basketRow: { flexDirection: "row", gap: spacing.sm, alignItems: "center" },
   headerCount: { color: theme.headerTint, fontWeight: "900", fontSize: typography.body },
   progressWrap: { gap: spacing.sm },
   locationCard: {

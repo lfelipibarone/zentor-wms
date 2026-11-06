@@ -300,7 +300,10 @@ export class TinyApiV3Client {
           );
         }
         const rec = asRecord(data);
-        const msg =
+        const detailMsgs = asArray(rec?.detalhes)
+          .map((d) => str(asRecord(d)?.mensagem))
+          .filter((m): m is string => Boolean(m));
+        const baseMsg =
           str(rec?.mensagem) ??
           str(asRecord(rec?.error)?.message) ??
           (res.status === 429
@@ -308,6 +311,8 @@ export class TinyApiV3Client {
                 getConnectionRateLimitUntil(this.connectionId) || Date.now() + 60_000,
               )
             : `Erro Tiny HTTP ${res.status}`);
+        const msg =
+          detailMsgs.length > 0 ? `${baseMsg}: ${detailMsgs.join("; ")}` : baseMsg;
         throw new TinyApiError(msg, res.status, res.status === 429 ? "RATE_LIMIT" : undefined);
       }
 
@@ -383,6 +388,32 @@ export class TinyApiV3Client {
 
   async getPedido(id: number | string) {
     return this.request<Record<string, unknown>>("GET", `/pedidos/${id}`);
+  }
+
+  async listSeparacoes(params: {
+    situacao?: number;
+    dataInicial?: string;
+    dataFinal?: string;
+    limit?: number;
+    offset?: number;
+  }) {
+    const body = await this.request<{
+      itens?: unknown[];
+      paginacao?: { total?: number; limit?: number; offset?: number };
+    }>("GET", "/separacao", {
+      query: {
+        situacao: params.situacao,
+        dataInicial: params.dataInicial,
+        dataFinal: params.dataFinal,
+        limit: params.limit ?? 100,
+        offset: params.offset ?? 0,
+        orderBy: "desc",
+      },
+    });
+    return {
+      items: asArray(body.itens),
+      pagination: body.paginacao ?? {},
+    };
   }
 
   async listProdutos(params: {

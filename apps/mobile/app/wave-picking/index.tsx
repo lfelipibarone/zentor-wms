@@ -4,6 +4,8 @@ import {
   ActivityIndicator,
   FlatList,
   Pressable,
+  RefreshControl,
+  ScrollView,
   StyleSheet,
   Text,
   View,
@@ -11,10 +13,10 @@ import {
 import { FactoryButton } from "@/components/FactoryButton";
 import { CollectionDeadlineRow } from "@/components/CollectionDeadlineRow";
 import { SplitWorkModal } from "@/components/SplitWorkModal";
-import { WorkShareCard, workBlockedMessage } from "@/components/WorkTimer";
+import { workBlockedMessage } from "@/components/WorkTimer";
 import { useReleasedWaves, useWaveById } from "@/hooks/useWavePicking";
 import { useSplitWork } from "@/hooks/useWorkShares";
-import type { WaveLineSummary } from "@/lib/api";
+import type { WaveLineSummary, WaveOrderSummary } from "@/lib/api";
 import { ApiError } from "@/lib/api";
 import { showErrorAlert, showToast } from "@/lib/app-alert";
 import { theme, spacing, typography } from "@/lib/theme";
@@ -24,6 +26,25 @@ function statusLabel(line: WaveLineSummary) {
   if (line.sortStatus === "PICKED") return "Packing no web";
   if (line.quantityPicked > 0) return "Em andamento";
   return "Pendente";
+}
+
+function WaveOrdersBlock({ orders }: { orders: WaveOrderSummary[] }) {
+  if (orders.length === 0) return null;
+  return (
+    <View style={styles.ordersBlock}>
+      <Text style={styles.ordersTitle}>Pedidos</Text>
+      {orders.map((o) => (
+        <View key={o.id} style={styles.orderRow}>
+          <Text style={styles.orderErp} numberOfLines={1}>
+            {o.erpOrderId}
+          </Text>
+          <Text style={styles.orderCustomer} numberOfLines={1}>
+            {o.customerName?.trim() || o.marketplace || "—"}
+          </Text>
+        </View>
+      ))}
+    </View>
+  );
 }
 
 type WaveEntry = {
@@ -37,6 +58,7 @@ type WaveEntry = {
   acceptedByName: string | null;
   collectionDeadline: string | null;
   marketplaces?: string[];
+  orders?: WaveOrderSummary[];
 };
 
 export default function WavePickingListScreen() {
@@ -66,6 +88,7 @@ export default function WavePickingListScreen() {
           acceptedByName: p.acceptedByName,
           collectionDeadline: w.collectionDeadline,
           marketplaces: w.marketplaces,
+          orders: w.orders,
         }))
       : [
           {
@@ -79,6 +102,7 @@ export default function WavePickingListScreen() {
             acceptedByName: w.acceptedByName,
             collectionDeadline: w.collectionDeadline,
             marketplaces: w.marketplaces,
+            orders: w.orders,
           },
         ],
   );
@@ -97,7 +121,15 @@ export default function WavePickingListScreen() {
 
   if (released.error || entries.length === 0) {
     return (
-      <View style={styles.centered}>
+      <ScrollView
+        contentContainerStyle={styles.centered}
+        refreshControl={
+          <RefreshControl
+            refreshing={released.isRefetching}
+            onRefresh={() => void released.refetch()}
+          />
+        }
+      >
         <Text style={styles.error}>
           {released.error instanceof Error
             ? released.error.message
@@ -108,7 +140,7 @@ export default function WavePickingListScreen() {
           variant="secondary"
           onPress={() => released.refetch()}
         />
-      </View>
+      </ScrollView>
     );
   }
 
@@ -117,12 +149,14 @@ export default function WavePickingListScreen() {
       <View style={styles.container}>
         <Text style={styles.waveName}>Ondas liberadas</Text>
         <Text style={styles.waveMeta}>
-          Escolha a onda para separar (ordenadas por urgência de coleta)
+          Toque na onda para ver os pedidos (ordenadas por urgência)
         </Text>
         <FlatList
           data={entries}
           keyExtractor={(e) => e.key}
           contentContainerStyle={styles.list}
+          refreshing={released.isRefetching}
+          onRefresh={() => void released.refetch()}
           renderItem={({ item }) => (
             <Pressable
               style={[styles.card, item.color ? { borderColor: item.color } : null]}
@@ -145,11 +179,6 @@ export default function WavePickingListScreen() {
               )}
             </Pressable>
           )}
-        />
-        <FactoryButton
-          label="Atualizar"
-          variant="secondary"
-          onPress={() => released.refetch()}
         />
       </View>
     );
@@ -180,13 +209,54 @@ export default function WavePickingListScreen() {
   }
 
   const { wave, lines, work } = data;
+  const orders = wave.orders ?? [];
   const blocked = workBlockedMessage(work);
   const pending = lines.filter((l) => l.sortStatus !== "SORTED");
+  const pickPending = lines.filter(
+    (l) => l.sortStatus !== "PICKED" && l.sortStatus !== "SORTED" && l.remaining > 0,
+  );
+  const pickFinished = lines.length > 0 && pickPending.length === 0;
   const waveTitle = wave.part ? `${wave.name} · ${wave.part.name}` : wave.name;
+
+  if (pickFinished) {
+    return (
+      <ScrollView
+        contentContainerStyle={styles.centered}
+        refreshControl={
+          <RefreshControl
+            refreshing={released.isRefetching || isRefetching}
+            onRefresh={() => {
+              void released.refetch();
+              void refetch();
+              setSelected(null);
+            }}
+          />
+        }
+      >
+        <Text style={styles.waveName}>Coleta concluída</Text>
+        <Text style={styles.waveMeta}>
+          Esta onda saiu do picking. Puxe para atualizar.
+        </Text>
+        <FactoryButton
+          label="Voltar às ondas"
+          variant="secondary"
+          onPress={() => {
+            setSelected(null);
+            void released.refetch();
+          }}
+        />
+      </ScrollView>
+    );
+  }
 
   if (wave.canAccept) {
     return (
-      <View style={styles.centered}>
+      <ScrollView
+        contentContainerStyle={styles.acceptScroll}
+        refreshControl={
+          <RefreshControl refreshing={isRefetching} onRefresh={() => void refetch()} />
+        }
+      >
         {entries.length > 1 ? (
           <FactoryButton
             label="Trocar onda"
@@ -204,6 +274,7 @@ export default function WavePickingListScreen() {
             {wave.marketplaces.join(" · ")}
           </Text>
         ) : null}
+        <WaveOrdersBlock orders={orders} />
         <Text style={styles.acceptHint}>
           Mesmo SKU agrupado — pick consolidado; packing nas cestas no web.
         </Text>
@@ -239,19 +310,20 @@ export default function WavePickingListScreen() {
               });
           }}
         />
-        <FactoryButton
-          label="Atualizar"
-          variant="secondary"
-          onPress={() => refetch()}
-        />
-      </View>
+      </ScrollView>
     );
   }
 
   if (!wave.canWork) {
     return (
-      <View style={styles.centered}>
+      <ScrollView
+        contentContainerStyle={styles.centered}
+        refreshControl={
+          <RefreshControl refreshing={isRefetching} onRefresh={() => void refetch()} />
+        }
+      >
         <Text style={styles.waveName}>{waveTitle}</Text>
+        <WaveOrdersBlock orders={orders} />
         <Text style={styles.error}>
           {wave.part ? "Parte aceita por" : "Onda aceita por"} {wave.acceptedByName ?? "outro operador"}.
         </Text>
@@ -260,7 +332,7 @@ export default function WavePickingListScreen() {
           variant="secondary"
           onPress={() => refetch()}
         />
-      </View>
+      </ScrollView>
     );
   }
 
@@ -285,7 +357,7 @@ export default function WavePickingListScreen() {
             {wave.marketplaces.join(" · ")}
           </Text>
         ) : null}
-        <WorkShareCard work={work} />
+        <WaveOrdersBlock orders={orders} />
       </View>
 
       <FlatList
@@ -353,13 +425,6 @@ export default function WavePickingListScreen() {
           );
         }}
       />
-
-      <FactoryButton
-        label="Atualizar onda"
-        variant="secondary"
-        onPress={() => refetch()}
-        loading={isRefetching}
-      />
     </View>
   );
 }
@@ -367,11 +432,18 @@ export default function WavePickingListScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: theme.bg, padding: spacing.md },
   centered: {
-    flex: 1,
+    flexGrow: 1,
     justifyContent: "center",
     alignItems: "center",
     padding: spacing.lg,
     backgroundColor: theme.bg,
+  },
+  acceptScroll: {
+    flexGrow: 1,
+    padding: spacing.lg,
+    backgroundColor: theme.bg,
+    gap: spacing.sm,
+    alignItems: "center",
   },
   loadingText: { marginTop: spacing.md, color: theme.textMuted },
   error: {
@@ -380,7 +452,7 @@ const styles = StyleSheet.create({
     fontWeight: "700",
     marginBottom: spacing.lg,
   },
-  header: { marginBottom: spacing.md },
+  header: { marginBottom: spacing.md, gap: spacing.xs },
   waveName: {
     fontSize: typography.title,
     fontWeight: "900",
@@ -399,6 +471,25 @@ const styles = StyleSheet.create({
     fontSize: typography.caption,
     fontWeight: "600",
   },
+  ordersBlock: {
+    alignSelf: "stretch",
+    marginTop: spacing.sm,
+    padding: spacing.md,
+    borderRadius: 12,
+    backgroundColor: theme.surface,
+    borderWidth: 1,
+    borderColor: theme.border,
+    gap: 6,
+  },
+  ordersTitle: {
+    fontSize: typography.caption,
+    fontWeight: "800",
+    color: theme.textMuted,
+    textTransform: "uppercase",
+  },
+  orderRow: { gap: 2 },
+  orderErp: { fontWeight: "800", color: theme.text, fontSize: typography.body },
+  orderCustomer: { color: theme.textMuted, fontWeight: "600", fontSize: typography.caption },
   acceptHint: {
     color: theme.textMuted,
     textAlign: "center",

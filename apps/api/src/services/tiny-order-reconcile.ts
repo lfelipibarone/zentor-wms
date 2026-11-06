@@ -5,8 +5,13 @@ import {
   parseTinyPedidoSituacao,
   TINY_ORDER_SITUACAO_CANCELADA,
   TINY_ORDER_SITUACOES_SYNC,
+  TINY_SEPARACAO_SITUACOES_BLOCK_PICKING,
 } from "./tiny-integration.js";
-import { getTinyApiClient, isTinyRateLimitError } from "./tiny-api-v3-client.js";
+import {
+  getTinyApiClient,
+  isTinyRateLimitError,
+  type TinyApiV3Client,
+} from "./tiny-api-v3-client.js";
 
 export const TINY_CANCELLED_PAUSE_REASON =
   "Pedido cancelado no Tiny ERP — conferir antes de seguir com a operação";
@@ -47,6 +52,127 @@ export function decideTinyOrderReconcileAction(params: {
     return "flag_cancelled";
   }
   return "keep";
+}
+
+/**
+ * Pedidos Em Separação no Tiny não devem ficar na fila de picking do WMS
+ * (ainda que a venda continue Faturada).
+ */
+export function decideTinySeparacaoBlockAction(params: {
+  separacaoSituacao: number | null;
+  status: OrderStatus;
+  hasOperationalProgress: boolean;
+}): TinyReconcileAction {
+  if (
+    params.separacaoSituacao === null ||
+    !TINY_SEPARACAO_SITUACOES_BLOCK_PICKING.has(params.separacaoSituacao)
+  ) {
+    return "keep";
+  }
+  if (params.status === OrderStatus.PENDING) return "remove";
+  if (
+    params.status === OrderStatus.PAUSED_ISSUE &&
+    !params.hasOperationalProgress
+  ) {
+    return "remove";
+  }
+  return "keep";
+}
+
+function parseSeparacaoVendaId(item: Record<string, unknown>): number | null {
+  const venda = item.venda;
+  if (!venda || typeof venda !== "object" || Array.isArray(venda)) return null;
+  const id = Number((venda as { id?: unknown }).id);
+  return Number.isFinite(id) && id > 0 ? Math.floor(id) : null;
+}
+
+function parseSeparacaoSituacao(item: Record<string, unknown>): number | null {
+  if (item.situacao === null || item.situacao === undefined) return null;
+  const n = Number(item.situacao);
+  return Number.isFinite(n) ? Math.floor(n) : null;
+}
+
+/** Lista no Tiny as separações que bloqueiam picking e devolve erpOrderIds TINY-*. */
+export async function listTinySeparacaoBlockedErpOrderIds(
+  client: TinyApiV3Client,
+): Promise<Map<string, number>> {
+  const blocked = new Map<string, number>();
+  for (const situacao of TINY_SEPARACAO_SITUACOES_BLOCK_PICKING) {
+    let offset = 0;
+    for (;;) {
+      const page = await client.listSeparacoes({
+        situacao,
+        limit: 100,
+        offset,
+      });
+      for (const raw of page.items) {
+        if (!raw || typeof raw !== "object" || Array.isArray(raw)) continue;
+        const row = raw as Record<string, unknown>;
+        const vendaId = parseSeparacaoVendaId(row);
+        const sepSit = parseSeparacaoSituacao(row) ?? situacao;
+        if (!vendaId) continue;
+        if (!TINY_SEPARACAO_SITUACOES_BLOCK_PICKING.has(sepSit)) continue;
+        blocked.set(`TINY-${vendaId}`, sepSit);
+      }
+      const total = Number(page.pagination.total ?? 0);
+      offset += page.items.length;
+      if (page.items.length === 0 || (total > 0 && offset >= total) || offset >= 2000) {
+        break;
+      }
+    }
+  }
+  return blocked;
+}
+
+/**
+ * Remove da fila WMS os PENDING (sem progresso) que já estão Em Separação
+ * no módulo Separação do Tiny.
+ */
+export async function removeOrdersBlockedByTinySeparacao(params: {
+  tenantId: string;
+  client: TinyApiV3Client;
+}): Promise<{ checked: number; removed: number }> {
+  const blocked = await listTinySeparacaoBlockedErpOrderIds(params.client);
+  if (blocked.size === 0) return { checked: 0, removed: 0 };
+
+  const erpIds = [...blocked.keys()];
+  const candidates = await prisma.order.findMany({
+    where: {
+      tenantId: params.tenantId,
+      erpOrderId: { in: erpIds },
+      status: {
+        in: [OrderStatus.PENDING, OrderStatus.PAUSED_ISSUE],
+      },
+    },
+    select: {
+      id: true,
+      erpOrderId: true,
+      status: true,
+      basketId: true,
+      assignedPickerId: true,
+      items: { select: { quantityPicked: true, quantityPacked: true } },
+      _count: { select: { timeLogs: true } },
+    },
+  });
+
+  let removed = 0;
+  for (const order of candidates) {
+    const hasOperationalProgress =
+      order.basketId !== null ||
+      order.assignedPickerId !== null ||
+      order._count.timeLogs > 0 ||
+      order.items.some((i) => i.quantityPicked > 0 || i.quantityPacked > 0);
+    const action = decideTinySeparacaoBlockAction({
+      separacaoSituacao: blocked.get(order.erpOrderId) ?? null,
+      status: order.status,
+      hasOperationalProgress,
+    });
+    if (action !== "remove") continue;
+    await prisma.order.delete({ where: { id: order.id } });
+    removed += 1;
+  }
+
+  return { checked: candidates.length, removed };
 }
 
 export type TinyReconcileOutcome = "removed" | "flagged" | "kept" | "missing";

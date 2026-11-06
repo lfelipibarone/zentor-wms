@@ -164,19 +164,45 @@ function BasketFormModal({
 }) {
   const [code, setCode] = useState("");
   const [barcode, setBarcode] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
 
   const save = async () => {
-    await apiFetch("/api/baskets", {
-      method: "POST",
-      body: JSON.stringify({ code, barcode }),
-    });
-    onSaved();
+    if (!code.trim()) {
+      setError("Informe o código da cesta");
+      return;
+    }
+    setSaving(true);
+    setError(null);
+    try {
+      await apiFetch("/api/baskets", {
+        method: "POST",
+        body: JSON.stringify({
+          code,
+          // Vazio = API usa o próprio código como barcode
+          barcode: barcode.trim() || undefined,
+        }),
+      });
+      onSaved();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Erro ao salvar cesta");
+    } finally {
+      setSaving(false);
+    }
   };
 
   return (
-    <Modal title="Nova cesta" onClose={onClose} onSave={save}>
+    <Modal title="Nova cesta" onClose={onClose} onSave={save} saving={saving}>
       <Field label="Código" value={code} onChange={setCode} />
-      <Field label="Barcode" value={barcode} onChange={setBarcode} />
+      <Field
+        label="Barcode (opcional)"
+        value={barcode}
+        onChange={setBarcode}
+        hint="Se vazio, usa o mesmo valor do código"
+      />
+      {error ? (
+        <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>
+      ) : null}
     </Modal>
   );
 }
@@ -186,11 +212,13 @@ function Modal({
   children,
   onClose,
   onSave,
+  saving,
 }: {
   title: string;
   children: React.ReactNode;
   onClose: () => void;
   onSave: () => void;
+  saving?: boolean;
 }) {
   return (
     <div className="fixed inset-0 z-50 overflow-y-auto bg-black/40 p-4">
@@ -199,15 +227,21 @@ function Modal({
           <h2 className="text-lg font-bold">{title}</h2>
           <div className="mt-4 space-y-3">{children}</div>
           <div className="mt-5 flex justify-end gap-2">
-            <button type="button" onClick={onClose} className="rounded-lg border px-4 py-2 text-sm">
+            <button
+              type="button"
+              onClick={onClose}
+              disabled={saving}
+              className="rounded-lg border px-4 py-2 text-sm"
+            >
               Cancelar
             </button>
             <button
               type="button"
               onClick={onSave}
-              className="rounded-lg bg-[#0d9488] px-4 py-2 text-sm font-semibold text-white"
+              disabled={saving}
+              className="rounded-lg bg-[#0d9488] px-4 py-2 text-sm font-semibold text-white disabled:opacity-60"
             >
-              Salvar
+              {saving ? "Salvando…" : "Salvar"}
             </button>
           </div>
         </div>
@@ -220,10 +254,12 @@ function Field({
   label,
   value,
   onChange,
+  hint,
 }: {
   label: string;
   value: string;
   onChange: (v: string) => void;
+  hint?: string;
 }) {
   return (
     <label className="block text-sm">
@@ -233,6 +269,7 @@ function Field({
         value={value}
         onChange={(e) => onChange(e.target.value)}
       />
+      {hint ? <span className="mt-1 block text-xs text-slate-500">{hint}</span> : null}
     </label>
   );
 }

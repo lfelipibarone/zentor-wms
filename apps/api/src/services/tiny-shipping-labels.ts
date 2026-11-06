@@ -1,3 +1,4 @@
+import { unzipSync } from "fflate";
 import { prisma } from "../lib/prisma.js";
 import { getTinyApiClient } from "./tiny-api-v3-client.js";
 import {
@@ -6,10 +7,12 @@ import {
   buscarEtiquetasExpedicaoComConcluir,
   ensurePedidoInExpedicao,
   findPedidoNoIndice,
+  isOneStepRetryable,
   listarAgrupamentosExpedicao,
   obterAgrupamentoExpedicao,
   obterEtiquetasAgrupamento,
   obterEtiquetasExpedicao,
+  oneStepShippingEtiquetas,
   type ExpedicaoMatch,
 } from "./tiny-expedicao-labels.js";
 
@@ -48,13 +51,160 @@ export function isDemoPackErpOrderId(erpOrderId: string): boolean {
   return erpOrderId.trim().toUpperCase().startsWith("DEMO-PACK-");
 }
 
-export function detectLabelFormat(url: string): "zpl" | "pdf" | "unknown" {
+export function detectLabelFormat(url: string): "zpl" | "pdf" | "zip" | "unknown" {
   const lower = url.toLowerCase();
   if (lower.startsWith(DEMO_LABEL_SCHEME) || lower.includes(".zpl") || lower.endsWith("zpl")) {
     return "zpl";
   }
   if (lower.includes(".pdf") || lower.endsWith("pdf")) return "pdf";
+  if (lower.includes(".zip") || lower.endsWith("zip")) return "zip";
   return "unknown";
+}
+
+/** Formato exposto na API (ZIP é envelope; o conteúdo impresso é ZPL/PDF). */
+export function apiLabelFormat(
+  url: string,
+): "zpl" | "pdf" | "unknown" {
+  const f = detectLabelFormat(url);
+  return f === "zip" ? "unknown" : f;
+}
+
+export function isZipBuffer(buf: Buffer): boolean {
+  return (
+    buf.length >= 4 &&
+    buf[0] === 0x50 &&
+    buf[1] === 0x4b &&
+    (buf[2] === 0x03 || buf[2] === 0x05 || buf[2] === 0x07)
+  );
+}
+
+export function isPdfBuffer(buf: Buffer): boolean {
+  return buf.length >= 5 && buf.subarray(0, 5).toString("utf-8") === "%PDF-";
+}
+
+function entryBaseName(path: string): string {
+  const parts = path.replace(/\\/g, "/").split("/");
+  return parts[parts.length - 1] ?? path;
+}
+
+export function looksLikeZpl(text: string): boolean {
+  return /\^XA/i.test(text) || /~DG/i.test(text);
+}
+
+function classifyLabelBytes(
+  content: Buffer,
+  hint?: "zpl" | "pdf" | "unknown" | null,
+): {
+  content: Buffer;
+  format: "zpl" | "pdf" | "unknown";
+  contentType: string;
+  filenameHint: string | null;
+} {
+  if (isPdfBuffer(content) || hint === "pdf") {
+    return {
+      content,
+      format: "pdf",
+      contentType: "application/pdf",
+      filenameHint: null,
+    };
+  }
+
+  const text = content.toString("utf-8");
+  if (looksLikeZpl(text) || hint === "zpl") {
+    return {
+      content: Buffer.from(text, "utf-8"),
+      format: "zpl",
+      contentType: "text/plain; charset=utf-8",
+      filenameHint: null,
+    };
+  }
+
+  return {
+    content,
+    format: "unknown",
+    contentType: "application/octet-stream",
+    filenameHint: null,
+  };
+}
+
+/**
+ * Normaliza o que a Tiny/marketplace devolve:
+ * - ZIP (Shopee etc.) → extrai ZPL/PDF de dentro
+ * - ZPL direto (Correios / link .zpl / corpo sem extensão)
+ * - PDF direto (Amazon / alguns carriers)
+ *
+ * Não depende do canal: classifica pelo conteúdo (+ dica da URL).
+ */
+export function unwrapShippingLabelPayload(
+  content: Buffer,
+  sourceUrl: string,
+): {
+  content: Buffer;
+  format: "zpl" | "pdf" | "unknown";
+  contentType: string;
+  filenameHint: string | null;
+  fromZip: boolean;
+} {
+  const urlFormat = detectLabelFormat(sourceUrl);
+  const urlHint =
+    urlFormat === "pdf" || urlFormat === "zpl" ? urlFormat : null;
+
+  if (urlFormat !== "zip" && !isZipBuffer(content)) {
+    const classified = classifyLabelBytes(content, urlHint);
+    return { ...classified, fromZip: false };
+  }
+
+  let entries: Record<string, Uint8Array>;
+  try {
+    entries = unzipSync(new Uint8Array(content));
+  } catch {
+    return {
+      content,
+      format: "unknown",
+      contentType: "application/zip",
+      filenameHint: null,
+      fromZip: true,
+    };
+  }
+
+  const files = Object.entries(entries)
+    .filter(([name, data]) => data.length > 0 && !name.endsWith("/"))
+    .map(([name, data]) => ({
+      name,
+      base: entryBaseName(name).toLowerCase(),
+      data: Buffer.from(data),
+    }));
+
+  const pick =
+    files.find((f) => f.base.endsWith(".zpl")) ??
+    files.find((f) => f.base.endsWith(".txt") && looksLikeZpl(f.data.toString("utf-8"))) ??
+    files.find((f) => f.base.endsWith(".pdf") || isPdfBuffer(f.data)) ??
+    files.find((f) => looksLikeZpl(f.data.toString("utf-8"))) ??
+    files[0];
+
+  if (!pick) {
+    return {
+      content,
+      format: "unknown",
+      contentType: "application/zip",
+      filenameHint: null,
+      fromZip: true,
+    };
+  }
+
+  const entryHint: "zpl" | "pdf" | "unknown" | null = pick.base.endsWith(".pdf")
+    ? "pdf"
+    : pick.base.endsWith(".zpl") || pick.base.endsWith(".txt")
+      ? "zpl"
+      : null;
+  const classified = classifyLabelBytes(pick.data, entryHint);
+  return {
+    ...classified,
+    filenameHint: classified.format === "zpl"
+      ? entryBaseName(pick.name).replace(/\.txt$/i, ".zpl")
+      : entryBaseName(pick.name),
+    fromZip: true,
+  };
 }
 
 export function buildDemoShippingLabelZpl(input: {
@@ -86,8 +236,18 @@ export function buildDemoShippingLabelZpl(input: {
   ].join("\n");
 }
 
-function labelFilename(erpOrderId: string, url: string): string {
-  const ext = detectLabelFormat(url) === "pdf" ? "pdf" : "zpl";
+function labelFilename(
+  erpOrderId: string,
+  format: "zpl" | "pdf" | "zip" | "unknown",
+  hint?: string | null,
+): string {
+  if (hint && /\.(zpl|pdf|txt)$/i.test(hint)) {
+    const safeHint = hint.replace(/[^\w.-]+/g, "_");
+    return safeHint.toLowerCase().endsWith(".txt")
+      ? safeHint.replace(/\.txt$/i, ".zpl")
+      : safeHint;
+  }
+  const ext = format === "pdf" ? "pdf" : "zpl";
   const safe = erpOrderId.replace(/[^\w.-]+/g, "_");
   return `etiqueta-${safe}.${ext}`;
 }
@@ -156,7 +316,7 @@ export async function fetchShippingLabelFile(params: {
       ok: true,
       content: Buffer.from(zpl, "utf-8"),
       contentType: "text/plain; charset=utf-8",
-      filename: labelFilename(erpOrderId, `${erpOrderId}.zpl`),
+      filename: labelFilename(erpOrderId, "zpl"),
       sourceUrl: url,
     };
   }
@@ -174,20 +334,36 @@ export async function fetchShippingLabelFile(params: {
     };
   }
 
-  const content = Buffer.from(await res.arrayBuffer());
-  const format = detectLabelFormat(url);
-  const contentType =
-    format === "pdf"
-      ? "application/pdf"
-      : format === "zpl"
-        ? "text/plain; charset=utf-8"
-        : (res.headers.get("content-type") ?? "application/octet-stream");
+  const raw = Buffer.from(await res.arrayBuffer());
+  const headerCt = (res.headers.get("content-type") ?? "").toLowerCase();
+  // Dica extra quando a URL não tem extensão (comum em S3 da Tiny).
+  const urlForDetect = headerCt.includes("pdf")
+    ? `${url}.pdf`
+    : headerCt.includes("zip")
+      ? `${url}.zip`
+      : headerCt.includes("zpl") || headerCt.includes("text/plain")
+        ? `${url}.zpl`
+        : url;
+  const unwrapped = unwrapShippingLabelPayload(raw, urlForDetect);
+  if (unwrapped.format === "unknown") {
+    return {
+      ok: false,
+      result: {
+        status: "API_ERROR",
+        urls: [url],
+        message: unwrapped.fromZip
+          ? "A Tiny retornou um ZIP de etiqueta, mas não foi possível extrair ZPL/PDF de dentro."
+          : "A Tiny retornou um arquivo de etiqueta sem ZPL/PDF reconhecível.",
+        cached: false,
+      },
+    };
+  }
 
   return {
     ok: true,
-    content,
-    contentType,
-    filename: labelFilename(erpOrderId, url),
+    content: unwrapped.content,
+    contentType: unwrapped.contentType,
+    filename: labelFilename(erpOrderId, unwrapped.format, unwrapped.filenameHint),
     sourceUrl: url,
   };
 }
@@ -246,8 +422,7 @@ export async function fetchShippingLabelPreview(params: {
   const file = await fetchShippingLabelFile(params);
   if (!file.ok) return file;
 
-  const format = detectLabelFormat(file.sourceUrl);
-  if (format === "pdf") {
+  if (file.contentType.includes("pdf") || isPdfBuffer(file.content)) {
     return {
       ok: true,
       content: file.content,
@@ -258,6 +433,17 @@ export async function fetchShippingLabelPreview(params: {
 
   try {
     const zpl = file.content.toString("utf-8");
+    if (!looksLikeZpl(zpl)) {
+      return {
+        ok: false,
+        result: {
+          status: "API_ERROR",
+          urls: [file.sourceUrl],
+          message: "Conteúdo da etiqueta não é ZPL/PDF reconhecível para preview.",
+          cached: false,
+        },
+      };
+    }
     const png = await renderZplToPng(zpl);
     return {
       ok: true,
@@ -312,7 +498,7 @@ export async function fetchShippingLabelsForOrder(params: {
       status: "OK",
       urls: [order.shippingLabel],
       cached: true,
-      labelFormat: detectLabelFormat(order.shippingLabel),
+      labelFormat: apiLabelFormat(order.shippingLabel),
       message: order.shippingLabel.startsWith(DEMO_LABEL_SCHEME)
         ? "Etiqueta simulada (demo)"
         : undefined,
@@ -358,27 +544,113 @@ export async function fetchShippingLabelsForOrder(params: {
     };
   }
 
-  let match: ExpedicaoMatch | null;
+  let match: ExpedicaoMatch | null = null;
   let createdAgrupamento = false;
+  let concludedAgrupamento = false;
+  let formaEnvioNome: string | null = null;
+  let oneStepMarketplaceError: string | null = null;
 
-  try {
-    const index = await buildPedidoExpedicaoIndex(client);
-    match = findPedidoNoIndice(index, pedidoId);
-  } catch (e) {
-    return {
-      status: "API_ERROR",
-      urls: [],
-      message: e instanceof Error ? e.message : "Erro ao listar expedição no Tiny",
-      cached: false,
-    };
+  // One Step primeiro (idempotente): evita varredura lenta de agrupamentos e
+  // o POST /expedicao clássico que cria lote vazio em Mercado Envios.
+  for (let attempt = 1; attempt <= 2; attempt++) {
+    const oneStep = await oneStepShippingEtiquetas(client, pedidoId);
+    if (oneStep.unsupported) break;
+
+    if (oneStep.item?.urls.length) {
+      createdAgrupamento = true;
+      concludedAgrupamento = true;
+      const urls = oneStep.item.urls;
+      const expedicao =
+        oneStep.item.idAgrupamento && oneStep.item.idExpedicao
+          ? {
+              idAgrupamento: oneStep.item.idAgrupamento,
+              idExpedicao: oneStep.item.idExpedicao,
+            }
+          : undefined;
+      await prisma.order.update({
+        where: { id: order.id },
+        data: { shippingLabel: urls[0], shippingLabelError: null },
+      });
+      return {
+        status: "OK",
+        urls,
+        expedicao,
+        formaEnvioNome,
+        cached: false,
+        createdAgrupamento,
+        concludedAgrupamento,
+        labelFormat: apiLabelFormat(urls[0]!),
+        message: "Etiqueta gerada via One Step Shipping (Tiny)",
+      };
+    }
+
+    if (oneStep.item?.idAgrupamento && oneStep.item.idExpedicao) {
+      match = {
+        idAgrupamento: oneStep.item.idAgrupamento,
+        idExpedicao: oneStep.item.idExpedicao,
+        pedidoId,
+        formaEnvioNome,
+      };
+      createdAgrupamento = true;
+      concludedAgrupamento = true;
+    }
+
+    oneStepMarketplaceError =
+      oneStep.item?.erro?.mensagem ?? oneStep.error ?? oneStepMarketplaceError;
+
+    if (isOneStepRetryable(oneStep.item) && attempt < 2) {
+      await new Promise((r) => setTimeout(r, 2_000 * attempt));
+      continue;
+    }
+
+    // Expedição ok no Tiny, mas ML/Shopee/Amazon não liberou a URL.
+    if (oneStepMarketplaceError && (match || oneStep.item?.erro)) {
+      return {
+        status: "MARKETPLACE_ERROR",
+        urls: [],
+        expedicao: match ?? undefined,
+        formaEnvioNome,
+        message: oneStepMarketplaceError,
+        cached: false,
+        createdAgrupamento,
+        concludedAgrupamento,
+      };
+    }
+
+    break;
+  }
+
+  // Fallback clássico (TRANSPORTADORA / CUSTOMIZADO ou One Step indisponível).
+  if (!match) {
+    try {
+      const index = await buildPedidoExpedicaoIndex(client);
+      match = findPedidoNoIndice(index, pedidoId);
+    } catch (e) {
+      return {
+        status: "API_ERROR",
+        urls: [],
+        message: e instanceof Error ? e.message : "Erro ao listar expedição no Tiny",
+        cached: false,
+      };
+    }
   }
 
   if (!match) {
     try {
       const ensured = await ensurePedidoInExpedicao(client, pedidoId);
       match = ensured.match;
-      createdAgrupamento = ensured.createdAgrupamento;
+      createdAgrupamento = ensured.createdAgrupamento || createdAgrupamento;
       if (!match) {
+        if (oneStepMarketplaceError) {
+          return {
+            status: "MARKETPLACE_ERROR",
+            urls: [],
+            message: oneStepMarketplaceError,
+            cached: false,
+            createdAgrupamento,
+            concludedAgrupamento,
+          };
+        }
         if (ensured.error && ensured.createdAgrupamento) {
           return {
             status: "CREATE_EXPEDICAO_ERROR",
@@ -408,17 +680,18 @@ export async function fetchShippingLabelsForOrder(params: {
     }
   }
 
-  const { urls, marketplaceError, concludedAgrupamento } =
+  formaEnvioNome = match.formaEnvioNome ?? formaEnvioNome;
+  const { urls, marketplaceError, concludedAgrupamento: concludedAgain } =
     await buscarEtiquetasExpedicaoComConcluir(client, match);
-  const formaEnvioNome = match.formaEnvioNome ?? null;
+  concludedAgrupamento = concludedAgrupamento || Boolean(concludedAgain);
 
-  if (urls.length === 0 && marketplaceError) {
+  if (urls.length === 0 && (marketplaceError || oneStepMarketplaceError)) {
     return {
       status: "MARKETPLACE_ERROR",
       urls: [],
       expedicao: match,
       formaEnvioNome,
-      message: marketplaceError,
+      message: marketplaceError ?? oneStepMarketplaceError ?? undefined,
       cached: false,
       createdAgrupamento,
       concludedAgrupamento,
@@ -452,7 +725,7 @@ export async function fetchShippingLabelsForOrder(params: {
     cached: false,
     createdAgrupamento,
     concludedAgrupamento,
-    labelFormat: detectLabelFormat(urls[0]!),
+    labelFormat: apiLabelFormat(urls[0]!),
   };
 }
 

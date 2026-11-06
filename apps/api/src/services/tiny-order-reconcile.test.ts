@@ -1,7 +1,10 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { OrderStatus } from "@prisma/client";
-import { decideTinyOrderReconcileAction } from "./tiny-order-reconcile.js";
+import {
+  decideTinyOrderReconcileAction,
+  decideTinySeparacaoBlockAction,
+} from "./tiny-order-reconcile.js";
 
 describe("decideTinyOrderReconcileAction", () => {
   const base = {
@@ -74,6 +77,40 @@ describe("decideTinyOrderReconcileAction", () => {
         status: OrderStatus.DISPATCHING,
         hasOperationalProgress: true,
         situacao: 5,
+      }),
+      "keep",
+    );
+  });
+});
+
+describe("decideTinySeparacaoBlockAction", () => {
+  it("remove PENDING em Em Separação no Tiny", () => {
+    assert.equal(
+      decideTinySeparacaoBlockAction({
+        separacaoSituacao: 4,
+        status: OrderStatus.PENDING,
+        hasOperationalProgress: false,
+      }),
+      "remove",
+    );
+  });
+
+  it("mantém Aguardando Separação, Separada e pedidos já em operação no WMS", () => {
+    for (const separacaoSituacao of [1, 2, 3, null]) {
+      assert.equal(
+        decideTinySeparacaoBlockAction({
+          separacaoSituacao,
+          status: OrderStatus.PENDING,
+          hasOperationalProgress: false,
+        }),
+        "keep",
+      );
+    }
+    assert.equal(
+      decideTinySeparacaoBlockAction({
+        separacaoSituacao: 4,
+        status: OrderStatus.PICKING,
+        hasOperationalProgress: true,
       }),
       "keep",
     );

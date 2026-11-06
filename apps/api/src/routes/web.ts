@@ -1160,15 +1160,18 @@ export async function webRoutes(app: FastifyInstance) {
     { preHandler: guard(Permission.REGISTERS_VIEW) },
     async (request, reply) => {
       const { code, barcode } = request.body ?? {};
-      if (!code?.trim() || !barcode?.trim()) {
-        return reply.status(400).send({ error: "Código e barcode obrigatórios" });
+      const normalizedCode = code?.trim().toUpperCase();
+      if (!normalizedCode) {
+        return reply.status(400).send({ error: "Código obrigatório" });
       }
+      // Sem barcode: usa o próprio código (permite cadastrar só pelo nome)
+      const normalizedBarcode = barcode?.trim() || normalizedCode;
       try {
         const basket = await prisma.basket.create({
           data: {
             tenantId: tenantWhere(request).tenantId,
-            code: code.trim().toUpperCase(),
-            barcode: barcode.trim(),
+            code: normalizedCode,
+            barcode: normalizedBarcode,
           },
         });
         return reply.status(201).send({ basket });
